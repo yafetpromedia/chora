@@ -1,0 +1,120 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  admin
+  teacher
+  student
+  parent
+}
+
+enum AttendanceStatus {
+  present
+  absent
+  late
+}
+
+model School {
+  id        String         @id
+  name      String
+  slug      String         @unique
+  joinCode  String         @unique
+  country   String?
+  phone     String?
+  invites   SchoolInvite[]
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+}
+
+model SchoolInvite {
+  id        String    @id @default(cuid())
+  schoolId  String
+  school    School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  token     String    @unique
+  role      UserRole
+  label     String?
+  expiresAt DateTime?
+  maxUses   Int?
+  useCount  Int       @default(0)
+  createdBy String
+  createdAt DateTime  @default(now())
+
+  @@index([schoolId])
+}
+
+model User {
+  id              String              @id
+  schoolId        String
+  role            UserRole
+  email           String              @unique
+  firstName       String
+  lastName        String
+  externalRef     String?
+  passwordHash    String
+  attendanceMarks AttendanceRecord[]  @relation("AttendanceMarkedBy")
+  resultsUpdated  ResultRecord[]      @relation("ResultUpdatedBy")
+  announcements   Announcement[]      @relation("AnnouncementCreatedBy")
+  reads           AnnouncementRead[]
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@index([schoolId, role])
+}
+
+model AttendanceRecord {
+  id         String           @id @default(cuid())
+  schoolId   String
+  studentId  String
+  date       DateTime
+  status     AttendanceStatus
+  recordedBy String
+  marker     User             @relation("AttendanceMarkedBy", fields: [recordedBy], references: [id])
+  createdAt  DateTime         @default(now())
+
+  @@unique([schoolId, studentId, date])
+  @@index([schoolId, studentId])
+}
+
+model ResultRecord {
+  id        String   @id @default(cuid())
+  schoolId  String
+  studentId String
+  subject   String
+  score     Int
+  updatedBy String
+  updater   User     @relation("ResultUpdatedBy", fields: [updatedBy], references: [id])
+  updatedAt DateTime @updatedAt
+
+  @@unique([schoolId, studentId, subject])
+  @@index([schoolId, studentId])
+}
+
+model Announcement {
+  id         String             @id @default(cuid())
+  schoolId   String
+  title      String
+  body       String
+  createdBy  String
+  creator    User               @relation("AnnouncementCreatedBy", fields: [createdBy], references: [id])
+  reads      AnnouncementRead[]
+  createdAt  DateTime           @default(now())
+
+  @@index([schoolId, createdAt])
+}
+
+model AnnouncementRead {
+  id             String       @id @default(cuid())
+  announcementId String
+  userId         String
+  announcement   Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  readAt         DateTime     @default(now())
+
+  @@unique([announcementId, userId])
+}

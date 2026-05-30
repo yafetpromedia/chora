@@ -1,0 +1,16 @@
+{
+  "name": "@edu-os/ui",
+  "version": "1.0.0",
+  "main": "src/index.tsx",
+  "types": "src/index.tsx",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "peerDependencies": {
+    "react": "^19.2.0"
+  }
+}
