@@ -1,7 +1,4 @@
 @import "tailwindcss";
-@import "../styles/landing.css";
-@import "../styles/auth.css";
-@import "../styles/dashboard.css";
 
 @theme inline {
   --font-sans: var(--font-figtree), "Figtree", system-ui, sans-serif;

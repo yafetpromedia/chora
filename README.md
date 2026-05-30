@@ -1,52 +1,106 @@
-# Edu OS
+# CampusOne
 
-Phase 1 monorepo for the School OS platform.
+Multi-tenant school platform — register your school, invite teachers/students/parents, and run attendance, grades, and announcements in one place.
+
+**Repo:** https://github.com/yafetpromedia/campusone
 
 ## Workspaces
 
-- `apps/web`: Next.js web portal
-- `apps/api`: NestJS API backend
-- `packages/ui`: shared UI components
-- `packages/types`: shared domain/auth types
-- `infra`: local Docker services and environment templates
-- `docs`: architecture and implementation docs
+| Path | Description |
+|------|-------------|
+| `apps/web` | Next.js web portal |
+| `apps/api` | NestJS API + Prisma |
+| `packages/*` | Shared UI and types |
+| `infra` | Docker Compose for local services |
+| `docs` | Architecture notes |
 
-## Quick Start
+## First-time setup
 
-1. Install dependencies:
-   - `npm install`
-2. Start local infrastructure:
-   - `docker compose -f infra/docker-compose.yml up -d`
-3. PostgreSQL (pgAdmin): create database `edu_os`, then set `apps/api/.env` — see [SETUP-POSTGRES.md](./SETUP-POSTGRES.md)
-4. Initialize database schema:
-   - `npm run prisma:generate --workspace apps/api`
-   - `npm run prisma:push --workspace apps/api`
-5. Run web + api:
-   - `npm run dev`
+### 1. Clone and install
 
-## Demo Credentials
+```powershell
+git clone https://github.com/yafetpromedia/campusone.git
+cd campusone
+npm install
+```
 
-- `admin@eduos.local` / `Passw0rd!`
-- `teacher@eduos.local` / `Passw0rd!`
-- `student@eduos.local` / `Passw0rd!`
-- `parent@eduos.local` / `Passw0rd!`
+### 2. PostgreSQL
 
-## Validation Commands
+Create database **`edu_os`** in pgAdmin (or `psql`). See **[SETUP-POSTGRES.md](./SETUP-POSTGRES.md)** for connection details.
 
-- `npm run lint`
-- `npm run test:e2e --workspace apps/api`
+Copy env templates and set your password:
 
-## Prisma Migrations
+```powershell
+copy apps\api\.env.example apps\api\.env
+copy apps\web\.env.example apps\web\.env.local
+```
 
-- Create/apply dev migration: `npm run prisma:migrate:dev --workspace apps/api`
-- Apply migrations in deploy: `npm run prisma:migrate:deploy --workspace apps/api`
-- Reset local database: `npm run prisma:migrate:reset --workspace apps/api`
-- Initial migration committed at `apps/api/prisma/migrations/20260528113600_init/migration.sql`
-- Cross-platform bootstrap (generate + migrate deploy): `npm run db:bootstrap --workspace apps/api`
-- Windows bootstrap (generate + migrate deploy): `npm run db:bootstrap:win --workspace apps/api`
+Edit `apps/api/.env` — set `DATABASE_URL` (encode `!` in passwords as `%21`).
 
-## Isolated E2E Database
+Example (port **8000** on this project’s Windows setup):
 
-- Copy `apps/api/.env.test.example` and set `TEST_DATABASE_URL`
-- Run isolated suite: `npm run test:e2e:isolated --workspace apps/api`
-- The test global setup resets only the test database via Prisma before tests run
+```env
+DATABASE_URL=postgresql://postgres:YOUR_PASSWORD@127.0.0.1:8000/edu_os?schema=public
+PORT=3001
+WEB_APP_URL=http://localhost:3000
+```
+
+### 3. Database schema
+
+```powershell
+cd apps\api
+npm run db:setup
+```
+
+### 4. Run the app
+
+From the repo root:
+
+```powershell
+npm run dev:clean
+```
+
+- Web: http://localhost:3000  
+- API health: http://localhost:3001/health  
+
+**Windows tips:** [SETUP-WINDOWS.md](./SETUP-WINDOWS.md) (port conflicts, pgAdmin).
+
+### 5. Optional — Google sign-in
+
+In `apps/web/.env.local`:
+
+```env
+NEXT_PUBLIC_API_URL=http://localhost:3001
+NEXT_PUBLIC_GOOGLE_CLIENT_ID=your-google-oauth-client-id
+```
+
+## Demo login
+
+| Email | Password | Role |
+|-------|----------|------|
+| `admin@eduos.local` | `Passw0rd!` | Admin |
+| `teacher@eduos.local` | `Passw0rd!` | Teacher |
+| `student@eduos.local` | `Passw0rd!` | Student |
+| `parent@eduos.local` | `Passw0rd!` | Parent |
+
+School join code for `/join`: **`BRIGHT1`**
+
+## Scripts
+
+| Command | Purpose |
+|---------|---------|
+| `npm run dev` | Web + API (concurrent) |
+| `npm run dev:clean` | Free ports 3000/3001, then dev |
+| `npm run ports:free` | Kill processes on dev ports |
+| `npm run lint` | Lint workspaces |
+| `npm run test:e2e --workspace apps/api` | API e2e tests |
+
+## Prisma
+
+- Dev migrate: `npm run prisma:migrate:dev --workspace apps/api`
+- Deploy migrate: `npm run prisma:migrate:deploy --workspace apps/api`
+- Bootstrap: `npm run db:bootstrap --workspace apps/api`
+
+## Security note
+
+Never commit `.env` or `.env.local` — they are gitignored. Use `.env.example` files as templates only.
