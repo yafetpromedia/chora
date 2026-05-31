@@ -40,13 +40,13 @@ export function MobileNav() {
             </a>
           ))}
           <Link href="/login" className="mobile-menu-link" onClick={() => setOpen(false)}>
-            Login
+            Sign in
           </Link>
           <Link href="/join" className="mobile-menu-link" onClick={() => setOpen(false)}>
-            Join school
+            Join with code
           </Link>
           <Link href="/register" className="btn-brand mt-2 text-center" onClick={() => setOpen(false)}>
-            Start your school
+            Start free trial
           </Link>
         </div>
       ) : null}

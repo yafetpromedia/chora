@@ -81,6 +81,7 @@ export type CreateStudentPayload = {
   region?: string;
   zone?: string;
   woreda?: string;
+  address?: string;
   phone?: string;
 };
 
@@ -121,6 +122,7 @@ export type StudentRecord = {
   region: string | null;
   zone: string | null;
   woreda: string | null;
+  address: string | null;
   phone: string | null;
   fayedaVerifiedAt: string | null;
   user: {
@@ -275,6 +277,9 @@ export type PlanOption = {
   admins: number | null;
   label: string;
   description: string;
+  usdMonthly?: number;
+  etbMonthly?: number;
+  features?: string[];
 };
 
 async function authPost(path: string, body: unknown): Promise<LoginResponse> {

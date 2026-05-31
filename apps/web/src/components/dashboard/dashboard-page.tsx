@@ -14,9 +14,9 @@ type Props = {
 export function DashboardPage({ role, title, subtitle, eyebrow, children }: Props) {
   return (
     <DashboardShell role={role} title={title} subtitle={subtitle}>
-      <div className="dash-page">
-        {eyebrow ? <p className="dash-page-eyebrow">{eyebrow}</p> : null}
-        <div className="dash-page-body">{children}</div>
+      <div className="dash-page co-page">
+        {eyebrow ? <span className="co-page-tag">{eyebrow}</span> : null}
+        <div className="dash-page-body co-page__body">{children}</div>
       </div>
     </DashboardShell>
   );

@@ -412,7 +412,9 @@
 }
 
 .stu-field input,
-.stu-field select {
+.stu-field select,
+.stu-field textarea,
+.stu-textarea {
   padding: 0.55rem 0.75rem;
   font-family: inherit;
   font-size: 0.875rem;
@@ -421,8 +423,17 @@
   background: #fff;
 }
 
+.stu-field textarea,
+.stu-textarea {
+  resize: vertical;
+  min-height: 2.75rem;
+  line-height: 1.45;
+}
+
 .stu-field input:focus,
-.stu-field select:focus {
+.stu-field select:focus,
+.stu-field textarea:focus,
+.stu-textarea:focus {
   outline: none;
   border-color: var(--brand-teal);
 }

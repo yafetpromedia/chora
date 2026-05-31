@@ -24,6 +24,7 @@ import {
   type ParentNotification,
 } from "@/lib/attendance";
 import { AdminDashboard } from "@/components/dashboard/admin-dashboard";
+import { getAdminAnalytics, type AdminAnalyticsOverview } from "@/lib/dashboard-analytics";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import { ParentTodayOverview } from "@/components/dashboard/today-overview";
 import { StudentIdCardPanel } from "@/components/students/student-id-card-panel";
@@ -91,6 +92,7 @@ export function RoleDashboard({ role }: Props) {
   const [financeAnalytics, setFinanceAnalytics] = useState<FinanceAnalytics | null>(null);
   const [parentAlerts, setParentAlerts] = useState<ParentNotification[]>([]);
   const [adminDay, setAdminDay] = useState<AdminDayOverview | null>(null);
+  const [adminAnalytics, setAdminAnalytics] = useState<AdminAnalyticsOverview | null>(null);
   const [parentDay, setParentDay] = useState<ParentDayOverview | null>(null);
   const [selectedChildId, setSelectedChildId] = useState("");
   const router = useRouter();
@@ -149,24 +151,21 @@ export function RoleDashboard({ role }: Props) {
 
         if (role === "admin") {
           if (isPrincipalView) {
-            const [schoolRes, attAnalytics, finAnalytics] = await Promise.all([
+            const [schoolRes, analyticsData] = await Promise.all([
               apiFetch<{ school: SchoolInfo | null }>("/schools/me").catch(() => ({
                 school: null,
               })),
-              getAttendanceAnalytics().catch(() => null),
-              canViewFinance ? getFinanceAnalytics().catch(() => null) : Promise.resolve(null),
+              getAdminAnalytics().catch(() => null),
             ]);
             if (schoolRes.school) setSchoolInfo(schoolRes.school);
-            if (attAnalytics) setAttendanceAnalytics(attAnalytics);
-            if (finAnalytics) setFinanceAnalytics(finAnalytics);
+            if (analyticsData) setAdminAnalytics(analyticsData);
           } else {
-            const [schoolRes, subscriptionData, setupStatus, attAnalytics, finAnalytics] =
+            const [schoolRes, subscriptionData, setupStatus, analyticsData] =
               await Promise.all([
                 apiFetch<{ school: SchoolInfo | null }>("/schools/me"),
                 getSchoolSubscription(),
                 getSetupStatus(),
-                getAttendanceAnalytics(),
-                canViewFinance ? getFinanceAnalytics().catch(() => null) : Promise.resolve(null),
+                getAdminAnalytics().catch(() => null),
               ]);
 
             if (!setupStatus.setupComplete) {
@@ -176,8 +175,7 @@ export function RoleDashboard({ role }: Props) {
 
             if (schoolRes.school) setSchoolInfo(schoolRes.school);
             setSubscription(subscriptionData);
-            setAttendanceAnalytics(attAnalytics);
-            if (finAnalytics) setFinanceAnalytics(finAnalytics);
+            if (analyticsData) setAdminAnalytics(analyticsData);
           }
         }
       } catch (loadError) {
@@ -219,10 +217,8 @@ export function RoleDashboard({ role }: Props) {
           schoolName={schoolName}
           subscription={subscription}
           adminDay={adminDay}
-          attendanceAnalytics={attendanceAnalytics}
-          financeAnalytics={financeAnalytics}
+          analytics={adminAnalytics}
           announcements={announcements}
-          dashboard={dashboard}
           isPrincipalView={isPrincipalView}
           canViewFinance={canViewFinance}
           error={error}
@@ -233,6 +229,7 @@ export function RoleDashboard({ role }: Props) {
 
   return (
     <DashboardShell role={role}>
+      <div className="co-page co-page__body">
       <section className="dash-welcome dash-welcome--modern">
         <div>
           <p className="dash-welcome-eyebrow">Welcome back</p>
@@ -464,6 +461,7 @@ export function RoleDashboard({ role }: Props) {
           </ul>
         )}
       </article>
+      </div>
     </DashboardShell>
   );
 }

@@ -59,9 +59,9 @@ export function TeacherDashboard() {
 
   if (loading) {
     return (
-      <div className="dash-loading">
+      <div className="dash-loading dash-loading--pro">
         <span className="dash-loading-spinner" aria-hidden />
-        Loading your classes…
+        <p>Loading your classes…</p>
       </div>
     );
   }
@@ -72,6 +72,7 @@ export function TeacherDashboard() {
 
   return (
     <DashboardShell role="teacher">
+      <div className="co-page co-page__body">
       <section className="dash-welcome dash-welcome--modern">
         <div>
           <p className="dash-welcome-eyebrow">My workspace</p>
@@ -321,6 +322,7 @@ export function TeacherDashboard() {
           </ul>
         </article>
       ) : null}
+      </div>
     </DashboardShell>
   );
 }

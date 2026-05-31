@@ -1,0 +1,315 @@
+/* School admin — Billing hub */
+.sbill-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 1.5rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--co-border, #e2e8f0);
+}
+
+.sbill-nav__link {
+  padding: 0.45rem 0.85rem;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #64748b;
+  text-decoration: none;
+  transition: background 0.15s, color 0.15s;
+}
+
+.sbill-nav__link:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.sbill-nav__link--active {
+  background: #ecfdf5;
+  color: #0f766e;
+}
+
+.sbill-hero {
+  margin-bottom: 1.5rem;
+}
+
+.sbill-hero__eyebrow {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #64748b;
+  margin: 0 0 0.35rem;
+}
+
+.sbill-hero__title {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 0.35rem;
+}
+
+.sbill-hero__sub {
+  font-size: 0.92rem;
+  color: #64748b;
+  margin: 0;
+  max-width: 42rem;
+}
+
+.sbill-plan-card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.15rem 1.25rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #f8fafc 0%, #fff 100%);
+  margin-bottom: 1.25rem;
+}
+
+.sbill-plan-card__plan {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #0f3d42;
+  margin: 0;
+}
+
+.sbill-plan-card__meta {
+  font-size: 0.88rem;
+  color: #64748b;
+  margin: 0.25rem 0 0;
+}
+
+.sbill-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.sbill-status--active {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.sbill-status--trial {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.sbill-status--off {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.sbill-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 0.85rem;
+  margin-bottom: 1.5rem;
+}
+
+.sbill-kpi {
+  padding: 0.9rem 1rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.sbill-kpi__label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #64748b;
+  margin: 0 0 0.25rem;
+}
+
+.sbill-kpi__value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+}
+
+.sbill-kpi__hint {
+  font-size: 0.78rem;
+  color: #94a3b8;
+  margin: 0.2rem 0 0;
+}
+
+.sbill-usage-grid {
+  display: grid;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+@media (min-width: 640px) {
+  .sbill-usage-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.sbill-usage-card {
+  padding: 1rem 1.1rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.sbill-usage-card--over {
+  border-color: #fecaca;
+  background: #fef2f2;
+}
+
+.sbill-usage-card__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 0.5rem;
+}
+
+.sbill-usage-card__label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+.sbill-usage-card__count {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.sbill-usage-card__count--over {
+  color: #b91c1c;
+}
+
+.sbill-usage-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: #e2e8f0;
+  overflow: hidden;
+}
+
+.sbill-usage-bar__fill {
+  height: 100%;
+  border-radius: 3px;
+  background: #0d9488;
+}
+
+.sbill-usage-bar__fill--warn {
+  background: #d97706;
+}
+
+.sbill-usage-bar__fill--over {
+  background: #dc2626;
+}
+
+.sbill-table-wrap {
+  overflow-x: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+}
+
+.sbill-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.sbill-table th {
+  text-align: left;
+  padding: 0.65rem 0.85rem;
+  background: #f8fafc;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #64748b;
+}
+
+.sbill-table td {
+  padding: 0.75rem 0.85rem;
+  border-top: 1px solid #eef2f4;
+  vertical-align: top;
+}
+
+.sbill-table-empty {
+  text-align: center;
+  color: #94a3b8;
+  padding: 2rem !important;
+}
+
+.sbill-invoice-status {
+  display: inline-block;
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.sbill-invoice-status--draft {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.sbill-invoice-status--sent {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.sbill-invoice-status--paid {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.sbill-invoice-status--overdue {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.sbill-invoice-status--void {
+  background: #f8fafc;
+  color: #94a3b8;
+}
+
+.sbill-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.sbill-link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.5rem 0.9rem;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  text-decoration: none;
+  border: 1px solid #dce4e8;
+  color: #0f3d42;
+  background: #fff;
+}
+
+.sbill-link-btn--primary {
+  background: #0f766e;
+  border-color: #0f766e;
+  color: #fff;
+}
+
+.sbill-link-btn:hover {
+  opacity: 0.92;
+}
+
+.sbill-muted {
+  color: #64748b;
+  font-size: 0.85rem;
+}

@@ -21,9 +21,6 @@ export function LoginShell({ children, error }: LoginShellProps) {
         <nav className="auth-login-links" aria-label="Other sign-in options">
           <Link href="/register">Register your school</Link>
           <Link href="/join">Join with a code</Link>
-          <Link href="/platform/login" className="auth-login-links__muted">
-            Platform admin
-          </Link>
         </nav>
       }
     >

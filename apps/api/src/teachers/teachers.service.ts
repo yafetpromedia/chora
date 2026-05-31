@@ -16,12 +16,19 @@ export class TeachersService {
     private readonly usersService: UsersService,
   ) {}
 
-  async list(schoolId: string) {
+  async list(schoolId: string, group?: 'teachers' | 'staff') {
+    const roleFilter =
+      group === 'teachers'
+        ? UserRole.teacher
+        : group === 'staff'
+          ? { in: [UserRole.admin, UserRole.staff] as UserRole[] }
+          : { in: [UserRole.admin, UserRole.staff, UserRole.teacher] };
+
     const users = await this.prisma.user.findMany({
       where: {
         schoolId,
-        role: { in: [UserRole.admin, UserRole.staff, UserRole.teacher] },
         roleTemplateId: { not: null },
+        role: roleFilter,
       },
       include: {
         roleTemplate: true,

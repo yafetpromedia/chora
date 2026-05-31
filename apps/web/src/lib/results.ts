@@ -145,6 +145,10 @@ export async function listSubjects() {
   return apiFetch<Subject[]>("/results/subjects");
 }
 
+export async function createSubject(body: { name: string; code: string }) {
+  return apiPost<Subject>("/results/subjects", body);
+}
+
 export async function listClassSubjects(academicYearId?: string) {
   const q = academicYearId ? `?academicYearId=${academicYearId}` : "";
   return apiFetch<ClassSubject[]>(`/results/class-subjects${q}`);

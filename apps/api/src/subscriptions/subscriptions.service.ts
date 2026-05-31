@@ -3,9 +3,15 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Plan, UserRole } from '@prisma/client';
+import {
+  BillingCurrency,
+  Plan,
+  PlatformInvoiceStatus,
+  UserRole,
+} from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { PLAN_LIMITS, TRIAL_DAYS, UPGRADE_PLANS } from './plan-limits';
+import { PlanCatalogService } from './plan-catalog.service';
+import { UPGRADE_PLANS } from './plan-limits';
 
 export type SubscriptionStatus = {
   plan: Plan;
@@ -29,11 +35,15 @@ export type SubscriptionStatus = {
 
 @Injectable()
 export class SubscriptionsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly planCatalog: PlanCatalogService,
+  ) {}
 
   async createTrial(schoolId: string) {
+    const trialDays = await this.planCatalog.getTrialDays();
     const trialEndsAt = new Date();
-    trialEndsAt.setDate(trialEndsAt.getDate() + TRIAL_DAYS);
+    trialEndsAt.setDate(trialEndsAt.getDate() + trialDays);
 
     return this.prisma.subscription.create({
       data: {
@@ -52,12 +62,16 @@ export class SubscriptionsService {
     if (existing) {
       return existing;
     }
+    const trialDays = await this.planCatalog.getTrialDays();
+    const trialEndsAt = new Date();
+    trialEndsAt.setDate(trialEndsAt.getDate() + trialDays);
+
     return this.prisma.subscription.create({
       data: {
         schoolId,
         plan,
         isActive: true,
-        trialEndsAt: plan === Plan.TRIAL ? this.trialEndDate() : null,
+        trialEndsAt: plan === Plan.TRIAL ? trialEndsAt : null,
       },
     });
   }
@@ -85,7 +99,7 @@ export class SubscriptionsService {
     }
 
     const usage = await this.countUsersByRole(schoolId);
-    const limits = PLAN_LIMITS[sub.plan];
+    const limits = await this.planCatalog.getLimits(sub.plan);
 
     let daysRemaining: number | null = null;
     if (sub.plan === Plan.TRIAL && sub.trialEndsAt) {
@@ -126,7 +140,7 @@ export class SubscriptionsService {
 
   async assertCanAddUser(schoolId: string, role: UserRole) {
     const status = await this.assertActive(schoolId);
-    const limits = PLAN_LIMITS[status.plan];
+    const limits = await this.planCatalog.getLimits(status.plan);
 
     if (role === 'student' && limits.students !== null) {
       if (status.usage.students >= limits.students) {
@@ -179,17 +193,117 @@ export class SubscriptionsService {
     });
   }
 
-  listPlans() {
-    return UPGRADE_PLANS.map((plan) => ({
-      plan,
-      ...PLAN_LIMITS[plan],
+  async adminSetSchoolPlan(
+    schoolId: string,
+    data: { plan: Plan; isActive?: boolean; trialEndsAt?: string | null },
+  ) {
+    let sub = await this.prisma.subscription.findUnique({ where: { schoolId } });
+    if (!sub) {
+      sub = await this.ensureSubscription(schoolId, data.plan);
+    }
+
+    const trialEndsAt =
+      data.trialEndsAt === undefined
+        ? data.plan === Plan.TRIAL
+          ? sub.trialEndsAt
+          : null
+        : data.trialEndsAt
+          ? new Date(data.trialEndsAt)
+          : null;
+
+    return this.prisma.subscription.update({
+      where: { schoolId },
+      data: {
+        plan: data.plan,
+        isActive: data.isActive ?? true,
+        trialEndsAt,
+      },
+    });
+  }
+
+  async listPlans() {
+    const rows = await this.planCatalog.findListed();
+    return rows.map((row) => ({
+      plan: row.plan,
+      students: row.students,
+      teachers: row.teachers,
+      admins: row.admins,
+      label: row.label,
+      description: row.description,
+      usdMonthly: row.usdMonthly,
+      etbMonthly: row.etbMonthly,
+      features: row.features,
     }));
   }
 
-  private trialEndDate() {
-    const d = new Date();
-    d.setDate(d.getDate() + TRIAL_DAYS);
-    return d;
+  async getBillingOverview(schoolId: string) {
+    const subscription = await this.getStatus(schoolId);
+    const catalog = await this.planCatalog.findAll();
+    const planRow = catalog.find((p) => p.plan === subscription.plan);
+
+    const invoices = await this.prisma.platformInvoice.findMany({
+      where: { schoolId },
+      orderBy: { dueAt: 'asc' },
+    });
+
+    let outstandingUsd = 0;
+    let outstandingEtb = 0;
+    let openCount = 0;
+    let nextDueAt: string | null = null;
+
+    for (const inv of invoices) {
+      if (
+        inv.status === PlatformInvoiceStatus.SENT ||
+        inv.status === PlatformInvoiceStatus.OVERDUE
+      ) {
+        openCount += 1;
+        outstandingUsd += inv.amountUsd;
+        outstandingEtb += inv.amountEtb;
+        if (!nextDueAt || inv.dueAt < new Date(nextDueAt)) {
+          nextDueAt = inv.dueAt.toISOString();
+        }
+      }
+    }
+
+    return {
+      subscription,
+      planPrice: planRow
+        ? {
+            usdMonthly: planRow.usdMonthly,
+            etbMonthly: planRow.etbMonthly,
+          }
+        : null,
+      invoices: {
+        total: invoices.length,
+        openCount,
+        outstandingUsd,
+        outstandingEtb,
+        nextDueAt,
+      },
+    };
+  }
+
+  async listInvoicesForSchool(schoolId: string) {
+    const rows = await this.prisma.platformInvoice.findMany({
+      where: { schoolId },
+      orderBy: { issuedAt: 'desc' },
+    });
+
+    return rows.map((inv) => ({
+      id: inv.id,
+      invoiceNumber: inv.invoiceNumber,
+      plan: inv.plan,
+      periodStart: inv.periodStart.toISOString(),
+      periodEnd: inv.periodEnd.toISOString(),
+      amountUsd: inv.amountUsd,
+      amountEtb: inv.amountEtb,
+      currency: inv.currency as BillingCurrency,
+      status: inv.status,
+      issuedAt: inv.issuedAt.toISOString(),
+      dueAt: inv.dueAt.toISOString(),
+      paidAt: inv.paidAt?.toISOString() ?? null,
+      notes: inv.notes,
+    }));
   }
 
   private async countUsersByRole(schoolId: string) {

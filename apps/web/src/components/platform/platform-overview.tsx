@@ -123,7 +123,25 @@ export function PlatformOverview({ dashboard, schools, onNavigate }: Props) {
             >
               <DashIcon name="finance" className="dash-admin-quick__icon" />
               <span className="dash-admin-quick__label">Billing</span>
-              <span className="dash-admin-quick__desc">Plans & trial dates</span>
+              <span className="dash-admin-quick__desc">MRR & subscriptions</span>
+            </button>
+            <button
+              type="button"
+              className="dash-admin-quick__card"
+              onClick={() => onNavigate("invoices")}
+            >
+              <DashIcon name="fees" className="dash-admin-quick__icon" />
+              <span className="dash-admin-quick__label">Invoices</span>
+              <span className="dash-admin-quick__desc">Issue & track payments</span>
+            </button>
+            <button
+              type="button"
+              className="dash-admin-quick__card"
+              onClick={() => onNavigate("usage")}
+            >
+              <DashIcon name="students" className="dash-admin-quick__icon" />
+              <span className="dash-admin-quick__label">Usage</span>
+              <span className="dash-admin-quick__desc">Limits per school</span>
             </button>
             <button
               type="button"

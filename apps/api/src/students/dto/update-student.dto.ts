@@ -57,6 +57,10 @@ export class UpdateStudentDto {
   photoUrl?: string | null;
 
   @IsString()
+  @IsOptional()
+  address?: string | null;
+
+  @IsString()
   @MinLength(1)
   @IsOptional()
   fatherName?: string;

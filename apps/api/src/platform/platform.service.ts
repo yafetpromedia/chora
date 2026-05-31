@@ -4,7 +4,10 @@ import { PrismaService } from '../prisma/prisma.service';
 import { SchoolsService } from '../schools/schools.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { UsersService } from '../users/users.service';
+import { PlanCatalogService } from '../subscriptions/plan-catalog.service';
 import { CreateTenantSchoolDto } from './dto/create-tenant-school.dto';
+import type { UpdatePlanCatalogDto } from './dto/update-plan-catalog.dto';
+import type { UpdateSchoolPlanDto } from './dto/update-plan-catalog.dto';
 
 @Injectable()
 export class PlatformService {
@@ -13,7 +16,52 @@ export class PlatformService {
     private readonly schoolsService: SchoolsService,
     private readonly usersService: UsersService,
     private readonly subscriptionsService: SubscriptionsService,
+    private readonly planCatalogService: PlanCatalogService,
   ) {}
+
+  listPlanCatalog() {
+    return this.planCatalogService.findAll();
+  }
+
+  updatePlanCatalog(planKey: string, dto: UpdatePlanCatalogDto) {
+    const plan = planKey as Plan;
+    if (!Object.values(Plan).includes(plan)) {
+      throw new NotFoundException('Invalid plan');
+    }
+    return this.planCatalogService.update(plan, {
+      label: dto.label,
+      description: dto.description,
+      studentsLimit: dto.studentsLimit,
+      teachersLimit: dto.teachersLimit,
+      adminsLimit: dto.adminsLimit,
+      usdMonthly: dto.usdMonthly,
+      etbMonthly: dto.etbMonthly,
+      features: dto.features,
+      trialDays: dto.trialDays,
+      sortOrder: dto.sortOrder,
+      isListed: dto.isListed,
+    });
+  }
+
+  async updateSchoolPlan(schoolId: string, dto: UpdateSchoolPlanDto) {
+    const school = await this.prisma.school.findUnique({ where: { id: schoolId } });
+    if (!school) throw new NotFoundException('School not found');
+
+    const sub = await this.subscriptionsService.adminSetSchoolPlan(schoolId, {
+      plan: dto.plan,
+      isActive: dto.isActive,
+      trialEndsAt: dto.trialEndsAt,
+    });
+
+    return {
+      schoolId,
+      subscription: {
+        plan: sub.plan,
+        isActive: sub.isActive,
+        trialEndsAt: sub.trialEndsAt,
+      },
+    };
+  }
 
   async getDashboard() {
     const [

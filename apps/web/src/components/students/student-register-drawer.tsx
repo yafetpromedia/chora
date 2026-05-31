@@ -66,6 +66,7 @@ export function StudentRegisterDrawer({ grades, onClose, onSuccess }: Props) {
   const [motherName, setMotherName] = useState("");
   const [motherPhone, setMotherPhone] = useState("");
   const [phone, setPhone] = useState("");
+  const [address, setAddress] = useState("");
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -125,6 +126,14 @@ export function StudentRegisterDrawer({ grades, onClose, onSuccess }: Props) {
     setIdNumber("");
     setGender("");
     setDateOfBirth("");
+    setAddress("");
+  }
+
+  function suggestAddressFromFayeda(profile: FayedaVerifiedProfile) {
+    return [profile.woreda, profile.zone, profile.region]
+      .map((p) => p?.trim())
+      .filter(Boolean)
+      .join(", ");
   }
 
   function applyFayedaProfile(profile: FayedaVerifiedProfile) {
@@ -137,6 +146,8 @@ export function StudentRegisterDrawer({ grades, onClose, onSuccess }: Props) {
     if (profile.gender) setGender(profile.gender);
     if (profile.dateOfBirth) setDateOfBirth(toDateInputValue(profile.dateOfBirth));
     if (profile.phone && !fatherPhone) setFatherPhone(profile.phone);
+    const suggested = suggestAddressFromFayeda(profile);
+    if (suggested) setAddress(suggested);
   }
 
   async function onSendFayedaCode() {
@@ -194,6 +205,7 @@ export function StudentRegisterDrawer({ grades, onClose, onSuccess }: Props) {
         motherName: motherName.trim(),
         motherPhone: motherPhone.trim(),
         phone: phone.trim() || undefined,
+        address: address.trim() || undefined,
         photoUrl: photoUrl ?? undefined,
         fayedaVerificationToken: fayedaProfile?.verificationToken,
       });
@@ -247,8 +259,8 @@ export function StudentRegisterDrawer({ grades, onClose, onSuccess }: Props) {
                     <p className="fayeda-profile__name">{fullName(fayedaProfile)}</p>
                     <dl className="fayeda-profile__meta">
                       <div>
-                        <dt>ID number</dt>
-                        <dd>{fayedaProfile.fcn}</dd>
+                        <dt>FAN / FCN</dt>
+                        <dd>{fayedaProfile.fan || fayedaProfile.fcn}</dd>
                       </div>
                       <div>
                         <dt>Date of birth</dt>
@@ -373,12 +385,12 @@ export function StudentRegisterDrawer({ grades, onClose, onSuccess }: Props) {
                 />
               </div>
               <div className="stu-field">
-                <label htmlFor="reg-id-number">ID number</label>
+                <label htmlFor="reg-id-number">FAN or FCN</label>
                 <input
                   id="reg-id-number"
                   value={idNumber}
                   onChange={(e) => setIdNumber(e.target.value)}
-                  placeholder="National ID"
+                  placeholder="16-digit FAN or 12-digit FCN"
                   readOnly={identityLocked && Boolean(fayedaProfile?.fcn)}
                   required
                 />
@@ -394,6 +406,21 @@ export function StudentRegisterDrawer({ grades, onClose, onSuccess }: Props) {
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="0911… (optional)"
               />
+            </div>
+
+            <div className="stu-field">
+              <label htmlFor="reg-address">Home address</label>
+              <textarea
+                id="reg-address"
+                className="stu-textarea"
+                rows={2}
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                placeholder="House no., street, woreda, city…"
+              />
+              <p className="stu-field-hint">
+                Printed on the student ID card. Edit freely — Fayeda may pre-fill woreda/zone/region.
+              </p>
             </div>
 
             <div className="stu-field-row">

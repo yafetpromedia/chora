@@ -9,6 +9,7 @@ import {
   AUTH_ROLE_TEMPLATE_KEY,
   AUTH_TOKEN_KEY,
 } from "@/lib/auth";
+import { persistSchoolBrand } from "@/lib/school-brand";
 
 export function persistAuthSession(response: LoginResponse) {
   localStorage.setItem(AUTH_TOKEN_KEY, response.accessToken);
@@ -31,12 +32,18 @@ export function persistAuthSession(response: LoginResponse) {
   if (response.school?.joinCode) {
     localStorage.setItem(AUTH_SCHOOL_JOIN_CODE_KEY, response.school.joinCode);
   }
-  if (response.school?.name) {
-    localStorage.setItem(AUTH_SCHOOL_NAME_KEY, response.school.name);
+  if (response.school) {
+    persistSchoolBrand({
+      name: response.school.name,
+      logoUrl: response.school.logoUrl ?? null,
+    });
   }
 }
 
 export function saveSchoolInfo(school: SchoolInfo) {
   localStorage.setItem(AUTH_SCHOOL_JOIN_CODE_KEY, school.joinCode);
-  localStorage.setItem(AUTH_SCHOOL_NAME_KEY, school.name);
+  persistSchoolBrand({
+    name: school.name,
+    logoUrl: school.logoUrl ?? null,
+  });
 }

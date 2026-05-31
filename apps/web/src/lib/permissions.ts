@@ -2,6 +2,8 @@ export type UserRole = "admin" | "staff" | "teacher" | "student" | "parent";
 
 export const AUTH_PERMISSIONS_KEY = "edu_os_permissions";
 export const AUTH_ROLE_TEMPLATE_KEY = "edu_os_role_template";
+/** Must match AUTH_ROLE_KEY in auth.ts (kept here to avoid circular imports). */
+const AUTH_ROLE_STORAGE_KEY = "edu_os_role";
 
 export const Permission = {
   SCHOOL_DASHBOARD: "school.dashboard",
@@ -53,6 +55,14 @@ export function permissionMatches(
 }
 
 export function hasPermission(required: PermissionKey | string): boolean {
+  if (typeof window !== "undefined") {
+    const template = localStorage.getItem(AUTH_ROLE_TEMPLATE_KEY);
+    if (template === "school_admin") return true;
+    const role = localStorage.getItem(AUTH_ROLE_STORAGE_KEY);
+    const perms = getStoredPermissions();
+    // Match API fallback: legacy admin sessions without stored grants
+    if (role === "admin" && perms.length === 0) return true;
+  }
   return permissionMatches(getStoredPermissions(), required);
 }
 
@@ -62,6 +72,8 @@ export const ROLE_TEMPLATE_LABELS: Record<string, string> = {
   academic_director: "Academic director",
   registrar: "Registrar",
   finance_officer: "Finance officer",
+  reception: "Reception",
+  attendance_officer: "Attendance officer",
   homeroom_teacher: "Homeroom teacher",
   subject_teacher: "Subject teacher",
 };

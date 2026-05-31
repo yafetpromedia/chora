@@ -12,12 +12,13 @@ import {
 } from "@/lib/attendance";
 import type { SchoolType } from "@/lib/api";
 import { getSchoolSubscription, type SubscriptionStatus } from "@/lib/api";
+import { SchoolLogoUpload } from "@/components/school/school-logo-upload";
 import {
   AUTH_ROLE_KEY,
-  AUTH_SCHOOL_NAME_KEY,
   AUTH_TOKEN_KEY,
   isSchoolWorkspaceRole,
 } from "@/lib/auth";
+import { persistSchoolBrand } from "@/lib/school-brand";
 import {
   getSchoolSettings,
   updateSchoolSettings,
@@ -128,7 +129,10 @@ export default function AdminSettingsPage() {
         paymentInstructions: paymentInstructions.trim(),
       });
       applySchool(updated);
-      localStorage.setItem(AUTH_SCHOOL_NAME_KEY, updated.name);
+      persistSchoolBrand({
+        name: updated.name,
+        logoUrl: updated.logoUrl ?? null,
+      });
       setToast("School profile saved.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save");
@@ -319,15 +323,11 @@ export default function AdminSettingsPage() {
                   placeholder="Include student name in transfer reference…"
                 />
               </div>
-              <div className="cfg-field">
-                <label htmlFor="cfg-logo">Logo URL (optional)</label>
-                <input
-                  id="cfg-logo"
-                  value={logoUrl}
-                  onChange={(e) => setLogoUrl(e.target.value)}
-                  placeholder="https://…"
-                />
-              </div>
+              <SchoolLogoUpload
+                schoolName={name.trim() || school?.name || "Your school"}
+                value={logoUrl}
+                onChange={setLogoUrl}
+              />
               <div className="cfg-actions">
                 <button type="submit" className="cfg-btn cfg-btn--primary" disabled={saving}>
                   {saving ? "Saving…" : "Save profile"}
@@ -407,7 +407,7 @@ export default function AdminSettingsPage() {
                   : ""}
               </p>
               <div className="cfg-link-row">
-                <Link href="/admin/upgrade" className="cfg-btn cfg-btn--primary">
+                <Link href="/admin/billing" className="cfg-btn cfg-btn--primary">
                   Upgrade plan
                 </Link>
               </div>

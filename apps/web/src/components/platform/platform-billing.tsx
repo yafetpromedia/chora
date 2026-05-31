@@ -1,55 +1,17 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { DashIcon } from "@/components/dashboard/dash-icons";
-import type { PlatformDashboard, PlatformSchoolRow } from "./platform-types";
+import { getBillingSummary, type BillingSummary } from "@/lib/platform-billing";
+import type { PlatformDashboard, PlatformSchoolRow, PlatformSection } from "./platform-types";
 
 type Props = {
   dashboard: PlatformDashboard;
   schools: PlatformSchoolRow[];
+  onNavigate?: (section: PlatformSection) => void;
 };
 
 type PlanFilter = "ALL" | "TRIAL" | "STARTER" | "PROFESSIONAL" | "ENTERPRISE" | "INACTIVE";
-
-const PLANS = [
-  {
-    id: "TRIAL",
-    name: "Trial",
-    price: "Free",
-    period: "14 days",
-    desc: "Full evaluation for new tenants. Auto-assigned when a school is created.",
-    features: ["All core modules", "Up to 50 students", "Email support"],
-    tone: "trial",
-  },
-  {
-    id: "STARTER",
-    name: "Starter",
-    price: "2,500",
-    period: "ETB / month",
-    desc: "Single campus running attendance, results, and family communication.",
-    features: ["Students & staff", "Attendance & results", "Announcements"],
-    tone: "starter",
-    popular: true,
-  },
-  {
-    id: "PROFESSIONAL",
-    name: "Professional",
-    price: "6,500",
-    period: "ETB / month",
-    desc: "Finance, reporting, and higher limits for growing schools.",
-    features: ["Everything in Starter", "Fees & finance", "Advanced reports"],
-    tone: "pro",
-  },
-  {
-    id: "ENTERPRISE",
-    name: "Enterprise",
-    price: "Custom",
-    period: "Annual contract",
-    desc: "Multi-campus, SLA, and dedicated onboarding for large groups.",
-    features: ["Custom limits", "Priority support", "Sales-assisted setup"],
-    tone: "enterprise",
-  },
-] as const;
 
 function formatDate(iso: string | null | undefined) {
   if (!iso) return "—";
@@ -70,9 +32,19 @@ function daysUntil(iso: string | null | undefined) {
   return Math.ceil((end - Date.now()) / (1000 * 60 * 60 * 24));
 }
 
-export function PlatformBilling({ dashboard, schools }: Props) {
+export function PlatformBilling({ dashboard, schools, onNavigate }: Props) {
   const [query, setQuery] = useState("");
   const [planFilter, setPlanFilter] = useState<PlanFilter>("ALL");
+  const [summary, setSummary] = useState<BillingSummary | null>(null);
+
+  const loadSummary = useCallback(async () => {
+    const data = await getBillingSummary();
+    setSummary(data);
+  }, []);
+
+  useEffect(() => {
+    void loadSummary().catch(() => setSummary(null));
+  }, [loadSummary, schools]);
 
   const planCounts = useMemo(() => {
     const counts: Record<string, number> = {
@@ -132,17 +104,46 @@ export function PlatformBilling({ dashboard, schools }: Props) {
       <header className="plat-section-hero plat-section-hero--billing">
         <div>
           <p className="plat-section-hero__eyebrow">Revenue & subscriptions</p>
-          <h2 className="plat-section-hero__title">Billing center</h2>
+          <h2 className="plat-section-hero__title">Billing</h2>
           <p className="plat-section-hero__sub">
-            Track trials, paid plans, and renewal risk across every tenant on CampusOne.
+            MRR estimates, subscription health, and trial conversion risk.
           </p>
         </div>
-        <div className="plat-billing-mrr">
-          <span className="plat-billing-mrr__label">Paid tenants</span>
-          <span className="plat-billing-mrr__value">{dashboard.schools.paid}</span>
-          <span className="plat-billing-mrr__hint">Active paid subscriptions</span>
-        </div>
+        {summary ? (
+          <div className="plat-billing-mrr">
+            <span className="plat-billing-mrr__label">Est. MRR (USD)</span>
+            <span className="plat-billing-mrr__value">${summary.mrrUsd.toLocaleString()}</span>
+            <span className="plat-billing-mrr__hint">
+              {summary.mrrEtb.toLocaleString()} ETB · {summary.paidSchools} paid schools
+            </span>
+          </div>
+        ) : (
+          <div className="plat-billing-mrr">
+            <span className="plat-billing-mrr__label">Paid tenants</span>
+            <span className="plat-billing-mrr__value">{dashboard.schools.paid}</span>
+          </div>
+        )}
       </header>
+
+      {onNavigate ? (
+        <div className="plat-billing-links">
+          <button type="button" className="plat-btn plat-btn--ghost" onClick={() => onNavigate("invoices")}>
+            <DashIcon name="fees" className="dash-icon--sm" />
+            Invoices
+            {summary ? (
+              <span className="plat-filter-count">{summary.invoices.total}</span>
+            ) : null}
+          </button>
+          <button type="button" className="plat-btn plat-btn--ghost" onClick={() => onNavigate("usage")}>
+            <DashIcon name="students" className="dash-icon--sm" />
+            Usage & limits
+          </button>
+          <button type="button" className="plat-btn plat-btn--ghost" onClick={() => onNavigate("plans")}>
+            <DashIcon name="settings" className="dash-icon--sm" />
+            Edit plan catalog
+          </button>
+        </div>
+      ) : null}
 
       <div className="dash-admin-kpis plat-kpis">
         <article className="dash-admin-kpi">
@@ -150,16 +151,30 @@ export function PlatformBilling({ dashboard, schools }: Props) {
             <DashIcon name="finance" />
           </div>
           <p className="dash-admin-kpi__label">Paid</p>
-          <p className="dash-admin-kpi__value">{dashboard.schools.paid}</p>
-          <p className="dash-admin-kpi__hint">Starter, Pro, Enterprise</p>
+          <p className="dash-admin-kpi__value">{summary?.paidSchools ?? dashboard.schools.paid}</p>
+          <p className="dash-admin-kpi__hint">Active paid subscriptions</p>
         </article>
         <article className="dash-admin-kpi">
           <div className="dash-admin-kpi__icon dash-admin-kpi__icon--amber">
             <DashIcon name="calendar" />
           </div>
           <p className="dash-admin-kpi__label">On trial</p>
-          <p className="dash-admin-kpi__value">{dashboard.schools.trial}</p>
+          <p className="dash-admin-kpi__value">{summary?.trialSchools ?? dashboard.schools.trial}</p>
           <p className="dash-admin-kpi__hint">{trialEndingSoon.length} ending in 14d</p>
+        </article>
+        <article className="dash-admin-kpi">
+          <div className="dash-admin-kpi__icon dash-admin-kpi__icon--blue">
+            <DashIcon name="fees" />
+          </div>
+          <p className="dash-admin-kpi__label">Outstanding</p>
+          <p className="dash-admin-kpi__value">
+            {summary ? `$${summary.invoices.outstandingUsd.toLocaleString()}` : "—"}
+          </p>
+          <p className="dash-admin-kpi__hint">
+            {summary
+              ? `${summary.invoices.sent + summary.invoices.overdue} open invoices`
+              : "Sent + overdue"}
+          </p>
         </article>
         <article className="dash-admin-kpi">
           <div className="dash-admin-kpi__icon dash-admin-kpi__icon--slate">
@@ -168,14 +183,6 @@ export function PlatformBilling({ dashboard, schools }: Props) {
           <p className="dash-admin-kpi__label">Billing off</p>
           <p className="dash-admin-kpi__value">{inactiveBilling.length}</p>
           <p className="dash-admin-kpi__hint">Needs follow-up</p>
-        </article>
-        <article className="dash-admin-kpi">
-          <div className="dash-admin-kpi__icon dash-admin-kpi__icon--blue">
-            <DashIcon name="students" />
-          </div>
-          <p className="dash-admin-kpi__label">Total schools</p>
-          <p className="dash-admin-kpi__value">{dashboard.schools.total}</p>
-          <p className="dash-admin-kpi__hint">All tenants</p>
         </article>
       </div>
 
@@ -201,7 +208,9 @@ export function PlatformBilling({ dashboard, schools }: Props) {
         <section className="plat-alert-strip">
           <DashIcon name="alert" className="dash-icon--sm" />
           <div className="plat-alert-strip__body">
-            <strong>{trialEndingSoon.length} trial{trialEndingSoon.length > 1 ? "s" : ""} ending soon</strong>
+            <strong>
+              {trialEndingSoon.length} trial{trialEndingSoon.length > 1 ? "s" : ""} ending soon
+            </strong>
             <p>Reach out before access expires — convert to Starter or extend trial.</p>
           </div>
           <ul className="plat-alert-strip__list">
@@ -220,7 +229,7 @@ export function PlatformBilling({ dashboard, schools }: Props) {
           <div>
             <h3 className="plat-panel__title">Subscription ledger</h3>
             <p className="plat-panel__hint">
-              Plans are set per school. Upgrades happen in the school admin or via sales.
+              Per-school plan and billing status. Assign plans from Schools → Billing tab.
             </p>
           </div>
         </div>
@@ -284,7 +293,9 @@ export function PlatformBilling({ dashboard, schools }: Props) {
                         <span className="plat-table-sub">{s.joinCode}</span>
                       </td>
                       <td>
-                        <span className={`plat-plan-badge plat-plan-badge--${(sub?.plan ?? "none").toLowerCase()}`}>
+                        <span
+                          className={`plat-plan-badge plat-plan-badge--${(sub?.plan ?? "none").toLowerCase()}`}
+                        >
                           {sub?.plan ?? "—"}
                         </span>
                       </td>
@@ -304,7 +315,9 @@ export function PlatformBilling({ dashboard, schools }: Props) {
                           <>
                             {formatDate(sub.trialEndsAt)}
                             {days !== null && days >= 0 ? (
-                              <span className={`plat-renewal-tag${urgent ? " plat-renewal-tag--urgent" : ""}`}>
+                              <span
+                                className={`plat-renewal-tag${urgent ? " plat-renewal-tag--urgent" : ""}`}
+                              >
                                 {days}d left
                               </span>
                             ) : null}
@@ -326,42 +339,6 @@ export function PlatformBilling({ dashboard, schools }: Props) {
               )}
             </tbody>
           </table>
-        </div>
-      </section>
-
-      <section className="plat-panel plat-panel--muted">
-        <div className="plat-panel__head">
-          <h3 className="plat-panel__title">Plan catalog</h3>
-          <p className="plat-panel__hint">Reference pricing for sales & support (pilot rates)</p>
-        </div>
-        <div className="plat-pricing-grid">
-          {PLANS.map((plan) => (
-            <article
-              key={plan.id}
-              className={`plat-pricing-card plat-pricing-card--${plan.tone}${"popular" in plan && plan.popular ? " plat-pricing-card--popular" : ""}`}
-            >
-              {"popular" in plan && plan.popular ? (
-                <span className="plat-pricing-card__badge">Most common</span>
-              ) : null}
-              <h4 className="plat-pricing-card__name">{plan.name}</h4>
-              <p className="plat-pricing-card__price">
-                {plan.price}
-                <span>{plan.period}</span>
-              </p>
-              <p className="plat-pricing-card__desc">{plan.desc}</p>
-              <ul className="plat-pricing-card__features">
-                {plan.features.map((f) => (
-                  <li key={f}>
-                    <DashIcon name="attendance" className="dash-icon--xs plat-pricing-check" />
-                    {f}
-                  </li>
-                ))}
-              </ul>
-              <p className="plat-pricing-card__count">
-                {planCounts[plan.id] ?? 0} school{(planCounts[plan.id] ?? 0) !== 1 ? "s" : ""} on this plan
-              </p>
-            </article>
-          ))}
         </div>
       </section>
     </div>

@@ -2,6 +2,9 @@ export type PlatformSection =
   | "overview"
   | "schools"
   | "billing"
+  | "invoices"
+  | "usage"
+  | "plans"
   | "permissions"
   | "profile"
   | "settings";
@@ -74,8 +77,20 @@ export const SECTION_META: Record<
     subtitle: "Create, inspect, and control tenant access",
   },
   billing: {
-    title: "Billing & plans",
-    subtitle: "Subscriptions and trial status across schools",
+    title: "Billing",
+    subtitle: "MRR, subscriptions, and trial status",
+  },
+  invoices: {
+    title: "Invoices",
+    subtitle: "Issue and track school invoices",
+  },
+  usage: {
+    title: "Usage",
+    subtitle: "Seat usage vs plan limits per school",
+  },
+  plans: {
+    title: "Plans",
+    subtitle: "Prices, limits, and catalog shown to schools",
   },
   permissions: {
     title: "Access control",

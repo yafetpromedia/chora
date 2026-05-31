@@ -1,0 +1,226 @@
+/* CampusOne — upgrade / plans page */
+
+.upg {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding-bottom: 2rem;
+}
+
+.upg-hero {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  margin: -0.25rem -0.5rem 1.5rem;
+  padding: 1rem 0.5rem 1.15rem;
+  text-align: center;
+  background: linear-gradient(180deg, #f0f4f4 75%, rgba(240, 244, 244, 0));
+  backdrop-filter: blur(8px);
+}
+
+.upg-hero__title {
+  margin: 0 0 1rem;
+  font-size: clamp(1.35rem, 3vw, 1.65rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--lite-black);
+}
+
+.upg-alert,
+.upg-success {
+  max-width: 520px;
+  margin: 0 auto 1rem;
+}
+
+.upg-success {
+  display: block;
+  padding: 0.75rem 1rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-align: center;
+  color: #065f46;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  border-radius: 0.75rem;
+}
+
+.upg-grid {
+  display: grid;
+  gap: 1.25rem;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 768px) {
+  .upg-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.25rem;
+    align-items: stretch;
+  }
+}
+
+.upg-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: 1.5rem 1.35rem 1.35rem;
+  background: #fff;
+  border: 1px solid rgba(42, 111, 111, 0.1);
+  border-radius: 1.15rem;
+  box-shadow: 0 2px 16px rgba(30, 74, 74, 0.05);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.upg-card:hover {
+  box-shadow: 0 12px 36px rgba(30, 74, 74, 0.1);
+  transform: translateY(-2px);
+}
+
+.upg-card--featured {
+  border-color: var(--brand-teal);
+  box-shadow:
+    0 0 0 1px rgba(13, 148, 136, 0.35),
+    0 16px 40px rgba(13, 148, 136, 0.12);
+}
+
+@media (min-width: 768px) {
+  .upg-card--featured {
+    transform: translateY(-4px);
+  }
+
+  .upg-card--featured:hover {
+    transform: translateY(-6px);
+  }
+}
+
+.upg-card--current {
+  border-color: #6ee7b7;
+  background: linear-gradient(180deg, #fff 0%, #f0fdf9 100%);
+}
+
+.upg-card__badge {
+  position: absolute;
+  top: 0.85rem;
+  right: 0.85rem;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.6rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #fff;
+  background: var(--brand-teal);
+  border-radius: 9999px;
+}
+
+.upg-card__name {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--lite-black);
+}
+
+.upg-card__features {
+  flex: 1;
+  margin: 0 0 1.15rem;
+  padding: 0;
+  list-style: none;
+}
+
+.upg-card__features li {
+  position: relative;
+  padding: 0.35rem 0 0.35rem 1.15rem;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: var(--brand-muted);
+  border-bottom: 1px solid rgba(42, 111, 111, 0.06);
+}
+
+.upg-card__features li:last-child {
+  border-bottom: none;
+}
+
+.upg-card__features li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.65rem;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--brand-teal);
+}
+
+.upg-card__btn {
+  width: 100%;
+  min-height: 44px;
+  font-family: inherit;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--brand-teal-dark);
+  cursor: pointer;
+  background: #fff;
+  border: 1.5px solid rgba(13, 148, 136, 0.3);
+  border-radius: 0.7rem;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.upg-card__btn:hover:not(:disabled) {
+  background: rgba(13, 148, 136, 0.06);
+  border-color: var(--brand-teal);
+}
+
+.upg-card__btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.upg-card--featured .upg-card__btn {
+  color: #fff;
+  background: linear-gradient(135deg, var(--brand-teal), var(--brand-teal-dark));
+  border-color: transparent;
+}
+
+.upg-card--featured .upg-card__btn:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+
+.upg-card__btn--current {
+  color: #047857;
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+}
+
+.upg-footnote {
+  margin: 1.5rem 0 0;
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--brand-muted);
+}
+
+.upg-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  min-height: 50vh;
+  color: var(--brand-muted);
+}
+
+.upg-loading__spinner {
+  width: 2rem;
+  height: 2rem;
+  border: 3px solid rgba(13, 148, 136, 0.15);
+  border-top-color: var(--brand-teal);
+  border-radius: 50%;
+  animation: auth-spin 0.7s linear infinite;
+}
+
+/* Upgrade page: full-width scroll area, no extra page wrapper gap */
+.dash-content--pro:has(.upg) {
+  padding-top: 0.5rem;
+}
+
+.dash-content--pro:has(.upg) .dash-page,
+.dash-content--pro:has(.upg) .dash-page-body {
+  gap: 0;
+}

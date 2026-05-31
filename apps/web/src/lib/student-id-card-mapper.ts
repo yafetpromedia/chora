@@ -52,8 +52,11 @@ export function mapStudentRecordToIdCard(
     grade: student.grade.name,
     section: student.section?.name ?? null,
     studentId: student.user.externalRef,
-    idNumber: student.fcn,
-    fan: student.fan,
+    fan: student.fan?.trim() || student.fcn?.trim() || null,
+    address: [student.woreda, student.zone, student.region]
+      .map((p) => p?.trim())
+      .filter(Boolean)
+      .join(", ") || null,
     gender: student.gender,
     dateOfBirth: student.dateOfBirth,
     age: ageFromDob(student.dateOfBirth),

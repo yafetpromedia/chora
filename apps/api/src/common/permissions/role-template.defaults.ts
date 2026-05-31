@@ -64,6 +64,30 @@ export const DEFAULT_ROLE_TEMPLATES: DefaultRoleTemplate[] = [
     permissionPatterns: ['finance.*', 'students.read'],
   },
   {
+    slug: 'reception',
+    name: 'Reception',
+    description: 'Front desk, visitors, and family inquiries',
+    portalRole: UserRole.staff,
+    permissionPatterns: [
+      'students.read',
+      'admissions.read',
+      'parent.messages',
+      'announcements.manage',
+    ],
+  },
+  {
+    slug: 'attendance_officer',
+    name: 'Attendance officer',
+    description: 'Gate checks, QR scan, and attendance monitoring',
+    portalRole: UserRole.staff,
+    permissionPatterns: [
+      'attendance.read',
+      'attendance.manage',
+      'attendance.analytics',
+      'students.read',
+    ],
+  },
+  {
     slug: 'homeroom_teacher',
     name: 'Homeroom teacher',
     description: 'Class attendance, parent comms, class performance',

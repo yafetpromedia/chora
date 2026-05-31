@@ -13,8 +13,9 @@ export type StudentIdCard = {
   grade: string;
   section: string | null;
   studentId: string | null;
-  idNumber: string | null;
+  /** Fayeda FAN (16 digits) or FCN (12 digits) — single national identifier */
   fan: string | null;
+  address: string | null;
   gender: "MALE" | "FEMALE" | "OTHER" | null;
   dateOfBirth: string | null;
   age: number | null;
@@ -46,13 +47,28 @@ export type ScanAttendanceResult = {
   scannedAt: string;
 };
 
-export async function listStudentIdCards(params?: {
+export async function countStudentIdCards(params?: {
   gradeId?: string;
   sectionId?: string;
 }) {
   const q = new URLSearchParams();
   if (params?.gradeId) q.set("gradeId", params.gradeId);
   if (params?.sectionId) q.set("sectionId", params.sectionId);
+  const suffix = q.toString() ? `?${q}` : "";
+  return apiFetch<{ count: number }>(`/schools/student-cards/count${suffix}`);
+}
+
+export async function listStudentIdCards(params?: {
+  gradeId?: string;
+  sectionId?: string;
+  skip?: number;
+  take?: number;
+}) {
+  const q = new URLSearchParams();
+  if (params?.gradeId) q.set("gradeId", params.gradeId);
+  if (params?.sectionId) q.set("sectionId", params.sectionId);
+  if (params?.skip !== undefined) q.set("skip", String(params.skip));
+  if (params?.take !== undefined) q.set("take", String(params.take));
   const suffix = q.toString() ? `?${q}` : "";
   return apiFetch<StudentIdCard[]>(`/schools/student-cards${suffix}`);
 }

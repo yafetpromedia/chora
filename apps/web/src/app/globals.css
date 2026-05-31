@@ -4,6 +4,24 @@
   --font-sans: var(--font-figtree), "Figtree", system-ui, sans-serif;
 }
 
+/* CampusOne design tokens — available on every page */
+:root {
+  --brand-teal: #3d9b9b;
+  --brand-teal-dark: #2a6f6f;
+  --brand-cyan: #5ec9cf;
+  --brand-cyan-light: #b8e8eb;
+  --brand-ink: #1e4a4a;
+  --brand-muted: #5f8f8f;
+  --brand-faint: #8fb4b4;
+  --brand-border: #c5e4e4;
+  --brand-surface: #edf8f8;
+  --brand-surface-2: #dff0f0;
+  --lite-black: #2c2c2c;
+  --lite-black-soft: #4a4a4a;
+  --co-radius: 1rem;
+  --co-shadow: 0 4px 24px rgba(30, 74, 74, 0.06);
+}
+
 html {
   scroll-behavior: smooth;
 }
@@ -14,4 +32,10 @@ body {
   color: var(--brand-ink);
   font-family: var(--font-figtree), "Figtree", system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::selection {
+  background: rgba(94, 201, 207, 0.35);
+  color: var(--lite-black);
 }

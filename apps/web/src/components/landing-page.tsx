@@ -5,7 +5,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import { AnimatedNav, NavBrand, NavLinks } from "@/components/animated-nav";
 import { BackToTop } from "@/components/back-to-top";
 import { Faq } from "@/components/faq";
-import { Counter } from "@/components/motion/counter";
+import { LandingPricing } from "@/components/landing/landing-pricing";
 import { Reveal, Stagger, StaggerItem } from "@/components/motion/reveal";
 import { ProductPreview } from "@/components/product-preview";
 import {
@@ -21,97 +21,101 @@ import { TrustMarquee } from "@/components/trust-marquee";
 import type { ReactNode } from "react";
 
 const FEATURES: { title: string; desc: string; icon: ReactNode }[] = [
-  { title: "Attendance", desc: "Real-time roll call synced to parents and admins.", icon: <IconAttendance /> },
-  { title: "Grades", desc: "Enter, review, and publish report cards in one flow.", icon: <IconGrades /> },
-  { title: "Announcements", desc: "Reach the whole school or a single class instantly.", icon: <IconAnnouncements /> },
-  { title: "Parent portal", desc: "Families see grades, attendance, and fees without calling.", icon: <IconParents /> },
-  { title: "Admin hub", desc: "Enrollment, staff, fees, and ops in one command center.", icon: <IconAdmin /> },
-  { title: "Secure stack", desc: "JWT auth, roles, PostgreSQL, multi-tenant ready.", icon: <IconSecurity /> },
+  {
+    title: "Attendance",
+    desc: "Daily or period roll call, QR campus cards, and instant parent visibility.",
+    icon: <IconAttendance />,
+  },
+  {
+    title: "Results & report cards",
+    desc: "Templates, approvals, and printable report cards per term.",
+    icon: <IconGrades />,
+  },
+  {
+    title: "Fees & finance",
+    desc: "Fee schedules, partial payments, and Telebirr-ready collection workflows.",
+    icon: <IconParents />,
+  },
+  {
+    title: "Announcements",
+    desc: "School-wide or class messages — families see updates without phone trees.",
+    icon: <IconAnnouncements />,
+  },
+  {
+    title: "Staff & permissions",
+    desc: "Registrar, finance, teachers — each role sees only what they need.",
+    icon: <IconAdmin />,
+  },
+  {
+    title: "Secure & multi-tenant",
+    desc: "Each school is isolated. JWT auth, role templates, PostgreSQL-backed.",
+    icon: <IconSecurity />,
+  },
 ];
 
 const PORTALS = [
-  { role: "Admin", desc: "Campus control & analytics", color: "var(--brand-teal-dark)" },
-  { role: "Teacher", desc: "Classes, grades & attendance", color: "var(--brand-teal)" },
-  { role: "Student", desc: "Schedule, work & results", color: "var(--brand-cyan)" },
-  { role: "Parent", desc: "Kids, fees & school news", color: "#4ab8be" },
+  { role: "Admin", desc: "Enrollment, billing, analytics, and school setup", href: "/login" },
+  { role: "Teacher", desc: "Attendance, grades, and class communication", href: "/login" },
+  { role: "Student", desc: "Timetable, results, and campus ID", href: "/login" },
+  { role: "Parent", desc: "Fees, attendance, and announcements for your children", href: "/login" },
 ];
 
-const STEPS = [
-  { n: "01", title: "Connect your school", desc: "Import students, staff, and classes in minutes." },
-  { n: "02", title: "Go live campus-wide", desc: "Roll out portals for every role on day one." },
-  { n: "03", title: "Run daily ops", desc: "Attendance, grades, fees, and comms in one place." },
+const PILLARS = [
+  {
+    title: "Stop juggling spreadsheets",
+    desc: "One database for students, staff, grades, and fees — not five WhatsApp groups and a shared Excel file.",
+  },
+  {
+    title: "Parents stay in the loop",
+    desc: "Families log in to see attendance and results the same day — fewer “what happened at school?” calls.",
+  },
+  {
+    title: "Built for how you bill",
+    desc: "List prices in USD and ETB. Platform invoicing when you move to a paid plan.",
+  },
 ];
-
-const INTEGRATIONS = ["CSV Import", "REST API", "Email alerts", "Role-based SSO", "PostgreSQL", "Multi-campus"];
 
 function HeroContent() {
   const reduce = useReducedMotion();
-
   const container = {
     hidden: {},
-    show: { transition: { staggerChildren: reduce ? 0 : 0.1 } },
+    show: { transition: { staggerChildren: reduce ? 0 : 0.08 } },
   };
   const item = {
-    hidden: { opacity: 0, y: 24 },
-    show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] as const } },
+    hidden: { opacity: 0, y: 20 },
+    show: { opacity: 1, y: 0, transition: { duration: 0.45, ease: "easeOut" as const } },
   };
 
   return (
-    <motion.div variants={container} initial="hidden" animate="show">
-      <motion.div variants={item}>
-        <div className="badge-pill">
-          <span className="badge-dot badge-dot-pulse" />
-          Education ERP + LMS + Parent Portal
-        </div>
-      </motion.div>
-
-      <motion.h1
-        variants={item}
-        className="mt-8 text-[2.75rem] font-extrabold leading-[1.08] tracking-tight sm:text-5xl lg:text-[3.5rem]"
-      >
-        <span className="c-black">One platform.</span>
-        <br />
-        <span className="text-brand-gradient">For your whole school.</span>
-      </motion.h1>
-
-      <motion.p variants={item} className="mt-6 max-w-md text-lg leading-relaxed">
-        <span className="c-black-soft">Attendance, grades, fees &amp; family updates</span>
-        <span className="c-muted"> — for admins, teachers, students &amp; parents.</span>
+    <motion.div variants={container} initial="hidden" animate="show" className="lp-hero__copy">
+      <motion.p variants={item} className="lp-hero__kicker">
+        School operations platform
       </motion.p>
 
-      <motion.div variants={item} className="mt-8 flex flex-wrap gap-3">
-        <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.98 }}>
-          <Link href="/register" className="btn-brand">
-            Start your school
-          </Link>
-        </motion.div>
-        <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.98 }}>
-          <a href="mailto:hello@campusone.local?subject=Book%20a%20demo" className="btn-ghost">
-            Book demo
-          </a>
-        </motion.div>
+      <motion.h1 variants={item} className="lp-hero__title">
+        Run your school on one system — from attendance to parent fees.
+      </motion.h1>
+
+      <motion.p variants={item} className="lp-hero__lead">
+        CampusOne is a multi-tenant platform for Ethiopian and international schools: admins,
+        teachers, students, and parents each get a focused portal. Start with a 14-day trial, then
+        scale on plans that match your size.
+      </motion.p>
+
+      <motion.div variants={item} className="lp-hero__ctas">
+        <Link href="/register" className="btn-brand">
+          Start your school — free trial
+        </Link>
+        <a href="#pricing" className="btn-ghost">
+          See pricing
+        </a>
       </motion.div>
 
-      <motion.div variants={item} className="mt-10 grid grid-cols-3 gap-3 max-[380px]:grid-cols-1">
-        <div className="stat-pill">
-          <p className="stat-value">
-            <Counter value={99.95} decimals={2} suffix="%" />
-          </p>
-          <p className="mt-1 text-[10px] font-bold uppercase tracking-wider c-muted">Uptime</p>
-        </div>
-        <div className="stat-pill">
-          <p className="stat-value">
-            <Counter value={120} prefix="<" suffix="ms" />
-          </p>
-          <p className="mt-1 text-[10px] font-bold uppercase tracking-wider c-muted">Latency</p>
-        </div>
-        <div className="stat-pill">
-          <p className="stat-value">
-            <Counter value={4} />
-          </p>
-          <p className="mt-1 text-[10px] font-bold uppercase tracking-wider c-muted">Portals</p>
-        </div>
-      </motion.div>
+      <motion.ul variants={item} className="lp-hero__checks" aria-label="Highlights">
+        <li>14-day trial · no card required</li>
+        <li>USD &amp; ETB plan pricing</li>
+        <li>Live in days, not months</li>
+      </motion.ul>
     </motion.div>
   );
 }
@@ -120,183 +124,120 @@ export function LandingPage() {
   const reduce = useReducedMotion();
 
   return (
-    <div className="page-shell">
+    <div className="page-shell lp-page">
       <AnimatedNav>
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 sm:px-8">
+        <div className="lp-nav-inner">
           <NavBrand />
           <NavLinks />
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="lp-nav-actions">
             <Link href="/login" className="nav-link hidden text-sm font-semibold sm:block">
-              Login
+              Sign in
             </Link>
-            <Link href="/join" className="nav-link hidden text-sm font-semibold lg:block">
-              Join school
+            <Link href="/register" className="btn-brand lp-nav-cta hidden md:inline-flex">
+              Start free trial
             </Link>
-            <motion.div className="hidden md:block" whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}>
-              <Link href="/register" className="btn-brand" style={{ padding: "0.55rem 1.25rem" }}>
-                Start your school
-              </Link>
-            </motion.div>
             <MobileNav />
           </div>
         </div>
       </AnimatedNav>
 
-      <main className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-        <section className="grid items-center gap-10 pb-8 pt-8 sm:gap-12 sm:pt-12 lg:grid-cols-2 lg:gap-14">
-          <HeroContent />
-          <div id="preview" className="relative">
-            <motion.div
-              className="preview-glow"
-              aria-hidden
-              animate={reduce ? {} : { scale: [1, 1.05, 1], opacity: [0.6, 0.85, 0.6] }}
-              transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-            />
-            <ProductPreview />
+      <main className="lp-main">
+        <section className="lp-hero">
+          <div className="lp-hero__grid">
+            <HeroContent />
+            <div id="preview" className="lp-hero__preview">
+              {!reduce ? (
+                <motion.div
+                  className="preview-glow"
+                  aria-hidden
+                  animate={{ opacity: [0.5, 0.75, 0.5] }}
+                  transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
+                />
+              ) : null}
+              <ProductPreview />
+            </div>
           </div>
         </section>
 
         <TrustMarquee />
 
         <Reveal>
-          <section className="pb-20">
-            <p className="section-label">How it works</p>
-            <h2 className="mt-2 text-3xl font-extrabold sm:text-4xl">
-              <span className="c-black">Live in </span>
-              <span className="text-brand-gradient">three steps</span>
-            </h2>
-            <Stagger className="steps-grid mt-10">
-              {STEPS.map((s) => (
-                <StaggerItem key={s.n}>
-                  <motion.div className="card h-full p-6" whileHover={{ y: -4 }}>
-                    <span className="text-4xl font-extrabold text-brand-gradient" style={{ lineHeight: 1 }}>
-                      {s.n}
-                    </span>
-                    <h3 className="mt-4 text-lg font-bold c-black">{s.title}</h3>
-                    <p className="mt-2 text-sm leading-relaxed c-muted">{s.desc}</p>
-                  </motion.div>
-                </StaggerItem>
-              ))}
-            </Stagger>
-          </section>
-        </Reveal>
-
-        <Reveal>
-          <section className="integrations-strip pb-20">
-            <p className="mb-4 text-center text-xs font-bold uppercase tracking-[0.2em] c-faint">
-              Built with modern tools
-            </p>
-            <div className="flex flex-wrap justify-center gap-3">
-              {INTEGRATIONS.map((tag) => (
-                <span key={tag} className="integration-tag">
-                  {tag}
-                </span>
+          <section className="lp-section lp-pillars">
+            <div className="lp-section__head">
+              <p className="section-label">Why CampusOne</p>
+              <h2 className="lp-section__title">Software that matches how schools actually work</h2>
+            </div>
+            <div className="lp-pillars__grid">
+              {PILLARS.map((p) => (
+                <article key={p.title} className="lp-pillar card">
+                  <h3 className="lp-pillar__title">{p.title}</h3>
+                  <p className="lp-pillar__desc">{p.desc}</p>
+                </article>
               ))}
             </div>
           </section>
         </Reveal>
 
-        <section id="features" className="pb-20">
+        <section id="features" className="lp-section">
           <Reveal>
-            <p className="section-label">Platform</p>
-            <h2 className="mt-2 max-w-lg text-3xl font-extrabold sm:text-4xl">
-              <span className="c-black">Every tool </span>
-              <span className="text-brand-gradient">your school needs</span>
-            </h2>
-            <p className="mt-3">
-              <span className="c-black-soft">Modular and focused</span>
-              <span className="c-muted"> — built for daily use.</span>
-            </p>
+            <div className="lp-section__head">
+              <p className="section-label">Platform</p>
+              <h2 className="lp-section__title">Everything on one campus, one login per role</h2>
+              <p className="lp-section__sub">
+                Modules schools use every day — not a bloated ERP you never finish implementing.
+              </p>
+            </div>
           </Reveal>
-          <Stagger className="features-grid mt-8 sm:mt-10">
+          <Stagger className="features-grid lp-features">
             {FEATURES.map((f) => (
               <StaggerItem key={f.title}>
-                <motion.article
-                  className="feature-card card h-full"
-                  whileHover={{ y: -5, transition: { duration: 0.2 } }}
-                >
+                <article className="feature-card card h-full lp-feature-card">
                   <div className="feature-icon-box">{f.icon}</div>
                   <h3 className="feature-card-title">{f.title}</h3>
                   <p className="feature-card-desc">{f.desc}</p>
-                </motion.article>
+                </article>
               </StaggerItem>
             ))}
           </Stagger>
         </section>
 
-        <section id="portals" className="pb-20">
+        <section id="portals" className="lp-section">
           <Reveal>
-            <p className="section-label">Portals</p>
-            <h2 className="mt-2 text-3xl font-extrabold sm:text-4xl">
-              <span className="c-black">Built for </span>
-              <span className="text-brand-gradient">every role</span>
-            </h2>
-            <p className="mt-3 c-muted">One database. Four experiences tailored to who&apos;s logging in.</p>
+            <div className="lp-section__head">
+              <p className="section-label">Portals</p>
+              <h2 className="lp-section__title">Four experiences, one source of truth</h2>
+              <p className="lp-section__sub">
+                Same student record whether a teacher marks attendance or a parent checks fees.
+              </p>
+            </div>
           </Reveal>
-          <Stagger className="portals-grid mt-8 sm:mt-10">
+          <Stagger className="portals-grid">
             {PORTALS.map((p) => (
               <StaggerItem key={p.role}>
-                <motion.div whileHover={{ y: -6 }}>
-                  <Link href="/login" className="card block h-full p-6 no-underline">
-                    <div
-                      className="portal-stripe"
-                      style={{ background: `linear-gradient(90deg, ${p.color}, var(--brand-cyan))` }}
-                    />
-                    <p className="text-xl font-bold c-black">{p.role}</p>
-                    <p className="mt-2 text-sm c-muted">{p.desc}</p>
-                    <span className="mt-5 inline-block text-sm font-bold c-teal">Enter portal →</span>
-                  </Link>
-                </motion.div>
+                <Link href={p.href} className="lp-portal card block h-full no-underline">
+                  <span className="lp-portal__role">{p.role}</span>
+                  <p className="lp-portal__desc">{p.desc}</p>
+                  <span className="lp-portal__link">Sign in →</span>
+                </Link>
               </StaggerItem>
             ))}
           </Stagger>
         </section>
 
-        <section id="pricing" className="pb-20">
+        <section id="pricing" className="lp-section">
           <Reveal>
-            <p className="section-label">Pricing</p>
-            <h2 className="mt-2 text-3xl font-extrabold sm:text-4xl">
-              <span className="c-black">Simple, </span>
-              <span className="text-brand-gradient">transparent plans</span>
-            </h2>
+            <div className="lp-section__head lp-section__head--center">
+              <p className="section-label">Pricing</p>
+              <h2 className="lp-section__title">Clear plans. No surprise modules.</h2>
+              <p className="lp-section__sub">
+                Try every core feature on trial. Upgrade when you are ready — billed monthly or
+                annually.
+              </p>
+            </div>
           </Reveal>
-          <Stagger className="pricing-grid mt-8 sm:mt-10">
-            {[
-              { name: "Starter", price: "$59", sub: "/mo · up to 800 students", hot: false },
-              { name: "Growth", price: "$179", sub: "/mo · up to 5,000 students", hot: true },
-              { name: "Enterprise", price: "Custom", sub: "Multi-campus · SSO · SLA", hot: false },
-            ].map((plan) => (
-              <StaggerItem key={plan.name}>
-                <motion.article
-                  className={`card relative flex h-full flex-col p-7 ${plan.hot ? "card-featured" : ""}`}
-                  whileHover={{ y: -4 }}
-                >
-                  {plan.hot ? (
-                    <span
-                      className="absolute -top-3 left-6 rounded-full px-3 py-1 text-[10px] font-bold uppercase text-white"
-                      style={{ background: "linear-gradient(90deg, var(--brand-teal), var(--brand-cyan))" }}
-                    >
-                      Popular
-                    </span>
-                  ) : null}
-                  <p className="text-sm font-semibold c-muted">{plan.name}</p>
-                  <p className="mt-2 text-4xl font-extrabold text-brand-gradient">{plan.price}</p>
-                  <p className="text-sm c-muted">{plan.sub}</p>
-                  <ul className="mt-6 flex-1 space-y-2 text-sm c-muted">
-                    <li>✓ All 4 portals</li>
-                    <li>✓ Attendance & grades</li>
-                    <li>✓ Messaging & alerts</li>
-                  </ul>
-                  <Link
-                    href="/register"
-                    className={plan.hot ? "btn-brand mt-6 text-center" : "btn-ghost mt-6 text-center"}
-                  >
-                    Choose {plan.name}
-                  </Link>
-                </motion.article>
-              </StaggerItem>
-            ))}
-          </Stagger>
+          <Reveal>
+            <LandingPricing />
+          </Reveal>
         </section>
 
         <Reveal>
@@ -304,35 +245,42 @@ export function LandingPage() {
         </Reveal>
 
         <Reveal>
-          <motion.section
-            className="cta-band mb-16"
-            whileInView={reduce ? {} : { scale: [0.98, 1] }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5 }}
-          >
-            <h2 className="text-3xl font-extrabold sm:text-4xl">Ready to modernize your school?</h2>
-            <p className="mx-auto mt-4 max-w-md text-base opacity-90">
-              Free trial · No credit card · Go live this week
-            </p>
-            <div className="mt-8 flex flex-wrap justify-center gap-3">
-              <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}>
-                <Link href="/register" className="btn-ghost">
-                  Start your school
+          <section className="lp-cta">
+            <div className="lp-cta__inner">
+              <h2 className="lp-cta__title">Ready to replace the spreadsheet stack?</h2>
+              <p className="lp-cta__sub">
+                Create your school in minutes. Invite teachers and import students when you are
+                ready.
+              </p>
+              <div className="lp-cta__actions">
+                <Link href="/register" className="btn-brand">
+                  Start free trial
                 </Link>
-              </motion.div>
-              <a
-                href="mailto:hello@schoolos.local"
-                className="btn-ghost"
-                style={{ background: "transparent", color: "#fff", borderColor: "rgba(255,255,255,0.5)" }}
-              >
-                Contact sales
-              </a>
+                <Link href="/login" className="lp-cta__secondary">
+                  I already have an account
+                </Link>
+              </div>
             </div>
-          </motion.section>
+          </section>
         </Reveal>
 
-        <footer className="pb-10 text-center text-xs c-faint">
-          © {new Date().getFullYear()} CampusOne · Multi-school education platform
+        <footer className="lp-footer">
+          <div className="lp-footer__brand">
+            <span className="logo-mark" aria-hidden>
+              C1
+            </span>
+            <div>
+              <strong>CampusOne</strong>
+              <p>Multi-school education platform</p>
+            </div>
+          </div>
+          <nav className="lp-footer__nav" aria-label="Footer">
+            <Link href="/register">Register school</Link>
+            <Link href="/login">School sign in</Link>
+            <Link href="/join">Join with code</Link>
+            <Link href="/platform/login">Platform admin</Link>
+          </nav>
+          <p className="lp-footer__copy">© {new Date().getFullYear()} CampusOne</p>
         </footer>
       </main>
 

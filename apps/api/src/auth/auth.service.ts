@@ -372,6 +372,18 @@ export class AuthService {
       this.configService.get<string>('JWT_REFRESH_EXPIRY_SECONDS', '604800'),
     );
 
+    const school = await this.prisma.school.findUnique({
+      where: { id: payload.schoolId },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        joinCode: true,
+        setupComplete: true,
+        logoUrl: true,
+      },
+    });
+
     return {
       accessToken: await this.jwtService.signAsync(payload),
       refreshToken: await this.jwtService.signAsync(payload, {
@@ -379,6 +391,16 @@ export class AuthService {
         expiresIn: refreshExpiresIn,
       }),
       user: payload,
+      school: school
+        ? {
+            id: school.id,
+            name: school.name,
+            slug: school.slug,
+            joinCode: school.joinCode,
+            setupComplete: school.setupComplete,
+            logoUrl: school.logoUrl,
+          }
+        : undefined,
     };
   }
 }

@@ -94,7 +94,9 @@ export default function AdminResultsPage() {
         <p className="setup-hint">
           <Link href="/admin/results/academic-years">Academic years</Link>
           {" · "}
-          <Link href="/admin/results/subjects">Subject & teacher assignment</Link>
+          <Link href="/admin/subjects">Subjects catalog</Link>
+          {" · "}
+          <Link href="/admin/subjects/assign">Assign to classes</Link>
           {" · "}
           <Link href="/admin/results/templates">Assessment templates</Link>
         </p>

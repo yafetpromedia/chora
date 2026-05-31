@@ -2010,3 +2010,199 @@
   border: 2px solid #cbd5e1;
   flex-shrink: 0;
 }
+
+/* Plan catalog editor (platform → Plans) */
+.plat-plans__ok {
+  margin: 0 0 1rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: 8px;
+  background: #ecfdf5;
+  color: #047857;
+  font-size: 0.88rem;
+}
+
+.plat-plans__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1.25rem;
+}
+
+.plat-plan-editor {
+  padding: 1.1rem 1.15rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.plat-plan-editor__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.85rem;
+}
+
+.plat-plan-editor__code {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.plat-plan-editor__listed {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: #475569;
+  margin-bottom: 0.65rem;
+  cursor: pointer;
+}
+
+.plat-plan-editor__row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+}
+
+.plat-plan-editor__row--3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+@media (max-width: 520px) {
+  .plat-plan-editor__row--3 {
+    grid-template-columns: 1fr;
+  }
+}
+
+.plat-field textarea {
+  width: 100%;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid #dce4e8;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 5rem;
+}
+
+.plat-select {
+  width: 100%;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid #dce4e8;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  background: #fff;
+}
+
+.plat-school-plan-form {
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid #eef2f4;
+}
+
+.plat-billing-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.plat-billing-links .plat-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.plat-usage-cell {
+  min-width: 7rem;
+}
+
+.plat-usage-cell__over {
+  color: #b91c1c;
+  font-weight: 600;
+}
+
+.plat-usage-bar {
+  margin-top: 0.35rem;
+  height: 4px;
+  border-radius: 2px;
+  background: #e2e8f0;
+  overflow: hidden;
+}
+
+.plat-usage-bar__fill {
+  height: 100%;
+  border-radius: 2px;
+  background: #0d9488;
+  transition: width 0.2s ease;
+}
+
+.plat-usage-bar__fill--warn {
+  background: #d97706;
+}
+
+.plat-usage-bar__fill--over {
+  background: #dc2626;
+}
+
+.plat-invoice-status {
+  display: inline-block;
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.plat-invoice-status--draft {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.plat-invoice-status--sent {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.plat-invoice-status--paid {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.plat-invoice-status--overdue {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.plat-invoice-status--void {
+  background: #f8fafc;
+  color: #94a3b8;
+  text-decoration: line-through;
+}
+
+.plat-invoice-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.plat-btn--xs {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+}
+
+.plat-invoice-form__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 0.5rem 0.75rem;
+}
+
+.plat-invoice-form__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}

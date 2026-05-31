@@ -51,6 +51,19 @@ enum Plan {
   ENTERPRISE
 }
 
+enum PlatformInvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  OVERDUE
+  VOID
+}
+
+enum BillingCurrency {
+  USD
+  ETB
+}
+
 enum SchoolStatus {
   ACTIVE
   TRIAL
@@ -150,6 +163,7 @@ model School {
   feeTypes       FeeType[]
   feeSchedules   FeeSchedule[]
   roleTemplates  RoleTemplate[]
+  platformInvoices PlatformInvoice[]
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 }
@@ -209,6 +223,49 @@ model Subscription {
   updatedAt   DateTime  @updatedAt
 
   @@index([plan, isActive])
+}
+
+/// Platform-managed sellable plans (prices, limits, copy)
+model PlanCatalog {
+  plan          Plan     @id
+  label         String
+  description   String   @db.Text
+  studentsLimit Int?
+  teachersLimit Int?
+  adminsLimit   Int?
+  usdMonthly    Int      @default(0)
+  etbMonthly    Int      @default(0)
+  features      Json     @default("[]")
+  trialDays     Int?
+  sortOrder     Int      @default(0)
+  isListed      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+/// Platform billing invoices issued to schools
+model PlatformInvoice {
+  id            String                @id @default(cuid())
+  schoolId      String
+  school        School                @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  invoiceNumber String                @unique
+  plan          Plan?
+  periodStart   DateTime
+  periodEnd     DateTime
+  amountUsd     Int                   @default(0)
+  amountEtb     Int                   @default(0)
+  currency      BillingCurrency       @default(USD)
+  status        PlatformInvoiceStatus @default(DRAFT)
+  issuedAt      DateTime              @default(now())
+  dueAt         DateTime
+  paidAt        DateTime?
+  notes         String?               @db.Text
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+
+  @@index([schoolId])
+  @@index([status])
+  @@index([dueAt])
 }
 
 model SchoolInvite {
@@ -314,6 +371,7 @@ model StudentProfile {
   region             String?
   zone               String?
   woreda             String?
+  address            String?              @db.Text
   phone              String?
   fayedaVerifiedAt   DateTime?
   cardCode           String?

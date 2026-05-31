@@ -74,6 +74,7 @@ export async function updateStudent(
     gender?: "MALE" | "FEMALE" | "OTHER";
     dateOfBirth?: string;
     phone?: string;
+    address?: string | null;
     photoUrl?: string | null;
     gradeId?: string;
     sectionId?: string | null;

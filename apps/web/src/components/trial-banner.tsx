@@ -17,10 +17,14 @@ export function TrialBanner({ subscription }: TrialBannerProps) {
 
   const studentLimit = subscription.limits.students ?? 50;
   const teacherLimit = subscription.limits.teachers ?? 10;
-  const studentPct = Math.min(
+  const daysLeft = subscription.daysRemaining ?? 0;
+  const trialDays = 14;
+  const timeUsedPct = Math.min(
     100,
-    Math.round((subscription.usage.students / studentLimit) * 100),
+    Math.max(0, Math.round(((trialDays - daysLeft) / trialDays) * 100)),
   );
+  const urgency =
+    daysLeft <= 3 ? "critical" : daysLeft <= 7 ? "urgent" : "normal";
 
   if (expired) {
     return (
@@ -31,7 +35,7 @@ export function TrialBanner({ subscription }: TrialBannerProps) {
             Upgrade to continue managing attendance, results, and announcements for your school.
           </p>
         </div>
-        <Link href="/admin/upgrade" className="trial-banner-cta">
+        <Link href="/admin/billing/plans" className="trial-banner-cta">
           Upgrade plan
         </Link>
       </section>
@@ -39,22 +43,46 @@ export function TrialBanner({ subscription }: TrialBannerProps) {
   }
 
   return (
-    <section className="trial-banner" aria-label="Trial status">
+    <section
+      className={`trial-banner trial-banner--countdown trial-banner--${urgency}`}
+      aria-label="Trial countdown"
+    >
+      <div className="trial-banner-countdown" aria-hidden>
+        <span className="trial-banner-countdown__n">{daysLeft}</span>
+        <span className="trial-banner-countdown__unit">
+          day{daysLeft === 1 ? "" : "s"}
+          <br />
+          left
+        </span>
+      </div>
       <div className="trial-banner-body">
-        <p className="trial-banner-eyebrow">CampusOne trial</p>
+        <p className="trial-banner-eyebrow">
+          {urgency === "critical"
+            ? "Trial ending soon"
+            : urgency === "urgent"
+              ? "Free trial · time running out"
+              : "Free trial active"}
+        </p>
         <h2 className="trial-banner-title">
-          {subscription.daysRemaining ?? 0} day
-          {(subscription.daysRemaining ?? 0) === 1 ? "" : "s"} remaining
+          {daysLeft} day{daysLeft === 1 ? "" : "s"} remaining on CampusOne
         </h2>
         <p className="trial-banner-text">
           {subscription.usage.students} / {studentLimit} students ·{" "}
-          {subscription.usage.teachers} / {teacherLimit} teachers · No credit card required
+          {subscription.usage.teachers} / {teacherLimit} teachers · Upgrade before your trial
+          ends
         </p>
-        <div className="trial-banner-meter" aria-hidden>
-          <span className="trial-banner-meter-fill" style={{ width: `${studentPct}%` }} />
+        <div
+          className="trial-banner-meter"
+          role="progressbar"
+          aria-valuenow={timeUsedPct}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-label={`${timeUsedPct}% of trial period used`}
+        >
+          <span className="trial-banner-meter-fill" style={{ width: `${timeUsedPct}%` }} />
         </div>
       </div>
-      <Link href="/admin/upgrade" className="trial-banner-cta trial-banner-cta--outline">
+      <Link href="/admin/billing/plans" className="trial-banner-cta">
         Upgrade plan
       </Link>
     </section>

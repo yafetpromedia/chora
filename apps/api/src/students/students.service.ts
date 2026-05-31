@@ -80,6 +80,58 @@ export class StudentsService {
     });
   }
 
+  async listParents(schoolId: string) {
+    const parents = await this.prisma.user.findMany({
+      where: { schoolId, role: UserRole.parent },
+      include: {
+        parentLinks: {
+          include: {
+            student: {
+              select: {
+                id: true,
+                middleName: true,
+                user: {
+                  select: {
+                    firstName: true,
+                    lastName: true,
+                    externalRef: true,
+                  },
+                },
+                grade: { select: { id: true, name: true } },
+                section: { select: { id: true, name: true } },
+              },
+            },
+          },
+        },
+      },
+      orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
+    });
+
+    return parents.map((p) => ({
+      userId: p.id,
+      email: p.email,
+      phone: p.phone,
+      firstName: p.firstName,
+      lastName: p.lastName,
+      name: `${p.firstName} ${p.lastName}`.trim(),
+      children: p.parentLinks.map((link) => {
+        const s = link.student;
+        const childName = [s.user.firstName, s.middleName, s.user.lastName]
+          .filter(Boolean)
+          .join(' ');
+        return {
+          profileId: s.id,
+          name: childName,
+          gradeId: s.grade.id,
+          gradeName: s.grade.name,
+          sectionId: s.section?.id ?? null,
+          sectionName: s.section?.name ?? null,
+          studentId: s.user.externalRef,
+        };
+      }),
+    }));
+  }
+
   async getOne(schoolId: string, profileId: string) {
     const student = await this.prisma.studentProfile.findFirst({
       where: { id: profileId, schoolId },
@@ -151,6 +203,7 @@ export class StudentsService {
         fcn?: string;
         phone?: string | null;
         photoUrl?: string | null;
+        address?: string | null;
       } = { sectionId };
 
       if (dto.gradeId) profileData.gradeId = dto.gradeId;
@@ -171,6 +224,9 @@ export class StudentsService {
       }
       if (dto.photoUrl !== undefined) {
         profileData.photoUrl = dto.photoUrl?.trim() || null;
+      }
+      if (dto.address !== undefined) {
+        profileData.address = dto.address?.trim() || null;
       }
 
       await tx.studentProfile.update({
@@ -365,6 +421,7 @@ export class StudentsService {
           region: fayedaFields.region ?? null,
           zone: fayedaFields.zone ?? null,
           woreda: fayedaFields.woreda ?? null,
+          address: dto.address?.trim() || null,
           phone: fayedaFields.phone ?? (dto.phone?.trim() || null),
           fayedaVerifiedAt: fayedaFields.fayedaVerifiedAt ?? null,
           cardCode: await this.allocateCardCode(tx, schoolId),
@@ -654,21 +711,43 @@ export class StudentsService {
     return this.getIdCard(schoolId, studentProfileId);
   }
 
-  async listIdCards(schoolId: string, gradeId?: string, sectionId?: string) {
+  private idCardListWhere(
+    schoolId: string,
+    gradeId?: string,
+    sectionId?: string,
+  ) {
+    return {
+      schoolId,
+      cardCode: { not: null },
+      ...(gradeId ? { gradeId } : {}),
+      ...(sectionId ? { sectionId } : {}),
+    };
+  }
+
+  async countIdCards(schoolId: string, gradeId?: string, sectionId?: string) {
+    await this.ensureCardCodes(schoolId);
+    return this.prisma.studentProfile.count({
+      where: this.idCardListWhere(schoolId, gradeId, sectionId),
+    });
+  }
+
+  async listIdCards(
+    schoolId: string,
+    gradeId?: string,
+    sectionId?: string,
+    skip?: number,
+    take?: number,
+  ) {
     await this.ensureCardCodes(schoolId);
     const profiles = await this.prisma.studentProfile.findMany({
-      where: {
-        schoolId,
-        ...(gradeId ? { gradeId } : {}),
-        ...(sectionId ? { sectionId } : {}),
-      },
+      where: this.idCardListWhere(schoolId, gradeId, sectionId),
       include: this.studentInclude,
       orderBy: [{ grade: { sortOrder: 'asc' } }, { user: { firstName: 'asc' } }],
+      ...(skip !== undefined ? { skip } : {}),
+      ...(take !== undefined ? { take } : {}),
     });
     const school = await this.loadSchoolForCard(schoolId);
-    return profiles
-      .filter((p) => p.cardCode)
-      .map((p) => this.formatIdCardPayload(p, school));
+    return profiles.map((p) => this.formatIdCardPayload(p, school));
   }
 
   private async loadSchoolForCard(schoolId: string) {
@@ -711,6 +790,20 @@ export class StudentsService {
     profile.cardCode = code;
   }
 
+  private formatStudentAddress(profile: {
+    address?: string | null;
+    woreda?: string | null;
+    zone?: string | null;
+    region?: string | null;
+  }): string | null {
+    const manual = profile.address?.trim();
+    if (manual) return manual;
+    const parts = [profile.woreda, profile.zone, profile.region]
+      .map((p) => p?.trim())
+      .filter(Boolean);
+    return parts.length > 0 ? parts.join(', ') : null;
+  }
+
   private formatIdCardPayload(
     profile: {
       id: string;
@@ -718,6 +811,10 @@ export class StudentsService {
       photoUrl?: string | null;
       fan?: string | null;
       fcn?: string | null;
+      region?: string | null;
+      zone?: string | null;
+      woreda?: string | null;
+      address?: string | null;
       gender?: Gender | null;
       dateOfBirth?: Date | null;
       phone?: string | null;
@@ -789,8 +886,8 @@ export class StudentsService {
       grade: profile.grade.name,
       section: profile.section?.name ?? null,
       studentId: profile.user.externalRef ?? null,
-      idNumber: profile.fcn ?? null,
-      fan: profile.fan ?? null,
+      fan: profile.fan?.trim() || profile.fcn?.trim() || null,
+      address: this.formatStudentAddress(profile),
       gender: profile.gender ?? null,
       dateOfBirth: profile.dateOfBirth ?? null,
       age,

@@ -3,6 +3,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PlatformBilling } from "@/components/platform/platform-billing";
+import { PlatformInvoices } from "@/components/platform/platform-invoices";
+import { PlatformPlans } from "@/components/platform/platform-plans";
+import { PlatformUsage } from "@/components/platform/platform-usage";
 import { PlatformOverview } from "@/components/platform/platform-overview";
 import { PlatformPermissions } from "@/components/platform/platform-permissions";
 import { PlatformSchools } from "@/components/platform/platform-schools";
@@ -98,8 +101,15 @@ export default function PlatformDashboardPage() {
             />
           ) : null}
           {section === "billing" ? (
-            <PlatformBilling dashboard={dashboard} schools={schools} />
+            <PlatformBilling
+              dashboard={dashboard}
+              schools={schools}
+              onNavigate={setSection}
+            />
           ) : null}
+          {section === "invoices" ? <PlatformInvoices schools={schools} /> : null}
+          {section === "usage" ? <PlatformUsage /> : null}
+          {section === "plans" ? <PlatformPlans /> : null}
           {section === "permissions" ? (
             <PlatformPermissions user={user} />
           ) : null}

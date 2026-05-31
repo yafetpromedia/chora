@@ -65,6 +65,7 @@ export function StudentManageDrawer({
   const [gender, setGender] = useState(student.gender ?? "");
   const [dateOfBirth, setDateOfBirth] = useState(toDateInputValue(student.dateOfBirth));
   const [phone, setPhone] = useState(student.phone ?? "");
+  const [address, setAddress] = useState(student.address ?? "");
   const [photoUrl, setPhotoUrl] = useState<string | null>(student.photoUrl);
   const [gradeId, setGradeId] = useState(student.grade.id);
   const [sectionId, setSectionId] = useState(student.section?.id ?? "");
@@ -86,6 +87,7 @@ export function StudentManageDrawer({
     setFatherPhone(father?.phone ?? "");
     setMotherName(mother ? `${mother.firstName} ${mother.lastName}`.trim() : "");
     setMotherPhone(mother?.phone ?? "");
+    setAddress(student.address ?? "");
     setTab("contact");
   }, [student]);
 
@@ -131,6 +133,7 @@ export function StudentManageDrawer({
         gender: gender ? (gender as "MALE" | "FEMALE" | "OTHER") : undefined,
         dateOfBirth: dateOfBirth ? new Date(dateOfBirth).toISOString() : undefined,
         phone: phone.trim() || undefined,
+        address: address.trim() || null,
         photoUrl,
         gradeId,
         sectionId: sectionId || null,
@@ -174,7 +177,9 @@ export function StudentManageDrawer({
                 </h2>
                 <p className="stu-manage-hero__ids">
                   <span>{student.user.externalRef ?? "—"}</span>
-                  {student.fcn ? <span> · ID {student.fcn}</span> : null}
+                  {student.fan || student.fcn ? (
+                    <span> · FAN {student.fan ?? student.fcn}</span>
+                  ) : null}
                 </p>
               </div>
             </div>
@@ -284,7 +289,7 @@ export function StudentManageDrawer({
                     />
                   </div>
                   <div className="stu-field">
-                    <label htmlFor="m-id-number">ID number</label>
+                    <label htmlFor="m-id-number">FAN / FCN</label>
                     <input
                       id="m-id-number"
                       value={idNumber}
@@ -312,6 +317,18 @@ export function StudentManageDrawer({
                       placeholder="0911…"
                     />
                   </div>
+                </div>
+                <div className="stu-field">
+                  <label htmlFor="m-address">Home address</label>
+                  <textarea
+                    id="m-address"
+                    className="stu-textarea"
+                    rows={2}
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    placeholder="House no., street, woreda, city…"
+                  />
+                  <p className="stu-field-hint">Shown on the student ID card.</p>
                 </div>
                 <div className="stu-field-row">
                   <div className="stu-field">

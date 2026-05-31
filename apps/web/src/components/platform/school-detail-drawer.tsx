@@ -2,8 +2,17 @@
 
 import { useEffect, useState } from "react";
 import { DashIcon } from "@/components/dashboard/dash-icons";
+import type { PlanType } from "@/lib/api";
 import { platformFetch } from "@/lib/platform-auth";
+import { setSchoolPlan } from "@/lib/platform-plans";
 import type { PlatformSchoolDetail, PlatformSchoolRow } from "./platform-types";
+
+const PLAN_OPTIONS: { value: PlanType; label: string }[] = [
+  { value: "TRIAL", label: "Trial" },
+  { value: "STARTER", label: "Starter" },
+  { value: "PROFESSIONAL", label: "Professional" },
+  { value: "ENTERPRISE", label: "Enterprise" },
+];
 
 type Props = {
   school: PlatformSchoolRow | null;
@@ -55,6 +64,10 @@ export function SchoolDetailDrawer({
   const [busy, setBusy] = useState(false);
   const [tab, setTab] = useState<Tab>("overview");
   const [copied, setCopied] = useState(false);
+  const [planDraft, setPlanDraft] = useState<PlanType>("TRIAL");
+  const [planActive, setPlanActive] = useState(true);
+  const [planSaving, setPlanSaving] = useState(false);
+  const [planMessage, setPlanMessage] = useState("");
 
   useEffect(() => {
     if (!school) {
@@ -72,9 +85,16 @@ export function SchoolDetailDrawer({
       .finally(() => setLoading(false));
   }, [school]);
 
+  const sub = school ? (detail?.subscription ?? school.subscription) : null;
+
+  useEffect(() => {
+    if (!school || !sub?.plan) return;
+    setPlanDraft(sub.plan as PlanType);
+    setPlanActive(sub.isActive ?? true);
+  }, [school, sub?.plan, sub?.isActive]);
+
   if (!school) return null;
 
-  const sub = detail?.subscription ?? school.subscription;
   const status = (detail?.school.status ?? school.status).toLowerCase();
   const usage = detail?.usage ?? {
     student: school.usage.students,
@@ -94,6 +114,25 @@ export function SchoolDetailDrawer({
       window.setTimeout(() => setCopied(false), 2000);
     } catch {
       /* ignore */
+    }
+  }
+
+  async function savePlan() {
+    if (!school) return;
+    setPlanSaving(true);
+    setPlanMessage("");
+    setError("");
+    try {
+      await setSchoolPlan(school.id, { plan: planDraft, isActive: planActive });
+      const refreshed = await platformFetch<PlatformSchoolDetail>(
+        `/platform/schools/${school.id}`,
+      );
+      setDetail(refreshed);
+      setPlanMessage("Plan updated for this school.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not update plan");
+    } finally {
+      setPlanSaving(false);
     }
   }
 
@@ -351,10 +390,43 @@ export function SchoolDetailDrawer({
                       <dd>{formatDate(detail?.school.createdAt ?? school.createdAt)}</dd>
                     </div>
                   </dl>
-                  <p className="plat-manage-card__hint">
-                    Upgrade to Starter or Professional from school settings, or contact CampusOne
-                    sales for enterprise.
-                  </p>
+                  <div className="plat-school-plan-form">
+                    <h3 className="plat-manage-card__title">Assign plan</h3>
+                    <p className="plat-manage-card__hint">
+                      Override what this school is on. Edit catalog prices under Platform → Plans.
+                    </p>
+                    <label className="plat-field">
+                      <span>Plan</span>
+                      <select
+                        className="plat-select"
+                        value={planDraft}
+                        onChange={(e) => setPlanDraft(e.target.value as PlanType)}
+                      >
+                        {PLAN_OPTIONS.map((o) => (
+                          <option key={o.value} value={o.value}>
+                            {o.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="plat-plan-editor__listed">
+                      <input
+                        type="checkbox"
+                        checked={planActive}
+                        onChange={(e) => setPlanActive(e.target.checked)}
+                      />
+                      Billing active
+                    </label>
+                    <button
+                      type="button"
+                      className="plat-btn plat-btn--primary plat-btn--block"
+                      disabled={planSaving || loading}
+                      onClick={() => void savePlan()}
+                    >
+                      {planSaving ? "Saving…" : "Save plan for school"}
+                    </button>
+                    {planMessage ? <p className="plat-plans__ok">{planMessage}</p> : null}
+                  </div>
                 </section>
               ) : null}
 

@@ -70,7 +70,6 @@ export default function RegisterSchoolPage() {
           links={[
             { href: "/login", label: "Sign in" },
             { href: "/join", label: "Join with a code" },
-            { href: "/platform/login", label: "Platform admin", muted: true },
           ]}
         />
       }

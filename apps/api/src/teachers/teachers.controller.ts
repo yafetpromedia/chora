@@ -5,6 +5,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -34,8 +35,11 @@ export class TeachersController {
   @Get()
   @Roles('admin', 'staff')
   @RequirePermissions(SchoolPermission.TEACHERS_READ)
-  list(@CurrentUser() user: AuthUser) {
-    return this.teachersService.list(user.schoolId);
+  list(
+    @CurrentUser() user: AuthUser,
+    @Query('group') group?: 'teachers' | 'staff',
+  ) {
+    return this.teachersService.list(user.schoolId, group);
   }
 
   @Get('me')

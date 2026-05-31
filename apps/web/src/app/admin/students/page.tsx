@@ -309,7 +309,7 @@ export default function StudentsPage() {
                             <strong>Student ID:</strong> {s.user.externalRef ?? "—"}
                           </div>
                           <div>
-                            <strong>ID no:</strong> {s.fcn ?? "—"}
+                            <strong>FAN:</strong> {s.fan ?? s.fcn ?? "—"}
                           </div>
                           {s.fayedaVerifiedAt ? (
                             <span className="stu-badge stu-badge--verified" style={{ marginTop: "0.25rem" }}>

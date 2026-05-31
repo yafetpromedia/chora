@@ -74,6 +74,20 @@ export class SchoolsController {
     return this.subscriptionsService.getStatus(user.schoolId);
   }
 
+  @Get('billing')
+  @UseGuards(JwtAuthGuard, SchoolTenantGuard, RolesGuard)
+  @Roles('admin')
+  getBilling(@CurrentUser() user: AuthUser) {
+    return this.subscriptionsService.getBillingOverview(user.schoolId);
+  }
+
+  @Get('billing/invoices')
+  @UseGuards(JwtAuthGuard, SchoolTenantGuard, RolesGuard)
+  @Roles('admin')
+  listBillingInvoices(@CurrentUser() user: AuthUser) {
+    return this.subscriptionsService.listInvoicesForSchool(user.schoolId);
+  }
+
   @Get('plans')
   listPlans() {
     return this.subscriptionsService.listPlans();

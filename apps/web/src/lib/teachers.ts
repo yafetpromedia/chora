@@ -39,8 +39,17 @@ export type RoleTemplate = {
   permissions: string[];
 };
 
-export async function listTeachers() {
-  return apiFetch<TeacherRecord[]>("/schools/teachers");
+export async function listTeachers(group?: "teachers" | "staff") {
+  const q = group ? `?group=${group}` : "";
+  return apiFetch<TeacherRecord[]>(`/schools/teachers${q}`);
+}
+
+export async function listOfficeStaff() {
+  return listTeachers("staff");
+}
+
+export async function listClassroomTeachers() {
+  return listTeachers("teachers");
 }
 
 export async function listRoleTemplates() {

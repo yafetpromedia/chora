@@ -3,13 +3,19 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { apiFetch, type SchoolInfo } from "@/lib/api";
 import {
   AUTH_ROLE_KEY,
-  AUTH_SCHOOL_NAME_KEY,
   AUTH_TOKEN_KEY,
   clearSessionStorage,
   type UserRole,
 } from "@/lib/auth";
+import {
+  persistSchoolBrand,
+  readSchoolBrand,
+  SCHOOL_BRAND_UPDATED_EVENT,
+} from "@/lib/school-brand";
+import { SchoolBrandLockup } from "./school-brand-lockup";
 import { DashIcon } from "./dash-icons";
 import { isNavActive, navForRole, type NavItem } from "./nav-config";
 
@@ -24,6 +30,7 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
   const pathname = usePathname();
   const router = useRouter();
   const [schoolName, setSchoolName] = useState("CampusOne");
+  const [schoolLogoUrl, setSchoolLogoUrl] = useState<string | null>(null);
   const [mobileNav, setMobileNav] = useState(false);
   const [navRole, setNavRole] = useState<UserRole>(role);
   const [nav, setNav] = useState<NavItem[]>([]);
@@ -46,10 +53,36 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
     const effectiveRole = stored ?? role;
     setNavRole(effectiveRole);
     setNav(navForRole(effectiveRole));
-    const name = localStorage.getItem(AUTH_SCHOOL_NAME_KEY);
-    if (name) setSchoolName(name);
+    const brand = readSchoolBrand();
+    setSchoolName(brand.name);
+    setSchoolLogoUrl(brand.logoUrl);
+
+    void apiFetch<{ school: SchoolInfo | null }>("/schools/me")
+      .then((res) => {
+        if (!res.school) return;
+        persistSchoolBrand({
+          name: res.school.name,
+          logoUrl: res.school.logoUrl ?? null,
+        });
+        setSchoolName(res.school.name);
+        setSchoolLogoUrl(res.school.logoUrl ?? null);
+      })
+      .catch(() => {
+        /* keep cached brand */
+      });
+
     setShellReady(true);
   }, [role, router]);
+
+  useEffect(() => {
+    function onBrandUpdate() {
+      const brand = readSchoolBrand();
+      setSchoolName(brand.name);
+      setSchoolLogoUrl(brand.logoUrl);
+    }
+    window.addEventListener(SCHOOL_BRAND_UPDATED_EVENT, onBrandUpdate);
+    return () => window.removeEventListener(SCHOOL_BRAND_UPDATED_EVENT, onBrandUpdate);
+  }, []);
 
   function logout() {
     clearSessionStorage();
@@ -79,14 +112,12 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
         className={`dash-sidebar dash-sidebar--pro${mobileNav ? " dash-sidebar--open" : ""}`}
         aria-label="Main navigation"
       >
-        <div className="dash-sidebar-brand dash-sidebar-brand--pro">
-          <span className="logo-mark logo-mark--sidebar-pro" aria-hidden>
-            C1
-          </span>
-          <div>
-            <span className="dash-sidebar-title">CampusOne</span>
-            <span className="dash-sidebar-role">{roleLabel} workspace</span>
-          </div>
+        <div className="dash-sidebar-brand dash-sidebar-brand--pro dash-sidebar-brand--dual">
+          <SchoolBrandLockup
+            schoolName={schoolName}
+            schoolLogoUrl={schoolLogoUrl}
+            roleLabel={`${roleLabel} workspace`}
+          />
         </div>
 
         <nav className="dash-nav dash-nav--pro">

@@ -6,10 +6,16 @@ import type { StudentIdCard } from "@/lib/student-cards";
 
 export type StudentIdCardVariant = "standard" | "compact" | "mini";
 
+const CAMPUSONE_WATERMARK = "/campusone/watermark.svg";
+
 type Props = {
   card: StudentIdCard;
   variant?: StudentIdCardVariant;
   showBack?: boolean;
+  /** Print layout: render only the back face */
+  backOnly?: boolean;
+  /** Pre-generated QR (bulk print). Skips client QR generation. */
+  qrDataUrl?: string;
   className?: string;
 };
 
@@ -55,31 +61,24 @@ export function StudentIdCardView({
   card,
   variant = "standard",
   showBack = false,
+  backOnly = false,
+  qrDataUrl: qrDataUrlProp,
   className = "",
 }: Props) {
-  const [qrUrl, setQrUrl] = useState("");
-  const [qrLargeUrl, setQrLargeUrl] = useState("");
+  const [qrGenerated, setQrGenerated] = useState("");
 
-  const frontQrSize = variant === "mini" ? 120 : variant === "compact" ? 160 : 200;
   const backQrSize = variant === "mini" ? 140 : variant === "compact" ? 180 : 220;
+  const qrLargeUrl = qrDataUrlProp ?? qrGenerated;
 
   useEffect(() => {
-    void QRCode.toDataURL(card.scanPayload, {
-      width: frontQrSize,
-      margin: 1,
-      errorCorrectionLevel: "M",
-      color: { dark: "#0a3d42", light: "#ffffff" },
-    }).then(setQrUrl);
-  }, [card.scanPayload, frontQrSize]);
-
-  useEffect(() => {
+    if (qrDataUrlProp) return;
     void QRCode.toDataURL(card.scanPayload, {
       width: backQrSize,
       margin: 1,
       errorCorrectionLevel: "M",
       color: { dark: "#0a3d42", light: "#ffffff" },
-    }).then(setQrLargeUrl);
-  }, [card.scanPayload, backQrSize]);
+    }).then(setQrGenerated);
+  }, [card.scanPayload, backQrSize, qrDataUrlProp]);
 
   const initial = card.name.trim().slice(0, 1).toUpperCase() || "?";
   const gradeLine = card.section ? `${card.grade} · ${card.section}` : card.grade;
@@ -87,17 +86,23 @@ export function StudentIdCardView({
 
   const front = (
     <article className={`sid${vClass}`}>
-      <div className="sid__stripe" aria-hidden />
+      <div
+        className="sid__watermark"
+        style={{ backgroundImage: `url(${CAMPUSONE_WATERMARK})` }}
+        aria-hidden
+      />
       <header className="sid__head">
         <div className="sid__school">
-          {card.schoolLogoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={card.schoolLogoUrl} alt="" className="sid__logo" />
-          ) : (
-            <span className="sid__logo sid__logo--text" aria-hidden>
-              C1
-            </span>
-          )}
+          <div className="sid__logo-wrap">
+            {card.schoolLogoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={card.schoolLogoUrl} alt="" className="sid__logo" />
+            ) : (
+              <span className="sid__logo sid__logo--text" aria-hidden>
+                {card.schoolName.slice(0, 2).toUpperCase()}
+              </span>
+            )}
+          </div>
           <div className="sid__school-text">
             <span className="sid__school-name">{card.schoolName}</span>
             <span className="sid__school-sub">Official student identification</span>
@@ -109,7 +114,7 @@ export function StudentIdCardView({
         </div>
       </header>
 
-      <div className="sid__main">
+      <div className="sid__main sid__main--front">
         <div className="sid__photo-block">
           {card.photoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -119,58 +124,64 @@ export function StudentIdCardView({
               {initial}
             </div>
           )}
-          <div className="sid__qr-wrap">
-            {qrUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img className="sid__qr" src={qrUrl} alt={`Attendance QR for ${card.name}`} />
-            ) : (
-              <div className="sid__qr sid__qr--loading" aria-hidden />
-            )}
-            <span className="sid__scan-hint">Scan for attendance</span>
-          </div>
         </div>
 
         <div className="sid__details">
-          <h3 className="sid__name">{card.name}</h3>
-          <p className="sid__grade">{gradeLine}</p>
+          <div className="sid__identity">
+            <h3 className="sid__name">{card.name}</h3>
+            <span className="sid__grade-pill">{gradeLine}</span>
+          </div>
 
-          <dl className="sid__fields">
-            <div>
+          <dl className="sid__fields sid__fields--modern">
+            <div className="sid__field-cell">
               <dt>Student ID</dt>
               <dd>{card.studentId ?? "—"}</dd>
             </div>
-            <div>
-              <dt>National ID</dt>
-              <dd>{card.idNumber ?? "—"}</dd>
-            </div>
-            <div>
+            <div className="sid__field-cell">
               <dt>FAN</dt>
-              <dd>{card.fan ?? "—"}</dd>
+              <dd className="sid__fan">{card.fan ?? "—"}</dd>
             </div>
-            <div>
+            <div className="sid__field-cell">
               <dt>Date of birth</dt>
               <dd>{formatDob(card.dateOfBirth)}</dd>
             </div>
-            <div>
+            <div className="sid__field-cell">
               <dt>Age</dt>
               <dd>{card.age != null ? `${card.age} yrs` : "—"}</dd>
             </div>
-            <div>
+            <div className="sid__field-cell">
               <dt>Sex</dt>
               <dd>{genderLabel(card.gender)}</dd>
+            </div>
+            <div className="sid__field-cell sid__field-cell--code">
+              <dt>Card code</dt>
+              <dd>
+                <code className="sid__inline-code">{card.cardCode}</code>
+              </dd>
+            </div>
+            <div className="sid__field-cell sid__field-cell--wide">
+              <dt>Address</dt>
+              <dd className="sid__address">{card.address ?? "—"}</dd>
             </div>
           </dl>
         </div>
       </div>
 
       <footer className="sid__foot">
-        <div className="sid__foot-left">
-          <span className="sid__card-label">Card code</span>
-          <code className="sid__card-code">{card.cardCode}</code>
-        </div>
-        <div className="sid__foot-right">
-          <span className="sid__valid">Valid {card.validThrough}</span>
-          <span className="sid__issued">Issued {formatIssued(card.issuedAt)}</span>
+        <div className="sid__foot-strip">
+          <span className="sid__foot-chip">Valid {card.validThrough}</span>
+          <span className="sid__foot-divider" aria-hidden />
+          <span className="sid__foot-chip">Issued {formatIssued(card.issuedAt)}</span>
+          {(card.schoolPhone || card.schoolEmail) && (
+            <>
+              <span className="sid__foot-divider" aria-hidden />
+              <span className="sid__foot-contact">
+                {card.schoolPhone}
+                {card.schoolPhone && card.schoolEmail ? " · " : ""}
+                {card.schoolEmail}
+              </span>
+            </>
+          )}
         </div>
       </footer>
     </article>
@@ -178,10 +189,18 @@ export function StudentIdCardView({
 
   const back = (
     <article className={`sid sid--back${vClass}`}>
+      <div
+        className="sid__watermark"
+        style={{ backgroundImage: `url(${CAMPUSONE_WATERMARK})` }}
+        aria-hidden
+      />
       <div className="sid__stripe sid__stripe--back" aria-hidden />
       <header className="sid__back-head">
         <strong>{card.schoolName}</strong>
-        <span>CampusOne · School code {card.schoolJoinCode}</span>
+        <span>
+          Powered by CampusOne · {card.schoolJoinCode}
+          {card.schoolPhone ? ` · ${card.schoolPhone}` : ""}
+        </span>
       </header>
 
       <div className="sid__back-body">
@@ -192,62 +211,44 @@ export function StudentIdCardView({
           ) : (
             <div className="sid__qr sid__qr--loading" aria-hidden />
           )}
-          <code className="sid__back-payload">{card.scanPayload}</code>
+          <span className="sid__scan-hint">Scan for attendance</span>
         </div>
 
         <div className="sid__back-info">
-          <section className="sid__parents">
-            <h4 className="sid__section-title">Parents / guardians</h4>
-            <dl className="sid__parent-grid">
-              <div>
-                <dt>Father</dt>
-                <dd>
-                  {card.fatherName ?? "—"}
-                  {card.fatherPhone ? (
-                    <span className="sid__back-phone">{card.fatherPhone}</span>
-                  ) : null}
-                </dd>
-              </div>
-              <div>
-                <dt>Mother</dt>
-                <dd>
-                  {card.motherName ?? "—"}
-                  {card.motherPhone ? (
-                    <span className="sid__back-phone">{card.motherPhone}</span>
-                  ) : null}
-                </dd>
-              </div>
-            </dl>
-          </section>
+          <div className="sid__back-cards">
+            <div className="sid__back-card">
+              <span className="sid__back-card-label">Father</span>
+              <span className="sid__back-card-name">{card.fatherName ?? "—"}</span>
+              {card.fatherPhone ? (
+                <span className="sid__back-phone">{card.fatherPhone}</span>
+              ) : null}
+            </div>
+            <div className="sid__back-card">
+              <span className="sid__back-card-label">Mother</span>
+              <span className="sid__back-card-name">{card.motherName ?? "—"}</span>
+              {card.motherPhone ? (
+                <span className="sid__back-phone">{card.motherPhone}</span>
+              ) : null}
+            </div>
+            <div className="sid__back-card">
+              <span className="sid__back-card-label">Emergency</span>
+              <span className="sid__back-card-name">{card.emergencyContactName ?? "—"}</span>
+              {card.emergencyContactPhone ? (
+                <span className="sid__back-phone">{card.emergencyContactPhone}</span>
+              ) : null}
+            </div>
+            <div className="sid__back-card">
+              <span className="sid__back-card-label">Student phone</span>
+              <span className="sid__back-card-name sid__back-card-name--solo">
+                {card.phone ?? "—"}
+              </span>
+            </div>
+          </div>
 
-          <dl className="sid__back-fields">
-            <div>
-              <dt>Emergency contact</dt>
-              <dd>
-                {card.emergencyContactName ?? "—"}
-                {card.emergencyContactPhone ? (
-                  <span className="sid__back-phone">{card.emergencyContactPhone}</span>
-                ) : null}
-              </dd>
-            </div>
-            <div>
-              <dt>Student phone</dt>
-              <dd>{card.phone ?? "—"}</dd>
-            </div>
-            <div>
-              <dt>School address</dt>
-              <dd>{card.schoolAddress ?? card.schoolName}</dd>
-            </div>
-            <div>
-              <dt>School contact</dt>
-              <dd>
-                {card.schoolPhone ?? "—"}
-                {card.schoolEmail ? (
-                  <span className="sid__back-email">{card.schoolEmail}</span>
-                ) : null}
-              </dd>
-            </div>
-          </dl>
+          <div className="sid__signature">
+            <div className="sid__signature-line" aria-hidden />
+            <span className="sid__signature-label">Authorized signature</span>
+          </div>
         </div>
       </div>
 
@@ -257,12 +258,16 @@ export function StudentIdCardView({
     </article>
   );
 
+  if (backOnly) {
+    return <div className={`sid-wrap${className ? ` ${className}` : ""}`}>{back}</div>;
+  }
+
   return (
     <div
-      className={`sid-wrap${showBack ? " sid-wrap--duplex" : ""}${className ? ` ${className}` : ""}`}
+      className={`sid-wrap${showBack && !backOnly ? " sid-wrap--duplex" : ""}${className ? ` ${className}` : ""}`}
     >
       {front}
-      {showBack ? back : null}
+      {showBack && !backOnly ? back : null}
     </div>
   );
 }

@@ -8,6 +8,7 @@ import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 import { UsersModule } from '../users/users.module';
 import { PlatformAuthService } from './platform-auth.service';
 import { PlatformController } from './platform.controller';
+import { PlatformBillingService } from './platform-billing.service';
 import { PlatformService } from './platform.service';
 
 @Module({
@@ -32,7 +33,7 @@ import { PlatformService } from './platform.service';
     SubscriptionsModule,
   ],
   controllers: [PlatformController],
-  providers: [PlatformAuthService, PlatformService],
+  providers: [PlatformAuthService, PlatformService, PlatformBillingService],
   exports: [PlatformAuthService],
 })
 export class PlatformModule {}

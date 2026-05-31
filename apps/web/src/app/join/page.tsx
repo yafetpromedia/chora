@@ -65,7 +65,6 @@ export default function JoinSchoolPage() {
           links={[
             { href: "/login", label: "Sign in" },
             { href: "/register", label: "Register your school" },
-            { href: "/platform/login", label: "Platform admin", muted: true },
           ]}
         />
       }

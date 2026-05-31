@@ -15,6 +15,7 @@ export const AUTH_ROLE_KEY = "edu_os_role";
 export const AUTH_USER_ID_KEY = "edu_os_user_id";
 export const AUTH_SCHOOL_JOIN_CODE_KEY = "edu_os_school_join_code";
 export const AUTH_SCHOOL_NAME_KEY = "edu_os_school_name";
+export const AUTH_SCHOOL_LOGO_KEY = "edu_os_school_logo";
 
 /** Current signed-in school user id (from session or JWT). */
 export function getCurrentUserId(): string | null {
@@ -51,4 +52,5 @@ export function clearSessionStorage() {
   localStorage.removeItem(AUTH_ROLE_TEMPLATE_KEY);
   localStorage.removeItem(AUTH_SCHOOL_JOIN_CODE_KEY);
   localStorage.removeItem(AUTH_SCHOOL_NAME_KEY);
+  localStorage.removeItem(AUTH_SCHOOL_LOGO_KEY);
 }

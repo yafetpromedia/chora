@@ -113,5 +113,9 @@ export class CreateStudentDto {
 
   @IsString()
   @IsOptional()
+  address?: string;
+
+  @IsString()
+  @IsOptional()
   phone?: string;
 }
