@@ -5,7 +5,7 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { UserRole } from '../auth.types';
+import { isSchoolUser, UserRole } from '../auth.types';
 import { ROLES_KEY } from '../decorators/roles.decorator';
 import { AuthenticatedRequest } from '../http.types';
 
@@ -26,11 +26,15 @@ export class RolesGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const user = request.user;
 
-    if (!user) {
-      throw new ForbiddenException('Authenticated user is required');
+    if (!user || !isSchoolUser(user)) {
+      throw new ForbiddenException('Authenticated school user is required');
     }
 
-    if (!requiredRoles.includes(user.role)) {
+    const roleAllowed =
+      requiredRoles.includes(user.role) ||
+      (user.role === 'staff' && requiredRoles.includes('admin'));
+
+    if (!roleAllowed) {
       throw new ForbiddenException('Insufficient role privileges');
     }
 

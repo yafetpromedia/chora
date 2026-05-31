@@ -1,7 +1,7 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Patch, Post, UseGuards } from '@nestjs/common';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { AuthUser } from '../common/auth.types';
-import { TenantGuard } from '../common/guards/tenant.guard';
+import { SchoolTenantGuard } from '../common/guards/school-tenant.guard';
 import { AuthService } from './auth.service';
 import { GoogleAuthDto } from './dto/google-auth.dto';
 import { JoinInviteDto } from './dto/join-invite.dto';
@@ -9,6 +9,7 @@ import { JoinSchoolDto } from './dto/join-school.dto';
 import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RegisterSchoolDto } from './dto/register-school.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 import { JwtAuthGuard } from './jwt-auth.guard';
 
 @Controller('auth')
@@ -46,8 +47,23 @@ export class AuthController {
   }
 
   @Get('me')
-  @UseGuards(JwtAuthGuard, TenantGuard)
+  @UseGuards(JwtAuthGuard, SchoolTenantGuard)
   me(@CurrentUser() user: AuthUser) {
     return { user };
+  }
+
+  @Get('profile')
+  @UseGuards(JwtAuthGuard, SchoolTenantGuard)
+  profile(@CurrentUser() user: AuthUser) {
+    return this.authService.getProfile(user);
+  }
+
+  @Patch('profile')
+  @UseGuards(JwtAuthGuard, SchoolTenantGuard)
+  updateProfile(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: UpdateProfileDto,
+  ) {
+    return this.authService.updateProfile(user, dto);
   }
 }

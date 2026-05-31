@@ -4,10 +4,15 @@ import {
   ForbiddenException,
   Injectable,
 } from '@nestjs/common';
+import { SchoolStatus } from '@prisma/client';
+import { isSchoolUser } from '../auth.types';
+import { PrismaService } from '../../prisma/prisma.service';
 import { AuthenticatedRequest } from '../http.types';
 
 @Injectable()
-export class TenantGuard implements CanActivate {
+export class SchoolTenantGuard implements CanActivate {
+  constructor(private readonly prisma: PrismaService) {}
+
   private getSchoolIdHeaderValue(
     schoolIdHeader: string | string[] | undefined,
   ): string | undefined {
@@ -17,12 +22,12 @@ export class TenantGuard implements CanActivate {
     return schoolIdHeader;
   }
 
-  canActivate(context: ExecutionContext): boolean {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const user = request.user;
 
-    if (!user) {
-      throw new ForbiddenException('Tenant check requires authenticated user');
+    if (!user || !isSchoolUser(user)) {
+      throw new ForbiddenException('School tenant access only');
     }
 
     const schoolIdParam = request.params?.schoolId as string | undefined;
@@ -35,7 +40,23 @@ export class TenantGuard implements CanActivate {
       throw new ForbiddenException('Cross-school access is not allowed');
     }
 
+    const school = await this.prisma.school.findUnique({
+      where: { id: user.schoolId },
+      select: { status: true },
+    });
+
+    if (!school) {
+      throw new ForbiddenException('School not found');
+    }
+
+    if (school.status === SchoolStatus.SUSPENDED) {
+      throw new ForbiddenException(
+        'This school account is suspended. Contact CampusOne support.',
+      );
+    }
+
     request.schoolId = user.schoolId;
+    request.user = { ...user, scope: 'school' };
     return true;
   }
 }

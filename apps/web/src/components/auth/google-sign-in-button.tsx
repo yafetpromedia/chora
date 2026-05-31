@@ -7,6 +7,7 @@ import { isGoogleAuthConfigured } from "@/components/auth/google-oauth-provider"
 type GoogleSignInButtonProps = {
   onCredential: (credential: string) => void | Promise<void>;
   disabled?: boolean;
+  variant?: "default" | "login";
 };
 
 function GoogleIcon() {
@@ -20,7 +21,11 @@ function GoogleIcon() {
   );
 }
 
-export function GoogleSignInButton({ onCredential, disabled }: GoogleSignInButtonProps) {
+export function GoogleSignInButton({
+  onCredential,
+  disabled,
+  variant = "default",
+}: GoogleSignInButtonProps) {
   const [loading, setLoading] = useState(false);
   const configured = isGoogleAuthConfigured();
 
@@ -37,11 +42,13 @@ export function GoogleSignInButton({ onCredential, disabled }: GoogleSignInButto
     [disabled, onCredential],
   );
 
+  const isLogin = variant === "login";
+
   return (
-    <div className="auth-google-wrap">
+    <div className={`auth-google-wrap${isLogin ? " auth-google-wrap--login" : ""}`}>
       <button
         type="button"
-        className="auth-google-btn"
+        className={`auth-google-btn${isLogin ? " auth-google-btn--login" : ""}`}
         disabled={disabled || loading || !configured}
         title={configured ? undefined : "Add NEXT_PUBLIC_GOOGLE_CLIENT_ID to enable"}
       >

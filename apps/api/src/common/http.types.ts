@@ -1,7 +1,12 @@
 import { Request } from 'express';
-import { AuthUser } from './auth.types';
+import { AuthUser, JwtPayload } from './auth.types';
 
 export type AuthenticatedRequest = Request & {
-  user?: AuthUser;
+  user?: JwtPayload;
   schoolId?: string;
+};
+
+export type SchoolAuthenticatedRequest = Request & {
+  user: AuthUser;
+  schoolId: string;
 };

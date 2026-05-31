@@ -1,9 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AuthShell } from "@/components/auth/auth-shell";
+import { AuthCardFooterLinks } from "@/components/auth/auth-card-footer-links";
+import { AuthCardShell } from "@/components/auth/auth-card-shell";
 import { AuthInput } from "@/components/auth/auth-input";
 import { AuthSubmitButton } from "@/components/auth/auth-submit-button";
 import { JoinRoleSelector, type JoinRole } from "@/components/auth/join-role-selector";
@@ -53,103 +53,115 @@ export default function JoinSchoolPage() {
   }
 
   return (
-    <AuthShell
-      mode="login"
+    <AuthCardShell
       title="Join your school"
-        subtitle="Use your school code, or open an invitation link from your admin."
+      subtitle="Enter your school code and create your account."
+      topLinkHref="/"
+      topLinkLabel="Home"
+      error={error || undefined}
+      hint="Demo code: BRIGHT1"
       footer={
-        <>
-          Running a school?{" "}
-          <Link href="/register" className="auth-link">
-            Register your school
-          </Link>
-        </>
+        <AuthCardFooterLinks
+          links={[
+            { href: "/login", label: "Sign in" },
+            { href: "/register", label: "Register your school" },
+            { href: "/platform/login", label: "Platform admin", muted: true },
+          ]}
+        />
       }
     >
-      <form onSubmit={onSubmit} className="auth-form-stack">
-        <AuthInput
-          id="join-code"
-          label="School code"
-          icon="none"
-          placeholder="e.g. BRIGHT1"
-          value={schoolCode}
-          onChange={(v) => setSchoolCode(v.toUpperCase())}
-          required
-        />
-
-        <fieldset className="auth-fieldset">
-          <legend className="auth-input-label">I am a</legend>
-          <JoinRoleSelector value={role} onChange={setRole} />
-        </fieldset>
-
-        {role === "student" ? (
+      <form onSubmit={onSubmit} className="auth-page-form auth-page-form--grid">
+        <div className="auth-page-span-full">
           <AuthInput
-            id="student-id"
-            label="Student ID"
+            id="join-code"
+            label="School code"
             icon="none"
-            placeholder="Roll number from your school"
-            value={studentId}
-            onChange={setStudentId}
-            required
-          />
-        ) : null}
-
-        <div className="auth-name-row">
-          <AuthInput
-            id="join-first"
-            label="First name"
-            icon="user"
-            autoComplete="given-name"
-            placeholder="Jane"
-            value={firstName}
-            onChange={setFirstName}
-            required
-          />
-          <AuthInput
-            id="join-last"
-            label="Last name"
-            icon="user"
-            autoComplete="family-name"
-            placeholder="Doe"
-            value={lastName}
-            onChange={setLastName}
+            variant="login"
+            placeholder="e.g. BRIGHT1"
+            value={schoolCode}
+            onChange={(v) => setSchoolCode(v.toUpperCase())}
             required
           />
         </div>
+
+        <fieldset className="auth-page-fieldset auth-page-span-full">
+          <legend className="auth-input-label">I am a</legend>
+          <JoinRoleSelector value={role} onChange={setRole} compact />
+        </fieldset>
+
+        {role === "student" ? (
+          <div className="auth-page-span-full">
+            <AuthInput
+              id="student-id"
+              label="Student ID"
+              icon="none"
+              variant="login"
+              placeholder="Roll number"
+              value={studentId}
+              onChange={setStudentId}
+              required
+            />
+          </div>
+        ) : null}
+
+        <AuthInput
+          id="join-first"
+          label="First name"
+          icon="user"
+          variant="login"
+          autoComplete="given-name"
+          placeholder="Jane"
+          value={firstName}
+          onChange={setFirstName}
+          required
+        />
+        <AuthInput
+          id="join-last"
+          label="Last name"
+          icon="user"
+          variant="login"
+          autoComplete="family-name"
+          placeholder="Doe"
+          value={lastName}
+          onChange={setLastName}
+          required
+        />
 
         <AuthInput
           id="join-email"
           label="Email"
           type="email"
           icon="email"
+          variant="login"
           autoComplete="email"
           placeholder="you@email.com"
           value={email}
           onChange={setEmail}
           required
         />
-
         <AuthInput
           id="join-password"
           label="Password"
           type="password"
           icon="password"
+          variant="login"
           autoComplete="new-password"
-          placeholder="At least 8 characters"
+          placeholder="Min. 8 characters"
           value={password}
           onChange={setPassword}
           required
           minLength={8}
         />
 
-        <AuthSubmitButton loading={loading} loadingLabel="Joining…" label="Join school" />
+        <div className="auth-page-span-full">
+          <AuthSubmitButton
+            variant="page"
+            loading={loading}
+            loadingLabel="Joining…"
+            label="Join school"
+          />
+        </div>
       </form>
-
-      {error ? (
-        <p className="auth-alert auth-alert--error" role="alert">
-          {error}
-        </p>
-      ) : null}
-    </AuthShell>
+    </AuthCardShell>
   );
 }

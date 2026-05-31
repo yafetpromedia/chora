@@ -7,6 +7,7 @@ import { randomBytes } from 'crypto';
 import { UserRole as PrismaUserRole } from '@prisma/client';
 import type { JoinRole } from '../auth/dto/join-school.dto';
 import { PrismaService } from '../prisma/prisma.service';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { SchoolsService } from './schools.service';
 import { CreateInviteDto } from './dto/create-invite.dto';
 
@@ -34,6 +35,7 @@ export class InvitesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly schoolsService: SchoolsService,
+    private readonly subscriptionsService: SubscriptionsService,
   ) {}
 
   async createInvite(
@@ -45,6 +47,8 @@ export class InvitesService {
     if (!school) {
       throw new NotFoundException('School not found');
     }
+
+    await this.subscriptionsService.assertActive(schoolId);
 
     const expiresInDays = dto.expiresInDays ?? 14;
     const expiresAt = new Date();

@@ -1,16 +1,22 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { CreateAnnouncementDto } from './dto/create-announcement.dto';
 
 @Injectable()
 export class AnnouncementsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly subscriptionsService: SubscriptionsService,
+  ) {}
 
   async create(
     dto: CreateAnnouncementDto,
     schoolId: string,
     createdBy: string,
   ) {
+    await this.subscriptionsService.assertActive(schoolId);
+
     return this.prisma.announcement.create({
       data: {
         schoolId,

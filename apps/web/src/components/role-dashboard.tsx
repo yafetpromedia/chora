@@ -1,23 +1,34 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Announcement,
   apiFetch,
   AttendanceRecord,
+  getSchoolSubscription,
   ResultRecord,
   type SchoolInfo,
+  type SubscriptionStatus,
 } from "@/lib/api";
+import { getFinanceAnalytics, type FinanceAnalytics } from "@/lib/finance";
+import { getSetupStatus } from "@/lib/school-setup";
+import { UserRole } from "@/lib/auth";
 import {
-  AUTH_ROLE_KEY,
-  AUTH_SCHOOL_JOIN_CODE_KEY,
-  AUTH_SCHOOL_NAME_KEY,
-  AUTH_TOKEN_KEY,
-  clearSessionStorage,
-  UserRole,
-} from "@/lib/auth";
-import { AdminInvitePanel } from "@/components/auth/admin-invite-panel";
-import { useRouter } from "next/navigation";
+  getAttendanceAnalytics,
+  getAttendanceSummary,
+  listParentNotifications,
+  type AttendanceAnalytics,
+  type AttendanceSummary,
+  type ParentNotification,
+} from "@/lib/attendance";
+import { AdminDashboard } from "@/components/dashboard/admin-dashboard";
+import { DashboardShell } from "@/components/dashboard/dashboard-shell";
+import { ParentTodayOverview } from "@/components/dashboard/today-overview";
+import { StudentIdCardPanel } from "@/components/students/student-id-card-panel";
+import type { AdminDayOverview, ParentDayOverview } from "@/lib/dashboard-day";
+import { hasPermission, Permission } from "@/lib/permissions";
 
 type Props = {
   role: UserRole;
@@ -42,13 +53,6 @@ const STAT_LABELS: Record<string, StatConfig> = {
   alerts: { label: "Alerts", icon: "⚠️" },
 };
 
-const ROLE_TITLES: Record<UserRole, string> = {
-  admin: "Admin",
-  teacher: "Teacher",
-  student: "Student",
-  parent: "Parent",
-};
-
 function formatDate(iso: string) {
   try {
     return new Date(iso).toLocaleDateString(undefined, {
@@ -69,6 +73,11 @@ function formatStatValue(key: string, value: string | number) {
 }
 
 export function RoleDashboard({ role }: Props) {
+  const isPrincipalView =
+    hasPermission(Permission.SCHOOL_DASHBOARD) &&
+    !hasPermission(Permission.STUDENTS_CREATE);
+  const canViewFinance = hasPermission(Permission.FINANCE_READ);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [dashboard, setDashboard] = useState<Record<string, string | number> | null>(null);
@@ -76,14 +85,21 @@ export function RoleDashboard({ role }: Props) {
   const [results, setResults] = useState<ResultRecord[]>([]);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [schoolInfo, setSchoolInfo] = useState<SchoolInfo | null>(null);
-  const [codeCopied, setCodeCopied] = useState(false);
+  const [subscription, setSubscription] = useState<SubscriptionStatus | null>(null);
+  const [attendanceSummary, setAttendanceSummary] = useState<AttendanceSummary | null>(null);
+  const [attendanceAnalytics, setAttendanceAnalytics] = useState<AttendanceAnalytics | null>(null);
+  const [financeAnalytics, setFinanceAnalytics] = useState<FinanceAnalytics | null>(null);
+  const [parentAlerts, setParentAlerts] = useState<ParentNotification[]>([]);
+  const [adminDay, setAdminDay] = useState<AdminDayOverview | null>(null);
+  const [parentDay, setParentDay] = useState<ParentDayOverview | null>(null);
+  const [selectedChildId, setSelectedChildId] = useState("");
   const router = useRouter();
-
-  const studentId = useMemo(() => "3", []);
 
   const stats = useMemo(() => {
     if (!dashboard) return [];
-    return Object.entries(dashboard).map(([key, value]) => ({
+    return Object.entries(dashboard)
+      .filter(([key]) => key !== "day")
+      .map(([key, value]) => ({
       key,
       value,
       ...(STAT_LABELS[key] ?? {
@@ -94,57 +110,79 @@ export function RoleDashboard({ role }: Props) {
   }, [dashboard]);
 
   useEffect(() => {
-    const token = localStorage.getItem(AUTH_TOKEN_KEY);
-    const storedRole = localStorage.getItem(AUTH_ROLE_KEY);
-
-    if (!token || !storedRole) {
-      router.replace("/login");
-      return;
-    }
-
-    if (storedRole !== role) {
-      router.replace(`/${storedRole}`);
-      return;
-    }
-
     const load = async () => {
       try {
-        const requests: Promise<unknown>[] = [
-          apiFetch<Record<string, string | number>>("/dashboards/me"),
-          apiFetch<AttendanceRecord[]>(`/attendance/student?studentId=${studentId}`),
-          apiFetch<ResultRecord[]>(`/results/student?studentId=${studentId}`),
-          apiFetch<Announcement[]>("/announcements"),
-        ];
-
-        if (role === "admin") {
-          requests.push(apiFetch<{ school: SchoolInfo | null }>("/schools/me"));
+        const dashboardData = await apiFetch<
+          Record<string, string | number> & {
+            day?: AdminDayOverview | ParentDayOverview;
+          }
+        >("/dashboards/me");
+        const announcementData = await apiFetch<Announcement[]>("/announcements");
+        setDashboard(dashboardData);
+        setAnnouncements(announcementData);
+        if (dashboardData.day?.kind === "admin_day") {
+          setAdminDay(dashboardData.day);
+        }
+        if (dashboardData.day?.kind === "parent_day") {
+          setParentDay(dashboardData.day);
         }
 
-        const [dashboardData, attendanceData, resultsData, announcementData, schoolRes] =
-          await Promise.all(requests);
+        if (role === "student") {
+          const [attendanceData, resultsData, summary] = await Promise.all([
+            apiFetch<AttendanceRecord[]>("/attendance/student"),
+            apiFetch<ResultRecord[]>("/results/student").catch(() => [] as ResultRecord[]),
+            getAttendanceSummary(),
+          ]);
+          setAttendance(attendanceData);
+          setResults(resultsData);
+          setAttendanceSummary(summary);
+        }
 
-        setDashboard(dashboardData as Record<string, string | number>);
-        setAttendance(attendanceData as AttendanceRecord[]);
-        setResults(resultsData as ResultRecord[]);
-        setAnnouncements(announcementData as Announcement[]);
+        if (role === "parent") {
+          const [summary, alerts] = await Promise.all([
+            getAttendanceSummary(),
+            listParentNotifications(),
+          ]);
+          setAttendanceSummary(summary);
+          setParentAlerts(alerts);
+        }
 
-        if (role === "admin" && schoolRes) {
-          const data = schoolRes as { school: SchoolInfo | null };
-          if (data.school) {
-            setSchoolInfo(data.school);
-          }
-        } else {
-          const joinCode = localStorage.getItem(AUTH_SCHOOL_JOIN_CODE_KEY);
-          const name = localStorage.getItem(AUTH_SCHOOL_NAME_KEY);
-          if (joinCode && name) {
-            setSchoolInfo({ id: "", name, joinCode });
+        if (role === "admin") {
+          if (isPrincipalView) {
+            const [schoolRes, attAnalytics, finAnalytics] = await Promise.all([
+              apiFetch<{ school: SchoolInfo | null }>("/schools/me").catch(() => ({
+                school: null,
+              })),
+              getAttendanceAnalytics().catch(() => null),
+              canViewFinance ? getFinanceAnalytics().catch(() => null) : Promise.resolve(null),
+            ]);
+            if (schoolRes.school) setSchoolInfo(schoolRes.school);
+            if (attAnalytics) setAttendanceAnalytics(attAnalytics);
+            if (finAnalytics) setFinanceAnalytics(finAnalytics);
+          } else {
+            const [schoolRes, subscriptionData, setupStatus, attAnalytics, finAnalytics] =
+              await Promise.all([
+                apiFetch<{ school: SchoolInfo | null }>("/schools/me"),
+                getSchoolSubscription(),
+                getSetupStatus(),
+                getAttendanceAnalytics(),
+                canViewFinance ? getFinanceAnalytics().catch(() => null) : Promise.resolve(null),
+              ]);
+
+            if (!setupStatus.setupComplete) {
+              router.replace("/admin/setup");
+              return;
+            }
+
+            if (schoolRes.school) setSchoolInfo(schoolRes.school);
+            setSubscription(subscriptionData);
+            setAttendanceAnalytics(attAnalytics);
+            if (finAnalytics) setFinanceAnalytics(finAnalytics);
           }
         }
       } catch (loadError) {
-        const message =
-          loadError instanceof Error ? loadError.message : "Load failed";
+        const message = loadError instanceof Error ? loadError.message : "Load failed";
         if (message === "Session expired" || message === "Not authenticated") {
-          clearSessionStorage();
           router.replace("/login");
           return;
         }
@@ -155,225 +193,277 @@ export function RoleDashboard({ role }: Props) {
     };
 
     void load();
-  }, [role, router, studentId]);
+  }, [role, router]);
 
-  const logout = () => {
-    clearSessionStorage();
-    router.push("/login");
-  };
-
-  const copyJoinCode = () => {
-    if (!schoolInfo?.joinCode) return;
-    void navigator.clipboard.writeText(schoolInfo.joinCode);
-    setCodeCopied(true);
-    window.setTimeout(() => setCodeCopied(false), 2000);
-  };
+  useEffect(() => {
+    if (parentDay?.children.length) {
+      setSelectedChildId(parentDay.children[0].profileId);
+    }
+  }, [parentDay]);
 
   if (loading) {
     return (
-      <div className="dash-loading">
+      <div className="dash-loading dash-loading--pro">
         <span className="dash-loading-spinner" aria-hidden />
-        Loading your dashboard…
+        <p>Loading your workspace…</p>
       </div>
     );
   }
 
   const schoolName = schoolInfo?.name ?? "CampusOne";
 
+  if (role === "admin") {
+    return (
+      <DashboardShell role={role} title="Dashboard" subtitle={`${schoolName} · Overview`}>
+        <AdminDashboard
+          schoolName={schoolName}
+          subscription={subscription}
+          adminDay={adminDay}
+          attendanceAnalytics={attendanceAnalytics}
+          financeAnalytics={financeAnalytics}
+          announcements={announcements}
+          dashboard={dashboard}
+          isPrincipalView={isPrincipalView}
+          canViewFinance={canViewFinance}
+          error={error}
+        />
+      </DashboardShell>
+    );
+  }
+
   return (
-    <div className="dash-shell">
-      <aside className="dash-sidebar" aria-label="Dashboard navigation">
-        <div className="dash-sidebar-brand">
-          <span className="logo-mark" aria-hidden>
-            C1
-          </span>
-          <span>CampusOne</span>
+    <DashboardShell role={role}>
+      <section className="dash-welcome dash-welcome--modern">
+        <div>
+          <p className="dash-welcome-eyebrow">Welcome back</p>
+          <h2>
+            {role === "teacher"
+              ? "Your classroom at a glance"
+              : `Here’s what’s happening at ${schoolName}`}
+          </h2>
+          <p>Attendance, results, and announcements updated in real time.</p>
         </div>
-        <nav className="dash-nav">
-          <span className="dash-nav-item dash-nav-item--active">
-            <span className="dash-nav-dot" aria-hidden />
-            Overview
-          </span>
-          <span className="dash-nav-item">Attendance</span>
-          <span className="dash-nav-item">Results</span>
-          <span className="dash-nav-item">Announcements</span>
-        </nav>
-      </aside>
+      </section>
 
-      <div className="dash-main">
-        <header className="dash-topbar">
-          <div className="dash-topbar-brand">
-            <span className="logo-mark" aria-hidden>
-              C1
-            </span>
-            <div>
-              <h1 className="dash-topbar-title" style={{ fontSize: "1.1rem" }}>
-                {ROLE_TITLES[role]}
-              </h1>
-              <p className="dash-topbar-sub">CampusOne</p>
-            </div>
-          </div>
-          <div className="dash-topbar-heading">
-            <h1 className="dash-topbar-title">{ROLE_TITLES[role]} dashboard</h1>
-            <p className="dash-topbar-sub">
-              {schoolName} · Attendance, results & announcements
-            </p>
-          </div>
-          <button type="button" onClick={logout} className="dash-logout">
-            Log out
-          </button>
-        </header>
+      {error ? (
+        <section className="auth-alert auth-alert--error dash-alert">{error}</section>
+      ) : null}
 
-        <div className="dash-content">
-          <section className="dash-welcome">
-            <h2>Welcome back</h2>
-            <p>
-              {role === "admin"
-                ? `Manage ${schoolName}, invite your team, and keep everyone in the loop.`
-                : `Here’s what’s happening at ${schoolName} today.`}
-            </p>
-          </section>
+      {role === "student" ? (
+        <StudentIdCardPanel
+          source="me"
+          title="My student ID"
+          subtitle="Keep this handy for attendance scan and school identification."
+        />
+      ) : null}
 
-          {error ? (
-            <section className="auth-alert auth-alert--error" style={{ marginBottom: "1.25rem" }}>
-              {error}
-            </section>
-          ) : null}
+      {role === "parent" && parentDay && parentDay.children.length > 1 ? (
+        <div className="sid-my-panel__selector att-field no-print">
+          <span>Select child</span>
+          <select
+            value={selectedChildId}
+            onChange={(e) => setSelectedChildId(e.target.value)}
+          >
+            {parentDay.children.map((child) => (
+              <option key={child.profileId} value={child.profileId}>
+                {child.name} · {child.grade}
+                {child.section ? `-${child.section}` : ""}
+              </option>
+            ))}
+          </select>
+        </div>
+      ) : null}
 
-          {role === "admin" && schoolInfo ? (
-            <>
-              <section className="dash-panel" style={{ marginBottom: "1.25rem" }}>
-                <div className="dash-panel-head">
-                  <h2 className="dash-panel-title">School join code</h2>
-                  <span className="dash-panel-badge">Share at /join</span>
-                </div>
-                <p style={{ margin: "0 0 1rem", fontSize: "0.875rem", color: "var(--brand-muted)" }}>
-                  Teachers, students, and parents can enter this code on the join page — or send
-                  invitation links below.
-                </p>
-                <div className="dash-code-box">
-                  <code className="dash-code">{schoolInfo.joinCode}</code>
-                  <span style={{ fontSize: "0.9rem", color: "var(--brand-muted)" }}>
-                    {schoolInfo.name}
-                  </span>
-                  <button type="button" className="dash-copy-btn" onClick={copyJoinCode}>
-                    {codeCopied ? "Copied!" : "Copy code"}
-                  </button>
-                </div>
-              </section>
-              <AdminInvitePanel />
-            </>
-          ) : null}
+      {role === "parent" && parentDay && parentDay.children.length > 0 ? (
+        <StudentIdCardPanel
+          key={selectedChildId || parentDay.children[0]?.profileId}
+          source="child"
+          profileId={selectedChildId || parentDay.children[0]?.profileId}
+          className="sid-my-panel--wide"
+          title={
+            parentDay.children.length > 1
+              ? "Child ID card"
+              : `ID card · ${parentDay.children[0]?.name ?? "Student"}`
+          }
+          subtitle="Digital ID for your child — open full view to print or save."
+        />
+      ) : null}
 
-          {stats.length > 0 ? (
-            <section className="dash-stats" aria-label="Key metrics">
-              {stats.map((stat) => (
-                <article key={stat.key} className="dash-stat">
-                  <div className="dash-stat-icon" aria-hidden>
-                    {stat.icon}
-                  </div>
-                  <p className="dash-stat-label">{stat.label}</p>
-                  <p className="dash-stat-value">{formatStatValue(stat.key, stat.value)}</p>
-                </article>
-              ))}
-            </section>
-          ) : null}
+      {role === "parent" && parentDay ? <ParentTodayOverview day={parentDay} /> : null}
 
-          <section className="dash-grid-2">
-            <article className="dash-panel">
-              <div className="dash-panel-head">
-                <h2 className="dash-panel-title">Attendance</h2>
-                <span className="dash-panel-badge">{attendance.length} records</span>
+      {stats.length > 0 ? (
+        <section className="dash-stats dash-stats--modern" aria-label="Key metrics">
+          {stats.map((stat) => (
+            <article key={stat.key} className="dash-stat dash-stat--modern">
+              <div className="dash-stat-icon" aria-hidden>
+                {stat.icon}
               </div>
-              {attendance.length === 0 ? (
-                <div className="dash-empty">
-                  <div className="dash-empty-icon" aria-hidden>
-                    📋
-                  </div>
-                  <p>No attendance records yet.</p>
-                </div>
-              ) : (
-                <ul className="dash-list">
-                  {attendance.map((row) => (
-                    <li key={row.id} className="dash-list-item">
-                      <div>
-                        <p className="dash-list-title">Student {row.studentId}</p>
-                        <p className="dash-list-meta">{formatDate(row.date)}</p>
-                      </div>
-                      <span className="dash-tag">{row.status}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
+              <p className="dash-stat-label">{stat.label}</p>
+              <p className="dash-stat-value">{formatStatValue(stat.key, stat.value)}</p>
             </article>
+          ))}
+        </section>
+      ) : null}
 
-            <article className="dash-panel">
-              <div className="dash-panel-head">
-                <h2 className="dash-panel-title">Results</h2>
-                <span className="dash-panel-badge">{results.length} subjects</span>
-              </div>
-              {results.length === 0 ? (
-                <div className="dash-empty">
-                  <div className="dash-empty-icon" aria-hidden>
-                    📊
-                  </div>
-                  <p>No results published yet.</p>
-                </div>
-              ) : (
-                <ul className="dash-list">
-                  {results.map((row) => (
-                    <li key={row.id} className="dash-list-item">
-                      <div>
-                        <p className="dash-list-title">{row.subject}</p>
-                        <p className="dash-list-meta">Student {row.studentId}</p>
-                      </div>
-                      <span className="dash-score">{row.score}%</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </article>
-          </section>
-
-          <article className="dash-panel">
-            <div className="dash-panel-head">
-              <h2 className="dash-panel-title">Announcements</h2>
-              <span className="dash-panel-badge">{announcements.length} total</span>
-            </div>
-            {announcements.length === 0 ? (
-              <div className="dash-empty">
-                <div className="dash-empty-icon" aria-hidden>
-                  📣
-                </div>
-                <p>No announcements yet. Post one from the admin tools when ready.</p>
-              </div>
+      <section className="dash-grid-2">
+        <article className="dash-panel dash-panel--flat">
+          <div className="dash-panel-head">
+            <h2 className="dash-panel-title">Attendance</h2>
+            {attendanceAnalytics ? (
+              <span className="dash-panel-badge">
+                {attendanceAnalytics.todayRate != null
+                  ? `${attendanceAnalytics.todayRate}% today`
+                  : "Today"}
+              </span>
+            ) : attendanceSummary ? (
+              <span className="dash-panel-badge">{attendanceSummary.rate}% rate</span>
             ) : (
-              <ul className="dash-list">
-                {announcements.map((item) => (
-                  <li key={item.id} className="dash-list-item">
-                    <div>
-                      <p className="dash-list-title">{item.title}</p>
-                      <p className="dash-list-meta">{formatDate(item.createdAt)}</p>
-                      {item.body ? (
-                        <p
-                          style={{
-                            margin: "0.35rem 0 0",
-                            fontSize: "0.85rem",
-                            color: "var(--brand-muted)",
-                            lineHeight: 1.45,
-                          }}
-                        >
-                          {item.body}
-                        </p>
-                      ) : null}
-                    </div>
-                  </li>
-                ))}
-              </ul>
+              <span className="dash-panel-badge">{attendance.length} records</span>
             )}
-          </article>
+          </div>
+
+          {attendanceAnalytics ? (
+            <div className="att-stats-grid">
+              <div className="att-stat">
+                <span className="att-stat-value">
+                  {attendanceAnalytics.todayRate != null ? `${attendanceAnalytics.todayRate}%` : "—"}
+                </span>
+                <span className="att-stat-label">Today</span>
+              </div>
+              <div className="att-stat">
+                <span className="att-stat-value">{attendanceAnalytics.markedToday}</span>
+                <span className="att-stat-label">Marked</span>
+              </div>
+              <div className="att-stat">
+                <span className="att-stat-value">{attendanceAnalytics.absentToday}</span>
+                <span className="att-stat-label">Absent</span>
+              </div>
+              <div className="att-stat">
+                <span className="att-stat-value">{attendanceAnalytics.totalStudents}</span>
+                <span className="att-stat-label">Students</span>
+              </div>
+            </div>
+          ) : attendanceSummary ? (
+            <div className="att-summary-block">
+              <p className="att-summary-rate">{attendanceSummary.rate}%</p>
+              <p className="setup-hint dash-panel-desc">
+                {attendanceSummary.student.name} · {attendanceSummary.student.grade}
+                {attendanceSummary.student.section ? `-${attendanceSummary.student.section}` : ""}
+              </p>
+              <ul className="att-summary-counts">
+                <li>Present: {attendanceSummary.counts.present}</li>
+                <li>Absent: {attendanceSummary.counts.absent}</li>
+                <li>Late: {attendanceSummary.counts.late}</li>
+                <li>Excused: {attendanceSummary.counts.excused}</li>
+              </ul>
+            </div>
+          ) : attendance.length === 0 ? (
+            <div className="dash-empty">
+              <div className="dash-empty-icon" aria-hidden>
+                📋
+              </div>
+              <p>No attendance records yet.</p>
+              {role === "teacher" ? (
+                <Link href="/teacher/attendance" className="dash-link-btn">
+                  Mark attendance
+                </Link>
+              ) : null}
+            </div>
+          ) : (
+            <ul className="dash-list">
+              {attendance.map((row) => (
+                <li key={row.id} className="dash-list-item">
+                  <div>
+                    <p className="dash-list-title">{row.status}</p>
+                    <p className="dash-list-meta">{formatDate(row.date)}</p>
+                  </div>
+                  <span className="dash-tag">{row.status}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </article>
+
+        <article className="dash-panel dash-panel--flat">
+          <div className="dash-panel-head">
+            <h2 className="dash-panel-title">Results</h2>
+            <span className="dash-panel-badge">{results.length} subjects</span>
+          </div>
+
+          {results.length === 0 ? (
+            <div className="dash-empty">
+              <div className="dash-empty-icon" aria-hidden>
+                📊
+              </div>
+              <p>No results published yet.</p>
+              {role === "teacher" ? (
+                <Link href="/teacher/results" className="dash-link-btn">
+                  Enter scores
+                </Link>
+              ) : null}
+            </div>
+          ) : (
+            <ul className="dash-list">
+              {results.map((row) => (
+                <li key={row.id} className="dash-list-item">
+                  <div>
+                    <p className="dash-list-title">{row.subject}</p>
+                    <p className="dash-list-meta">Student {row.studentId}</p>
+                  </div>
+                  <span className="dash-score">{row.score}%</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </article>
+      </section>
+
+      {role === "parent" && parentAlerts.length > 0 ? (
+        <article className="dash-panel dash-panel--flat dash-alert-panel">
+          <div className="dash-panel-head">
+            <h2 className="dash-panel-title">Attendance alerts</h2>
+            <span className="dash-panel-badge">{parentAlerts.length}</span>
+          </div>
+          <ul className="dash-list">
+            {parentAlerts.slice(0, 5).map((n) => (
+              <li key={n.id} className="dash-list-item dash-list-item--stack">
+                <div>
+                  <p className="dash-list-title">{n.title}</p>
+                  <p className="dash-list-meta dash-announce-body">{n.body}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </article>
+      ) : null}
+
+      <article className="dash-panel dash-panel--flat">
+        <div className="dash-panel-head">
+          <h2 className="dash-panel-title">Announcements</h2>
+          <span className="dash-panel-badge">{announcements.length} total</span>
         </div>
-      </div>
-    </div>
+        {announcements.length === 0 ? (
+          <div className="dash-empty">
+            <div className="dash-empty-icon" aria-hidden>
+              📣
+            </div>
+            <p>No announcements yet.</p>
+            null
+          </div>
+        ) : (
+          <ul className="dash-list">
+            {announcements.map((item) => (
+              <li key={item.id} className="dash-list-item dash-list-item--stack">
+                <div>
+                  <p className="dash-list-title">{item.title}</p>
+                  <p className="dash-list-meta">{formatDate(item.createdAt)}</p>
+                  {item.body ? <p className="dash-announce-body">{item.body}</p> : null}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </article>
+    </DashboardShell>
   );
 }

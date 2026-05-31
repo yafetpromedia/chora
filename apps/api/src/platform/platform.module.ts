@@ -1,0 +1,38 @@
+import { Module, forwardRef } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { JwtModule } from '@nestjs/jwt';
+import { AuthModule } from '../auth/auth.module';
+import { PrismaModule } from '../prisma/prisma.module';
+import { SchoolsModule } from '../schools/schools.module';
+import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
+import { UsersModule } from '../users/users.module';
+import { PlatformAuthService } from './platform-auth.service';
+import { PlatformController } from './platform.controller';
+import { PlatformService } from './platform.service';
+
+@Module({
+  imports: [
+    PrismaModule,
+    ConfigModule,
+    JwtModule.registerAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
+        secret: configService.get<string>('JWT_SECRET', 'dev-secret'),
+        signOptions: {
+          expiresIn: Number(
+            configService.get<string>('JWT_EXPIRY_SECONDS', '3600'),
+          ),
+        },
+      }),
+    }),
+    forwardRef(() => AuthModule),
+    SchoolsModule,
+    UsersModule,
+    SubscriptionsModule,
+  ],
+  controllers: [PlatformController],
+  providers: [PlatformAuthService, PlatformService],
+  exports: [PlatformAuthService],
+})
+export class PlatformModule {}

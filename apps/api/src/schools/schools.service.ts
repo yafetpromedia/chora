@@ -1,19 +1,39 @@
 import { ConflictException, Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
+import { AttendanceMode, GradePreset, Plan, SchoolStatus } from '@prisma/client';
+import { gradeNamesForPreset } from '../grades/grade-presets';
 import { randomBytes } from 'crypto';
+import { PermissionsService } from '../permissions/permissions.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 
 export type SchoolRecord = {
   id: string;
   name: string;
   slug: string;
   joinCode: string;
+  logoUrl: string | null;
+  schoolType: string | null;
+  address: string | null;
+  email: string | null;
   country: string | null;
   phone: string | null;
+  setupComplete: boolean;
+  gradePreset: string | null;
+  attendanceMode: string;
+  status: string;
+  bankName: string | null;
+  bankAccountHolder: string | null;
+  bankAccountNumber: string | null;
+  paymentInstructions: string | null;
 };
 
 @Injectable()
 export class SchoolsService implements OnModuleInit {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly subscriptionsService: SubscriptionsService,
+    private readonly permissionsService: PermissionsService,
+  ) {}
 
   async onModuleInit() {
     await this.prisma.school.upsert({
@@ -24,16 +44,93 @@ export class SchoolsService implements OnModuleInit {
         slug: 'bright-side',
         joinCode: 'BRIGHT1',
         country: 'Ethiopia',
+        bankName: 'Commercial Bank of Ethiopia',
+        bankAccountHolder: 'Bright Side International School',
+        bankAccountNumber: '1000123456789',
+        paymentInstructions:
+          'Use your child’s full name as the transfer reference. Upload the bank receipt after paying.',
       },
       update: {
         name: 'Bright Side International School',
         joinCode: 'BRIGHT1',
+        status: SchoolStatus.ACTIVE,
+        bankName: 'Commercial Bank of Ethiopia',
+        bankAccountHolder: 'Bright Side International School',
+        bankAccountNumber: '1000123456789',
+        paymentInstructions:
+          'Use your child’s full name as the transfer reference. Upload the bank receipt after paying.',
       },
     });
+
+    await this.subscriptionsService.ensureSubscription('school-addis', Plan.STARTER);
+
+    const demoGradeCount = await this.prisma.grade.count({
+      where: { schoolId: 'school-addis' },
+    });
+    if (demoGradeCount === 0) {
+      const names = gradeNamesForPreset(GradePreset.GRADES_1_8);
+      await this.prisma.$transaction([
+        ...names.map((name, index) =>
+          this.prisma.grade.create({
+            data: { schoolId: 'school-addis', name, sortOrder: index },
+          }),
+        ),
+        this.prisma.school.update({
+          where: { id: 'school-addis' },
+          data: {
+            gradePreset: GradePreset.GRADES_1_8,
+            setupComplete: true,
+            schoolType: 'MIXED',
+          },
+        }),
+      ]);
+      const grades = await this.prisma.grade.findMany({
+        where: { schoolId: 'school-addis' },
+      });
+      for (const grade of grades.slice(0, 2)) {
+        await this.prisma.section.createMany({
+          data: [
+            { gradeId: grade.id, name: 'A' },
+            { gradeId: grade.id, name: 'B' },
+          ],
+          skipDuplicates: true,
+        });
+      }
+    }
+
+    const firstGrade = await this.prisma.grade.findFirst({
+      where: { schoolId: 'school-addis' },
+      orderBy: { sortOrder: 'asc' },
+      include: { sections: true },
+    });
+    if (firstGrade) {
+      const sectionId = firstGrade.sections[0]?.id ?? null;
+      const demoProfile = await this.prisma.studentProfile.upsert({
+        where: { userId: '3' },
+        create: {
+          userId: '3',
+          schoolId: 'school-addis',
+          gradeId: firstGrade.id,
+          sectionId,
+        },
+        update: { gradeId: firstGrade.id, sectionId },
+      });
+      await this.prisma.parentStudent.upsert({
+        where: {
+          parentId_studentId: { parentId: '4', studentId: demoProfile.id },
+        },
+        create: { parentId: '4', studentId: demoProfile.id },
+        update: {},
+      });
+    }
   }
 
   async createSchool(input: {
     name: string;
+    schoolType?: string;
+    address?: string;
+    email?: string;
+    logoUrl?: string;
     country?: string;
     phone?: string;
   }): Promise<SchoolRecord> {
@@ -48,10 +145,18 @@ export class SchoolsService implements OnModuleInit {
           name: input.name.trim(),
           slug,
           joinCode,
+          schoolType: input.schoolType as never,
+          address: input.address?.trim() || null,
+          email: input.email?.trim() || null,
+          logoUrl: input.logoUrl?.trim() || null,
           country: input.country?.trim() || null,
           phone: input.phone?.trim() || null,
+          setupComplete: false,
+          status: SchoolStatus.TRIAL,
         },
       });
+      await this.subscriptionsService.createTrial(school.id);
+      await this.permissionsService.ensureSchoolRoleTemplates(school.id);
       return this.toRecord(school);
     } catch {
       throw new ConflictException('Could not create school. Try a different name.');
@@ -71,6 +176,72 @@ export class SchoolsService implements OnModuleInit {
   async findById(id: string): Promise<SchoolRecord | null> {
     const school = await this.prisma.school.findUnique({ where: { id } });
     return school ? this.toRecord(school) : null;
+  }
+
+  async updateAttendanceMode(schoolId: string, mode: AttendanceMode) {
+    const school = await this.prisma.school.update({
+      where: { id: schoolId },
+      data: { attendanceMode: mode },
+      select: { attendanceMode: true },
+    });
+    return { mode: school.attendanceMode };
+  }
+
+  async updateSettings(
+    schoolId: string,
+    input: {
+      name?: string;
+      schoolType?: string;
+      address?: string;
+      email?: string;
+      phone?: string;
+      country?: string;
+      logoUrl?: string | null;
+      attendanceMode?: AttendanceMode;
+      bankName?: string | null;
+      bankAccountHolder?: string | null;
+      bankAccountNumber?: string | null;
+      paymentInstructions?: string | null;
+    },
+  ): Promise<SchoolRecord> {
+    const existing = await this.prisma.school.findUnique({ where: { id: schoolId } });
+    if (!existing) {
+      throw new NotFoundException('School not found');
+    }
+
+    const data: Record<string, unknown> = {};
+
+    if (input.name !== undefined) {
+      data.name = input.name.trim();
+    }
+    if (input.schoolType !== undefined) {
+      data.schoolType = input.schoolType;
+    }
+    if (input.address !== undefined) {
+      data.address = input.address.trim() || null;
+    }
+    if (input.email !== undefined) {
+      data.email = input.email.trim() || null;
+    }
+    if (input.phone !== undefined) {
+      data.phone = input.phone.trim() || null;
+    }
+    if (input.country !== undefined) {
+      data.country = input.country.trim() || null;
+    }
+    if (input.logoUrl !== undefined) {
+      data.logoUrl = input.logoUrl?.trim() || null;
+    }
+    if (input.attendanceMode !== undefined) {
+      data.attendanceMode = input.attendanceMode;
+    }
+
+    const school = await this.prisma.school.update({
+      where: { id: schoolId },
+      data,
+    });
+
+    return this.toRecord(school);
   }
 
   private async generateUniqueJoinCode(): Promise<string> {
@@ -115,16 +286,40 @@ export class SchoolsService implements OnModuleInit {
     name: string;
     slug: string;
     joinCode: string;
+    logoUrl: string | null;
+    schoolType: string | null;
+    address: string | null;
+    email: string | null;
     country: string | null;
     phone: string | null;
+    setupComplete: boolean;
+    gradePreset: string | null;
+    attendanceMode: string;
+    status: string;
+    bankName: string | null;
+    bankAccountHolder: string | null;
+    bankAccountNumber: string | null;
+    paymentInstructions: string | null;
   }): SchoolRecord {
     return {
       id: school.id,
       name: school.name,
       slug: school.slug,
       joinCode: school.joinCode,
+      logoUrl: school.logoUrl,
+      schoolType: school.schoolType,
+      address: school.address,
+      email: school.email,
       country: school.country,
       phone: school.phone,
+      setupComplete: school.setupComplete,
+      gradePreset: school.gradePreset,
+      attendanceMode: school.attendanceMode,
+      status: school.status,
+      bankName: school.bankName,
+      bankAccountHolder: school.bankAccountHolder,
+      bankAccountNumber: school.bankAccountNumber,
+      paymentInstructions: school.paymentInstructions,
     };
   }
 }

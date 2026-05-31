@@ -1,29 +1,48 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AuthShell } from "@/components/auth/auth-shell";
 import { AuthInput } from "@/components/auth/auth-input";
-import { AuthSubmitButton } from "@/components/auth/auth-submit-button";
 import { GoogleOAuthProviderWrapper } from "@/components/auth/google-oauth-provider";
 import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
+import { LoginShell } from "@/components/auth/login-shell";
 import { login, loginWithGoogle } from "@/lib/api";
 import { persistAuthSession } from "@/lib/auth-session";
 import { getRolePath } from "@/lib/auth";
 
+const REMEMBER_KEY = "campusone_remember_email";
+
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [remember, setRemember] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(REMEMBER_KEY);
+      if (saved) {
+        setEmail(saved);
+        setRemember(true);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   async function completeAuth(action: () => ReturnType<typeof login>) {
     setLoading(true);
     setError("");
     try {
       const response = await action();
+      if (remember) {
+        localStorage.setItem(REMEMBER_KEY, email.trim());
+      } else {
+        localStorage.removeItem(REMEMBER_KEY);
+      }
       persistAuthSession(response);
       router.push(getRolePath(response.user.role));
     } catch (submitError) {
@@ -35,43 +54,24 @@ export default function LoginPage() {
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    void completeAuth(() => login(email.trim(), password));
+    const trimmed = email.trim().toLowerCase();
+    if (trimmed.includes("platform@") || trimmed.endsWith("@campusone.local")) {
+      router.push("/platform/login");
+      return;
+    }
+    void completeAuth(() => login(trimmed, password));
   }
 
   return (
     <GoogleOAuthProviderWrapper>
-      <AuthShell
-        mode="login"
-        title="Sign in"
-        subtitle="Log in to your school workspace."
-        showDemoHint
-        footer={
-          <>
-            <Link href="/register" className="auth-link">
-              Register a school
-            </Link>
-            {" · "}
-            <Link href="/join" className="auth-link">
-              Join with code
-            </Link>
-          </>
-        }
-      >
-        <GoogleSignInButton
-          onCredential={(credential) => completeAuth(() => loginWithGoogle(credential))}
-          disabled={loading}
-        />
-
-        <div className="auth-separator">
-          <span>or</span>
-        </div>
-
-        <form onSubmit={onSubmit} className="auth-form-stack">
+      <LoginShell error={error || undefined}>
+        <form onSubmit={onSubmit} className="auth-page-form">
           <AuthInput
             id="login-email"
             label="Email"
             type="email"
             icon="email"
+            variant="login"
             autoComplete="email"
             placeholder="you@school.edu"
             value={email}
@@ -83,21 +83,50 @@ export default function LoginPage() {
             label="Password"
             type="password"
             icon="password"
+            variant="login"
             autoComplete="current-password"
-            placeholder="Your password"
+            placeholder="Password"
             value={password}
             onChange={setPassword}
             required
           />
-          <AuthSubmitButton loading={loading} loadingLabel="Signing in…" label="Sign in" />
+
+          <div className="auth-page-form-row">
+            <label className="auth-page-remember">
+              <input
+                type="checkbox"
+                checked={remember}
+                onChange={(e) => setRemember(e.target.checked)}
+              />
+              <span>Remember me</span>
+            </label>
+            <Link href="/register" className="auth-page-forgot">
+              Create account
+            </Link>
+          </div>
+
+          <button type="submit" className="auth-page-submit" disabled={loading}>
+            {loading ? (
+              <>
+                <span className="auth-spinner" aria-hidden />
+                Signing in…
+              </>
+            ) : (
+              "Sign in"
+            )}
+          </button>
         </form>
 
-        {error ? (
-          <p className="auth-alert auth-alert--error" role="alert">
-            {error}
-          </p>
-        ) : null}
-      </AuthShell>
+        <div className="auth-page-separator">
+          <span>or</span>
+        </div>
+
+        <GoogleSignInButton
+          variant="login"
+          onCredential={(credential) => completeAuth(() => loginWithGoogle(credential))}
+          disabled={loading}
+        />
+      </LoginShell>
     </GoogleOAuthProviderWrapper>
   );
 }

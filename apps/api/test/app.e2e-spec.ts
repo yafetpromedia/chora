@@ -66,19 +66,51 @@ describe('School OS MVP flows (e2e)', () => {
   });
 
   it('allows teacher to mark attendance and student to read own data', async () => {
-    await request(app.getHttpServer())
-      .post('/attendance')
+    const adminLogin = await request(app.getHttpServer())
+      .post('/auth/login')
+      .send({ email: 'admin@eduos.local', password: 'Passw0rd!' })
+      .expect(201);
+    const adminToken = (adminLogin.body as { accessToken: string }).accessToken;
+
+    const gradeList = await request(app.getHttpServer())
+      .get('/schools/grades')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+    const gradeId = (gradeList.body as Array<{ id: string }>)[0]?.id;
+    expect(gradeId).toBeTruthy();
+
+    const roster = await request(app.getHttpServer())
+      .get(
+        `/attendance/roster?gradeId=${gradeId}&date=2026-05-28&periodNumber=0`,
+      )
       .set('Authorization', `Bearer ${teacherToken}`)
-      .send({ studentId: '3', date: '2026-05-28', status: 'present' })
+      .expect(200);
+    const students = roster.body as Array<{ studentProfileId: string }>;
+    expect(students.length).toBeGreaterThan(0);
+
+    await request(app.getHttpServer())
+      .post('/attendance/bulk')
+      .set('Authorization', `Bearer ${teacherToken}`)
+      .send({
+        gradeId,
+        date: '2026-05-28',
+        periodNumber: 0,
+        records: [
+          {
+            studentProfileId: students[0].studentProfileId,
+            status: 'present',
+          },
+        ],
+      })
       .expect(201);
 
     const attendance = await request(app.getHttpServer())
-      .get('/attendance/student?studentId=3')
+      .get('/attendance/student')
       .set('Authorization', `Bearer ${studentToken}`)
       .expect(200);
 
     const rows = attendance.body as AttendanceResponse;
-    expect(rows).toHaveLength(1);
+    expect(rows.length).toBeGreaterThanOrEqual(1);
     expect(rows[0].status).toBe('present');
   });
 

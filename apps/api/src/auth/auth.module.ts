@@ -1,7 +1,10 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
+import { PlatformModule } from '../platform/platform.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
+import { PrismaModule } from '../prisma/prisma.module';
+import { PermissionsModule } from '../permissions/permissions.module';
 import { SchoolsModule } from '../schools/schools.module';
 import { UsersModule } from '../users/users.module';
 import { AuthController } from './auth.controller';
@@ -12,7 +15,10 @@ import { JwtStrategy } from './jwt.strategy';
   imports: [
     ConfigModule,
     UsersModule,
+    PrismaModule,
+    PermissionsModule,
     SchoolsModule,
+    forwardRef(() => PlatformModule),
     PassportModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],

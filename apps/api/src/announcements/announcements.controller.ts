@@ -4,12 +4,12 @@ import type { AuthUser } from '../common/auth.types';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
 import { RolesGuard } from '../common/guards/roles.guard';
-import { TenantGuard } from '../common/guards/tenant.guard';
+import { SchoolTenantGuard } from '../common/guards/school-tenant.guard';
 import { AnnouncementsService } from './announcements.service';
 import { CreateAnnouncementDto } from './dto/create-announcement.dto';
 
 @Controller('announcements')
-@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, SchoolTenantGuard, RolesGuard)
 export class AnnouncementsController {
   constructor(private readonly announcementsService: AnnouncementsService) {}
 

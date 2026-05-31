@@ -3,7 +3,7 @@ import { CurrentUser } from './common/decorators/current-user.decorator';
 import { Roles } from './common/decorators/roles.decorator';
 import type { AuthUser } from './common/auth.types';
 import { RolesGuard } from './common/guards/roles.guard';
-import { TenantGuard } from './common/guards/tenant.guard';
+import { SchoolTenantGuard } from './common/guards/school-tenant.guard';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { AppService } from './app.service';
 
@@ -22,7 +22,7 @@ export class AppController {
   }
 
   @Get('admin/overview')
-  @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, SchoolTenantGuard, RolesGuard)
   @Roles('admin')
   getAdminOverview(@CurrentUser() user: AuthUser) {
     return this.appService.getAdminOverview(user.schoolId);

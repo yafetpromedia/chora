@@ -2,16 +2,32 @@ import { ConflictException, Injectable, OnModuleInit } from '@nestjs/common';
 import { hashSync } from 'bcrypt';
 import { randomBytes } from 'crypto';
 import { UserRole as PrismaUserRole } from '@prisma/client';
-import { AuthUser, UserRole } from '../common/auth.types';
+import { UserRole } from '../common/auth.types';
+import { PermissionsService } from '../permissions/permissions.service';
 import { PrismaService } from '../prisma/prisma.service';
 
-export interface UserRecord extends AuthUser {
+export interface UserRecord {
+  id: string;
+  schoolId: string;
+  role: UserRole;
+  roleTemplateId: string | null;
+  email: string;
+  firstName: string;
+  lastName: string;
   passwordHash: string;
 }
 
+const DEFAULT_TEMPLATE_BY_ROLE: Record<string, string> = {
+  admin: 'school_admin',
+  teacher: 'subject_teacher',
+};
+
 @Injectable()
 export class UsersService implements OnModuleInit {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly permissionsService: PermissionsService,
+  ) {}
 
   async onModuleInit() {
     const passwordHash = hashSync('Passw0rd!', 10);
@@ -47,17 +63,41 @@ export class UsersService implements OnModuleInit {
     ];
 
     for (const user of users) {
+      await this.permissionsService.ensureSchoolRoleTemplates(user.schoolId);
+      const templateSlug =
+        user.role === 'teacher' ? 'homeroom_teacher' : DEFAULT_TEMPLATE_BY_ROLE[user.role];
+      const template = templateSlug
+        ? await this.prisma.roleTemplate.findFirst({
+            where: { schoolId: user.schoolId, slug: templateSlug },
+          })
+        : null;
+
       await this.prisma.user.upsert({
         where: { email: user.email },
-        create: user,
+        create: {
+          ...user,
+          roleTemplateId: template?.id ?? null,
+        },
         update: {
           schoolId: user.schoolId,
           role: user.role,
           firstName: user.firstName,
           lastName: user.lastName,
+          roleTemplateId: template?.id ?? undefined,
         },
       });
+      if (user.role === 'teacher') {
+        await this.ensureTeacherProfile(user.id, user.schoolId);
+      }
     }
+  }
+
+  private async ensureTeacherProfile(userId: string, schoolId: string) {
+    await this.prisma.teacherProfile.upsert({
+      where: { userId },
+      create: { userId, schoolId },
+      update: { schoolId },
+    });
   }
 
   async findByEmail(email: string): Promise<UserRecord | undefined> {
@@ -79,6 +119,8 @@ export class UsersService implements OnModuleInit {
     lastName: string;
     role: UserRole;
     schoolId: string;
+    roleTemplateId?: string;
+    roleTemplateSlug?: string;
     externalRef?: string;
   }): Promise<UserRecord> {
     const email = input.email.toLowerCase();
@@ -86,6 +128,29 @@ export class UsersService implements OnModuleInit {
     if (existing) {
       throw new ConflictException('Email already registered');
     }
+
+    await this.permissionsService.ensureSchoolRoleTemplates(input.schoolId);
+
+    let roleTemplateId = input.roleTemplateId ?? null;
+    if (!roleTemplateId && input.roleTemplateSlug) {
+      const tpl = await this.prisma.roleTemplate.findFirst({
+        where: { schoolId: input.schoolId, slug: input.roleTemplateSlug },
+      });
+      roleTemplateId = tpl?.id ?? null;
+    }
+    if (!roleTemplateId && DEFAULT_TEMPLATE_BY_ROLE[input.role]) {
+      const tpl = await this.prisma.roleTemplate.findFirst({
+        where: {
+          schoolId: input.schoolId,
+          slug: DEFAULT_TEMPLATE_BY_ROLE[input.role],
+        },
+      });
+      roleTemplateId = tpl?.id ?? null;
+    }
+
+    const template = roleTemplateId
+      ? await this.prisma.roleTemplate.findUnique({ where: { id: roleTemplateId } })
+      : null;
 
     const passwordHash = hashSync(
       input.password ?? randomBytes(32).toString('hex'),
@@ -98,12 +163,17 @@ export class UsersService implements OnModuleInit {
         email,
         firstName: input.firstName,
         lastName: input.lastName,
-        role: input.role,
+        role: template?.portalRole ?? input.role,
+        roleTemplateId,
         schoolId: input.schoolId,
         externalRef: input.externalRef ?? null,
         passwordHash,
       },
     });
+
+    if (user.role === 'teacher') {
+      await this.ensureTeacherProfile(user.id, input.schoolId);
+    }
 
     return this.toUserRecord(user);
   }
@@ -130,6 +200,7 @@ export class UsersService implements OnModuleInit {
     id: string;
     schoolId: string;
     role: PrismaUserRole;
+    roleTemplateId: string | null;
     email: string;
     firstName: string;
     lastName: string;
@@ -138,7 +209,8 @@ export class UsersService implements OnModuleInit {
     return {
       id: user.id,
       schoolId: user.schoolId,
-      role: user.role,
+      role: user.role as UserRole,
+      roleTemplateId: user.roleTemplateId,
       email: user.email,
       firstName: user.firstName,
       lastName: user.lastName,

@@ -11,11 +11,16 @@ const ROLES: { value: JoinRole; label: string; desc: string }[] = [
 type JoinRoleSelectorProps = {
   value: JoinRole;
   onChange: (role: JoinRole) => void;
+  compact?: boolean;
 };
 
-export function JoinRoleSelector({ value, onChange }: JoinRoleSelectorProps) {
+export function JoinRoleSelector({ value, onChange, compact }: JoinRoleSelectorProps) {
   return (
-    <div className="auth-role-grid" role="radiogroup" aria-label="Your role">
+    <div
+      className={`auth-role-grid${compact ? " auth-role-grid--compact" : ""}`}
+      role="radiogroup"
+      aria-label="Your role"
+    >
       {ROLES.map((r) => (
         <button
           key={r.value}

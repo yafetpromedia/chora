@@ -1,0 +1,975 @@
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { Gender, UserRole } from '@prisma/client';
+import { randomBytes } from 'crypto';
+import { hashSync } from 'bcrypt';
+import { PrismaService } from '../prisma/prisma.service';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service';
+import { CreateStudentDto } from './dto/create-student.dto';
+import { UpdateStudentDto } from './dto/update-student.dto';
+import {
+  buildCardScanPayload,
+  formatSchoolStudentId,
+  generateStudentCardCode,
+  parseSchoolStudentIdSequence,
+} from './student-card.util';
+import { FayedaService } from '../fayeda/fayeda.service';
+import { AcademicEnrollmentService } from '../results/academic-enrollment.service';
+
+export type StudentRow = {
+  firstName: string;
+  lastName: string;
+  gender?: string;
+  gradeName: string;
+  sectionName?: string;
+  parentName: string;
+  parentPhone: string;
+  studentId?: string;
+  idNumber?: string;
+  dateOfBirth?: string;
+  motherName?: string;
+  motherPhone?: string;
+  email?: string;
+};
+
+@Injectable()
+export class StudentsService {
+  private readonly studentInclude = {
+    user: {
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        externalRef: true,
+      },
+    },
+    grade: { select: { id: true, name: true } },
+    section: { select: { id: true, name: true } },
+    parents: {
+      include: {
+        parent: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            phone: true,
+            email: true,
+          },
+        },
+      },
+    },
+  } as const;
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly subscriptionsService: SubscriptionsService,
+    private readonly fayedaService: FayedaService,
+    private readonly enrollment: AcademicEnrollmentService,
+  ) {}
+
+  async list(schoolId: string) {
+    return this.prisma.studentProfile.findMany({
+      where: { schoolId },
+      include: this.studentInclude,
+      orderBy: [{ grade: { sortOrder: 'asc' } }, { user: { firstName: 'asc' } }],
+    });
+  }
+
+  async getOne(schoolId: string, profileId: string) {
+    const student = await this.prisma.studentProfile.findFirst({
+      where: { id: profileId, schoolId },
+      include: this.studentInclude,
+    });
+    if (!student) {
+      throw new NotFoundException('Student not found');
+    }
+    return student;
+  }
+
+  async update(schoolId: string, profileId: string, dto: UpdateStudentDto) {
+    const profile = await this.getOne(schoolId, profileId);
+
+    if (dto.gradeId) {
+      const grade = await this.prisma.grade.findFirst({
+        where: { id: dto.gradeId, schoolId },
+      });
+      if (!grade) {
+        throw new NotFoundException('Grade not found');
+      }
+    }
+
+    const gradeId = dto.gradeId ?? profile.gradeId;
+    let sectionId: string | null =
+      dto.sectionId === null ? null : (dto.sectionId ?? profile.sectionId);
+
+    if (sectionId) {
+      const section = await this.prisma.section.findFirst({
+        where: { id: sectionId, gradeId },
+      });
+      if (!section) {
+        throw new NotFoundException('Section not found');
+      }
+    }
+
+    const fatherName = dto.fatherName?.trim() || dto.parentName?.trim();
+    const fatherPhone = dto.fatherPhone?.trim() || dto.parentPhone?.trim();
+    const motherName = dto.motherName?.trim();
+    const motherPhone = dto.motherPhone?.trim();
+
+    if (dto.photoUrl !== undefined) {
+      this.assertValidPhotoUrl(dto.photoUrl);
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const userData: {
+        firstName?: string;
+        lastName?: string;
+        externalRef?: string;
+      } = {};
+      if (dto.firstName) userData.firstName = dto.firstName.trim();
+      if (dto.lastName) userData.lastName = dto.lastName.trim();
+      if (dto.studentId?.trim()) userData.externalRef = dto.studentId.trim();
+
+      if (Object.keys(userData).length > 0) {
+        await tx.user.update({
+          where: { id: profile.userId },
+          data: userData,
+        });
+      }
+
+      const profileData: {
+        gradeId?: string;
+        sectionId?: string | null;
+        middleName?: string | null;
+        gender?: Gender;
+        dateOfBirth?: Date | null;
+        fcn?: string;
+        phone?: string | null;
+        photoUrl?: string | null;
+      } = { sectionId };
+
+      if (dto.gradeId) profileData.gradeId = dto.gradeId;
+      if (dto.middleName !== undefined) {
+        profileData.middleName = dto.middleName.trim() || null;
+      }
+      if (dto.gender !== undefined) profileData.gender = dto.gender;
+      if (dto.dateOfBirth !== undefined) {
+        const dob = new Date(dto.dateOfBirth);
+        if (Number.isNaN(dob.getTime())) {
+          throw new BadRequestException('Invalid date of birth');
+        }
+        profileData.dateOfBirth = dob;
+      }
+      if (dto.idNumber?.trim()) profileData.fcn = dto.idNumber.trim();
+      if (dto.phone !== undefined) {
+        profileData.phone = dto.phone.trim() || null;
+      }
+      if (dto.photoUrl !== undefined) {
+        profileData.photoUrl = dto.photoUrl?.trim() || null;
+      }
+
+      await tx.studentProfile.update({
+        where: { id: profileId },
+        data: profileData,
+      });
+
+      if (fatherName || fatherPhone) {
+        await this.updateParentLink(
+          tx,
+          profile,
+          0,
+          fatherName,
+          fatherPhone,
+          schoolId,
+          profileId,
+        );
+      }
+      if (motherName || motherPhone) {
+        await this.updateParentLink(
+          tx,
+          profile,
+          1,
+          motherName,
+          motherPhone,
+          schoolId,
+          profileId,
+        );
+      }
+
+      return tx.studentProfile.findFirstOrThrow({
+        where: { id: profileId },
+        include: this.studentInclude,
+      });
+    });
+  }
+
+  async remove(schoolId: string, profileId: string) {
+    const profile = await this.getOne(schoolId, profileId);
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.resultRecord.deleteMany({
+        where: { schoolId, studentId: profile.userId },
+      });
+      await tx.user.delete({
+        where: { id: profile.userId },
+      });
+    });
+
+    return { removed: true, id: profileId };
+  }
+
+  async create(schoolId: string, dto: CreateStudentDto) {
+    await this.subscriptionsService.assertCanAddUser(schoolId, UserRole.student);
+
+    let fayedaFields: {
+      middleName?: string | null;
+      dateOfBirth?: Date | null;
+      photoUrl?: string | null;
+      fan?: string | null;
+      fcn?: string | null;
+      nationality?: string | null;
+      region?: string | null;
+      zone?: string | null;
+      woreda?: string | null;
+      phone?: string | null;
+      gender?: Gender | null;
+      fayedaVerifiedAt?: Date | null;
+      firstName?: string;
+      lastName?: string;
+    } = {};
+
+    if (dto.photoUrl?.trim()) {
+      this.assertValidPhotoUrl(dto.photoUrl);
+    }
+
+    if (dto.fayedaVerificationToken) {
+      const verified = this.fayedaService.consumeVerificationToken(
+        schoolId,
+        dto.fayedaVerificationToken,
+      );
+      fayedaFields = {
+        middleName: verified.middleName,
+        dateOfBirth: new Date(verified.dateOfBirth),
+        photoUrl: verified.photoUrl,
+        fan: verified.fan,
+        fcn: verified.fcn,
+        nationality: verified.nationality,
+        region: verified.region,
+        zone: verified.zone,
+        woreda: verified.woreda,
+        phone: verified.phone,
+        gender: verified.gender,
+        fayedaVerifiedAt: new Date(),
+        firstName: verified.firstName,
+        lastName: verified.lastName,
+      };
+    } else if (dto.fan || dto.fcn) {
+      fayedaFields = {
+        middleName: dto.middleName?.trim() || null,
+        dateOfBirth: dto.dateOfBirth ? new Date(dto.dateOfBirth) : null,
+        photoUrl: dto.photoUrl?.trim() || null,
+        fan: dto.fan?.trim() || null,
+        fcn: dto.fcn?.trim() || null,
+        nationality: dto.nationality?.trim() || null,
+        region: dto.region?.trim() || null,
+        zone: dto.zone?.trim() || null,
+        woreda: dto.woreda?.trim() || null,
+        phone: dto.phone?.trim() || null,
+      };
+    }
+
+    const grade = await this.prisma.grade.findFirst({
+      where: { id: dto.gradeId, schoolId },
+    });
+    if (!grade) {
+      throw new NotFoundException('Grade not found');
+    }
+
+    if (dto.sectionId) {
+      const section = await this.prisma.section.findFirst({
+        where: { id: dto.sectionId, gradeId: dto.gradeId },
+      });
+      if (!section) {
+        throw new NotFoundException('Section not found');
+      }
+    }
+
+    const tempPassword = this.generateTempPassword();
+    const studentEmail =
+      dto.email?.toLowerCase().trim() ||
+      `student.${randomBytes(6).toString('hex')}@school.campusone.app`;
+
+    const fatherName =
+      dto.fatherName?.trim() || dto.parentName?.trim() || '';
+    const fatherPhone =
+      dto.fatherPhone?.trim() || dto.parentPhone?.trim() || '';
+    const motherName = dto.motherName?.trim() || '';
+    const motherPhone = dto.motherPhone?.trim() || '';
+
+    if (!fatherName || !fatherPhone || !motherName || !motherPhone) {
+      throw new BadRequestException(
+        'Father and mother full names and phone numbers are required',
+      );
+    }
+
+    const idNumber = (dto.idNumber?.trim() || fayedaFields.fcn || '').trim();
+    if (!idNumber) {
+      throw new BadRequestException('ID number is required');
+    }
+
+    const dateOfBirth = fayedaFields.dateOfBirth ?? new Date(dto.dateOfBirth);
+    if (Number.isNaN(dateOfBirth.getTime())) {
+      throw new BadRequestException('Invalid date of birth');
+    }
+
+    const gender = fayedaFields.gender ?? dto.gender;
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      const schoolStudentId =
+        dto.studentId?.trim() ||
+        (await this.allocateSchoolStudentId(tx, schoolId));
+
+      const studentUser = await tx.user.create({
+        data: {
+          id: `u_${randomBytes(8).toString('hex')}`,
+          schoolId,
+          role: UserRole.student,
+          email: studentEmail,
+          firstName: (fayedaFields.firstName ?? dto.firstName).trim(),
+          lastName: (fayedaFields.lastName ?? dto.lastName).trim(),
+          externalRef: schoolStudentId,
+          passwordHash: hashSync(tempPassword, 10),
+        },
+      });
+
+      const profile = await tx.studentProfile.create({
+        data: {
+          userId: studentUser.id,
+          schoolId,
+          gradeId: dto.gradeId,
+          sectionId: dto.sectionId ?? null,
+          gender,
+          middleName:
+            fayedaFields.middleName ?? (dto.middleName?.trim() || null),
+          dateOfBirth,
+          photoUrl:
+            fayedaFields.photoUrl ?? (dto.photoUrl?.trim() || null),
+          fan: fayedaFields.fan ?? null,
+          fcn: idNumber,
+          nationality: fayedaFields.nationality ?? null,
+          region: fayedaFields.region ?? null,
+          zone: fayedaFields.zone ?? null,
+          woreda: fayedaFields.woreda ?? null,
+          phone: fayedaFields.phone ?? (dto.phone?.trim() || null),
+          fayedaVerifiedAt: fayedaFields.fayedaVerifiedAt ?? null,
+          cardCode: await this.allocateCardCode(tx, schoolId),
+        },
+      });
+
+      const father = await this.linkParent(
+        tx,
+        schoolId,
+        fatherName,
+        fatherPhone,
+        profile.id,
+        dto.parentEmail,
+      );
+      const mother = await this.linkParent(
+        tx,
+        schoolId,
+        motherName,
+        motherPhone,
+        profile.id,
+      );
+
+      const welcomeParts: string[] = [];
+      if (father.isNew && father.tempPassword) {
+        welcomeParts.push(
+          `Father — login ${father.phone} · temp password ${father.tempPassword}`,
+        );
+      }
+      if (mother.isNew && mother.tempPassword) {
+        welcomeParts.push(
+          `Mother — login ${mother.phone} · temp password ${mother.tempPassword}`,
+        );
+      }
+
+      return {
+        student: {
+          id: profile.id,
+          userId: studentUser.id,
+          name: `${studentUser.firstName} ${studentUser.lastName}`,
+          grade: grade.name,
+          studentId: schoolStudentId,
+          idNumber,
+        },
+        father: {
+          id: father.user.id,
+          phone: father.user.phone,
+          email: father.user.email,
+          isNew: father.isNew,
+        },
+        mother: {
+          id: mother.user.id,
+          phone: mother.user.phone,
+          email: mother.user.email,
+          isNew: mother.isNew,
+        },
+        parent: {
+          id: father.user.id,
+          phone: father.user.phone,
+          email: father.user.email,
+          isNew: father.isNew,
+        },
+        credentials: {
+          studentEmail,
+          studentTempPassword: tempPassword,
+          parentPhone: father.phone,
+          parentTempPassword: father.tempPassword,
+          fatherPhone: father.phone,
+          fatherTempPassword: father.tempPassword,
+          motherPhone: mother.phone,
+          motherTempPassword: mother.tempPassword,
+          welcomeMessage:
+            welcomeParts.length > 0
+              ? welcomeParts.join(' · ')
+              : `Parent accounts linked (father ${father.phone}, mother ${mother.phone}).`,
+        },
+      };
+    });
+
+    await this.enrollment.ensureForCurrentYear(
+      schoolId,
+      result.student.id,
+      dto.gradeId,
+      dto.sectionId ?? null,
+    );
+
+    return result;
+  }
+
+  async importRows(schoolId: string, rows: StudentRow[]) {
+    const grades = await this.prisma.grade.findMany({
+      where: { schoolId },
+      include: { sections: true },
+    });
+
+    const results: {
+      row: number;
+      ok: boolean;
+      error?: string;
+      studentName?: string;
+    }[] = [];
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      try {
+        const grade = grades.find(
+          (g) => g.name.toLowerCase() === row.gradeName.trim().toLowerCase(),
+        );
+        if (!grade) {
+          throw new Error(`Grade "${row.gradeName}" not found`);
+        }
+
+        let sectionId: string | undefined;
+        if (row.sectionName?.trim()) {
+          const section = grade.sections.find(
+            (s) =>
+              s.name.toLowerCase() === row.sectionName!.trim().toLowerCase(),
+          );
+          if (!section) {
+            throw new Error(
+              `Section "${row.sectionName}" not found in ${grade.name}`,
+            );
+          }
+          sectionId = section.id;
+        }
+
+        let gender: Gender | undefined;
+        if (row.gender) {
+          const g = row.gender.trim().toUpperCase();
+          if (g === 'M' || g === 'MALE') gender = Gender.MALE;
+          else if (g === 'F' || g === 'FEMALE') gender = Gender.FEMALE;
+          else gender = Gender.OTHER;
+        }
+
+        await this.create(schoolId, {
+          firstName: row.firstName.trim(),
+          lastName: row.lastName.trim(),
+          gradeId: grade.id,
+          sectionId,
+          gender: gender ?? Gender.OTHER,
+          ...(row.studentId?.trim() ? { studentId: row.studentId.trim() } : {}),
+          idNumber:
+            row.idNumber?.trim() ||
+            `IMPID-${String(i + 1).padStart(4, '0')}`,
+          dateOfBirth: row.dateOfBirth?.trim() || '2010-01-01',
+          fatherName: row.parentName.trim(),
+          fatherPhone: row.parentPhone.trim(),
+          motherName: row.motherName?.trim() || row.parentName.trim(),
+          motherPhone: row.motherPhone?.trim() || row.parentPhone.trim(),
+          email: row.email,
+        });
+
+        results.push({
+          row: i + 1,
+          ok: true,
+          studentName: `${row.firstName} ${row.lastName}`,
+        });
+      } catch (err) {
+        results.push({
+          row: i + 1,
+          ok: false,
+          error: err instanceof Error ? err.message : 'Failed',
+        });
+      }
+    }
+
+    return {
+      total: rows.length,
+      success: results.filter((r) => r.ok).length,
+      failed: results.filter((r) => !r.ok).length,
+      results,
+    };
+  }
+
+  parseCsv(buffer: Buffer): StudentRow[] {
+    const text = buffer.toString('utf-8').replace(/^\uFEFF/, '');
+    const lines = text.split(/\r?\n/).filter((l) => l.trim());
+    if (lines.length < 2) {
+      throw new BadRequestException('File must include a header row and data');
+    }
+
+    const headers = lines[0].split(',').map((h) => h.trim().toLowerCase());
+    const col = (names: string[]) => {
+      for (const n of names) {
+        const i = headers.indexOf(n);
+        if (i >= 0) return i;
+      }
+      return -1;
+    };
+
+    const firstIdx = col(['first name', 'firstname', 'student name']);
+    const lastIdx = col(['last name', 'lastname']);
+    const fullNameIdx = col(['student name', 'name']);
+    const gradeIdx = col(['grade']);
+    const sectionIdx = col(['section']);
+    const genderIdx = col(['gender']);
+    const parentNameIdx = col(['parent name', 'parentname']);
+    const phoneIdx = col(['phone', 'parent phone', 'parentphone']);
+
+    if (gradeIdx < 0 || parentNameIdx < 0 || phoneIdx < 0) {
+      throw new BadRequestException(
+        'CSV must include columns: Grade, Parent Name, Phone (and student name)',
+      );
+    }
+
+    const rows: StudentRow[] = [];
+
+    for (let i = 1; i < lines.length; i++) {
+      const cells = lines[i].split(',').map((c) => c.trim());
+      if (cells.every((c) => !c)) continue;
+
+      let firstName = '';
+      let lastName = '';
+
+      if (firstIdx >= 0 && lastIdx >= 0) {
+        firstName = cells[firstIdx] ?? '';
+        lastName = cells[lastIdx] ?? '';
+      } else if (fullNameIdx >= 0) {
+        const parts = (cells[fullNameIdx] ?? '').split(/\s+/);
+        firstName = parts[0] ?? '';
+        lastName = parts.slice(1).join(' ') || 'Student';
+      } else {
+        throw new BadRequestException('Missing student name columns');
+      }
+
+      rows.push({
+        firstName,
+        lastName,
+        gender: genderIdx >= 0 ? cells[genderIdx] : undefined,
+        gradeName: cells[gradeIdx] ?? '',
+        sectionName: sectionIdx >= 0 ? cells[sectionIdx] : undefined,
+        parentName: cells[parentNameIdx] ?? '',
+        parentPhone: cells[phoneIdx] ?? '',
+      });
+    }
+
+    return rows;
+  }
+
+  async ensureCardCodes(schoolId: string) {
+    const missing = await this.prisma.studentProfile.findMany({
+      where: { schoolId, cardCode: null },
+      select: { id: true },
+    });
+    let updated = 0;
+    for (const row of missing) {
+      const code = await this.allocateCardCode(this.prisma, schoolId);
+      await this.prisma.studentProfile.update({
+        where: { id: row.id },
+        data: { cardCode: code },
+      });
+      updated++;
+    }
+    return { updated, total: missing.length };
+  }
+
+  async getIdCard(schoolId: string, profileId: string) {
+    const profile = await this.getOne(schoolId, profileId);
+    await this.ensureProfileCardCode(profile, schoolId);
+    const school = await this.loadSchoolForCard(schoolId);
+    return this.formatIdCardPayload(profile, school);
+  }
+
+  async getIdCardByUserId(schoolId: string, userId: string) {
+    const profile = await this.prisma.studentProfile.findFirst({
+      where: { schoolId, userId },
+      include: this.studentInclude,
+    });
+    if (!profile) {
+      throw new NotFoundException('Student profile not found');
+    }
+    await this.ensureProfileCardCode(profile, schoolId);
+    const school = await this.loadSchoolForCard(schoolId);
+    return this.formatIdCardPayload(profile, school);
+  }
+
+  async getIdCardForParentChild(
+    schoolId: string,
+    parentUserId: string,
+    studentProfileId: string,
+  ) {
+    const link = await this.prisma.parentStudent.findFirst({
+      where: { parentId: parentUserId, studentId: studentProfileId },
+    });
+    if (!link) {
+      throw new NotFoundException('Student not linked to this parent');
+    }
+    return this.getIdCard(schoolId, studentProfileId);
+  }
+
+  async listIdCards(schoolId: string, gradeId?: string, sectionId?: string) {
+    await this.ensureCardCodes(schoolId);
+    const profiles = await this.prisma.studentProfile.findMany({
+      where: {
+        schoolId,
+        ...(gradeId ? { gradeId } : {}),
+        ...(sectionId ? { sectionId } : {}),
+      },
+      include: this.studentInclude,
+      orderBy: [{ grade: { sortOrder: 'asc' } }, { user: { firstName: 'asc' } }],
+    });
+    const school = await this.loadSchoolForCard(schoolId);
+    return profiles
+      .filter((p) => p.cardCode)
+      .map((p) => this.formatIdCardPayload(p, school));
+  }
+
+  private async loadSchoolForCard(schoolId: string) {
+    const [school, currentYear] = await Promise.all([
+      this.prisma.school.findUnique({
+        where: { id: schoolId },
+        select: {
+          name: true,
+          logoUrl: true,
+          joinCode: true,
+          phone: true,
+          address: true,
+          email: true,
+        },
+      }),
+      this.enrollment.getCurrentYear(schoolId),
+    ]);
+    const year = new Date().getFullYear();
+    return {
+      name: school?.name ?? 'CampusOne',
+      logoUrl: school?.logoUrl ?? null,
+      joinCode: school?.joinCode ?? '',
+      phone: school?.phone ?? null,
+      address: school?.address ?? null,
+      email: school?.email ?? null,
+      academicYearName: currentYear?.name ?? String(year),
+    };
+  }
+
+  private async ensureProfileCardCode(
+    profile: { id: string; cardCode: string | null },
+    schoolId: string,
+  ) {
+    if (profile.cardCode) return;
+    const code = await this.allocateCardCode(this.prisma, schoolId);
+    await this.prisma.studentProfile.update({
+      where: { id: profile.id },
+      data: { cardCode: code },
+    });
+    profile.cardCode = code;
+  }
+
+  private formatIdCardPayload(
+    profile: {
+      id: string;
+      middleName?: string | null;
+      photoUrl?: string | null;
+      fan?: string | null;
+      fcn?: string | null;
+      gender?: Gender | null;
+      dateOfBirth?: Date | null;
+      phone?: string | null;
+      cardCode: string | null;
+      user: {
+        firstName: string;
+        lastName: string;
+        externalRef?: string | null;
+      };
+      grade: { name: string };
+      section?: { name: string } | null;
+      parents?: {
+        parent: { firstName: string; lastName: string; phone: string | null };
+      }[];
+    },
+    school: {
+      name: string;
+      logoUrl: string | null;
+      joinCode: string;
+      phone: string | null;
+      address: string | null;
+      email: string | null;
+      academicYearName: string;
+    },
+  ) {
+    const cardCode = profile.cardCode!;
+    const name = [
+      profile.user.firstName,
+      profile.middleName,
+      profile.user.lastName,
+    ]
+      .filter(Boolean)
+      .join(' ');
+
+    let age: number | null = null;
+    if (profile.dateOfBirth) {
+      const dob = new Date(profile.dateOfBirth);
+      if (!Number.isNaN(dob.getTime())) {
+        const today = new Date();
+        age = today.getFullYear() - dob.getFullYear();
+        const m = today.getMonth() - dob.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) age -= 1;
+      }
+    }
+
+    const year = new Date().getFullYear();
+    const father = profile.parents?.[0]?.parent;
+    const mother = profile.parents?.[1]?.parent;
+    const fatherName = father
+      ? `${father.firstName} ${father.lastName}`.trim()
+      : null;
+    const fatherPhone = father?.phone ?? null;
+    const motherName = mother
+      ? `${mother.firstName} ${mother.lastName}`.trim()
+      : null;
+    const motherPhone = mother?.phone ?? null;
+    const emergencyName = fatherName ?? motherName;
+    const emergencyPhone = fatherPhone ?? motherPhone;
+
+    return {
+      studentProfileId: profile.id,
+      cardCode,
+      scanPayload: buildCardScanPayload(cardCode),
+      name,
+      firstName: profile.user.firstName,
+      lastName: profile.user.lastName,
+      middleName: profile.middleName ?? null,
+      photoUrl: profile.photoUrl ?? null,
+      grade: profile.grade.name,
+      section: profile.section?.name ?? null,
+      studentId: profile.user.externalRef ?? null,
+      idNumber: profile.fcn ?? null,
+      fan: profile.fan ?? null,
+      gender: profile.gender ?? null,
+      dateOfBirth: profile.dateOfBirth ?? null,
+      age,
+      phone: profile.phone ?? null,
+      schoolName: school.name,
+      schoolLogoUrl: school.logoUrl,
+      schoolJoinCode: school.joinCode,
+      schoolPhone: school.phone,
+      schoolAddress: school.address,
+      schoolEmail: school.email,
+      validThrough: `${year}–${year + 1}`,
+      academicYear: school.academicYearName,
+      issuedAt: new Date().toISOString(),
+      fatherName,
+      fatherPhone,
+      motherName,
+      motherPhone,
+      emergencyContactName: emergencyName,
+      emergencyContactPhone: emergencyPhone,
+    };
+  }
+
+  private async allocateSchoolStudentId(
+    db: Pick<PrismaService, 'user'>,
+    schoolId: string,
+  ): Promise<string> {
+    const year = new Date().getFullYear();
+    const prefix = `STU-${year}-`;
+
+    const existing = await db.user.findMany({
+      where: {
+        schoolId,
+        role: UserRole.student,
+        externalRef: { startsWith: prefix },
+      },
+      select: { externalRef: true },
+    });
+
+    let maxSeq = 0;
+    for (const row of existing) {
+      if (!row.externalRef) continue;
+      const seq = parseSchoolStudentIdSequence(row.externalRef, year);
+      if (seq != null && seq > maxSeq) maxSeq = seq;
+    }
+
+    for (let attempt = 0; attempt < 100; attempt++) {
+      const candidate = formatSchoolStudentId(year, maxSeq + 1 + attempt);
+      const clash = await db.user.findFirst({
+        where: { schoolId, externalRef: candidate },
+      });
+      if (!clash) return candidate;
+    }
+
+    throw new ConflictException('Could not allocate student ID');
+  }
+
+  private async allocateCardCode(
+    db: Pick<PrismaService, 'studentProfile'>,
+    schoolId: string,
+  ): Promise<string> {
+    for (let attempt = 0; attempt < 12; attempt++) {
+      const cardCode = generateStudentCardCode();
+      const existing = await db.studentProfile.findFirst({
+        where: { schoolId, cardCode },
+      });
+      if (!existing) {
+        return cardCode;
+      }
+    }
+    throw new ConflictException('Could not generate student card code');
+  }
+
+  private assertValidPhotoUrl(url: string | null) {
+    if (!url) return;
+    const trimmed = url.trim();
+    if (trimmed.startsWith('data:image/') && trimmed.length > 3_000_000) {
+      throw new BadRequestException('Photo file is too large (max 2 MB)');
+    }
+  }
+
+  private async updateParentLink(
+    tx: Pick<PrismaService, 'user' | 'parentStudent'>,
+    profile: Awaited<ReturnType<StudentsService['getOne']>>,
+    index: number,
+    fullName: string | undefined,
+    phone: string | undefined,
+    schoolId: string,
+    studentProfileId: string,
+  ) {
+    const link = profile.parents[index];
+    if (link && (fullName || phone)) {
+      const [first, ...rest] = (fullName ?? '').trim().split(/\s+/);
+      const parent = link.parent;
+      await tx.user.update({
+        where: { id: link.parentId },
+        data: {
+          ...(fullName
+            ? {
+                firstName: first || parent.firstName,
+                lastName: rest.join(' ') || parent.lastName || 'Parent',
+              }
+            : {}),
+          ...(phone ? { phone: this.normalizePhone(phone) } : {}),
+        },
+      });
+      return;
+    }
+
+    if (!link && fullName && phone) {
+      await this.linkParent(tx, schoolId, fullName, phone, studentProfileId);
+    }
+  }
+
+  private async linkParent(
+    tx: Pick<PrismaService, 'user' | 'parentStudent'>,
+    schoolId: string,
+    fullName: string,
+    phone: string,
+    studentProfileId: string,
+    emailOverride?: string,
+  ) {
+    const normalizedPhone = this.normalizePhone(phone);
+    const [first, ...rest] = fullName.trim().split(/\s+/);
+    const lastName = rest.join(' ') || 'Parent';
+    const email =
+      emailOverride?.toLowerCase().trim() ||
+      `${normalizedPhone.replace(/\D/g, '')}.${first.toLowerCase()}@parent.campusone.app`;
+
+    let user = await tx.user.findFirst({
+      where: { schoolId, phone: normalizedPhone, role: UserRole.parent },
+    });
+
+    let tempPassword: string | null = null;
+
+    if (!user) {
+      await this.subscriptionsService.assertCanAddUser(
+        schoolId,
+        UserRole.parent,
+      );
+      tempPassword = this.generateTempPassword();
+      user = await tx.user.create({
+        data: {
+          id: `u_${randomBytes(8).toString('hex')}`,
+          schoolId,
+          role: UserRole.parent,
+          email,
+          phone: normalizedPhone,
+          firstName: first,
+          lastName,
+          passwordHash: hashSync(tempPassword, 10),
+        },
+      });
+    }
+
+    const existingLink = await tx.parentStudent.findFirst({
+      where: { parentId: user.id, studentId: studentProfileId },
+    });
+    if (!existingLink) {
+      await tx.parentStudent.create({
+        data: {
+          parentId: user.id,
+          studentId: studentProfileId,
+        },
+      });
+    }
+
+    return {
+      user,
+      phone: normalizedPhone,
+      isNew: tempPassword !== null,
+      tempPassword,
+    };
+  }
+
+  private normalizePhone(phone: string) {
+    return phone.replace(/\s/g, '').trim();
+  }
+
+  private generateTempPassword() {
+    return `Co${randomBytes(3).toString('hex')}!`;
+  }
+}

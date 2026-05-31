@@ -1,13 +1,15 @@
 import {
   BadRequestException,
   Injectable,
+  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { OAuth2Client } from 'google-auth-library';
-import { compare } from 'bcrypt';
+import { compare, hashSync } from 'bcrypt';
 import { AuthUser } from '../common/auth.types';
+import { PermissionsService } from '../permissions/permissions.service';
 import { SchoolsService } from '../schools/schools.service';
 import { UsersService } from '../users/users.service';
 import { GoogleAuthDto } from './dto/google-auth.dto';
@@ -16,7 +18,10 @@ import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { JoinInviteDto } from './dto/join-invite.dto';
 import { RegisterSchoolDto } from './dto/register-school.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 import { InvitesService } from '../schools/invites.service';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service';
+import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class AuthService {
@@ -24,13 +29,139 @@ export class AuthService {
     private readonly usersService: UsersService,
     private readonly schoolsService: SchoolsService,
     private readonly invitesService: InvitesService,
+    private readonly subscriptionsService: SubscriptionsService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly permissionsService: PermissionsService,
+    private readonly prisma: PrismaService,
   ) {}
+
+  async getProfile(actor: AuthUser) {
+    const user = await this.prisma.user.findFirst({
+      where: { id: actor.id, schoolId: actor.schoolId },
+      include: {
+        roleTemplate: { select: { slug: true, name: true } },
+        studentProfile: {
+          include: {
+            grade: { select: { name: true } },
+            section: { select: { name: true } },
+          },
+        },
+        teacherProfile: {
+          include: {
+            homeroomGrade: { select: { name: true } },
+            homeroomSection: { select: { name: true } },
+          },
+        },
+        parentLinks: {
+          include: {
+            student: {
+              include: {
+                user: { select: { firstName: true, lastName: true } },
+                grade: { select: { name: true } },
+                section: { select: { name: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const school = await this.prisma.school.findUnique({
+      where: { id: actor.schoolId },
+      select: { id: true, name: true, joinCode: true },
+    });
+    if (!school) {
+      throw new NotFoundException('School not found');
+    }
+
+    const resolved = await this.permissionsService.resolveForUser(user.id);
+
+    return {
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        phone: user.phone,
+        role: user.role,
+        externalRef: user.externalRef,
+        roleTemplateSlug: resolved.roleTemplateSlug,
+        roleTemplateName: resolved.roleTemplateName,
+        permissions: resolved.permissions,
+        createdAt: user.createdAt,
+      },
+      school,
+      student:
+        user.studentProfile ?
+          {
+            grade: user.studentProfile.grade.name,
+            section: user.studentProfile.section?.name ?? null,
+            fan: user.studentProfile.fan,
+            dateOfBirth: user.studentProfile.dateOfBirth,
+          }
+        : null,
+      teacher:
+        user.teacherProfile ?
+          {
+            homeroomGrade: user.teacherProfile.homeroomGrade?.name ?? null,
+            homeroomSection: user.teacherProfile.homeroomSection?.name ?? null,
+          }
+        : null,
+      children: user.parentLinks.map((link) => ({
+        name: `${link.student.user.firstName} ${link.student.user.lastName}`.trim(),
+        grade: link.student.grade.name,
+        section: link.student.section?.name ?? null,
+      })),
+    };
+  }
+
+  async updateProfile(actor: AuthUser, dto: UpdateProfileDto) {
+    const user = await this.prisma.user.findFirst({
+      where: { id: actor.id, schoolId: actor.schoolId },
+    });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const data: {
+      firstName?: string;
+      lastName?: string;
+      phone?: string | null;
+      passwordHash?: string;
+    } = {};
+
+    if (dto.firstName?.trim()) data.firstName = dto.firstName.trim();
+    if (dto.lastName?.trim()) data.lastName = dto.lastName.trim();
+    if (dto.phone !== undefined) {
+      data.phone = dto.phone.trim() || null;
+    }
+    if (dto.newPassword) {
+      data.passwordHash = hashSync(dto.newPassword, 10);
+    }
+
+    if (Object.keys(data).length === 0) {
+      return this.getProfile(actor);
+    }
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data,
+    });
+
+    return this.getProfile(actor);
+  }
 
   async registerSchool(dto: RegisterSchoolDto) {
     const school = await this.schoolsService.createSchool({
       name: dto.schoolName,
+      schoolType: dto.schoolType,
+      address: dto.address,
+      email: dto.schoolEmail,
+      logoUrl: dto.logoUrl,
       country: dto.country,
       phone: dto.phone,
     });
@@ -44,16 +175,9 @@ export class AuthService {
       schoolId: school.id,
     });
 
-    const payload: AuthUser = {
-      id: user.id,
-      schoolId: user.schoolId,
-      role: user.role,
-      email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
-    };
+    const payload = await this.toSchoolPayload(user);
 
-    const tokens = await this.issueTokens(payload);
+    const tokens = await this.issueSchoolTokens(payload);
     return {
       ...tokens,
       school: {
@@ -61,6 +185,7 @@ export class AuthService {
         name: school.name,
         slug: school.slug,
         joinCode: school.joinCode,
+        setupComplete: school.setupComplete,
       },
     };
   }
@@ -79,6 +204,8 @@ export class AuthService {
       throw new BadRequestException('School no longer exists');
     }
 
+    await this.subscriptionsService.assertCanAddUser(schoolId, role);
+
     const user = await this.usersService.createUser({
       email: dto.email,
       password: dto.password,
@@ -89,16 +216,9 @@ export class AuthService {
       externalRef: dto.externalRef?.trim() || undefined,
     });
 
-    const payload: AuthUser = {
-      id: user.id,
-      schoolId: user.schoolId,
-      role: user.role,
-      email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
-    };
+    const payload = await this.toSchoolPayload(user);
 
-    const tokens = await this.issueTokens(payload);
+    const tokens = await this.issueSchoolTokens(payload);
     return {
       ...tokens,
       school: {
@@ -116,6 +236,8 @@ export class AuthService {
       throw new BadRequestException('Student ID is required for student accounts');
     }
 
+    await this.subscriptionsService.assertCanAddUser(school.id, dto.role);
+
     const user = await this.usersService.createUser({
       email: dto.email,
       password: dto.password,
@@ -126,16 +248,9 @@ export class AuthService {
       externalRef: dto.externalRef?.trim() || undefined,
     });
 
-    const payload: AuthUser = {
-      id: user.id,
-      schoolId: user.schoolId,
-      role: user.role,
-      email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
-    };
+    const payload = await this.toSchoolPayload(user);
 
-    const tokens = await this.issueTokens(payload);
+    const tokens = await this.issueSchoolTokens(payload);
     return {
       ...tokens,
       school: {
@@ -175,16 +290,7 @@ export class AuthService {
       );
     }
 
-    const authUser: AuthUser = {
-      id: user.id,
-      schoolId: user.schoolId,
-      role: user.role,
-      email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
-    };
-
-    return this.issueTokens(authUser);
+    return this.issueSchoolTokens(await this.toSchoolPayload(user));
   }
 
   async login(dto: LoginDto) {
@@ -198,16 +304,7 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    const payload: AuthUser = {
-      id: user.id,
-      schoolId: user.schoolId,
-      role: user.role,
-      email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
-    };
-
-    return this.issueTokens(payload);
+    return this.issueSchoolTokens(await this.toSchoolPayload(user));
   }
 
   async validateUserById(id: string): Promise<AuthUser | null> {
@@ -216,14 +313,7 @@ export class AuthService {
       return null;
     }
 
-    return {
-      id: user.id,
-      schoolId: user.schoolId,
-      role: user.role,
-      email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
-    };
+    return await this.toSchoolPayload(user);
   }
 
   async refresh(dto: RefreshTokenDto) {
@@ -231,22 +321,49 @@ export class AuthService {
       'JWT_REFRESH_SECRET',
       'dev-refresh-secret',
     );
-    const payload = await this.jwtService.verifyAsync<AuthUser>(
+    const payload = await this.jwtService.verifyAsync<{ id: string; scope?: string }>(
       dto.refreshToken,
       {
         secret: refreshSecret,
       },
     );
 
+    if (payload.scope === 'platform') {
+      throw new UnauthorizedException('Use platform refresh endpoint');
+    }
+
     const user = await this.validateUserById(payload.id);
     if (!user) {
       throw new UnauthorizedException('User no longer exists');
     }
 
-    return this.issueTokens(user);
+    return this.issueSchoolTokens(user);
   }
 
-  private async issueTokens(payload: AuthUser) {
+  async toSchoolPayload(user: {
+    id: string;
+    schoolId: string;
+    role: AuthUser['role'];
+    email: string;
+    firstName: string;
+    lastName: string;
+  }): Promise<AuthUser> {
+    const resolved = await this.permissionsService.resolveForUser(user.id);
+    return {
+      id: user.id,
+      schoolId: user.schoolId,
+      role: user.role,
+      permissions: resolved.permissions,
+      roleTemplateSlug: resolved.roleTemplateSlug,
+      roleTemplateName: resolved.roleTemplateName,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      scope: 'school',
+    };
+  }
+
+  async issueSchoolTokens(payload: AuthUser) {
     const refreshSecret = this.configService.get<string>(
       'JWT_REFRESH_SECRET',
       'dev-refresh-secret',
@@ -265,3 +382,4 @@ export class AuthService {
     };
   }
 }
+

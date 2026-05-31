@@ -1,5 +1,5 @@
-import { RoleDashboard } from "@/components/role-dashboard";
+import { TeacherDashboard } from "@/components/teacher/teacher-dashboard";
 
 export default function TeacherPage() {
-  return <RoleDashboard role="teacher" />;
+  return <TeacherDashboard />;
 }

@@ -1,0 +1,210 @@
+/* CampusOne — school settings */
+
+.cfg-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.cfg-tabs {
+  display: flex;
+  gap: 0.35rem;
+  padding: 0.35rem;
+  border-radius: 0.85rem;
+  background: var(--brand-surface);
+  border: 1px solid var(--brand-border);
+  width: fit-content;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.cfg-tab {
+  padding: 0.5rem 1rem;
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--brand-muted);
+  background: transparent;
+  border: none;
+  border-radius: 0.6rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.cfg-tab--active {
+  color: var(--brand-teal-dark);
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(42, 111, 111, 0.1);
+}
+
+.cfg-section {
+  padding: 1.25rem 1.35rem;
+  border-radius: 1rem;
+  background: #fff;
+  border: 1px solid var(--brand-border);
+  box-shadow: 0 2px 14px rgba(42, 111, 111, 0.05);
+}
+
+.cfg-section__title {
+  margin: 0 0 0.25rem;
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--lite-black);
+}
+
+.cfg-section__lead {
+  margin: 0 0 1rem;
+  font-size: 0.82rem;
+  color: var(--brand-muted);
+  line-height: 1.45;
+  max-width: 40rem;
+}
+
+.cfg-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.cfg-form-row {
+  display: grid;
+  gap: 0.85rem;
+}
+
+@media (min-width: 560px) {
+  .cfg-form-row {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.cfg-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.cfg-field label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--brand-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.cfg-field input,
+.cfg-field select,
+.cfg-field textarea {
+  padding: 0.55rem 0.75rem;
+  font-family: inherit;
+  font-size: 0.875rem;
+  border: 1px solid var(--brand-border);
+  border-radius: 0.55rem;
+  background: #fff;
+}
+
+.cfg-field textarea {
+  min-height: 4.5rem;
+  resize: vertical;
+}
+
+.cfg-field input:focus,
+.cfg-field select:focus,
+.cfg-field textarea:focus {
+  outline: none;
+  border-color: var(--brand-teal);
+}
+
+.cfg-field input:disabled {
+  background: var(--brand-surface);
+  color: var(--brand-muted);
+}
+
+.cfg-code-box {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 1.15rem;
+  border-radius: 0.85rem;
+  background: var(--brand-surface);
+  border: 1px dashed var(--brand-cyan);
+}
+
+.cfg-code {
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: var(--brand-teal-dark);
+}
+
+.cfg-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding-top: 0.5rem;
+}
+
+.cfg-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0.55rem 1.15rem;
+  font-family: inherit;
+  font-size: 0.84rem;
+  font-weight: 700;
+  border-radius: 0.65rem;
+  cursor: pointer;
+  text-decoration: none;
+  transition: transform 0.12s;
+}
+
+.cfg-btn--primary {
+  color: #fff;
+  border: none;
+  background: linear-gradient(135deg, var(--brand-teal-dark), var(--brand-teal));
+  box-shadow: 0 3px 14px rgba(42, 111, 111, 0.22);
+}
+
+.cfg-btn--ghost {
+  color: var(--brand-teal-dark);
+  background: #fff;
+  border: 1px solid var(--brand-border);
+}
+
+.cfg-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.cfg-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.cfg-toast {
+  padding: 0.75rem 1rem;
+  border-radius: 0.65rem;
+  font-size: 0.85rem;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  color: #065f46;
+}
+
+.cfg-toast--error {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #b91c1c;
+}
+
+.cfg-link-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.cfg-hint {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--brand-muted);
+}

@@ -4,6 +4,15 @@ import "./globals.css";
 import "../styles/landing.css";
 import "../styles/auth.css";
 import "../styles/dashboard.css";
+import "../styles/setup.css";
+import "../styles/students.css";
+import "../styles/attendance.css";
+import "../styles/settings.css";
+import "../styles/student-cards.css";
+import "../styles/teachers.css";
+import "../styles/results.css";
+import "../styles/platform.css";
+import "../styles/profile.css";
 
 const figtree = Figtree({
   subsets: ["latin"],
