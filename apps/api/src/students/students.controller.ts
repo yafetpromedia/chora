@@ -81,6 +81,12 @@ export class StudentsController {
     return this.studentsService.update(user.schoolId, id, dto);
   }
 
+  @Post(':id/reset-portal-password')
+  @RequirePermissions(SchoolPermission.STUDENTS_EDIT)
+  resetPortalPassword(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.studentsService.resetPortalPassword(user.schoolId, id);
+  }
+
   @Delete(':id')
   remove(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.studentsService.remove(user.schoolId, id);

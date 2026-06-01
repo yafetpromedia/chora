@@ -2,7 +2,7 @@
 
 CampusOne restricts teachers to **only their assigned classes** — homeroom and/or subject assignments. Admins and staff (`portalRole: admin | staff`) remain school-wide.
 
-**Status:** ✅ Implemented (Sprint 1). Subject assignment UI: `/admin/results/subjects`.
+**Status:** ✅ Implemented. Homeroom on `/admin/teachers`; subject classes on `/admin/subjects/assign`.
 
 ## Data model
 
@@ -14,9 +14,11 @@ CampusOne restricts teachers to **only their assigned classes** — homeroom and
 **Scope rule:** A teacher can access a class when:
 
 1. **Homeroom** matches `gradeId` (+ optional `sectionId`), or  
-2. An **assignment** matches `gradeId` (+ optional `sectionId`), or  
-3. **`ClassSubject.teacherId`** equals the teacher (results), or  
+2. A non-homeroom **`TeacherAssignment`** matches `gradeId` (+ optional `sectionId`), or  
+3. **`ClassSubject.teacherId`** equals the teacher (current academic year — attendance + results), or  
 4. User is **admin/staff** (unrestricted).
+
+Homeroom and subject teaching are **independent**: a teacher can be homeroom for Grade 11 while teaching Math in Grades 9–10 via Subject assignment.
 
 Grade-wide scope (`sectionId = null`) allows any section in that grade.
 
@@ -73,11 +75,17 @@ Subject-only assignment (`subjectId` set) still gates by **grade/section** today
 
 Permissions and assignments are resolved at login (JWT `permissions[]`). After admin changes assignments, teacher should **log out and back in**.
 
-## Example
+## Examples
 
-**Mr. Samuel** — Math, Grade 10-A, Grade 10-B:
+**Ms. Sara** — Homeroom **Grade 11 · Natural B**; teaches **Math** in Grades 9 and 10:
 
-After login he sees only 10-A and 10-B in attendance and results — not Grade 9 or 11.
+1. Admin sets homeroom on `/admin/teachers` (any teacher role, e.g. `subject_teacher`).
+2. Admin assigns her to Math per grade on `/admin/subjects/assign`.
+3. She sees Grade 11 (homeroom) plus Grades 9–10 in attendance pickers and her teaching slots on `/teacher`.
+
+**Mr. Samuel** — only Math, Grade 10-A and 10-B (no homeroom):
+
+After login he sees only 10-A and 10-B — not other grades.
 
 ## Testing
 

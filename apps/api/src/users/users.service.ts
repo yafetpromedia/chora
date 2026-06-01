@@ -5,6 +5,7 @@ import { UserRole as PrismaUserRole } from '@prisma/client';
 import { UserRole } from '../common/auth.types';
 import { PermissionsService } from '../permissions/permissions.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { isSchoolStudentIdLogin } from '../students/student-card.util';
 
 export interface UserRecord {
   id: string;
@@ -105,6 +106,29 @@ export class UsersService implements OnModuleInit {
       where: { email: email.toLowerCase() },
     });
     return user ? this.toUserRecord(user) : undefined;
+  }
+
+  async findByLoginIdentifier(
+    identifier: string,
+  ): Promise<UserRecord | undefined> {
+    const trimmed = identifier.trim();
+    if (!trimmed) return undefined;
+
+    if (trimmed.includes('@')) {
+      return this.findByEmail(trimmed);
+    }
+
+    if (isSchoolStudentIdLogin(trimmed)) {
+      const user = await this.prisma.user.findFirst({
+        where: {
+          role: PrismaUserRole.student,
+          externalRef: trimmed.toUpperCase(),
+        },
+      });
+      return user ? this.toUserRecord(user) : undefined;
+    }
+
+    return this.findByEmail(trimmed);
   }
 
   async findById(id: string): Promise<UserRecord | undefined> {

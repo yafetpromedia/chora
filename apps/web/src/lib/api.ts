@@ -57,7 +57,7 @@ export type CreateStudentPayload = {
   lastName: string;
   gradeId: string;
   sectionId?: string;
-  /** Omit to auto-generate (e.g. STU-2026-00001) */
+  /** Omit to auto-generate a unique random ID (e.g. STU-K7H3NP2M) */
   studentId?: string;
   idNumber: string;
   gender: "MALE" | "FEMALE" | "OTHER";
@@ -99,6 +99,7 @@ export type CreateStudentResult = {
   parent: { id: string; phone: string | null; email: string; isNew: boolean };
   credentials: {
     studentEmail: string;
+    portalUsername: string;
     studentTempPassword: string;
     parentPhone: string;
     parentTempPassword: string | null;
@@ -112,6 +113,7 @@ export type CreateStudentResult = {
 
 export type StudentRecord = {
   id: string;
+  portalTempPassword: string | null;
   gender: "MALE" | "FEMALE" | "OTHER" | null;
   middleName: string | null;
   dateOfBirth: string | null;

@@ -2,11 +2,21 @@
 
 import { useEffect, useState } from "react";
 import QRCode from "qrcode";
+import { StudentCardBarcode } from "@/components/students/student-card-barcode";
 import type { StudentIdCard } from "@/lib/student-cards";
 
 export type StudentIdCardVariant = "standard" | "compact" | "mini";
 
 const CAMPUSONE_WATERMARK = "/campusone/watermark.svg";
+
+function CardWatermark() {
+  return (
+    <div className="sid__watermark" aria-hidden>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={CAMPUSONE_WATERMARK} alt="" className="sid__watermark-img" />
+    </div>
+  );
+}
 
 type Props = {
   card: StudentIdCard;
@@ -86,11 +96,6 @@ export function StudentIdCardView({
 
   const front = (
     <article className={`sid${vClass}`}>
-      <div
-        className="sid__watermark"
-        style={{ backgroundImage: `url(${CAMPUSONE_WATERMARK})` }}
-        aria-hidden
-      />
       <header className="sid__head">
         <div className="sid__school">
           <div className="sid__logo-wrap">
@@ -110,58 +115,65 @@ export function StudentIdCardView({
         </div>
         <div className="sid__head-meta">
           <span className="sid__badge">Student</span>
-          <span className="sid__year">{card.academicYear}</span>
         </div>
       </header>
 
       <div className="sid__main sid__main--front">
+        <CardWatermark />
         <div className="sid__photo-block">
-          {card.photoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={card.photoUrl} alt="" className="sid__photo" />
-          ) : (
-            <div className="sid__photo sid__photo--empty" aria-hidden>
-              {initial}
+          <div className="sid__photo-col">
+            <div className="sid__photo-frame">
+              {card.photoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={card.photoUrl} alt="" className="sid__photo" />
+              ) : (
+                <div className="sid__photo sid__photo--empty" aria-hidden>
+                  {initial}
+                </div>
+              )}
             </div>
-          )}
+            <StudentCardBarcode code={card.cardCode} variant={variant} />
+          </div>
         </div>
 
         <div className="sid__details">
           <div className="sid__identity">
             <h3 className="sid__name">{card.name}</h3>
-            <span className="sid__grade-pill">{gradeLine}</span>
+            <p className="sid__grade-line">{gradeLine}</p>
           </div>
 
-          <dl className="sid__fields sid__fields--modern">
-            <div className="sid__field-cell">
+          <dl className="sid__fields sid__fields--body">
+            <div className="sid__field sid__field--col-a">
               <dt>Student ID</dt>
-              <dd>{card.studentId ?? "—"}</dd>
+              <dd className="sid__student-id">{card.studentId ?? "—"}</dd>
             </div>
-            <div className="sid__field-cell">
+            <div className="sid__field sid__field--col-b">
               <dt>FAN</dt>
               <dd className="sid__fan">{card.fan ?? "—"}</dd>
             </div>
-            <div className="sid__field-cell">
+            <div className="sid__field sid__field--col-a">
               <dt>Date of birth</dt>
               <dd>{formatDob(card.dateOfBirth)}</dd>
             </div>
-            <div className="sid__field-cell">
+            <div className="sid__field sid__field--col-b">
               <dt>Age</dt>
               <dd>{card.age != null ? `${card.age} yrs` : "—"}</dd>
             </div>
-            <div className="sid__field-cell">
+            <div className="sid__field sid__field--col-a">
               <dt>Sex</dt>
               <dd>{genderLabel(card.gender)}</dd>
             </div>
-            <div className="sid__field-cell sid__field-cell--code">
-              <dt>Card code</dt>
-              <dd>
-                <code className="sid__inline-code">{card.cardCode}</code>
-              </dd>
+            <div className="sid__field sid__field--col-b">
+              <dt>Academic year</dt>
+              <dd>{card.academicYear}</dd>
             </div>
-            <div className="sid__field-cell sid__field-cell--wide">
+            <div className="sid__field sid__field--col-a">
               <dt>Address</dt>
               <dd className="sid__address">{card.address ?? "—"}</dd>
+            </div>
+            <div className="sid__field sid__field--col-b">
+              <dt>Phone</dt>
+              <dd className="sid__phone">{card.phone ?? "—"}</dd>
             </div>
           </dl>
         </div>
@@ -189,11 +201,6 @@ export function StudentIdCardView({
 
   const back = (
     <article className={`sid sid--back${vClass}`}>
-      <div
-        className="sid__watermark"
-        style={{ backgroundImage: `url(${CAMPUSONE_WATERMARK})` }}
-        aria-hidden
-      />
       <div className="sid__stripe sid__stripe--back" aria-hidden />
       <header className="sid__back-head">
         <strong>{card.schoolName}</strong>
@@ -204,50 +211,50 @@ export function StudentIdCardView({
       </header>
 
       <div className="sid__back-body">
-        <div className="sid__back-qr sid__back-qr--large">
-          {qrLargeUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={qrLargeUrl} alt="" />
-          ) : (
-            <div className="sid__qr sid__qr--loading" aria-hidden />
-          )}
-          <span className="sid__scan-hint">Scan for attendance</span>
+        <CardWatermark />
+        <div className="sid__back-left">
+          <div className="sid__back-qr sid__back-qr--large">
+            {qrLargeUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={qrLargeUrl} alt="" />
+            ) : (
+              <div className="sid__qr sid__qr--loading" aria-hidden />
+            )}
+            <span className="sid__scan-hint">Scan for attendance</span>
+          </div>
+
+          <div className="sid__body-signature">
+            <div className="sid__body-signature-line" aria-hidden />
+            <span className="sid__body-signature-label">Authorized signature</span>
+          </div>
         </div>
 
         <div className="sid__back-info">
-          <div className="sid__back-cards">
-            <div className="sid__back-card">
-              <span className="sid__back-card-label">Father</span>
-              <span className="sid__back-card-name">{card.fatherName ?? "—"}</span>
+          <h4 className="sid__body-section-title">Parents / Guardians</h4>
+          <div className="sid__body-contacts">
+            <div className="sid__body-contact">
+              <span className="sid__body-contact-label">Father</span>
+              <span className="sid__body-contact-name">{card.fatherName ?? "—"}</span>
               {card.fatherPhone ? (
-                <span className="sid__back-phone">{card.fatherPhone}</span>
+                <span className="sid__body-contact-phone">{card.fatherPhone}</span>
               ) : null}
             </div>
-            <div className="sid__back-card">
-              <span className="sid__back-card-label">Mother</span>
-              <span className="sid__back-card-name">{card.motherName ?? "—"}</span>
+            <div className="sid__body-contact">
+              <span className="sid__body-contact-label">Mother</span>
+              <span className="sid__body-contact-name">{card.motherName ?? "—"}</span>
               {card.motherPhone ? (
-                <span className="sid__back-phone">{card.motherPhone}</span>
+                <span className="sid__body-contact-phone">{card.motherPhone}</span>
               ) : null}
             </div>
-            <div className="sid__back-card">
-              <span className="sid__back-card-label">Emergency</span>
-              <span className="sid__back-card-name">{card.emergencyContactName ?? "—"}</span>
-              {card.emergencyContactPhone ? (
-                <span className="sid__back-phone">{card.emergencyContactPhone}</span>
-              ) : null}
-            </div>
-            <div className="sid__back-card">
-              <span className="sid__back-card-label">Student phone</span>
-              <span className="sid__back-card-name sid__back-card-name--solo">
-                {card.phone ?? "—"}
+            <div className="sid__body-contact sid__body-contact--emergency">
+              <span className="sid__body-contact-label">Emergency</span>
+              <span className="sid__body-contact-name">
+                {card.emergencyContactName ?? "—"}
               </span>
+              {card.emergencyContactPhone ? (
+                <span className="sid__body-contact-phone">{card.emergencyContactPhone}</span>
+              ) : null}
             </div>
-          </div>
-
-          <div className="sid__signature">
-            <div className="sid__signature-line" aria-hidden />
-            <span className="sid__signature-label">Authorized signature</span>
           </div>
         </div>
       </div>

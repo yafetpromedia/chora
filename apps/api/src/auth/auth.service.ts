@@ -152,6 +152,13 @@ export class AuthService {
       data,
     });
 
+    if (dto.newPassword && user.role === 'student') {
+      await this.prisma.studentProfile.updateMany({
+        where: { userId: user.id },
+        data: { portalTempPassword: null },
+      });
+    }
+
     return this.getProfile(actor);
   }
 
@@ -294,7 +301,7 @@ export class AuthService {
   }
 
   async login(dto: LoginDto) {
-    const user = await this.usersService.findByEmail(dto.email);
+    const user = await this.usersService.findByLoginIdentifier(dto.email);
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
     }

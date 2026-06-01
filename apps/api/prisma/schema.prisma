@@ -375,6 +375,8 @@ model StudentProfile {
   phone              String?
   fayedaVerifiedAt   DateTime?
   cardCode           String?
+  /// Shown to admins while student has not changed their portal password.
+  portalTempPassword String?
   parents            ParentStudent[]
   attendanceRecords  AttendanceRecord[]
   parentNotifications ParentNotification[]

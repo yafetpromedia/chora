@@ -111,7 +111,7 @@ export default function StudentsPage() {
 
   async function onRegisterSuccess(result: CreateStudentResult) {
     setToast(
-      `${result.student.name} enrolled · ID ${result.student.studentId} · ${result.credentials.welcomeMessage}`,
+      `${result.student.name} enrolled · Portal login: ${result.credentials.portalUsername} / ${result.credentials.studentTempPassword}`,
     );
     await refresh();
   }

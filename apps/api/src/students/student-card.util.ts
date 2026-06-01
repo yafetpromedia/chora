@@ -23,17 +23,28 @@ export function parseCardScanPayload(raw: string): string | null {
   return trimmed.replace(/[^A-Z0-9]/g, '') || null;
 }
 
-/** School roll number, e.g. STU-2026-00042 */
-export function formatSchoolStudentId(year: number, sequence: number): string {
-  return `STU-${year}-${String(sequence).padStart(5, '0')}`;
+const STUDENT_ID_PREFIX = 'STU-';
+const STUDENT_ID_RANDOM_LEN = 8;
+
+/** Login email derived from school code + student ID (globally unique). */
+export function buildStudentPortalEmail(
+  joinCode: string,
+  schoolStudentId: string,
+): string {
+  const school = joinCode.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const id = schoolStudentId.toLowerCase().replace(/[^a-z0-9-]/g, '');
+  return `${id}.${school}@students.campusone.app`;
 }
 
-export function parseSchoolStudentIdSequence(
-  externalRef: string,
-  year: number,
-): number | null {
-  const prefix = `STU-${year}-`;
-  if (!externalRef.startsWith(prefix)) return null;
-  const n = Number.parseInt(externalRef.slice(prefix.length), 10);
-  return Number.isFinite(n) ? n : null;
+export function isSchoolStudentIdLogin(input: string): boolean {
+  return /^stu-[a-z0-9]+$/i.test(input.trim());
+}
+
+/** School roll number, e.g. STU-K7H3NP2M (unique random per school). */
+export function generateSchoolStudentId(): string {
+  let suffix = '';
+  for (let i = 0; i < STUDENT_ID_RANDOM_LEN; i++) {
+    suffix += CARD_CHARS[randomBytes(1)[0]! % CARD_CHARS.length];
+  }
+  return `${STUDENT_ID_PREFIX}${suffix}`;
 }

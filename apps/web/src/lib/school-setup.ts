@@ -93,6 +93,13 @@ export async function deleteStudent(id: string) {
   return apiDelete<{ removed: boolean; id: string }>(`/schools/students/${id}`);
 }
 
+export async function resetStudentPortalPassword(studentProfileId: string) {
+  return apiPost<{ portalUsername: string; tempPassword: string }>(
+    `/schools/students/${studentProfileId}/reset-portal-password`,
+    {},
+  );
+}
+
 export async function createStudent(body: CreateStudentPayload) {
   return apiPost<CreateStudentResult>("/schools/students", body);
 }

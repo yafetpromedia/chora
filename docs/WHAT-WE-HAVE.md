@@ -67,10 +67,12 @@ edu-os/
 | `staff` | `/admin` (filtered nav) | Registrar, finance, academic office |
 | `teacher` | `/teacher` | Homeroom & subject teachers |
 | `parent` | `/parent` | Guardians |
-| `student` | `/student` | Students |
+| `student` | `/student` | Students — login with **Student ID** or portal email |
 
 **Demo school:** `admin@eduos.local` / `Passw0rd!`  
 Also seeded: `teacher@`, `parent@`, `student@` (same password)
+
+**Student portal login:** Username is the school **Student ID** (`STU-xxxxxxxx`, stored on `User.externalRef`). Login accepts **Student ID or email**. On enroll, a synthetic email is created (`stu-{id}.{joinCode}@students.campusone.app`) and a **temporary password** is shown in **Manage student → Profile** until the student changes their password.
 
 ---
 
@@ -119,15 +121,21 @@ Schools are not limited to one shared “Admin” login. Each person gets a **ro
 | Feature | Location |
 |---------|----------|
 | List, search, grade filter | `/admin/students` |
-| Register / edit / remove | Drawers |
+| Register / edit / remove | Register drawer + **Manage student** drawer (tabs: Contact, Profile, Parents, Class, ID card) |
+| Auto Student ID | `STU-` + 8 random chars on create (override optional) |
 | CSV import | Toolbar |
 | Fayeda verification (mock OTP `123456`) | Register drawer |
-| Extra fields | FAN, FCN, photo, DOB, address |
+| Extra fields | FAN, FCN, photo, DOB, address, gender |
+| Portal credentials | Manage → Profile: username, temp password, reset password |
+| Photo upload | Client resize/compress before API (10 MB body limit on API) |
 
 ### ID cards & scan attendance
 
 | Feature | Location |
 |---------|----------|
+| **CR80 student ID** (ISO 7810) | Component `.sid` — front/back, watermark, barcode + QR on back |
+| Preview in Manage student | **ID card** tab (same layout as print modal) |
+| Print / PDF (single or bulk) | Manage → **Open full card · Print**, `/admin/students/cards`, `/print/student-id-cards` |
 | Printable QR ID cards | `/admin/students/cards` |
 | Student `cardCode` + backfill | API `/schools/student-cards` |
 | QR payload | `CAMPUS1:{cardCode}` |
@@ -136,17 +144,24 @@ Schools are not limited to one shared “Admin” login. Each person gets a **ro
 | Manual attendance | Card grid + bulk save |
 | Camera scanner | `AttendanceScanner` component |
 
+**Front card body:** photo + barcode (left); name/grade; 4×2 grid (Student ID, FAN, DOB, Age, Sex, Academic year, Address, Phone).  
+**Styles:** `apps/web/src/styles/student-cards.css`
+
 ### Staff & teachers
 
 | Feature | Location |
 |---------|----------|
-| Staff roster | `/admin/teachers` |
+| Teachers roster | `/admin/teachers` |
+| Office staff roster | `/admin/staff` (shared `PeopleDirectoryPanel`) |
 | Add staff (role template) | Drawer |
-| Per-user permission editor | `/admin/teachers` |
-| Teacher profile & assignments | `TeacherProfile`, `TeacherAssignment` |
-| Homeroom assignment | On create |
-| Teacher dashboard | `/teacher` — classes, pending attendance & results |
-| **Scoped access** | Teachers only see assigned classes — see [TEACHER-SCOPING.md](./TEACHER-SCOPING.md) |
+| Per-user permission editor | Teachers / staff drawers |
+| **Homeroom** (one class) | Any teacher — set grade/section on `/admin/teachers` (not tied to role name) |
+| **Subject teaching** (other grades) | `/admin/subjects/assign` — assigns `ClassSubject.teacherId` per grade/subject |
+| Teacher profile | `TeacherProfile.homeroomGradeId` + `TeacherAssignment` + class subjects |
+| Teacher dashboard | `/teacher` — homeroom, teaching slots, pending attendance & results |
+| **Scoped access** | Homeroom + assignments + subjects they teach — see [TEACHER-SCOPING.md](./TEACHER-SCOPING.md) |
+
+**Example:** Homeroom for **Grade 11**, teaches **Math** in Grades **9** and **10** via Subject assignment.
 
 ### Attendance (admin)
 
@@ -165,7 +180,9 @@ Full pipeline: **Academic Year → Terms → Subjects → Assessment Templates �
 | Academic years (create, set current) | `/admin/results/academic-years` |
 | End-of-year promotion | `/admin/results/promotion` |
 | School day dashboards (admin, teacher, parent) | `/admin`, `/teacher`, `/parent` |
-| Subject + teacher assignment | `/admin/results/subjects` |
+| Subject catalog | `/admin/subjects` |
+| Subject + teacher per class | `/admin/subjects/assign` |
+| Legacy results subjects UI | `/admin/results/subjects` |
 | Assessment templates (weighted components) | `/admin/results/templates` — see [ASSESSMENT-TEMPLATES.md](./ASSESSMENT-TEMPLATES.md) |
 | Score matrix (admin) | `/admin/results` |
 | Score matrix (teacher, scoped) | `/teacher/results` |
@@ -199,9 +216,11 @@ Full pipeline: **Academic Year → Terms → Subjects → Assessment Templates �
 ### Auth & security
 
 - Email/password + optional Google sign-in
+- **Students:** login with Student ID or portal email + password
 - JWT + refresh tokens
 - `SchoolTenantGuard` — all school data scoped by `schoolId`
 - Rate limiting, audit logging
+- API JSON body limit **10 MB** (student photos)
 
 ### Marketing
 
@@ -217,7 +236,7 @@ Full pipeline: **Academic Year → Terms → Subjects → Assessment Templates �
 
 **Academics & results:** `AssessmentTemplate`, `AssessmentTemplateComponent`, `AssessmentTemplateGrade`, `Assessment`, `StudentAssessmentScore`, `ClassSubjectTermSheet`, `StudentTermReport`, `GradingScale`, `GradingBand`, `ResultRecord` (legacy)
 
-**People:** `TeacherProfile`, `TeacherAssignment`, `ParentStudent`
+**People:** `TeacherProfile` (`homeroomGradeId`, `homeroomSectionId`), `TeacherAssignment`, `StudentProfile` (`portalTempPassword`), `ParentStudent`
 
 **Operations:** `AttendanceRecord`, `Announcement`, `ParentNotification`
 
@@ -232,7 +251,7 @@ Full pipeline: **Academic Year → Terms → Subjects → Assessment Templates �
 | `auth` | Login, register, join, refresh |
 | `schools` | Profile, settings, invites, subscription |
 | `grades` | Setup, grades, sections |
-| `students` | CRUD, import, single card |
+| `students` | CRUD, import, portal reset, `STU-*` IDs |
 | `student-cards` | Bulk cards, backfill codes |
 | `fayeda` | FAN verify (mock) |
 | `teachers` | Staff CRUD, assignments, teacher dashboard |
@@ -253,7 +272,9 @@ Full pipeline: **Academic Year → Terms → Subjects → Assessment Templates �
 
 **Platform:** `/platform/login`, `/platform`
 
-**Admin:** `/admin`, `/admin/setup`, `/admin/students`, `/admin/students/cards`, `/admin/teachers`, `/admin/attendance`, `/admin/results`, `/admin/results/academic-years`, `/admin/results/promotion`, `/admin/results/subjects`, `/admin/results/templates`, `/admin/results/print`, `/admin/finance`, `/admin/announcements`, `/admin/settings`, `/admin/upgrade`
+**Admin:** `/admin`, `/admin/setup`, `/admin/students`, `/admin/students/cards`, `/admin/teachers`, `/admin/staff`, `/admin/subjects`, `/admin/subjects/assign`, `/admin/attendance`, `/admin/results`, `/admin/results/academic-years`, `/admin/results/promotion`, `/admin/results/subjects`, `/admin/results/templates`, `/admin/results/print`, `/admin/finance`, `/admin/announcements`, `/admin/settings`, `/admin/upgrade`
+
+**Print:** `/print/student-id-cards`
 
 **Teacher:** `/teacher`, `/teacher/attendance`, `/teacher/results`
 
@@ -292,12 +313,12 @@ Full pipeline: **Academic Year → Terms → Subjects → Assessment Templates �
 ### Usable now
 
 - Register school + setup wizard  
-- Students (Fayeda mock, import, edit)  
-- ID cards + QR scan attendance  
+- Students (Fayeda mock, import, manage drawer, auto Student ID, portal login)  
+- **CR80 ID cards** (print/PDF, manage preview, bulk) + QR scan attendance  
 - Manual attendance + analytics  
 - Role templates + filtered navigation + per-user permission grants  
-- Staff management + teacher dashboard  
-- **Teacher scoping** on attendance, results, grade pickers  
+- Teachers + staff directories; **homeroom + multi-grade subject teaching**  
+- **Teacher scoping** (homeroom, assignments, class subjects)  
 - **Academic engine:** years, subject assignment, templates, score matrix, approval workflow, HTML report cards  
 - Settings, invites, finance UI (manual payment verification)  
 - Platform school management  
@@ -351,4 +372,4 @@ Log out and log in again after permission/schema updates.
 
 ## One-line summary
 
-CampusOne is a **multi-tenant school operating system** with tenants, students, Fayeda hook (mock), attendance (manual + QR), ID cards, finance (manual verify), and a full **academic results engine** (templates, teacher scoping, approval workflow, report cards) plus a **department-based permission workplace** — ready for a pilot school’s daily academics; next wins are **year promotion, PDF report cards, and payment gateways**.
+CampusOne is a **multi-tenant school operating system** with tenants, students (Fayeda mock, portal login by Student ID), **CR80 ID cards**, attendance (manual + QR), finance (manual verify), **homeroom + subject teacher** workflows, and a full **academic results engine** (templates, scoping, approval, report cards) plus a **department-based permission workplace** — ready for pilot daily use; next wins are **PDF report cards, timetable, and payment gateways**.

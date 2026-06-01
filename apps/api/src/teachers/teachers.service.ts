@@ -49,7 +49,22 @@ export class TeachersService {
       orderBy: [{ role: 'asc' }, { firstName: 'asc' }],
     });
 
-    return users.map((u) => this.formatStaff(u));
+    const currentYear = await this.prisma.academicYear.findFirst({
+      where: { schoolId, isCurrent: true },
+      select: { id: true },
+    });
+    const teacherUserIds = users
+      .filter((u) => u.role === UserRole.teacher)
+      .map((u) => u.id);
+    const teachingByUser = await this.loadTeachingSlotsBatch(
+      schoolId,
+      teacherUserIds,
+      currentYear?.id,
+    );
+
+    return users.map((u) =>
+      this.formatStaff(u, teachingByUser.get(u.id) ?? []),
+    );
   }
 
   async listGradesForSchool(schoolId: string) {
@@ -86,7 +101,8 @@ export class TeachersService {
     if (!user) {
       throw new NotFoundException('User not found');
     }
-    return this.formatStaff(user);
+    const teachingSlots = await this.loadTeachingSlots(schoolId, user.id);
+    return this.formatStaff(user, teachingSlots);
   }
 
   async create(schoolId: string, dto: CreateTeacherDto) {
@@ -161,21 +177,29 @@ export class TeachersService {
       });
     }
 
-    if (profile && (dto.homeroomGradeId !== undefined || dto.homeroomSectionId !== undefined)) {
+    if (
+      profile &&
+      (dto.homeroomGradeId !== undefined || dto.homeroomSectionId !== undefined)
+    ) {
+      const homeroomGradeId = dto.homeroomGradeId ?? null;
+      const homeroomSectionId = dto.homeroomSectionId ?? null;
       await this.prisma.teacherProfile.update({
         where: { id: profile.id },
-        data: {
-          homeroomGradeId: dto.homeroomGradeId ?? null,
-          homeroomSectionId: dto.homeroomSectionId ?? null,
-        },
+        data: { homeroomGradeId, homeroomSectionId },
       });
+      await this.syncHomeroomAssignment(
+        profile.id,
+        schoolId,
+        homeroomGradeId,
+        homeroomSectionId,
+      );
     }
 
     if (profile && dto.assignments) {
       await this.prisma.teacherAssignment.deleteMany({
-        where: { teacherProfileId: profile.id },
+        where: { teacherProfileId: profile.id, isHomeroom: false },
       });
-      for (const a of dto.assignments) {
+      for (const a of dto.assignments.filter((x) => !x.isHomeroom)) {
         await this.prisma.teacherAssignment.create({
           data: {
             teacherProfileId: profile.id,
@@ -183,7 +207,7 @@ export class TeachersService {
             gradeId: a.gradeId,
             sectionId: a.sectionId ?? null,
             subjectId: a.subjectId ?? null,
-            isHomeroom: a.isHomeroom ?? false,
+            isHomeroom: false,
           },
         });
       }
@@ -215,10 +239,84 @@ export class TeachersService {
     if (!user) {
       throw new NotFoundException('Staff member not found');
     }
-    return this.formatStaff(user);
+    const teachingSlots = await this.loadTeachingSlots(schoolId, user.id);
+    return this.formatStaff(user, teachingSlots);
   }
 
-  private formatStaff(user: {
+  private async loadTeachingSlotsBatch(
+    schoolId: string,
+    userIds: string[],
+    academicYearId?: string,
+  ) {
+    const teachingByUser = new Map<
+      string,
+      { gradeName: string; sectionName: string | null; subjectName: string }[]
+    >();
+    if (userIds.length === 0) return teachingByUser;
+
+    const slots = await this.prisma.classSubject.findMany({
+      where: {
+        schoolId,
+        teacherId: { in: userIds },
+        ...(academicYearId ? { academicYearId } : {}),
+      },
+      include: {
+        subject: { select: { name: true } },
+        grade: { select: { name: true } },
+        section: { select: { name: true } },
+      },
+      orderBy: [{ grade: { sortOrder: 'asc' } }, { subject: { name: 'asc' } }],
+    });
+    for (const cs of slots) {
+      if (!cs.teacherId) continue;
+      const list = teachingByUser.get(cs.teacherId) ?? [];
+      list.push({
+        gradeName: cs.grade.name,
+        sectionName: cs.section?.name ?? null,
+        subjectName: cs.subject.name,
+      });
+      teachingByUser.set(cs.teacherId, list);
+    }
+    return teachingByUser;
+  }
+
+  private async loadTeachingSlots(schoolId: string, userId: string) {
+    const currentYear = await this.prisma.academicYear.findFirst({
+      where: { schoolId, isCurrent: true },
+      select: { id: true },
+    });
+    const map = await this.loadTeachingSlotsBatch(
+      schoolId,
+      [userId],
+      currentYear?.id,
+    );
+    return map.get(userId) ?? [];
+  }
+
+  private async syncHomeroomAssignment(
+    profileId: string,
+    schoolId: string,
+    gradeId: string | null,
+    sectionId: string | null,
+  ) {
+    await this.prisma.teacherAssignment.deleteMany({
+      where: { teacherProfileId: profileId, isHomeroom: true },
+    });
+    if (gradeId) {
+      await this.prisma.teacherAssignment.create({
+        data: {
+          teacherProfileId: profileId,
+          schoolId,
+          gradeId,
+          sectionId,
+          isHomeroom: true,
+        },
+      });
+    }
+  }
+
+  private formatStaff(
+    user: {
     id: string;
     email: string;
     firstName: string;
@@ -240,7 +338,13 @@ export class TeachersService {
         subject: { id: string; name: string; code: string } | null;
       }[];
     } | null;
-  }) {
+  },
+    teachingSlots: {
+      gradeName: string;
+      sectionName: string | null;
+      subjectName: string;
+    }[] = [],
+  ) {
     const p = user.teacherProfile;
     return {
       userId: user.id,
@@ -269,6 +373,7 @@ export class TeachersService {
         subjectName: a.subject?.name ?? null,
         isHomeroom: a.isHomeroom,
       })),
+      teachingSlots,
     };
   }
 }

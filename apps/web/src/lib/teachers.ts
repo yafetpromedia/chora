@@ -27,6 +27,11 @@ export type TeacherRecord = {
     sectionName: string | null;
   } | null;
   assignments: TeacherAssignment[];
+  teachingSlots: {
+    gradeName: string;
+    sectionName: string | null;
+    subjectName: string;
+  }[];
 };
 
 export type RoleTemplate = {

@@ -64,7 +64,9 @@ export function StudentPhotoUpload({ value, onChange, label = "Student photo" }:
               e.target.value = "";
             }}
           />
-          <p className="stu-field-hint">JPEG, PNG or WebP · max 2 MB</p>
+          <p className="stu-field-hint">
+            JPEG, PNG or WebP · resized automatically for enroll
+          </p>
           {error ? <p className="stu-toast stu-toast--error stu-photo-upload__error">{error}</p> : null}
         </div>
       </div>

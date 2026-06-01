@@ -29,6 +29,7 @@ export function StudentIdCardPrintDialog({
 }: Props) {
   const [gradeId, setGradeId] = useState(initialGradeId);
   const [sectionId, setSectionId] = useState(initialSectionId);
+  const [style, setStyle] = useState<IdCardPrintStyle>("full");
   const [duplex, setDuplex] = useState(true);
   const [perPage, setPerPage] = useState<BulkPrintLayout>("6");
   const [count, setCount] = useState<number | null>(null);

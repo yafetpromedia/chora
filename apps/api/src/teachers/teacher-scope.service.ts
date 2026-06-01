@@ -44,7 +44,25 @@ export class TeacherScopeService {
     }
 
     for (const a of profile.assignments) {
-      scopes.push({ gradeId: a.gradeId, sectionId: a.sectionId });
+      if (!a.isHomeroom) {
+        scopes.push({ gradeId: a.gradeId, sectionId: a.sectionId });
+      }
+    }
+
+    const currentYear = await this.prisma.academicYear.findFirst({
+      where: { schoolId, isCurrent: true },
+      select: { id: true },
+    });
+    const classSubjects = await this.prisma.classSubject.findMany({
+      where: {
+        schoolId,
+        teacherId: userId,
+        ...(currentYear ? { academicYearId: currentYear.id } : {}),
+      },
+      select: { gradeId: true, sectionId: true },
+    });
+    for (const cs of classSubjects) {
+      scopes.push({ gradeId: cs.gradeId, sectionId: cs.sectionId });
     }
 
     return this.dedupeScopes(scopes);

@@ -49,7 +49,7 @@ export function PeopleDirectoryPanel({ group }: Props) {
   const [lastName, setLastName] = useState("");
   const [password, setPassword] = useState("");
   const [roleTemplateSlug, setRoleTemplateSlug] = useState(
-    isTeachers ? "homeroom_teacher" : "reception",
+    isTeachers ? "subject_teacher" : "reception",
   );
   const [homeroomGradeId, setHomeroomGradeId] = useState("");
   const [homeroomSectionId, setHomeroomSectionId] = useState("");
@@ -83,7 +83,7 @@ export function PeopleDirectoryPanel({ group }: Props) {
     setFirstName("");
     setLastName("");
     setPassword("");
-    setRoleTemplateSlug(isTeachers ? "homeroom_teacher" : "reception");
+    setRoleTemplateSlug(isTeachers ? "subject_teacher" : "reception");
     setHomeroomGradeId("");
     setHomeroomSectionId("");
     setEditTarget(null);
@@ -100,7 +100,7 @@ export function PeopleDirectoryPanel({ group }: Props) {
     setFirstName(person.firstName);
     setLastName(person.lastName);
     setPassword("");
-    setRoleTemplateSlug(person.roleTemplateSlug ?? (isTeachers ? "homeroom_teacher" : "reception"));
+    setRoleTemplateSlug(person.roleTemplateSlug ?? (isTeachers ? "subject_teacher" : "reception"));
     setHomeroomGradeId(person.homeroom?.gradeId ?? "");
     setHomeroomSectionId(person.homeroom?.sectionId ?? "");
     setDrawerOpen(true);
@@ -166,14 +166,10 @@ export function PeopleDirectoryPanel({ group }: Props) {
       if (editTarget) {
         await updateTeacher(editTarget.userId, {
           roleTemplateSlug,
-          homeroomGradeId:
-            isTeachers && roleTemplateSlug === "homeroom_teacher"
-              ? homeroomGradeId || null
-              : null,
-          homeroomSectionId:
-            isTeachers && roleTemplateSlug === "homeroom_teacher"
-              ? homeroomSectionId || null
-              : null,
+          homeroomGradeId: isTeachers ? homeroomGradeId || null : undefined,
+          homeroomSectionId: isTeachers
+            ? homeroomSectionId || null
+            : undefined,
         });
       } else {
         await createTeacher({
@@ -183,13 +179,9 @@ export function PeopleDirectoryPanel({ group }: Props) {
           password: password || undefined,
           roleTemplateSlug,
           homeroomGradeId:
-            isTeachers && roleTemplateSlug === "homeroom_teacher" && homeroomGradeId
-              ? homeroomGradeId
-              : undefined,
+            isTeachers && homeroomGradeId ? homeroomGradeId : undefined,
           homeroomSectionId:
-            isTeachers && roleTemplateSlug === "homeroom_teacher" && homeroomSectionId
-              ? homeroomSectionId
-              : undefined,
+            isTeachers && homeroomSectionId ? homeroomSectionId : undefined,
         });
       }
       setDrawerOpen(false);
@@ -208,9 +200,10 @@ export function PeopleDirectoryPanel({ group }: Props) {
 
       {isTeachers ? (
         <p className="setup-hint tch-page-hint">
-          Homeroom teachers get a class on this page. To assign a teacher to{" "}
-          <strong>Math, English, etc.</strong> per grade, use{" "}
-          <Link href="/admin/subjects/assign">Subject assignment</Link>.
+          A teacher can be <strong>homeroom</strong> for one class (e.g. Grade 11) and
+          teach subjects in other grades (e.g. Grade 9–10) via{" "}
+          <Link href="/admin/subjects/assign">Subject assignment</Link>. Set homeroom
+          below; subject classes are assigned per grade on that page.
         </p>
       ) : (
         <p className="setup-hint tch-page-hint">
@@ -263,22 +256,47 @@ export function PeopleDirectoryPanel({ group }: Props) {
                     </td>
                     <td>
                       {isTeachers ? (
-                        t.homeroom ? (
-                          <>
-                            Homeroom: {t.homeroom.gradeName}
-                            {t.homeroom.sectionName ? ` · ${t.homeroom.sectionName}` : ""}
-                          </>
-                        ) : t.assignments.length === 0 ? (
-                          <span className="tch-meta">No homeroom</span>
-                        ) : (
-                          t.assignments.map((a) => (
-                            <div key={a.id} className="tch-meta">
-                              {a.gradeName}
-                              {a.sectionName ? ` ${a.sectionName}` : ""}
-                              {a.subjectName ? ` · ${a.subjectName}` : ""}
+                        <>
+                          {t.homeroom ? (
+                            <div>
+                              Homeroom: {t.homeroom.gradeName}
+                              {t.homeroom.sectionName
+                                ? ` · ${t.homeroom.sectionName}`
+                                : ""}
                             </div>
-                          ))
-                        )
+                          ) : (
+                            <div className="tch-meta">No homeroom</div>
+                          )}
+                          {(t.teachingSlots ?? []).length > 0 ? (
+                            (t.teachingSlots ?? []).map((slot, i) => (
+                              <div key={`${slot.gradeName}-${slot.subjectName}-${i}`} className="tch-meta">
+                                Teaches: {slot.gradeName}
+                                {slot.sectionName ? ` ${slot.sectionName}` : ""} ·{" "}
+                                {slot.subjectName}
+                              </div>
+                            ))
+                          ) : t.assignments.filter((a) => !a.isHomeroom).length ===
+                              0 ? null : (
+                            t.assignments
+                              .filter((a) => !a.isHomeroom)
+                              .map((a) => (
+                                <div key={a.id} className="tch-meta">
+                                  {a.gradeName}
+                                  {a.sectionName ? ` ${a.sectionName}` : ""}
+                                  {a.subjectName ? ` · ${a.subjectName}` : ""}
+                                </div>
+                              ))
+                          )}
+                          {!t.homeroom &&
+                          (t.teachingSlots ?? []).length === 0 &&
+                          t.assignments.filter((a) => !a.isHomeroom).length ===
+                            0 ? (
+                            <div className="tch-meta">
+                              No subject classes — use{" "}
+                              <Link href="/admin/subjects/assign">Subject assignment</Link>
+                            </div>
+                          ) : null}
+                        </>
                       ) : (
                         <span className="tch-meta">
                           {t.roleTemplateSlug === "finance_officer"
@@ -411,8 +429,12 @@ export function PeopleDirectoryPanel({ group }: Props) {
                   </label>
                 </>
               ) : null}
-              {isTeachers && roleTemplateSlug === "homeroom_teacher" ? (
+              {isTeachers ? (
                 <>
+                  <p className="setup-hint">
+                    Optional. Homeroom is separate from subject teaching in other
+                    grades.
+                  </p>
                   <label>
                     Homeroom grade
                     <select
@@ -447,6 +469,12 @@ export function PeopleDirectoryPanel({ group }: Props) {
                     </label>
                   ) : null}
                 </>
+              ) : null}
+              {isTeachers ? (
+                <p className="setup-hint">
+                  Assign Math, English, etc. per grade on{" "}
+                  <Link href="/admin/subjects/assign">Subject assignment</Link>.
+                </p>
               ) : null}
               <div className="tch-drawer__actions">
                 <button type="submit" className="att-btn att-btn--primary" disabled={busy}>

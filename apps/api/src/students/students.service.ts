@@ -13,9 +13,9 @@ import { CreateStudentDto } from './dto/create-student.dto';
 import { UpdateStudentDto } from './dto/update-student.dto';
 import {
   buildCardScanPayload,
-  formatSchoolStudentId,
+  buildStudentPortalEmail,
+  generateSchoolStudentId,
   generateStudentCardCode,
-  parseSchoolStudentIdSequence,
 } from './student-card.util';
 import { FayedaService } from '../fayeda/fayeda.service';
 import { AcademicEnrollmentService } from '../results/academic-enrollment.service';
@@ -51,6 +51,7 @@ export class StudentsService {
     grade: { select: { id: true, name: true } },
     section: { select: { id: true, name: true } },
     parents: {
+      orderBy: { id: 'asc' },
       include: {
         parent: {
           select: {
@@ -177,6 +178,18 @@ export class StudentsService {
       this.assertValidPhotoUrl(dto.photoUrl);
     }
 
+    const updatedStudentId = dto.studentId?.trim();
+    if (
+      updatedStudentId &&
+      updatedStudentId !== (profile.user.externalRef ?? '')
+    ) {
+      await this.assertSchoolStudentIdAvailable(
+        schoolId,
+        updatedStudentId,
+        profile.userId,
+      );
+    }
+
     return this.prisma.$transaction(async (tx) => {
       const userData: {
         firstName?: string;
@@ -185,7 +198,7 @@ export class StudentsService {
       } = {};
       if (dto.firstName) userData.firstName = dto.firstName.trim();
       if (dto.lastName) userData.lastName = dto.lastName.trim();
-      if (dto.studentId?.trim()) userData.externalRef = dto.studentId.trim();
+      if (updatedStudentId) userData.externalRef = updatedStudentId;
 
       if (Object.keys(userData).length > 0) {
         await tx.user.update({
@@ -262,6 +275,26 @@ export class StudentsService {
         include: this.studentInclude,
       });
     });
+  }
+
+  async resetPortalPassword(schoolId: string, profileId: string) {
+    const profile = await this.getOne(schoolId, profileId);
+    const portalUsername =
+      profile.user.externalRef?.trim() || profile.user.email;
+    const tempPassword = this.generateTempPassword();
+
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: profile.userId },
+        data: { passwordHash: hashSync(tempPassword, 10) },
+      }),
+      this.prisma.studentProfile.update({
+        where: { id: profileId },
+        data: { portalTempPassword: tempPassword },
+      }),
+    ]);
+
+    return { portalUsername, tempPassword };
   }
 
   async remove(schoolId: string, profileId: string) {
@@ -355,10 +388,15 @@ export class StudentsService {
       }
     }
 
+    const school = await this.prisma.school.findUnique({
+      where: { id: schoolId },
+      select: { joinCode: true },
+    });
+    if (!school) {
+      throw new NotFoundException('School not found');
+    }
+
     const tempPassword = this.generateTempPassword();
-    const studentEmail =
-      dto.email?.toLowerCase().trim() ||
-      `student.${randomBytes(6).toString('hex')}@school.campusone.app`;
 
     const fatherName =
       dto.fatherName?.trim() || dto.parentName?.trim() || '';
@@ -385,10 +423,25 @@ export class StudentsService {
 
     const gender = fayedaFields.gender ?? dto.gender;
 
+    const manualStudentId = dto.studentId?.trim();
+    if (manualStudentId) {
+      await this.assertSchoolStudentIdAvailable(schoolId, manualStudentId);
+    }
+
     const result = await this.prisma.$transaction(async (tx) => {
       const schoolStudentId =
-        dto.studentId?.trim() ||
-        (await this.allocateSchoolStudentId(tx, schoolId));
+        manualStudentId || (await this.allocateSchoolStudentId(tx, schoolId));
+
+      const studentEmail =
+        dto.email?.toLowerCase().trim() ||
+        buildStudentPortalEmail(school.joinCode, schoolStudentId);
+
+      const emailTaken = await tx.user.findUnique({
+        where: { email: studentEmail },
+      });
+      if (emailTaken) {
+        throw new ConflictException('Portal login email already in use');
+      }
 
       const studentUser = await tx.user.create({
         data: {
@@ -425,6 +478,7 @@ export class StudentsService {
           phone: fayedaFields.phone ?? (dto.phone?.trim() || null),
           fayedaVerifiedAt: fayedaFields.fayedaVerifiedAt ?? null,
           cardCode: await this.allocateCardCode(tx, schoolId),
+          portalTempPassword: tempPassword,
         },
       });
 
@@ -485,6 +539,7 @@ export class StudentsService {
         },
         credentials: {
           studentEmail,
+          portalUsername: schoolStudentId,
           studentTempPassword: tempPassword,
           parentPhone: father.phone,
           parentTempPassword: father.tempPassword,
@@ -493,9 +548,8 @@ export class StudentsService {
           motherPhone: mother.phone,
           motherTempPassword: mother.tempPassword,
           welcomeMessage:
-            welcomeParts.length > 0
-              ? welcomeParts.join(' · ')
-              : `Parent accounts linked (father ${father.phone}, mother ${mother.phone}).`,
+            `Student portal — username ${schoolStudentId} · password ${tempPassword}` +
+            (welcomeParts.length > 0 ? ` · ${welcomeParts.join(' · ')}` : ''),
         },
       };
     });
@@ -910,31 +964,29 @@ export class StudentsService {
     };
   }
 
+  private async assertSchoolStudentIdAvailable(
+    schoolId: string,
+    studentId: string,
+    excludeUserId?: string,
+  ): Promise<void> {
+    const clash = await this.prisma.user.findFirst({
+      where: {
+        schoolId,
+        externalRef: studentId,
+        ...(excludeUserId ? { id: { not: excludeUserId } } : {}),
+      },
+    });
+    if (clash) {
+      throw new ConflictException('Student ID already in use at this school');
+    }
+  }
+
   private async allocateSchoolStudentId(
     db: Pick<PrismaService, 'user'>,
     schoolId: string,
   ): Promise<string> {
-    const year = new Date().getFullYear();
-    const prefix = `STU-${year}-`;
-
-    const existing = await db.user.findMany({
-      where: {
-        schoolId,
-        role: UserRole.student,
-        externalRef: { startsWith: prefix },
-      },
-      select: { externalRef: true },
-    });
-
-    let maxSeq = 0;
-    for (const row of existing) {
-      if (!row.externalRef) continue;
-      const seq = parseSchoolStudentIdSequence(row.externalRef, year);
-      if (seq != null && seq > maxSeq) maxSeq = seq;
-    }
-
-    for (let attempt = 0; attempt < 100; attempt++) {
-      const candidate = formatSchoolStudentId(year, maxSeq + 1 + attempt);
+    for (let attempt = 0; attempt < 24; attempt++) {
+      const candidate = generateSchoolStudentId();
       const clash = await db.user.findFirst({
         where: { schoolId, externalRef: candidate },
       });
@@ -977,28 +1029,54 @@ export class StudentsService {
     schoolId: string,
     studentProfileId: string,
   ) {
+    const name = fullName?.trim();
+    const phoneRaw = phone?.trim();
+    if (!name || !phoneRaw) return;
+
+    const normalizedPhone = this.normalizePhone(phoneRaw);
     const link = profile.parents[index];
-    if (link && (fullName || phone)) {
-      const [first, ...rest] = (fullName ?? '').trim().split(/\s+/);
-      const parent = link.parent;
-      await tx.user.update({
-        where: { id: link.parentId },
-        data: {
-          ...(fullName
-            ? {
-                firstName: first || parent.firstName,
-                lastName: rest.join(' ') || parent.lastName || 'Parent',
-              }
-            : {}),
-          ...(phone ? { phone: this.normalizePhone(phone) } : {}),
-        },
-      });
+
+    if (!link) {
+      await this.linkParent(tx, schoolId, name, phoneRaw, studentProfileId);
       return;
     }
 
-    if (!link && fullName && phone) {
-      await this.linkParent(tx, schoolId, fullName, phone, studentProfileId);
+    const parent = link.parent;
+    const currentName = `${parent.firstName} ${parent.lastName}`.trim();
+    const nameChanged = currentName !== name;
+    const phoneChanged = (parent.phone ?? '') !== normalizedPhone;
+    if (!nameChanged && !phoneChanged) return;
+
+    if (phoneChanged) {
+      await this.unlinkParentFromStudent(
+        tx,
+        link.parentId,
+        studentProfileId,
+      );
+      await this.linkParent(tx, schoolId, name, phoneRaw, studentProfileId);
+      return;
     }
+
+    const [first, ...rest] = name.split(/\s+/);
+    await tx.user.update({
+      where: { id: link.parentId },
+      data: {
+        firstName: first || parent.firstName,
+        lastName: rest.join(' ') || parent.lastName || 'Parent',
+      },
+    });
+  }
+
+  private async unlinkParentFromStudent(
+    tx: Pick<PrismaService, 'parentStudent'>,
+    parentId: string,
+    studentProfileId: string,
+  ) {
+    await tx.parentStudent.delete({
+      where: {
+        parentId_studentId: { parentId, studentId: studentProfileId },
+      },
+    });
   }
 
   private async linkParent(
@@ -1039,6 +1117,11 @@ export class StudentsService {
           lastName,
           passwordHash: hashSync(tempPassword, 10),
         },
+      });
+    } else {
+      await tx.user.update({
+        where: { id: user.id },
+        data: { firstName: first, lastName },
       });
     }
 

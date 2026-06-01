@@ -80,10 +80,14 @@ NEXT_PUBLIC_GOOGLE_CLIENT_ID=your-google-oauth-client-id
 |-------|----------|------|
 | `admin@eduos.local` | `Passw0rd!` | Admin |
 | `teacher@eduos.local` | `Passw0rd!` | Teacher |
-| `student@eduos.local` | `Passw0rd!` | Student |
+| `student@eduos.local` | `Passw0rd!` | Student (seed account) |
 | `parent@eduos.local` | `Passw0rd!` | Parent |
 
+**Enrolled students:** sign in at `/login` with **Student ID** (`STU-…`) or portal email + password from **Manage student → Profile**.
+
 School join code for `/join`: **`BRIGHT1`**
+
+**Full feature list:** [docs/WHAT-WE-HAVE.md](./docs/WHAT-WE-HAVE.md)
 
 ## Scripts
 

@@ -228,7 +228,8 @@ export function StudentRegisterDrawer({ grades, onClose, onSuccess }: Props) {
               Register student
             </h2>
             <p className="stu-drawer__sub">
-              Student ID is assigned automatically. Enter ID number, parents, sex, age, and class.
+              Student ID and portal password are assigned on enroll. Enter ID number, parents, sex,
+              age, and class.
             </p>
           </div>
           <button type="button" className="stu-drawer__close" onClick={onClose} aria-label="Close">
@@ -396,7 +397,9 @@ export function StudentRegisterDrawer({ grades, onClose, onSuccess }: Props) {
                 />
               </div>
             </div>
-            <p className="stu-field-hint">School student ID (e.g. STU-2026-00001) is generated on enroll.</p>
+            <p className="stu-field-hint">
+              School student ID (e.g. STU-K7H3NP2M) is generated randomly on enroll.
+            </p>
 
             <div className="stu-field">
               <label htmlFor="reg-phone">Student phone</label>

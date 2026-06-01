@@ -54,12 +54,13 @@ export default function LoginPage() {
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const trimmed = email.trim().toLowerCase();
-    if (trimmed.includes("platform@") || trimmed.endsWith("@campusone.local")) {
+    const trimmed = email.trim();
+    const loginId = trimmed.includes("@") ? trimmed.toLowerCase() : trimmed;
+    if (loginId.includes("platform@") || loginId.endsWith("@campusone.local")) {
       router.push("/platform/login");
       return;
     }
-    void completeAuth(() => login(trimmed, password));
+    void completeAuth(() => login(loginId, password));
   }
 
   return (
@@ -68,12 +69,12 @@ export default function LoginPage() {
         <form onSubmit={onSubmit} className="auth-page-form">
           <AuthInput
             id="login-email"
-            label="Email"
-            type="email"
+            label="Email or student ID"
+            type="text"
             icon="email"
             variant="login"
-            autoComplete="email"
-            placeholder="you@school.edu"
+            autoComplete="username"
+            placeholder="you@school.edu or STU-…"
             value={email}
             onChange={setEmail}
             required

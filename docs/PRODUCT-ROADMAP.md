@@ -67,7 +67,7 @@ Teacher (User)
 ```
 
 - API: `GET/POST/PATCH /schools/teachers`, assignments on `TeacherProfile`
-- UI: `/admin/teachers` — list, assign homeroom, assign subjects/classes
+- UI: `/admin/teachers` — homeroom (any teacher); `/admin/subjects/assign` — subject teacher per grade
 - **Scoped:** attendance, results, grade pickers, teacher dashboard — [TEACHER-SCOPING.md](./TEACHER-SCOPING.md)
 
 ---

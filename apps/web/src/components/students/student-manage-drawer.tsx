@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import type { GradeWithSections, StudentRecord } from "@/lib/api";
-import { updateStudent } from "@/lib/school-setup";
+import { resetStudentPortalPassword, updateStudent } from "@/lib/school-setup";
 import { DashIcon } from "@/components/dashboard/dash-icons";
 import { StudentContactLinks } from "@/components/students/student-contact-links";
 import { StudentPhotoUpload } from "@/components/students/student-photo-upload";
@@ -74,6 +74,10 @@ export function StudentManageDrawer({
   const [motherName, setMotherName] = useState("");
   const [motherPhone, setMotherPhone] = useState("");
   const [saving, setSaving] = useState(false);
+  const [portalTempPassword, setPortalTempPassword] = useState(
+    student.portalTempPassword,
+  );
+  const [portalResetBusy, setPortalResetBusy] = useState(false);
   const [error, setError] = useState("");
 
   const selectedGrade = grades.find((g) => g.id === gradeId);
@@ -88,6 +92,7 @@ export function StudentManageDrawer({
     setMotherName(mother ? `${mother.firstName} ${mother.lastName}`.trim() : "");
     setMotherPhone(mother?.phone ?? "");
     setAddress(student.address ?? "");
+    setPortalTempPassword(student.portalTempPassword);
     setTab("contact");
   }, [student]);
 
@@ -118,6 +123,22 @@ export function StudentManageDrawer({
       .catch(() => setIdCard(null))
       .finally(() => setIdCardLoading(false));
   }, [tab, student.id]);
+
+  async function onResetPortalPassword() {
+    setPortalResetBusy(true);
+    setError("");
+    try {
+      const result = await resetStudentPortalPassword(student.id);
+      setPortalTempPassword(result.tempPassword);
+      if (result.portalUsername !== studentId.trim()) {
+        setStudentId(result.portalUsername);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not reset portal password");
+    } finally {
+      setPortalResetBusy(false);
+    }
+  }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -256,6 +277,44 @@ export function StudentManageDrawer({
             ) : null}
 
             {tab === "profile" ? (
+              <>
+              <section className="stu-manage-card stu-portal-login">
+                <h3 className="stu-manage-card__title">Student portal login</h3>
+                <p className="stu-field-hint">
+                  Sign in at the login page with the username and password below.
+                </p>
+                <dl className="stu-portal-login__fields">
+                  <div>
+                    <dt>Username</dt>
+                    <dd>{student.user.externalRef?.trim() || "—"}</dd>
+                  </div>
+                  <div>
+                    <dt>Password</dt>
+                    <dd>
+                      {portalTempPassword ? (
+                        <code className="stu-portal-login__code">{portalTempPassword}</code>
+                      ) : (
+                        <span className="stu-portal-login__changed">
+                          Changed by student — reset to issue a new temporary password.
+                        </span>
+                      )}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Login email</dt>
+                    <dd className="stu-portal-login__email">{student.user.email}</dd>
+                  </div>
+                </dl>
+                <button
+                  type="button"
+                  className="stu-btn stu-btn--ghost"
+                  disabled={portalResetBusy || saving}
+                  onClick={() => void onResetPortalPassword()}
+                >
+                  {portalResetBusy ? "Resetting…" : "Reset portal password"}
+                </button>
+              </section>
+
               <section className="stu-manage-card">
                 <h3 className="stu-manage-card__title">Profile & photo</h3>
                 <StudentPhotoUpload value={photoUrl} onChange={setPhotoUrl} />
@@ -363,6 +422,7 @@ export function StudentManageDrawer({
                   </p>
                 ) : null}
               </section>
+              </>
             ) : null}
 
             {tab === "parents" ? (
@@ -461,7 +521,7 @@ export function StudentManageDrawer({
                   <p className="stu-field-hint">Loading card…</p>
                 ) : idCard ? (
                   <div className="sid-manage-preview">
-                    <StudentIdCardView card={idCard} variant="compact" />
+                    <StudentIdCardView card={idCard} variant="standard" />
                   </div>
                 ) : (
                   <p className="stu-field-hint">Could not load ID card.</p>
