@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { DashboardPage } from "@/components/dashboard/dashboard-page";
-import { PeopleDirectoryPanel } from "@/components/admin/people-directory-panel";
+import { TeachersWorkspace } from "@/components/admin/teachers-workspace";
 import { AUTH_ROLE_KEY, AUTH_TOKEN_KEY, type UserRole } from "@/lib/auth";
 
 export default function AdminTeachersPage() {
@@ -24,10 +24,9 @@ export default function AdminTeachersPage() {
     <DashboardPage
       role={shellRole}
       title="Teachers"
-      subtitle="Classroom teachers — homeroom assignment and links to subject teaching slots."
       eyebrow="School admin"
     >
-      <PeopleDirectoryPanel group="teachers" />
+      <TeachersWorkspace />
     </DashboardPage>
   );
 }

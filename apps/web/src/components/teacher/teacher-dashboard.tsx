@@ -10,6 +10,7 @@ import {
   type TeacherDashboardOverview,
 } from "@/lib/teachers";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
+import { TimetableDayList } from "@/components/timetable/timetable-day-list";
 
 function formatDate(iso: string) {
   try {
@@ -101,10 +102,24 @@ export function TeacherDashboard() {
         </section>
       ) : null}
 
+      {overview?.todaySchedule && overview.todaySchedule.slots.length > 0 ? (
+        <section className="dash-panel dash-panel--flat dash-today">
+          <div className="dash-panel-head">
+            <h2 className="dash-panel-title">
+              Today — {overview.todaySchedule.weekdayLabel} (timetable)
+            </h2>
+            <Link href="/teacher/timetable" className="dash-link-btn">
+              Full week
+            </Link>
+          </div>
+          <TimetableDayList slots={overview.todaySchedule.slots} emptyMessage="" />
+        </section>
+      ) : null}
+
       {overview && overview.teachingSlots.length > 0 ? (
         <section className="dash-panel dash-panel--flat dash-today">
           <div className="dash-panel-head">
-            <h2 className="dash-panel-title">Today — my subjects</h2>
+            <h2 className="dash-panel-title">My subject classes</h2>
             <span className="dash-panel-badge">{overview.date}</span>
           </div>
           <ul className="dash-list">

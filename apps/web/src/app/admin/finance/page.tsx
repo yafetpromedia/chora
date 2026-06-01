@@ -195,7 +195,6 @@ export default function AdminFinancePage() {
     <DashboardPage
       role="admin"
       title="Finance"
-      subtitle="Fee schedules, payments, reminders, and exports."
       eyebrow="CampusOne"
     >
       {error ? <p className="auth-alert auth-alert--error">{error}</p> : null}
@@ -228,7 +227,7 @@ export default function AdminFinancePage() {
                 <span className="att-stat-label">Unpaid students</span>
               </div>
             </div>
-            <p className="setup-hint">
+            <p className="tch-meta">
               Forecast: {formatEtb(analytics.collectedCents)} collected of{" "}
               {formatEtb(analytics.expectedRevenueCents)} expected · {analytics.overdueFeesCount}{" "}
               overdue fees
@@ -238,9 +237,6 @@ export default function AdminFinancePage() {
 
         <section className="att-admin-section">
           <h2 className="setup-panel-label">Pending payment verification</h2>
-          <p className="setup-hint">
-            Parents submit bank transfers here until Chapa / Telebirr is connected.
-          </p>
           {pending.length === 0 ? (
             <p className="setup-hint">No payments awaiting verification.</p>
           ) : (

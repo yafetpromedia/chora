@@ -2671,10 +2671,11 @@
 .dash-sidebar-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 30;
+  z-index: 100;
   border: none;
   background: rgba(15, 45, 45, 0.45);
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
 
 @media (min-width: 1024px) {
@@ -2984,21 +2985,36 @@
 
 .dash-sidebar--pro {
   display: flex;
+  flex-direction: column;
   position: fixed;
-  inset: 0 auto 0 0;
-  z-index: 40;
-  width: 260px;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  z-index: 110;
+  width: min(85vw, 280px);
+  max-width: 280px;
+  height: 100dvh;
+  max-height: 100dvh;
   padding: 1.25rem 0.85rem;
+  padding-top: max(1.25rem, env(safe-area-inset-top, 0px));
+  padding-bottom: max(1.25rem, env(safe-area-inset-bottom, 0px));
   background: #fff;
   border-right: 1px solid rgba(42, 111, 111, 0.1);
   color: var(--lite-black);
-  transform: translateX(-100%);
+  transform: translate3d(-100%, 0, 0);
   transition: transform 0.22s ease;
   box-shadow: 4px 0 28px rgba(15, 45, 45, 0.08);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  visibility: hidden;
+  pointer-events: none;
 }
 
 .dash-sidebar--pro.dash-sidebar--open {
-  transform: translateX(0);
+  transform: translate3d(0, 0, 0);
+  visibility: visible;
+  pointer-events: auto;
 }
 
 @media (min-width: 1024px) {
@@ -3006,11 +3022,15 @@
     position: fixed;
     top: 0;
     left: 0;
+    width: 260px;
+    max-width: 260px;
     height: 100dvh;
     transform: none;
     box-shadow: none;
     overflow-y: auto;
     overscroll-behavior: contain;
+    visibility: visible;
+    pointer-events: auto;
   }
 }
 
@@ -3177,13 +3197,18 @@
 @media (max-width: 1023px) {
   .dash-shell--pro {
     height: 100dvh;
-    overflow: hidden;
+    /* Avoid overflow:hidden on shell — it clips position:fixed sidebar on mobile Safari */
   }
 
   .dash-main--pro {
     flex: 1;
+    min-width: 0;
     min-height: 0;
     overflow: hidden;
+  }
+
+  .dash-shell--pro.dash-shell--nav-open .dash-main--pro {
+    pointer-events: none;
   }
 }
 

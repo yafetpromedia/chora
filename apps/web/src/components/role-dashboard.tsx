@@ -212,7 +212,7 @@ export function RoleDashboard({ role }: Props) {
 
   if (role === "admin") {
     return (
-      <DashboardShell role={role} title="Dashboard" subtitle={`${schoolName} · Overview`}>
+      <DashboardShell role={role} title="Dashboard">
         <AdminDashboard
           schoolName={schoolName}
           subscription={subscription}
@@ -238,7 +238,6 @@ export function RoleDashboard({ role }: Props) {
               ? "Your classroom at a glance"
               : `Here’s what’s happening at ${schoolName}`}
           </h2>
-          <p>Attendance, results, and announcements updated in real time.</p>
         </div>
       </section>
 
@@ -247,11 +246,7 @@ export function RoleDashboard({ role }: Props) {
       ) : null}
 
       {role === "student" ? (
-        <StudentIdCardPanel
-          source="me"
-          title="My student ID"
-          subtitle="Keep this handy for attendance scan and school identification."
-        />
+        <StudentIdCardPanel source="me" title="My student ID" />
       ) : null}
 
       {role === "parent" && parentDay && parentDay.children.length > 1 ? (
@@ -282,7 +277,6 @@ export function RoleDashboard({ role }: Props) {
               ? "Child ID card"
               : `ID card · ${parentDay.children[0]?.name ?? "Student"}`
           }
-          subtitle="Digital ID for your child — open full view to print or save."
         />
       ) : null}
 
@@ -343,7 +337,7 @@ export function RoleDashboard({ role }: Props) {
           ) : attendanceSummary ? (
             <div className="att-summary-block">
               <p className="att-summary-rate">{attendanceSummary.rate}%</p>
-              <p className="setup-hint dash-panel-desc">
+              <p className="tch-meta dash-panel-desc">
                 {attendanceSummary.student.name} · {attendanceSummary.student.grade}
                 {attendanceSummary.student.section ? `-${attendanceSummary.student.section}` : ""}
               </p>

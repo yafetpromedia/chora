@@ -58,17 +58,10 @@ export default function AdminParentsPage() {
     <DashboardPage
       role="admin"
       title="Parents & guardians"
-      subtitle="Family portal accounts linked to students — created when you register students."
       eyebrow="Families"
     >
       <div className="att-page par-page">
         {error ? <p className="att-toast att-toast--error">{error}</p> : null}
-
-        <p className="setup-hint tch-page-hint">
-          Parent logins are created automatically from father/mother phone when you{" "}
-          <Link href="/admin/students">register students</Link>. Each parent sees linked
-          children in the parent portal (fees, attendance, results).
-        </p>
 
         <div className="par-stats">
           <div className="par-stat">

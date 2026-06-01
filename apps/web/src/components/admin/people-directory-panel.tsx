@@ -198,21 +198,6 @@ export function PeopleDirectoryPanel({ group }: Props) {
     <div className="att-page">
       {error ? <p className="att-toast att-toast--error">{error}</p> : null}
 
-      {isTeachers ? (
-        <p className="setup-hint tch-page-hint">
-          A teacher can be <strong>homeroom</strong> for one class (e.g. Grade 11) and
-          teach subjects in other grades (e.g. Grade 9–10) via{" "}
-          <Link href="/admin/subjects/assign">Subject assignment</Link>. Set homeroom
-          below; subject classes are assigned per grade on that page.
-        </p>
-      ) : (
-        <p className="setup-hint tch-page-hint">
-          Office teams: finance, reception, attendance monitoring, registrar, and leadership.
-          Classroom teachers are managed under{" "}
-          <Link href="/admin/teachers">Teachers</Link>.
-        </p>
-      )}
-
       <div className="tch-toolbar">
         <button type="button" className="att-btn att-btn--primary" onClick={openCreate}>
           {isTeachers ? "+ Add teacher" : "+ Add staff member"}
@@ -431,10 +416,6 @@ export function PeopleDirectoryPanel({ group }: Props) {
               ) : null}
               {isTeachers ? (
                 <>
-                  <p className="setup-hint">
-                    Optional. Homeroom is separate from subject teaching in other
-                    grades.
-                  </p>
                   <label>
                     Homeroom grade
                     <select
@@ -469,12 +450,6 @@ export function PeopleDirectoryPanel({ group }: Props) {
                     </label>
                   ) : null}
                 </>
-              ) : null}
-              {isTeachers ? (
-                <p className="setup-hint">
-                  Assign Math, English, etc. per grade on{" "}
-                  <Link href="/admin/subjects/assign">Subject assignment</Link>.
-                </p>
               ) : null}
               <div className="tch-drawer__actions">
                 <button type="submit" className="att-btn att-btn--primary" disabled={busy}>

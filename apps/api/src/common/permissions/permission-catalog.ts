@@ -32,6 +32,10 @@ export const PermissionCatalog = {
   RESULTS_MANAGE: 'results.manage',
   RESULTS_APPROVE: 'results.approve',
 
+  // Timetable
+  TIMETABLE_READ: 'timetable.read',
+  TIMETABLE_MANAGE: 'timetable.manage',
+
   // Finance
   FINANCE_READ: 'finance.read',
   FINANCE_MANAGE: 'finance.manage',
@@ -39,6 +43,11 @@ export const PermissionCatalog = {
   // Comms
   ANNOUNCEMENTS_MANAGE: 'announcements.manage',
   PARENT_MESSAGES: 'parent.messages',
+
+  // Digital library
+  LIBRARY_READ: 'library.read',
+  LIBRARY_MANAGE: 'library.manage',
+  LIBRARY_UPLOAD: 'library.upload',
 } as const;
 
 export type PermissionKey =
@@ -74,10 +83,15 @@ export const PERMISSION_META: PermissionMeta[] = [
   { key: 'results.read', label: 'View results', category: 'results', description: 'Scores and report cards' },
   { key: 'results.manage', label: 'Enter results', category: 'results', description: 'Assessments and grades' },
   { key: 'results.approve', label: 'Approve results', category: 'results', description: 'Publish report cards' },
+  { key: 'timetable.read', label: 'View timetable', category: 'academics', description: 'Class schedules' },
+  { key: 'timetable.manage', label: 'Manage timetable', category: 'academics', description: 'Edit periods and class schedule' },
   { key: 'finance.read', label: 'View finance', category: 'finance', description: 'Fees and balances' },
   { key: 'finance.manage', label: 'Manage finance', category: 'finance', description: 'Payments and schedules' },
   { key: 'announcements.manage', label: 'Announcements', category: 'comms', description: 'School announcements' },
   { key: 'parent.messages', label: 'Parent messages', category: 'comms', description: 'Reply to parent inquiries' },
+  { key: 'library.read', label: 'View eLibrary', category: 'library', description: 'Browse digital resources' },
+  { key: 'library.manage', label: 'Manage eLibrary', category: 'library', description: 'Publish and approve resources' },
+  { key: 'library.upload', label: 'Upload to eLibrary', category: 'library', description: 'Add notes and materials' },
 ];
 
 /** Expand patterns like `finance.*` or `students.*` into concrete keys. */

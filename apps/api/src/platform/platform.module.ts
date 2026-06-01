@@ -3,6 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { AuthModule } from '../auth/auth.module';
 import { PrismaModule } from '../prisma/prisma.module';
+import { ProvisioningModule } from '../provisioning/provisioning.module';
 import { SchoolsModule } from '../schools/schools.module';
 import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 import { UsersModule } from '../users/users.module';
@@ -29,6 +30,7 @@ import { PlatformService } from './platform.service';
     }),
     forwardRef(() => AuthModule),
     SchoolsModule,
+    ProvisioningModule,
     UsersModule,
     SubscriptionsModule,
   ],

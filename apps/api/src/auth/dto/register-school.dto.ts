@@ -1,4 +1,4 @@
-import { SchoolType } from '@prisma/client';
+import { GradePreset, SchoolType } from '@prisma/client';
 import {
   IsEmail,
   IsEnum,
@@ -51,4 +51,12 @@ export class RegisterSchoolDto {
   @IsString()
   @IsOptional()
   country?: string;
+
+  @IsOptional()
+  @IsString()
+  curriculumPackageKey?: string;
+
+  @IsOptional()
+  @IsEnum(GradePreset)
+  gradePreset?: GradePreset;
 }

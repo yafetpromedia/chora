@@ -21,6 +21,9 @@ import { TeachersModule } from './teachers/teachers.module';
 import { CommonModule } from './common/common.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ResultsModule } from './results/results.module';
+import { TimetableModule } from './timetable/timetable.module';
+import { LibraryModule } from './library/library.module';
+import { ProvisioningModule } from './provisioning/provisioning.module';
 import { InvitesModule } from './invites/invites.module';
 import { SchoolsModule } from './schools/schools.module';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
@@ -45,6 +48,9 @@ import { UsersModule } from './users/users.module';
     DashboardsModule,
     AttendanceModule,
     ResultsModule,
+    TimetableModule,
+    LibraryModule,
+    ProvisioningModule,
     AnnouncementsModule,
     NotificationsModule,
     FinanceModule,

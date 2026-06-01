@@ -56,7 +56,7 @@ export default function SchoolInvoicesPage() {
   }, [invoices, filter]);
 
   return (
-    <DashboardPage role="admin" title="Invoices" subtitle="CampusOne subscription invoices">
+    <DashboardPage role="admin" title="Invoices">
       <SchoolBillingNav />
 
       <header className="sbill-hero">

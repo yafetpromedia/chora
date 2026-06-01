@@ -38,7 +38,7 @@ export default function SchoolUsagePage() {
         subscription.usage.admins > subscription.limits.admins));
 
   return (
-    <DashboardPage role="admin" title="Usage" subtitle="Seats used on your plan">
+    <DashboardPage role="admin" title="Usage">
       <SchoolBillingNav />
 
       <header className="sbill-hero">

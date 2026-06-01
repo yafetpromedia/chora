@@ -102,12 +102,10 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
 
   const isAdminWorkspace = role === "admin" || role === "staff";
   const pageTitle = title ?? (isAdminWorkspace ? "Dashboard" : `${roleLabel} dashboard`);
-  const pageSub =
-    subtitle ??
-    (isAdminWorkspace ? `${schoolName} · School operations` : `${schoolName} · Campus portal`);
-
   return (
-    <div className="dash-shell dash-shell--pro">
+    <div
+      className={`dash-shell dash-shell--pro${mobileNav ? " dash-shell--nav-open" : ""}`}
+    >
       <aside
         className={`dash-sidebar dash-sidebar--pro${mobileNav ? " dash-sidebar--open" : ""}`}
         aria-label="Main navigation"
@@ -170,7 +168,7 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
           </button>
           <div className="dash-topbar-heading">
             <h1 className="dash-topbar-title">{pageTitle}</h1>
-            <p className="dash-topbar-sub">{pageSub}</p>
+            {subtitle ? <p className="dash-topbar-sub">{subtitle}</p> : null}
           </div>
           <button type="button" onClick={logout} className="dash-logout dash-logout--pro">
             <DashIcon name="logout" className="dash-icon--sm" />

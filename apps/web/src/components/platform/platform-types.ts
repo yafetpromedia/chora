@@ -1,6 +1,7 @@
 export type PlatformSection =
   | "overview"
   | "schools"
+  | "curriculum"
   | "billing"
   | "invoices"
   | "usage"
@@ -24,6 +25,7 @@ export type PlatformSchoolRow = {
   id: string;
   name: string;
   slug?: string;
+  logoUrl?: string | null;
   joinCode: string;
   status: string;
   createdAt: string;
@@ -46,6 +48,7 @@ export type PlatformSchoolDetail = {
     id: string;
     name: string;
     slug: string;
+    logoUrl: string | null;
     joinCode: string;
     status: string;
     email: string | null;
@@ -75,6 +78,10 @@ export const SECTION_META: Record<
   schools: {
     title: "Schools",
     subtitle: "Create, inspect, and control tenant access",
+  },
+  curriculum: {
+    title: "Curriculum packages",
+    subtitle: "Manage starter packs for school provisioning",
   },
   billing: {
     title: "Billing",

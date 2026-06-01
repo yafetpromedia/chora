@@ -183,6 +183,7 @@ Full pipeline: **Academic Year → Terms → Subjects → Assessment Templates �
 | Subject catalog | `/admin/subjects` |
 | Subject + teacher per class | `/admin/subjects/assign` |
 | Legacy results subjects UI | `/admin/results/subjects` |
+| **Timetable** (weekly grid) | `/admin/timetable` — see [TIMETABLE.md](./TIMETABLE.md) |
 | Assessment templates (weighted components) | `/admin/results/templates` — see [ASSESSMENT-TEMPLATES.md](./ASSESSMENT-TEMPLATES.md) |
 | Score matrix (admin) | `/admin/results` |
 | Score matrix (teacher, scoped) | `/teacher/results` |
@@ -258,6 +259,7 @@ Full pipeline: **Academic Year → Terms → Subjects → Assessment Templates �
 | `permissions` | Templates, catalog, staff grants |
 | `attendance` | Roster, bulk, scan, analytics |
 | `results` | Academic years, terms, subjects, templates, score matrix, workflow, report cards |
+| `timetable` | Weekly schedule, periods, rooms, portal views |
 | `finance` | Fees, payments, receipts |
 | `announcements` | Posts |
 | `notifications` | Parent inbox |
@@ -272,15 +274,15 @@ Full pipeline: **Academic Year → Terms → Subjects → Assessment Templates �
 
 **Platform:** `/platform/login`, `/platform`
 
-**Admin:** `/admin`, `/admin/setup`, `/admin/students`, `/admin/students/cards`, `/admin/teachers`, `/admin/staff`, `/admin/subjects`, `/admin/subjects/assign`, `/admin/attendance`, `/admin/results`, `/admin/results/academic-years`, `/admin/results/promotion`, `/admin/results/subjects`, `/admin/results/templates`, `/admin/results/print`, `/admin/finance`, `/admin/announcements`, `/admin/settings`, `/admin/upgrade`
+**Admin:** `/admin`, `/admin/setup`, `/admin/students`, `/admin/students/cards`, `/admin/teachers`, `/admin/staff`, `/admin/subjects`, `/admin/subjects/assign`, `/admin/timetable`, `/admin/attendance`, `/admin/results`, `/admin/results/academic-years`, `/admin/results/promotion`, `/admin/results/subjects`, `/admin/results/templates`, `/admin/results/print`, `/admin/finance`, `/admin/announcements`, `/admin/settings`, `/admin/upgrade`
 
 **Print:** `/print/student-id-cards`
 
-**Teacher:** `/teacher`, `/teacher/attendance`, `/teacher/results`
+**Teacher:** `/teacher`, `/teacher/attendance`, `/teacher/results`, `/teacher/timetable`
 
-**Parent:** `/parent`, `/parent/fees`
+**Parent:** `/parent`, `/parent/fees`, `/parent/timetable`
 
-**Student:** `/student`
+**Student:** `/student`, `/student/timetable`
 
 ---
 
@@ -298,6 +300,7 @@ Full pipeline: **Academic Year → Terms → Subjects → Assessment Templates �
 | [ACADEMIC-ENGINE.md](./ACADEMIC-ENGINE.md) | Years, workflow, report cards |
 | [ASSESSMENT-TEMPLATES.md](./ASSESSMENT-TEMPLATES.md) | Weighted grading per grade |
 | [TEACHER-SCOPING.md](./TEACHER-SCOPING.md) | Assigned classes only |
+| [TIMETABLE.md](./TIMETABLE.md) | Weekly schedules |
 | [INTEGRATIONS.md](./INTEGRATIONS.md) | Fayda, SMS, payments strategy |
 | [TENANT-ARCHITECTURE.md](./TENANT-ARCHITECTURE.md) | Multi-tenant isolation |
 | [PERMISSIONS.md](./PERMISSIONS.md) | Role templates & matrix |
@@ -329,7 +332,7 @@ Full pipeline: **Academic Year → Terms → Subjects → Assessment Templates �
 - Subject-specific templates (e.g. Art / PE only)  
 - ~~Academic year promotion~~ ✅ `/admin/results/promotion`  
 - Admissions module UI  
-- Timetable  
+- ~~Timetable~~ ✅ `/admin/timetable` + teacher/student/parent views  
 - Structured parent messaging (routed tickets)  
 - Telebirr + Chapa live payments  
 - Live Fayda API + SMS provider  

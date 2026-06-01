@@ -29,7 +29,6 @@ export default function TeacherAttendancePage() {
     <DashboardPage
       role="teacher"
       title="Mark attendance"
-      subtitle="Scan student ID cards or mark exceptions manually."
       eyebrow="Homeroom"
     >
       <nav className="att-tabs" aria-label="Attendance mode">

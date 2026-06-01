@@ -1,12 +1,17 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AuthCardFooterLinks } from "@/components/auth/auth-card-footer-links";
 import { AuthCardShell } from "@/components/auth/auth-card-shell";
 import { AuthInput } from "@/components/auth/auth-input";
 import { AuthSubmitButton } from "@/components/auth/auth-submit-button";
-import { registerSchool, type SchoolType } from "@/lib/api";
+import {
+  fetchCurriculumPackages,
+  registerSchool,
+  type CurriculumPackageOption,
+  type SchoolType,
+} from "@/lib/api";
 import { persistAuthSession } from "@/lib/auth-session";
 
 const SCHOOL_TYPES: { value: SchoolType; label: string }[] = [
@@ -28,9 +33,17 @@ export default function RegisterSchoolPage() {
   const [phone, setPhone] = useState("");
   const [country, setCountry] = useState("");
   const [password, setPassword] = useState("");
+  const [curriculumPackageKey, setCurriculumPackageKey] = useState("ETHIOPIAN_PRIVATE");
+  const [packages, setPackages] = useState<CurriculumPackageOption[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+
+  useEffect(() => {
+    void fetchCurriculumPackages()
+      .then(setPackages)
+      .catch(() => undefined);
+  }, []);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -48,9 +61,12 @@ export default function RegisterSchoolPage() {
         password,
         phone: phone.trim() || undefined,
         country: country.trim() || undefined,
+        curriculumPackageKey,
       });
       persistAuthSession(response);
-      router.push("/admin/setup");
+      router.push(
+        response.school?.setupComplete ? "/admin" : "/admin/setup",
+      );
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Registration failed");
     } finally {
@@ -86,6 +102,28 @@ export default function RegisterSchoolPage() {
             onChange={setSchoolName}
             required
           />
+        </div>
+
+        <div className="auth-page-span-full auth-page-fieldset">
+          <label className="auth-input-label" htmlFor="curriculum-package">
+            Starter package
+          </label>
+          <select
+            id="curriculum-package"
+            className="auth-input auth-input--login auth-input--login-plain"
+            value={curriculumPackageKey}
+            onChange={(e) => setCurriculumPackageKey(e.target.value)}
+          >
+            {packages.length === 0 ? (
+              <option value="ETHIOPIAN_PRIVATE">Ethiopian private school</option>
+            ) : (
+              packages.map((p) => (
+                <option key={p.key} value={p.key}>
+                  {p.label}
+                </option>
+              ))
+            )}
+          </select>
         </div>
 
         <div className="auth-page-span-full auth-page-fieldset">

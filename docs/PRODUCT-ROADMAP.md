@@ -145,7 +145,7 @@ Telebirr + Chapa: parent pays → webhook confirms → balance + receipt.
 | 3 | Academic year promotion + enrollment history | ✅ Core done |
 | 3b | Unified school-day dashboards | ✅ Admin / teacher / parent |
 | 4 | Report card PDF, subject templates, parent messaging | Planned |
-| 5 | Timetable | Planned |
+| 5 | Timetable | ✅ Initial (`/admin/timetable`, portal views) |
 | 6 | Chapa + Telebirr live | Planned |
 
 After sprint 3–4, CampusOne is viable for a full academic year at a private school in Ethiopia.

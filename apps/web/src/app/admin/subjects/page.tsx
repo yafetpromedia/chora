@@ -62,7 +62,6 @@ export default function AdminSubjectsPage() {
     <DashboardPage
       role="admin"
       title="Subjects"
-      subtitle="School subject catalog — then assign subjects to grades and teachers."
       eyebrow="Academics"
     >
       <div className="att-page sub-page">
@@ -71,17 +70,16 @@ export default function AdminSubjectsPage() {
 
         <Link href="/admin/subjects/assign" className="sub-assign-card">
           <span className="sub-assign-card__title">Assign subjects to classes</span>
-          <span className="sub-assign-card__desc">
-            Pick a grade, add subjects, and assign a teacher for each (Math, English, etc.).
-          </span>
           <span className="sub-assign-card__cta">Open assignment →</span>
+        </Link>
+
+        <Link href="/admin/timetable" className="sub-assign-card">
+          <span className="sub-assign-card__title">Timetable</span>
+          <span className="sub-assign-card__cta">Open timetable →</span>
         </Link>
 
         <section className="sub-catalog">
           <h2 className="setup-panel-label">Subject catalog</h2>
-          <p className="setup-hint">
-            Add every subject your school teaches once. Class assignment links them to grades.
-          </p>
 
           <form className="sub-add-form" onSubmit={(e) => void onCreate(e)}>
             <label>

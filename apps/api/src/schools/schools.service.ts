@@ -1,8 +1,10 @@
 import { ConflictException, Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
-import { AttendanceMode, GradePreset, Plan, SchoolStatus } from '@prisma/client';
+import { AttendanceMode, GradePreset, Plan, SchoolStatus, SchoolType } from '@prisma/client';
 import { gradeNamesForPreset } from '../grades/grade-presets';
 import { randomBytes } from 'crypto';
 import { PermissionsService } from '../permissions/permissions.service';
+import { SchoolProvisioningService } from '../provisioning/school-provisioning.service';
+import { DEFAULT_CURRICULUM_PACKAGE_KEY } from '../provisioning/curriculum-packages.data';
 import { PrismaService } from '../prisma/prisma.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 
@@ -19,6 +21,7 @@ export type SchoolRecord = {
   phone: string | null;
   setupComplete: boolean;
   gradePreset: string | null;
+  curriculumPackageKey: string | null;
   attendanceMode: string;
   status: string;
   bankName: string | null;
@@ -33,6 +36,7 @@ export class SchoolsService implements OnModuleInit {
     private readonly prisma: PrismaService,
     private readonly subscriptionsService: SubscriptionsService,
     private readonly permissionsService: PermissionsService,
+    private readonly provisioning: SchoolProvisioningService,
   ) {}
 
   async onModuleInit() {
@@ -133,6 +137,8 @@ export class SchoolsService implements OnModuleInit {
     logoUrl?: string;
     country?: string;
     phone?: string;
+    curriculumPackageKey?: string;
+    gradePreset?: GradePreset;
   }): Promise<SchoolRecord> {
     const joinCode = await this.generateUniqueJoinCode();
     const slug = await this.generateUniqueSlug(input.name);
@@ -157,7 +163,16 @@ export class SchoolsService implements OnModuleInit {
       });
       await this.subscriptionsService.createTrial(school.id);
       await this.permissionsService.ensureSchoolRoleTemplates(school.id);
-      return this.toRecord(school);
+      await this.provisioning.provisionSchool(school.id, {
+        curriculumPackageKey:
+          input.curriculumPackageKey?.trim() || DEFAULT_CURRICULUM_PACKAGE_KEY,
+        gradePreset: input.gradePreset,
+        schoolType: input.schoolType as SchoolType | undefined,
+      });
+      const refreshed = await this.prisma.school.findUnique({
+        where: { id: school.id },
+      });
+      return this.toRecord(refreshed ?? school);
     } catch {
       throw new ConflictException('Could not create school. Try a different name.');
     }
@@ -294,6 +309,7 @@ export class SchoolsService implements OnModuleInit {
     phone: string | null;
     setupComplete: boolean;
     gradePreset: string | null;
+    curriculumPackageKey?: string | null;
     attendanceMode: string;
     status: string;
     bankName: string | null;
@@ -314,6 +330,7 @@ export class SchoolsService implements OnModuleInit {
       phone: school.phone,
       setupComplete: school.setupComplete,
       gradePreset: school.gradePreset,
+      curriculumPackageKey: school.curriculumPackageKey ?? null,
       attendanceMode: school.attendanceMode,
       status: school.status,
       bankName: school.bankName,

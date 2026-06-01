@@ -151,7 +151,6 @@ export default function StudentsPage() {
     <DashboardPage
       role="admin"
       title="Students"
-      subtitle="Search, register, and manage enrolled students."
       eyebrow="Admission"
     >
       <div className="stu-page">

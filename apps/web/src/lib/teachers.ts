@@ -110,6 +110,19 @@ export type TeacherDashboardOverview = {
     sectionId: string | null;
     subjectName: string;
   }[];
+  todaySchedule?: {
+    weekday: string;
+    weekdayLabel: string;
+    slots: {
+      id: string;
+      period: { label: string; startTime: string | null; endTime: string | null };
+      subject: { name: string };
+      grade: { name: string };
+      section: { name: string } | null;
+      teacher: { name: string } | null;
+      room: { name: string } | null;
+    }[];
+  };
 };
 
 export async function getTeacherDashboard() {

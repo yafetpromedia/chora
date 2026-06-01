@@ -30,7 +30,7 @@ export function StudentIdCardPanel({
   variant = "compact",
   className = "",
   title = "Student ID card",
-  subtitle = "Show at school gates or scan for attendance.",
+  subtitle,
 }: Props) {
   const [card, setCard] = useState<StudentIdCard | null>(staticCard ?? null);
   const [loading, setLoading] = useState(source !== "static" && !staticCard);
@@ -79,7 +79,7 @@ export function StudentIdCardPanel({
       <div className="sid-my-panel__head">
         <div>
           <h2 className="sid-my-panel__title">{title}</h2>
-          <p className="sid-my-panel__sub">{subtitle}</p>
+          {subtitle ? <p className="sid-my-panel__sub">{subtitle}</p> : null}
         </div>
         {card ? (
           <button

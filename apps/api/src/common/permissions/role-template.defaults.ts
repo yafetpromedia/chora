@@ -42,6 +42,8 @@ export const DEFAULT_ROLE_TEMPLATES: DefaultRoleTemplate[] = [
     portalRole: UserRole.staff,
     permissionPatterns: [
       'results.*',
+      'timetable.*',
+      'library.*',
       'attendance.analytics',
       'teachers.read',
       'teachers.manage',
@@ -97,6 +99,9 @@ export const DEFAULT_ROLE_TEMPLATES: DefaultRoleTemplate[] = [
       'attendance.read',
       'attendance.analytics',
       'results.read',
+      'timetable.read',
+      'library.read',
+      'library.upload',
       'announcements.manage',
       'parent.messages',
     ],
@@ -111,6 +116,9 @@ export const DEFAULT_ROLE_TEMPLATES: DefaultRoleTemplate[] = [
       'attendance.read',
       'results.read',
       'results.manage',
+      'timetable.read',
+      'library.read',
+      'library.upload',
     ],
   },
 ];

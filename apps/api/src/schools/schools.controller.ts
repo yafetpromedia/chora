@@ -10,6 +10,7 @@ import { CreateInviteDto } from './dto/create-invite.dto';
 import { UpgradePlanDto } from './dto/upgrade-plan.dto';
 import { UpdateSchoolSettingsDto } from './dto/update-school-settings.dto';
 import { InvitesService } from './invites.service';
+import { CurriculumCatalogService } from '../provisioning/curriculum-catalog.service';
 import { SchoolsService } from './schools.service';
 
 @Controller('schools')
@@ -18,7 +19,24 @@ export class SchoolsController {
     private readonly schoolsService: SchoolsService,
     private readonly invitesService: InvitesService,
     private readonly subscriptionsService: SubscriptionsService,
+    private readonly curriculumCatalog: CurriculumCatalogService,
   ) {}
+
+  /** Public — used during school registration. */
+  @Get('curriculum-packages')
+  listCurriculumPackages() {
+    return this.curriculumCatalog.listPackages().then((rows) =>
+      rows.map((p) => ({
+        key: p.key,
+        label: p.label,
+        description: p.description,
+        gradePreset: p.gradePreset,
+        schoolType: p.schoolType,
+        isBlank: p.isBlank,
+        counts: p._count,
+      })),
+    );
+  }
 
   @Get('me')
   @UseGuards(JwtAuthGuard, SchoolTenantGuard)

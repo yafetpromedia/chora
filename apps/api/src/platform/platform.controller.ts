@@ -81,10 +81,34 @@ export class PlatformController {
     return this.platformService.getSchoolDetail(id);
   }
 
+  @Get('curriculum-packages')
+  @UseGuards(JwtAuthGuard, PlatformGuard)
+  listCurriculumPackages() {
+    return this.platformService.listCurriculumPackages();
+  }
+
+  @Get('curriculum-packages/:key')
+  @UseGuards(JwtAuthGuard, PlatformGuard)
+  getCurriculumPackage(@Param('key') key: string) {
+    return this.platformService.getCurriculumPackage(key);
+  }
+
   @Post('schools')
   @UseGuards(JwtAuthGuard, PlatformGuard)
   createSchool(@Body() dto: CreateTenantSchoolDto) {
     return this.platformService.createTenantSchool(dto);
+  }
+
+  @Post('schools/:id/provision')
+  @UseGuards(JwtAuthGuard, PlatformGuard)
+  reprovisionSchool(
+    @Param('id') id: string,
+    @Body() body: { curriculumPackageKey: string },
+  ) {
+    return this.platformService.reprovisionSchool(
+      id,
+      body.curriculumPackageKey,
+    );
   }
 
   @Patch('schools/:id/status')

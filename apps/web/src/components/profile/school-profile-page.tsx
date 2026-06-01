@@ -35,7 +35,6 @@ export function SchoolProfilePage({ role }: Props) {
     <DashboardPage
       role={shellRole}
       title="My profile"
-      subtitle="Your account, school membership, and sign-in details."
       eyebrow="Account"
     >
       <UserProfilePanel />

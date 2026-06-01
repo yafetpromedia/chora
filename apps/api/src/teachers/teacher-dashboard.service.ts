@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
+import { UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { TimetableService } from '../timetable/timetable.service';
 import { TeacherScopeService } from './teacher-scope.service';
 
 function todayUtc(): Date {
@@ -13,6 +15,7 @@ export class TeacherDashboardService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly teacherScope: TeacherScopeService,
+    private readonly timetable: TimetableService,
   ) {}
 
   async getOverview(schoolId: string, userId: string) {
@@ -208,6 +211,12 @@ export class TeacherDashboardService {
       }
     }
 
+    const todaySchedule = await this.timetable.getScheduleForUser(
+      schoolId,
+      userId,
+      UserRole.teacher,
+    );
+
     const teachingSlots = await this.prisma.classSubject.findMany({
       where: {
         schoolId,
@@ -254,6 +263,7 @@ export class TeacherDashboardService {
         sectionId: cs.section?.id ?? null,
         subjectName: cs.subject.name,
       })),
+      todaySchedule,
     };
   }
 }

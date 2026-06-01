@@ -197,7 +197,7 @@ export function ScoreMatrixPanel({ role }: Props) {
 
       {workflowStatus ? (
         <div className="att-summary-block" style={{ marginBottom: "0.75rem" }}>
-          <p className="setup-hint">
+          <p className="tch-meta">
             Workflow: <strong>{workflowStatus}</strong>
             {matrix?.workflow?.submittedByName
               ? ` · submitted by ${matrix.workflow.submittedByName}`
@@ -267,18 +267,6 @@ export function ScoreMatrixPanel({ role }: Props) {
         </p>
       ) : null}
 
-      {matrix?.template ? (
-        <p className="setup-hint">
-          Assessment template: <strong>{matrix.template.name}</strong> (
-          {matrix.template.components.map((c) => `${c.name} ${c.weightPercent}%`).join(" · ")})
-        </p>
-      ) : matrix ? (
-        <p className="setup-hint">
-          No template assigned for {selectedCs?.grade.name ?? "this class"}. Ask admin to set up
-          assessment templates.
-        </p>
-      ) : null}
-
       {loading ? (
         <p className="setup-hint">Loading score sheet…</p>
       ) : matrix && matrix.assessments.length > 0 ? (
@@ -332,7 +320,7 @@ export function ScoreMatrixPanel({ role }: Props) {
           </div>
         </>
       ) : matrix ? (
-        <p className="setup-hint">No assessment columns yet. Assign a template and sync.</p>
+        <p className="tch-meta">No assessment columns yet.</p>
       ) : null}
     </div>
   );

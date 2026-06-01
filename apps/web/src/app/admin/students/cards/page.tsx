@@ -75,7 +75,6 @@ export default function StudentCardsPage() {
     <DashboardPage
       role="admin"
       title="Student ID cards"
-      subtitle="Preview cards on screen — use Print to run large batches efficiently (2,000+ students)."
       eyebrow="Management"
     >
       <div className="att-page">

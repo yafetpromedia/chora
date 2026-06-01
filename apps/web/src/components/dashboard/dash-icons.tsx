@@ -30,7 +30,8 @@ export type DashIconName =
   | "profile"
   | "chart"
   | "plus"
-  | "arrow";
+  | "arrow"
+  | "library";
 
 export function DashIcon({ name, className }: { name: DashIconName; className?: string }) {
   const p = { ...base, className: className ?? "dash-icon" };
@@ -162,6 +163,15 @@ export function DashIcon({ name, className }: { name: DashIconName; className?: 
         <svg {...p}>
           <line x1="5" y1="12" x2="19" y2="12" />
           <polyline points="12 5 19 12 12 19" />
+        </svg>
+      );
+    case "library":
+      return (
+        <svg {...p}>
+          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+          <line x1="12" y1="6" x2="12" y2="14" />
+          <line x1="8" y1="10" x2="16" y2="10" />
         </svg>
       );
     default:

@@ -62,12 +62,7 @@ export function AuthPageShell({
         </header>
 
         <main className={`auth-login-main${wide ? " auth-login-main--wide" : ""}`}>
-          <motion.div
-            className="auth-login-card"
-            initial={reduce ? false : { opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-          >
+          <div className="auth-login-card">
             <div className="auth-login-card__head">
               <h1 className="auth-login-card__title">{title}</h1>
               <p className="auth-login-card__subtitle">{subtitle}</p>
@@ -93,7 +88,7 @@ export function AuthPageShell({
                 ) : null}
               </div>
             ) : null}
-          </motion.div>
+          </div>
         </main>
       </div>
     );

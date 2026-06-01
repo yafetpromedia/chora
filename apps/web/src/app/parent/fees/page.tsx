@@ -102,7 +102,6 @@ export default function ParentFeesPage() {
     <DashboardPage
       role="parent"
       title="Fees & payments"
-      subtitle="View balances and submit bank transfer payments for verification."
       eyebrow="CampusOne"
     >
       {error ? <p className="auth-alert auth-alert--error">{error}</p> : null}

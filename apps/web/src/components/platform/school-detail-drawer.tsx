@@ -168,6 +168,7 @@ export function SchoolDetailDrawer({
   ];
 
   const isSuspended = (detail?.school.status ?? school.status) === "SUSPENDED";
+  const logoUrl = detail?.school.logoUrl ?? school.logoUrl ?? null;
 
   return (
     <>
@@ -185,8 +186,16 @@ export function SchoolDetailDrawer({
         <header className="plat-manage-hero">
           <div className="plat-manage-hero__top">
             <div className="plat-manage-hero__brand">
-              <span className="plat-manage-avatar" aria-hidden>
-                {schoolInitials(school.name)}
+              <span
+                className={`plat-manage-avatar${logoUrl ? " plat-manage-avatar--img" : ""}`}
+                aria-hidden
+              >
+                {logoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={logoUrl} alt="" />
+                ) : (
+                  schoolInitials(school.name)
+                )}
               </span>
               <div className="plat-manage-hero__titles">
                 <p className="plat-manage-hero__eyebrow">Tenant school</p>

@@ -1,4 +1,5 @@
-import { IsEmail, IsOptional, IsString, MinLength } from 'class-validator';
+import { GradePreset, SchoolType } from '@prisma/client';
+import { IsEmail, IsEnum, IsOptional, IsString, MinLength } from 'class-validator';
 
 export class CreateTenantSchoolDto {
   @IsString()
@@ -20,4 +21,16 @@ export class CreateTenantSchoolDto {
   @IsOptional()
   @IsString()
   country?: string;
+
+  @IsOptional()
+  @IsString()
+  curriculumPackageKey?: string;
+
+  @IsOptional()
+  @IsEnum(GradePreset)
+  gradePreset?: GradePreset;
+
+  @IsOptional()
+  @IsEnum(SchoolType)
+  schoolType?: SchoolType;
 }

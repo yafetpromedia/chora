@@ -217,8 +217,16 @@ export class ResultsController {
 
   @Get('academic-years/current')
   @Roles('admin', 'staff', 'teacher')
-  currentAcademicYear(@CurrentUser() user: AuthUser) {
-    return this.academicYearsService.getCurrent(user.schoolId);
+  async currentAcademicYear(@CurrentUser() user: AuthUser) {
+    const year = await this.academicYearsService.getCurrent(user.schoolId);
+    return { year: year ?? null };
+  }
+
+  @Post('academic-years/ensure-current')
+  @Roles('admin', 'staff')
+  async ensureCurrentAcademicYear(@CurrentUser() user: AuthUser) {
+    const year = await this.academicYearsService.ensureCurrentYear(user.schoolId);
+    return { year };
   }
 
   @Post('academic-years')

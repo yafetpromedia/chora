@@ -113,7 +113,7 @@ export default function SchoolPlansPage() {
   }
 
   return (
-    <DashboardPage role="admin" title="Plans" subtitle="Choose billing for your school">
+    <DashboardPage role="admin" title="Plans">
       <SchoolBillingNav />
 
       <div className="upg" data-upgrade-page>

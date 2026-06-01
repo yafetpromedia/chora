@@ -120,7 +120,21 @@ export async function listAcademicYears() {
 }
 
 export async function getCurrentAcademicYear() {
-  return apiFetch<AcademicYear | null>("/results/academic-years/current");
+  const res = await apiFetch<{ year: AcademicYear | null }>(
+    "/results/academic-years/current",
+  );
+  return res?.year ?? null;
+}
+
+/** Returns current year, creating a default one if the school has none. */
+export async function getOrEnsureCurrentAcademicYear() {
+  const existing = await getCurrentAcademicYear();
+  if (existing) return existing;
+  const res = await apiPost<{ year: AcademicYear }>(
+    "/results/academic-years/ensure-current",
+    {},
+  );
+  return res.year;
 }
 
 export async function createAcademicYear(body: {

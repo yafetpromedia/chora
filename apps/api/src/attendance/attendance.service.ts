@@ -373,12 +373,21 @@ export class AttendanceService {
       orderBy: { date: 'desc' },
     });
 
-    const counts = { present: 0, absent: 0, late: 0, excused: 0 };
+    const counts = {
+      present: 0,
+      absent: 0,
+      late: 0,
+      excused: 0,
+      medical: 0,
+    };
     for (const r of records) {
-      counts[r.status] += 1;
+      if (r.status in counts) {
+        counts[r.status as keyof typeof counts] += 1;
+      }
     }
     const total = records.length;
-    const attended = counts.present + counts.late + counts.excused;
+    const attended =
+      counts.present + counts.late + counts.excused + counts.medical;
     const rate = total > 0 ? Math.round((attended / total) * 100) : 100;
 
     return {

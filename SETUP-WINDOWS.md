@@ -64,3 +64,38 @@ npm run dev:clean
 `EPERM` on `prisma generate` almost always means port 3001 is still running — run `npm run ports:free` again.
 
 Log out and log in again so your JWT includes `permissions` and `roleTemplateSlug`.
+
+## Use on your phone (same Wi‑Fi as this PC)
+
+CampusOne is a **website** — open it in **Chrome or Safari** on your phone. It is responsive and works for login, attendance scan, ID cards, etc.
+
+`http://localhost:3000` only works on the computer running the app. On your phone, use your PC’s **LAN IP** (same Wi‑Fi).
+
+1. Find your PC IP (PowerShell):
+   ```powershell
+   ipconfig
+   ```
+   Use the **IPv4 Address** under Wi‑Fi (example: `192.168.1.42`).
+
+2. Edit `apps/web/.env.local` (create from `.env.example` if needed):
+   ```env
+   NEXT_PUBLIC_API_BASE_URL=http://192.168.1.9:3001
+   ```
+   Replace `192.168.1.9` with your real IP.
+
+3. If the login page is **blank** (nav only), set your IP in `apps/web/next.config.ts` → `LAN_DEV_ORIGIN` (already `192.168.1.9` by default) — Next.js 16 blocks `/_next/*` from LAN until `allowedDevOrigins` is set.
+
+4. Restart dev:
+   ```powershell
+   npm run dev:clean
+   ```
+
+5. On your phone’s browser open:
+   ```text
+   http://192.168.1.9:3000/login
+   ```
+   School login: `/login` · Platform: `/platform/login`
+
+6. If login still fails, run `npm run ports:free` then `npm run dev:clean` (fixes API `EADDRINUSE` on 3001). Allow **Windows Firewall** for ports **3000** and **3001** on private networks.
+
+**Note:** Your phone must stay on the **same Wi‑Fi** as the PC. For access from anywhere (not just home Wi‑Fi), deploy to a public server or use a tunnel (e.g. ngrok) later.

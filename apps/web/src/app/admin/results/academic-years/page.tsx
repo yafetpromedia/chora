@@ -1,7 +1,6 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { DashboardPage } from "@/components/dashboard/dashboard-page";
 import {
@@ -65,14 +64,8 @@ export default function AcademicYearsPage() {
     <DashboardPage
       role="admin"
       title="Academic years"
-      subtitle="Define the school calendar. Terms and class subjects belong to the active year."
       eyebrow="Academics"
     >
-      <p className="setup-hint">
-        <Link href="/admin/results">← Results</Link>
-        {" · "}
-        <Link href="/admin/results/promotion">End-of-year promotion</Link>
-      </p>
       {error ? <p className="auth-alert auth-alert--error">{error}</p> : null}
 
       {loading ? (
@@ -83,7 +76,7 @@ export default function AcademicYearsPage() {
             <li key={y.id}>
               <strong>{y.name}</strong>
               {y.isCurrent ? " (current)" : ""}
-              <span className="setup-hint">
+              <span className="tch-meta">
                 {" "}
                 · {y._count?.academicTerms ?? 0} terms · {y._count?.classSubjects ?? 0}{" "}
                 class subjects

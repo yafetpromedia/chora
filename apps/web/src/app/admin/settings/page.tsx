@@ -172,7 +172,6 @@ export default function AdminSettingsPage() {
     <DashboardPage
       role="admin"
       title="Settings"
-      subtitle="School profile, attendance rules, access, and billing — separate from daily management."
       eyebrow="Configuration"
     >
       <div className="cfg-page">

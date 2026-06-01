@@ -49,7 +49,6 @@ export default function AdminAttendancePage() {
     <DashboardPage
       role="admin"
       title="Attendance"
-      subtitle="Mark rolls and view school-wide stats. Configure rules in Settings."
       eyebrow="Management"
     >
       <div className="att-page">

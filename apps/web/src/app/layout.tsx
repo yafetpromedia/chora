@@ -17,6 +17,7 @@ import "../styles/profile.css";
 import "../styles/workspace.css";
 import "../styles/upgrade.css";
 import "../styles/billing.css";
+import "../styles/library.css";
 
 const figtree = Figtree({
   subsets: ["latin"],

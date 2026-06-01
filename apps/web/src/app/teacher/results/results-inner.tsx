@@ -24,7 +24,6 @@ export function TeacherResultsInner() {
     <DashboardPage
       role="teacher"
       title="Enter scores"
-      subtitle="Pick your class and subject — assessment columns come from your school's template."
       eyebrow="CampusOne"
     >
       <ScoreMatrixPanel role="teacher" />

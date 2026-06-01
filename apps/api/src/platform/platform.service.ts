@@ -1,5 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Plan, SchoolStatus, UserRole } from '@prisma/client';
+import { CurriculumCatalogService } from '../provisioning/curriculum-catalog.service';
+import { SchoolProvisioningService } from '../provisioning/school-provisioning.service';
+import { DEFAULT_CURRICULUM_PACKAGE_KEY } from '../provisioning/curriculum-packages.data';
 import { PrismaService } from '../prisma/prisma.service';
 import { SchoolsService } from '../schools/schools.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
@@ -17,7 +20,17 @@ export class PlatformService {
     private readonly usersService: UsersService,
     private readonly subscriptionsService: SubscriptionsService,
     private readonly planCatalogService: PlanCatalogService,
+    private readonly curriculumCatalog: CurriculumCatalogService,
+    private readonly provisioning: SchoolProvisioningService,
   ) {}
+
+  listCurriculumPackages() {
+    return this.curriculumCatalog.listPackages();
+  }
+
+  getCurriculumPackage(key: string) {
+    return this.curriculumCatalog.getPackageByKey(key);
+  }
 
   listPlanCatalog() {
     return this.planCatalogService.findAll();
@@ -133,6 +146,7 @@ export class PlatformService {
         id: s.id,
         name: s.name,
         slug: s.slug,
+        logoUrl: s.logoUrl,
         joinCode: s.joinCode,
         status: s.status,
         createdAt: s.createdAt,
@@ -182,12 +196,15 @@ export class PlatformService {
         id: school.id,
         name: school.name,
         slug: school.slug,
+        logoUrl: school.logoUrl,
         joinCode: school.joinCode,
         status: school.status,
         email: school.email,
         phone: school.phone,
         country: school.country,
         setupComplete: school.setupComplete,
+        curriculumPackageKey: school.curriculumPackageKey,
+        gradePreset: school.gradePreset,
         createdAt: school.createdAt,
       },
       subscription: school.subscription,
@@ -212,6 +229,10 @@ export class PlatformService {
     const school = await this.schoolsService.createSchool({
       name: dto.schoolName,
       country: dto.country,
+      schoolType: dto.schoolType,
+      curriculumPackageKey:
+        dto.curriculumPackageKey?.trim() || DEFAULT_CURRICULUM_PACKAGE_KEY,
+      gradePreset: dto.gradePreset,
     });
 
     await this.prisma.school.update({
@@ -234,11 +255,17 @@ export class PlatformService {
         name: school.name,
         joinCode: school.joinCode,
         status: SchoolStatus.TRIAL,
+        setupComplete: school.setupComplete,
+        curriculumPackageKey: school.curriculumPackageKey,
       },
       admin: {
         id: admin.id,
         email: admin.email,
       },
     };
+  }
+
+  reprovisionSchool(schoolId: string, curriculumPackageKey: string) {
+    return this.provisioning.reprovisionSchool(schoolId, curriculumPackageKey);
   }
 }

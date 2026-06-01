@@ -17,6 +17,7 @@ import {
 const NAV: { id: PlatformSection; label: string; icon: DashIconName }[] = [
   { id: "overview", label: "Overview", icon: "overview" },
   { id: "schools", label: "Schools", icon: "students" },
+  { id: "curriculum", label: "Curriculum", icon: "results" },
   { id: "billing", label: "Billing", icon: "finance" },
   { id: "invoices", label: "Invoices", icon: "fees" },
   { id: "usage", label: "Usage", icon: "students" },
@@ -62,7 +63,9 @@ export function PlatformShell({
     : "Platform operator";
 
   return (
-    <div className="dash-shell dash-shell--pro plat-shell">
+    <div
+      className={`dash-shell dash-shell--pro plat-shell${mobileNav ? " dash-shell--nav-open" : ""}`}
+    >
       <aside
         className={`dash-sidebar dash-sidebar--pro plat-sidebar${mobileNav ? " dash-sidebar--open" : ""}`}
         aria-label="Platform navigation"

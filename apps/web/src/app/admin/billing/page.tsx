@@ -44,7 +44,7 @@ export default function SchoolBillingPage() {
   const sub = data?.subscription;
 
   return (
-    <DashboardPage role="admin" title="Billing" subtitle="Your CampusOne subscription">
+    <DashboardPage role="admin" title="Billing">
       <SchoolBillingNav />
 
       {loading ? <p className="sbill-muted">Loading billing…</p> : null}

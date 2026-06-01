@@ -19,7 +19,6 @@ export default function StudentIdCardPage() {
     <DashboardPage
       role="student"
       title="Campus ID card"
-      subtitle="Your official school ID — show or scan for attendance."
       eyebrow="Student"
     >
       <MyStudentIdCardPanel />

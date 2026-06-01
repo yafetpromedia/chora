@@ -71,3 +71,153 @@
   border-radius: 999px;
   background: rgba(42, 111, 111, 0.08);
 }
+
+/* Timetable */
+.tt-page-hint {
+  margin-bottom: 1rem;
+}
+
+.tt-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: flex-end;
+  margin-bottom: 1rem;
+}
+
+.tt-toolbar label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.tt-toolbar select,
+.tt-toolbar input {
+  min-width: 10rem;
+  padding: 0.4rem 0.55rem;
+  border: 1px solid var(--brand-border);
+  border-radius: 8px;
+}
+
+.tt-grid-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--brand-border);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.tt-grid {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+}
+
+.tt-grid th,
+.tt-grid td {
+  border: 1px solid var(--brand-border);
+  padding: 0.35rem;
+  vertical-align: top;
+}
+
+.tt-grid__period {
+  min-width: 5.5rem;
+  background: #f4fafa;
+  font-weight: 700;
+}
+
+.tt-grid__period span {
+  display: block;
+  font-weight: 500;
+  font-size: 0.68rem;
+  color: var(--brand-muted);
+}
+
+.tt-grid__cell {
+  min-width: 9rem;
+}
+
+.tt-grid__cell select,
+.tt-grid__cell input {
+  width: 100%;
+  margin-bottom: 0.25rem;
+  padding: 0.25rem;
+  font-size: 0.72rem;
+  border: 1px solid var(--brand-border);
+  border-radius: 6px;
+}
+
+.tt-panel {
+  padding: 1rem;
+  margin-bottom: 1rem;
+  background: #fff;
+  border: 1px solid var(--brand-border);
+  border-radius: 14px;
+}
+
+.tt-panel__title {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.tt-panel__day {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--brand-border);
+}
+
+.tt-panel__day h3 {
+  margin: 0 0 0.5rem;
+  font-size: 0.88rem;
+}
+
+.tt-day-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.tt-day-list__item {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 10px;
+  background: #f8fbfb;
+  border: 1px solid rgba(42, 111, 111, 0.1);
+}
+
+.tt-day-list__time {
+  flex: 0 0 5.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  font-size: 0.75rem;
+}
+
+.tt-day-list__time span {
+  color: var(--brand-muted);
+  font-weight: 500;
+}
+
+.tt-day-list__subject {
+  margin: 0;
+  font-weight: 800;
+  color: var(--brand-teal-dark);
+}
+
+.tt-day-list__meta,
+.tt-day-list__child {
+  margin: 0.15rem 0 0;
+  font-size: 0.78rem;
+  color: var(--brand-muted);
+}
+
+.tt-day-list__child {
+  font-weight: 700;
+  color: var(--lite-black);
+}

@@ -48,6 +48,20 @@ export const DASHBOARD_NAV: NavItem[] = [
     permission: Permission.RESULTS_READ,
   },
   {
+    href: "/admin/timetable",
+    label: "Timetable",
+    icon: "calendar",
+    roles: ["admin", "staff"],
+    permission: Permission.TIMETABLE_READ,
+  },
+  {
+    href: "/admin/library",
+    label: "eLibrary",
+    icon: "library",
+    roles: ["admin", "staff"],
+    permission: Permission.LIBRARY_READ,
+  },
+  {
     href: "/admin/staff",
     label: "Staff",
     icon: "users",
@@ -104,12 +118,17 @@ export const DASHBOARD_NAV: NavItem[] = [
   { href: "/teacher", label: "Overview", icon: "overview", roles: ["teacher"] },
   { href: "/teacher/attendance", label: "Attendance", icon: "attendance", roles: ["teacher"] },
   { href: "/teacher/results", label: "Results", icon: "results", roles: ["teacher"] },
+  { href: "/teacher/timetable", label: "Timetable", icon: "calendar", roles: ["teacher"] },
+  { href: "/teacher/library", label: "eLibrary", icon: "library", roles: ["teacher"] },
   { href: "/teacher/profile", label: "Profile", icon: "profile", roles: ["teacher"] },
   { href: "/parent", label: "Overview", icon: "overview", roles: ["parent"] },
   { href: "/parent/fees", label: "Fees", icon: "fees", roles: ["parent"] },
+  { href: "/parent/timetable", label: "Timetable", icon: "calendar", roles: ["parent"] },
   { href: "/parent/profile", label: "Profile", icon: "profile", roles: ["parent"] },
   { href: "/student", label: "Overview", icon: "overview", roles: ["student"] },
   { href: "/student/id-card", label: "Campus ID", icon: "students", roles: ["student"] },
+  { href: "/student/timetable", label: "Timetable", icon: "calendar", roles: ["student"] },
+  { href: "/student/library", label: "eLibrary", icon: "library", roles: ["student"] },
   { href: "/student/profile", label: "Profile", icon: "profile", roles: ["student"] },
 ];
 

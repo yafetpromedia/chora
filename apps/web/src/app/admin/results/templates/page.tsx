@@ -95,13 +95,8 @@ export default function AssessmentTemplatesPage() {
     <DashboardPage
       role="admin"
       title="Assessment templates"
-      subtitle="Define weighted components per grade or subject. Teachers see columns automatically."
       eyebrow="Academics"
     >
-      <p className="setup-hint">
-        <Link href="/admin/results">← Back to results</Link>
-      </p>
-
       {error ? <p className="auth-alert auth-alert--error">{error}</p> : null}
 
       {loading ? (
@@ -117,7 +112,7 @@ export default function AssessmentTemplatesPage() {
                 <article key={t.id} className="res-template-card">
                   <strong>{t.name}</strong>
                   {t.description ? (
-                    <p className="setup-hint" style={{ margin: "0.25rem 0" }}>
+                    <p className="tch-meta" style={{ margin: "0.25rem 0" }}>
                       {t.description}
                     </p>
                   ) : null}
@@ -128,7 +123,7 @@ export default function AssessmentTemplatesPage() {
                       </span>
                     ))}
                   </div>
-                  <p className="setup-hint" style={{ marginTop: "0.5rem" }}>
+                  <p className="tch-meta" style={{ marginTop: "0.5rem" }}>
                     Assigned:{" "}
                     {t.gradeAssignments.length === 0
                       ? "none"

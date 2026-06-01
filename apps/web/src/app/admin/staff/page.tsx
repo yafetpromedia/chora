@@ -24,7 +24,6 @@ export default function AdminStaffPage() {
     <DashboardPage
       role={shellRole}
       title="Staff & teams"
-      subtitle="Finance, reception, attendance monitoring, registrar, and other office roles."
       eyebrow="School admin"
     >
       <PeopleDirectoryPanel group="staff" />

@@ -5,11 +5,27 @@ import {
   clearSessionStorage,
 } from "./auth";
 
-const configuredApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
-const API_BASE_URL =
-  configuredApiBaseUrl && configuredApiBaseUrl.length > 0
-    ? configuredApiBaseUrl
-    : "http://localhost:3001";
+const API_PORT = process.env.NEXT_PUBLIC_API_PORT?.trim() || "3001";
+
+/** API origin: matches the page host in local dev (localhost vs LAN IP). */
+export function getApiBaseUrl(): string {
+  if (typeof window !== "undefined") {
+    const { hostname, protocol } = window.location;
+    const isLocalDevHost =
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname.startsWith("192.168.") ||
+      hostname.startsWith("10.") ||
+      /^172\.(1[6-9]|2\d|3[01])\./.test(hostname);
+    if (isLocalDevHost && process.env.NODE_ENV !== "production") {
+      return `${protocol}//${hostname}:${API_PORT}`;
+    }
+  }
+  const configured = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
+  return configured && configured.length > 0
+    ? configured
+    : `http://localhost:${API_PORT}`;
+}
 
 export type SchoolType =
   | "KINDERGARTEN"
@@ -171,6 +187,21 @@ export type LoginResponse = {
   school?: SchoolInfo;
 };
 
+export type CurriculumPackageOption = {
+  key: string;
+  label: string;
+  description: string | null;
+  gradePreset: string | null;
+  schoolType: string | null;
+  isBlank: boolean;
+  counts: {
+    subjects: number;
+    departments: number;
+    libraryItems: number;
+    templates: number;
+  };
+};
+
 export type RegisterSchoolPayload = {
   schoolName: string;
   schoolType?: SchoolType;
@@ -183,7 +214,16 @@ export type RegisterSchoolPayload = {
   password: string;
   phone?: string;
   country?: string;
+  curriculumPackageKey?: string;
 };
+
+export async function fetchCurriculumPackages() {
+  const response = await fetch(`${getApiBaseUrl()}/schools/curriculum-packages`);
+  if (!response.ok) {
+    throw new Error("Could not load curriculum packages");
+  }
+  return response.json() as Promise<CurriculumPackageOption[]>;
+}
 
 export type JoinSchoolPayload = {
   schoolCode: string;
@@ -287,7 +327,7 @@ export type PlanOption = {
 async function authPost(path: string, body: unknown): Promise<LoginResponse> {
   let response: Response;
   try {
-    response = await fetch(`${API_BASE_URL}${path}`, {
+    response = await fetch(`${getApiBaseUrl()}${path}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
@@ -331,7 +371,7 @@ export async function joinInvite(payload: JoinInvitePayload): Promise<LoginRespo
 }
 
 export async function fetchInvitePreview(token: string): Promise<InvitePreview> {
-  const response = await fetch(`${API_BASE_URL}/invites/${encodeURIComponent(token)}`);
+  const response = await fetch(`${getApiBaseUrl()}/invites/${encodeURIComponent(token)}`);
   if (!response.ok) {
     throw new Error("Invitation not found");
   }
@@ -356,7 +396,7 @@ export async function getSchoolSubscription(): Promise<SubscriptionStatus> {
 }
 
 export async function listPlans(): Promise<PlanOption[]> {
-  const response = await fetch(`${API_BASE_URL}/schools/plans`);
+  const response = await fetch(`${getApiBaseUrl()}/schools/plans`);
   if (!response.ok) {
     throw new Error("Could not load plans");
   }
@@ -377,7 +417,7 @@ async function refreshAccessToken(): Promise<string | null> {
     return null;
   }
 
-  const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+  const response = await fetch(`${getApiBaseUrl()}/auth/refresh`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ refreshToken }),
@@ -397,6 +437,18 @@ async function refreshAccessToken(): Promise<string | null> {
   return data.accessToken;
 }
 
+async function readJsonBody<T>(response: Response): Promise<T> {
+  const text = await response.text();
+  if (!text.trim()) {
+    return null as T;
+  }
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw new Error("Invalid response from server");
+  }
+}
+
 async function authedFetch<T>(
   path: string,
   init: RequestInit = {},
@@ -410,7 +462,17 @@ async function authedFetch<T>(
   headers.set("Content-Type", "application/json");
   headers.set("Authorization", `Bearer ${token}`);
 
-  const response = await fetch(`${API_BASE_URL}${path}`, { ...init, headers });
+  const base = getApiBaseUrl();
+  let response: Response;
+  try {
+    response = await fetch(`${base}${path}`, { ...init, headers });
+  } catch (err) {
+    const hint =
+      err instanceof TypeError
+        ? `Cannot reach API at ${base}. Start it: cd apps/api && npm run dev`
+        : "API is unavailable";
+    throw new Error(hint);
+  }
 
   if (response.status === 401) {
     const newAccessToken = await refreshAccessToken();
@@ -418,15 +480,26 @@ async function authedFetch<T>(
       throw new Error("Session expired");
     }
     headers.set("Authorization", `Bearer ${newAccessToken}`);
-    const retryResponse = await fetch(`${API_BASE_URL}${path}`, { ...init, headers });
+    let retryResponse: Response;
+    try {
+      retryResponse = await fetch(`${base}${path}`, { ...init, headers });
+    } catch (err) {
+      const hint =
+        err instanceof TypeError
+          ? `Cannot reach API at ${base}. Start it: cd apps/api && npm run dev`
+          : "API is unavailable";
+      throw new Error(hint);
+    }
     if (!retryResponse.ok) {
       throw new Error(`Request failed: ${retryResponse.status}`);
     }
-    return retryResponse.json();
+    return readJsonBody<T>(retryResponse);
   }
 
   if (!response.ok) {
-    const data = (await response.json().catch(() => null)) as { message?: string | string[] } | null;
+    const data = await readJsonBody<{ message?: string | string[] } | null>(response).catch(
+      () => null,
+    );
     const msg = Array.isArray(data?.message) ? data.message[0] : data?.message;
     if (response.status === 403) {
       throw new Error(msg ?? "Not allowed");
@@ -434,7 +507,7 @@ async function authedFetch<T>(
     throw new Error(msg ?? `Request failed: ${response.status}`);
   }
 
-  return response.json();
+  return readJsonBody<T>(response);
 }
 
 export async function apiFetch<T>(path: string): Promise<T> {
@@ -453,10 +526,6 @@ export async function apiDelete<T>(path: string): Promise<T> {
   return authedFetch<T>(path, { method: "DELETE" });
 }
 
-export function getApiBaseUrl() {
-  return API_BASE_URL;
-}
-
 export async function apiUpload<T>(path: string, file: File): Promise<T> {
   const token = localStorage.getItem(AUTH_TOKEN_KEY);
   if (!token) {
@@ -466,11 +535,21 @@ export async function apiUpload<T>(path: string, file: File): Promise<T> {
   const form = new FormData();
   form.append("file", file);
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
-    body: form,
-  });
+  const base = getApiBaseUrl();
+  let response: Response;
+  try {
+    response = await fetch(`${base}${path}`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: form,
+    });
+  } catch (err) {
+    throw new Error(
+      err instanceof TypeError
+        ? `Cannot reach API at ${base}. Start it: cd apps/api && npm run dev`
+        : "Upload failed — API unavailable",
+    );
+  }
 
   if (!response.ok) {
     const data = (await response.json().catch(() => null)) as {

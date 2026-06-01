@@ -86,20 +86,9 @@ export default function AdminResultsPage() {
     <DashboardPage
       role="admin"
       title="Results"
-      subtitle="Terms, weighted exams, numeric + letter grades, printable report cards."
       eyebrow="Academics"
     >
       {error ? <p className="auth-alert auth-alert--error">{error}</p> : null}
-
-        <p className="setup-hint">
-          <Link href="/admin/results/academic-years">Academic years</Link>
-          {" · "}
-          <Link href="/admin/subjects">Subjects catalog</Link>
-          {" · "}
-          <Link href="/admin/subjects/assign">Assign to classes</Link>
-          {" · "}
-          <Link href="/admin/results/templates">Assessment templates</Link>
-        </p>
 
         {pending.length > 0 ? (
           <section className="att-admin-section" style={{ borderTop: "none", marginTop: 0 }}>
@@ -144,7 +133,7 @@ export default function AdminResultsPage() {
 
         <section className="att-admin-section">
           <h2 className="setup-panel-label">Terms</h2>
-          <p className="setup-hint">
+          <p className="tch-meta">
             {terms.map((t) => `${t.name} (${t.academicYear.name})`).join(" · ") || "No terms yet"}
           </p>
         </section>
@@ -188,12 +177,12 @@ export default function AdminResultsPage() {
                 {report.overallAverage ?? "—"}% {report.overallLetter ? `(${report.overallLetter})` : ""}
               </p>
               {report.rank ? (
-                <p className="setup-hint">
+                <p className="tch-meta">
                   Rank {report.rank} of {report.classSize}
                 </p>
               ) : null}
               {report.attendance?.rate != null ? (
-                <p className="setup-hint">
+                <p className="tch-meta">
                   Attendance {report.attendance.rate}% ({report.attendance.present}/
                   {report.attendance.total} days)
                 </p>

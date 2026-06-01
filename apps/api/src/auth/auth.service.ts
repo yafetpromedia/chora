@@ -171,6 +171,8 @@ export class AuthService {
       logoUrl: dto.logoUrl,
       country: dto.country,
       phone: dto.phone,
+      curriculumPackageKey: dto.curriculumPackageKey,
+      gradePreset: dto.gradePreset,
     });
 
     const user = await this.usersService.createUser({

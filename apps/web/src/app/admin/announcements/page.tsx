@@ -42,7 +42,6 @@ export default function AdminAnnouncementsPage() {
     <DashboardPage
       role="admin"
       title="Announcements"
-      subtitle="Replace Telegram groups — reach every parent instantly."
       eyebrow="Communication"
     >
       {error ? <p className="auth-alert auth-alert--error">{error}</p> : null}

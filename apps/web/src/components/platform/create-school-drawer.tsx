@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { fetchCurriculumPackages, type CurriculumPackageOption } from "@/lib/api";
 import { platformFetch } from "@/lib/platform-auth";
 
 type Props = {
@@ -12,12 +13,21 @@ type Props = {
 export function CreateSchoolDrawer({ open, onClose, onCreated }: Props) {
   const [schoolName, setSchoolName] = useState("");
   const [country, setCountry] = useState("Ethiopia");
+  const [curriculumPackageKey, setCurriculumPackageKey] = useState("ETHIOPIAN_PRIVATE");
+  const [packages, setPackages] = useState<CurriculumPackageOption[]>([]);
   const [adminEmail, setAdminEmail] = useState("");
   const [adminFirstName, setAdminFirstName] = useState("");
   const [adminLastName, setAdminLastName] = useState("");
   const [adminPassword, setAdminPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    void fetchCurriculumPackages()
+      .then(setPackages)
+      .catch(() => undefined);
+  }, [open]);
 
   if (!open) return null;
 
@@ -41,6 +51,7 @@ export function CreateSchoolDrawer({ open, onClose, onCreated }: Props) {
         body: JSON.stringify({
           schoolName,
           country: country || undefined,
+          curriculumPackageKey,
           adminEmail,
           adminFirstName,
           adminLastName,
@@ -95,6 +106,26 @@ export function CreateSchoolDrawer({ open, onClose, onCreated }: Props) {
               required
               autoComplete="organization"
             />
+          </label>
+          <label className="plat-field">
+            <span>Curriculum package</span>
+            <select
+              value={curriculumPackageKey}
+              onChange={(e) => setCurriculumPackageKey(e.target.value)}
+            >
+              {packages.length === 0 ? (
+                <option value="ETHIOPIAN_PRIVATE">Ethiopian private school</option>
+              ) : (
+                packages.map((p) => (
+                  <option key={p.key} value={p.key}>
+                    {p.label}
+                    {!p.isBlank
+                      ? ` (${p.counts.subjects} subjects)`
+                      : " (blank)"}
+                  </option>
+                ))
+              )}
+            </select>
           </label>
           <label className="plat-field">
             <span>Country</span>

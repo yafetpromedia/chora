@@ -23,10 +23,15 @@ export const Permission = {
   RESULTS_READ: "results.read",
   RESULTS_MANAGE: "results.manage",
   RESULTS_APPROVE: "results.approve",
+  TIMETABLE_READ: "timetable.read",
+  TIMETABLE_MANAGE: "timetable.manage",
   FINANCE_READ: "finance.read",
   FINANCE_MANAGE: "finance.manage",
   ANNOUNCEMENTS_MANAGE: "announcements.manage",
   PARENT_MESSAGES: "parent.messages",
+  LIBRARY_READ: "library.read",
+  LIBRARY_MANAGE: "library.manage",
+  LIBRARY_UPLOAD: "library.upload",
 } as const;
 
 export type PermissionKey = (typeof Permission)[keyof typeof Permission];

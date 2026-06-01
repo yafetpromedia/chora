@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { DashboardPage } from "@/components/dashboard/dashboard-page";
 import {
@@ -117,23 +116,13 @@ export default function YearPromotionPage() {
     <DashboardPage
       role="admin"
       title="End-of-year promotion"
-      subtitle="Move students to the next grade while keeping historical enrollments frozen."
       eyebrow="Academics"
     >
-      <p className="setup-hint">
-        <Link href="/admin/results/academic-years">← Academic years</Link>
-        {" · "}
-        <Link href="/admin/results">Results</Link>
-      </p>
       {error ? <p className="auth-alert auth-alert--error">{error}</p> : null}
       {success ? <p className="att-toast">{success}</p> : null}
 
       <section className="att-admin-section" style={{ borderTop: "none" }}>
         <h2 className="setup-panel-label">Before you promote</h2>
-        <p className="setup-hint">
-          Create the <strong>next academic year</strong> first, then run promotion. Old year
-          enrollments are archived; student profiles move to the new grade.
-        </p>
         <button
           type="button"
           className="dash-copy-btn"
@@ -180,10 +169,6 @@ export default function YearPromotionPage() {
 
           {preview ? (
             <>
-              <p className="setup-hint">
-                {preview.totalStudents} students across {preview.mappings.length} grades.
-                Adjust targets — leave as <em>Graduate</em> for final-year leavers.
-              </p>
               <table className="res-matrix">
                 <thead>
                   <tr>
@@ -220,10 +205,6 @@ export default function YearPromotionPage() {
                   ))}
                 </tbody>
               </table>
-              <p className="setup-hint">
-                Tip: use the suggested next grade from preview. The dropdown lists all grades in
-                your school — pick the grade immediately above (e.g. Grade 9 → Grade 10).
-              </p>
               <div className="setup-actions-row">
                 <button
                   type="button"
