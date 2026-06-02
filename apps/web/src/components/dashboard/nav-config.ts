@@ -83,6 +83,13 @@ export const DASHBOARD_NAV: NavItem[] = [
     permission: Permission.RESULTS_READ,
   },
   {
+    href: "/admin/results/templates",
+    label: "Assessment templates",
+    icon: "results",
+    roles: ["admin", "staff"],
+    permission: Permission.RESULTS_READ,
+  },
+  {
     href: "/admin/finance",
     label: "Finance",
     icon: "finance",
@@ -127,6 +134,8 @@ export const DASHBOARD_NAV: NavItem[] = [
   { href: "/parent/profile", label: "Profile", icon: "profile", roles: ["parent"] },
   { href: "/student", label: "Overview", icon: "overview", roles: ["student"] },
   { href: "/student/id-card", label: "Campus ID", icon: "students", roles: ["student"] },
+  { href: "/student/results", label: "Results", icon: "results", roles: ["student"] },
+  { href: "/student/fees", label: "Fees", icon: "fees", roles: ["student"] },
   { href: "/student/timetable", label: "Timetable", icon: "calendar", roles: ["student"] },
   { href: "/student/library", label: "eLibrary", icon: "library", roles: ["student"] },
   { href: "/student/profile", label: "Profile", icon: "profile", roles: ["student"] },
@@ -145,6 +154,12 @@ export function navForRole(role: UserRole) {
 export function isNavActive(pathname: string, href: string) {
   if (href === "/admin" || href === "/teacher" || href === "/parent" || href === "/student") {
     return pathname === href;
+  }
+  // If we have nested routes that should not mark the parent item as active,
+  // handle them explicitly here.
+  if (href === "/admin/results") {
+    // When browsing assessment templates, highlight that item only.
+    return pathname === href || pathname.startsWith(`${href}/`) && !pathname.startsWith(`${href}/templates`);
   }
   return pathname === href || pathname.startsWith(`${href}/`);
 }

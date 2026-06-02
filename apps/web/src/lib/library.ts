@@ -1,4 +1,5 @@
 import { apiFetch, apiPatch, apiPost, apiDelete, getApiBaseUrl, apiUpload } from "@/lib/api";
+import { AUTH_TOKEN_KEY } from "@/lib/auth";
 
 export type LibraryResourceType =
   | "BOOK_PDF"
@@ -14,6 +15,7 @@ export type LibraryResourceType =
   | "OTHER";
 
 export type LibraryResourceStatus = "DRAFT" | "PENDING" | "PUBLISHED" | "ARCHIVED";
+export type LibraryAudience = "STUDENTS" | "TEACHERS" | "BOTH";
 
 export type LibraryCategory = {
   id: string;
@@ -32,6 +34,7 @@ export type LibraryResource = {
   coverUrl: string | null;
   resourceType: LibraryResourceType;
   resourceTypeLabel: string;
+  audience: LibraryAudience;
   subject: string | null;
   author: string | null;
   status: LibraryResourceStatus;
@@ -71,6 +74,33 @@ export function resolveLibraryAssetUrl(url: string | null | undefined) {
   return `${getApiBaseUrl()}${url}`;
 }
 
+export async function fetchLibraryAssetObjectUrl(url: string) {
+  const token = localStorage.getItem(AUTH_TOKEN_KEY);
+  if (!token) throw new Error("Not authenticated");
+  const resolved = resolveLibraryAssetUrl(url);
+  if (!resolved) throw new Error("Missing file URL");
+  const res = await fetch(resolved, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    if (res.status === 401) throw new Error("Session expired");
+    throw new Error("Could not load file");
+  }
+  const blob = await res.blob();
+  return URL.createObjectURL(blob);
+}
+
+export async function openLibraryAsset(url: string) {
+  const objectUrl = await fetchLibraryAssetObjectUrl(url);
+  const tab = window.open(objectUrl, "_blank", "noopener,noreferrer");
+  if (!tab) {
+    URL.revokeObjectURL(objectUrl);
+    throw new Error("Popup blocked. Allow popups and try again.");
+  }
+  // Keep blob URL alive briefly for browser viewers, then clean up.
+  setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+}
+
 export async function getLibraryHub() {
   return apiFetch<LibraryHub>("/schools/library/hub");
 }
@@ -105,6 +135,7 @@ export async function createLibraryResource(body: {
   description?: string;
   categoryId: string;
   resourceType: LibraryResourceType;
+  audience?: LibraryAudience;
   subject?: string;
   gradeId?: string;
   author?: string;
@@ -168,3 +199,12 @@ export const LIBRARY_RESOURCE_TYPES: { value: LibraryResourceType; label: string
     { value: "RESEARCH", label: "Research paper" },
     { value: "OTHER", label: "Other" },
   ];
+
+export const LIBRARY_AUDIENCE_OPTIONS: {
+  value: LibraryAudience;
+  label: string;
+}[] = [
+  { value: "BOTH", label: "Students and teachers" },
+  { value: "STUDENTS", label: "Students only" },
+  { value: "TEACHERS", label: "Teachers only" },
+];

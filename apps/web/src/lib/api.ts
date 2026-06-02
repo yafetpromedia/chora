@@ -288,6 +288,8 @@ export type Announcement = {
   title: string;
   body: string;
   createdAt: string;
+  readAt?: string | null;
+  isRead?: boolean;
 };
 
 export type PlanType = "TRIAL" | "STARTER" | "PROFESSIONAL" | "ENTERPRISE";
@@ -527,7 +529,7 @@ export async function apiDelete<T>(path: string): Promise<T> {
 }
 
 export async function apiUpload<T>(path: string, file: File): Promise<T> {
-  const token = localStorage.getItem(AUTH_TOKEN_KEY);
+  let token = localStorage.getItem(AUTH_TOKEN_KEY);
   if (!token) {
     throw new Error("Not authenticated");
   }
@@ -551,11 +553,35 @@ export async function apiUpload<T>(path: string, file: File): Promise<T> {
     );
   }
 
+  if (response.status === 401) {
+    const refreshed = await refreshAccessToken();
+    if (!refreshed) {
+      throw new Error("Session expired");
+    }
+    token = refreshed;
+    try {
+      response = await fetch(`${base}${path}`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: form,
+      });
+    } catch (err) {
+      throw new Error(
+        err instanceof TypeError
+          ? `Cannot reach API at ${base}. Start it: cd apps/api && npm run dev`
+          : "Upload failed — API unavailable",
+      );
+    }
+  }
+
   if (!response.ok) {
     const data = (await response.json().catch(() => null)) as {
       message?: string | string[];
     } | null;
     const msg = Array.isArray(data?.message) ? data.message[0] : data?.message;
+    if (response.status === 403) {
+      throw new Error(msg ?? "Not allowed");
+    }
     throw new Error(msg ?? `Upload failed: ${response.status}`);
   }
 

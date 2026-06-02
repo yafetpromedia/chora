@@ -27,11 +27,41 @@ export class AnnouncementsService {
     });
   }
 
-  async list(schoolId: string) {
-    return this.prisma.announcement.findMany({
+  async list(schoolId: string, userId?: string) {
+    if (!userId) {
+      const rows = await this.prisma.announcement.findMany({
+        where: { schoolId },
+        orderBy: { createdAt: 'desc' },
+      });
+      return rows.map((row) => ({
+        id: row.id,
+        title: row.title,
+        body: row.body,
+        createdAt: row.createdAt,
+        readAt: null,
+        isRead: false,
+      }));
+    }
+
+    const rows = await this.prisma.announcement.findMany({
       where: { schoolId },
       orderBy: { createdAt: 'desc' },
+      include: {
+        reads: {
+          where: { userId },
+          select: { readAt: true },
+          take: 1,
+        },
+      },
     });
+    return rows.map((row) => ({
+      id: row.id,
+      title: row.title,
+      body: row.body,
+      createdAt: row.createdAt,
+      readAt: row.reads[0]?.readAt ?? null,
+      isRead: row.reads.length > 0,
+    }));
   }
 
   async markRead(announcementId: string, userId: string) {
@@ -52,5 +82,38 @@ export class AnnouncementsService {
     });
 
     return { announcementId, userId, read: true };
+  }
+
+  async unreadCount(schoolId: string, userId: string) {
+    const count = await this.prisma.announcement.count({
+      where: {
+        schoolId,
+        reads: {
+          none: { userId },
+        },
+      },
+    });
+    return { count };
+  }
+
+  async markAllRead(schoolId: string, userId: string) {
+    const unread = await this.prisma.announcement.findMany({
+      where: {
+        schoolId,
+        reads: { none: { userId } },
+      },
+      select: { id: true },
+    });
+    if (unread.length === 0) return { updated: 0 };
+    const now = new Date();
+    await this.prisma.announcementRead.createMany({
+      data: unread.map((a) => ({
+        announcementId: a.id,
+        userId,
+        readAt: now,
+      })),
+      skipDuplicates: true,
+    });
+    return { updated: unread.length };
   }
 }

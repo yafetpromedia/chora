@@ -22,7 +22,19 @@ export class AnnouncementsController {
   @Get()
   @Roles('admin', 'teacher', 'student', 'parent')
   list(@CurrentUser() user: AuthUser) {
-    return this.announcementsService.list(user.schoolId);
+    return this.announcementsService.list(user.schoolId, user.id);
+  }
+
+  @Get('unread-count')
+  @Roles('admin', 'teacher', 'student', 'parent')
+  unreadCount(@CurrentUser() user: AuthUser) {
+    return this.announcementsService.unreadCount(user.schoolId, user.id);
+  }
+
+  @Post('read-all')
+  @Roles('admin', 'teacher', 'student', 'parent')
+  markAllRead(@CurrentUser() user: AuthUser) {
+    return this.announcementsService.markAllRead(user.schoolId, user.id);
   }
 
   @Post(':id/read')

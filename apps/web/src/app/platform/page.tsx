@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PlatformCurriculum } from "@/components/platform/platform-curriculum";
+import { PlatformAssessments } from "@/components/platform/platform-assessments";
 import { PlatformBilling } from "@/components/platform/platform-billing";
 import { PlatformInvoices } from "@/components/platform/platform-invoices";
 import { PlatformPlans } from "@/components/platform/platform-plans";
@@ -102,6 +103,7 @@ export default function PlatformDashboardPage() {
             />
           ) : null}
           {section === "curriculum" ? <PlatformCurriculum /> : null}
+          {section === "assessments" ? <PlatformAssessments schools={schools} /> : null}
           {section === "billing" ? (
             <PlatformBilling
               dashboard={dashboard}

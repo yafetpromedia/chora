@@ -2,6 +2,7 @@ export type PlatformSection =
   | "overview"
   | "schools"
   | "curriculum"
+  | "assessments"
   | "billing"
   | "invoices"
   | "usage"
@@ -82,6 +83,10 @@ export const SECTION_META: Record<
   curriculum: {
     title: "Curriculum packages",
     subtitle: "Manage starter packs for school provisioning",
+  },
+  assessments: {
+    title: "Assessment templates",
+    subtitle: "Manage school grading components and weights",
   },
   billing: {
     title: "Billing",

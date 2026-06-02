@@ -37,6 +37,9 @@ coverage/
 apps/api/prisma/*.db
 apps/api/prisma/*.db-journal
 
+# Runtime uploads (local dev)
+apps/api/uploads/
+
 # Misc
 .vercel
 .turbo

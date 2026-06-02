@@ -6,7 +6,7 @@ import {
   MaxLength,
   MinLength,
 } from 'class-validator';
-import { LibraryResourceType } from '@prisma/client';
+import { LibraryAudience, LibraryResourceType } from '@prisma/client';
 
 export class CreateLibraryResourceDto {
   @IsString()
@@ -24,6 +24,10 @@ export class CreateLibraryResourceDto {
 
   @IsEnum(LibraryResourceType)
   resourceType!: LibraryResourceType;
+
+  @IsOptional()
+  @IsEnum(LibraryAudience)
+  audience?: LibraryAudience;
 
   @IsOptional()
   @IsString()

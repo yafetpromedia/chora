@@ -79,6 +79,7 @@ export function ScoreMatrixPanel({ role }: Props) {
   }, [termId, classSubjectId]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadMatrix();
   }, [loadMatrix]);
 
@@ -158,9 +159,15 @@ export function ScoreMatrixPanel({ role }: Props) {
   }
 
   const selectedCs = classSubjects.find((c) => c.id === classSubjectId);
+  const filledScores = matrix
+    ? matrix.students.reduce((sum, st) => {
+        const row = draft[st.studentProfileId] ?? {};
+        return sum + Object.values(row).filter((v) => v != null && !Number.isNaN(v)).length;
+      }, 0)
+    : 0;
 
   return (
-    <div className="att-page">
+    <div className="att-page res-matrix-modern">
       {error ? <p className="att-toast att-toast--error">{error}</p> : null}
       {saved ? (
         <p className="att-toast" role="status">
@@ -168,7 +175,35 @@ export function ScoreMatrixPanel({ role }: Props) {
         </p>
       ) : null}
 
-      <div className="att-mark-toolbar">
+      <section className="res-matrix-hero">
+        <div>
+          <p className="res-matrix-hero__eyebrow">Score Entry Studio</p>
+          <h3 className="res-matrix-hero__title">
+            {selectedCs
+              ? `${selectedCs.grade.name}${selectedCs.section ? ` · ${selectedCs.section.name}` : ""} — ${selectedCs.subject.name}`
+              : "Select class and term"}
+          </h3>
+          <p className="res-matrix-hero__sub">
+            Enter component scores, then submit for approval/publish workflow.
+          </p>
+        </div>
+        <div className="res-matrix-kpis">
+          <div className="res-matrix-kpi">
+            <span>Students</span>
+            <strong>{matrix?.students.length ?? 0}</strong>
+          </div>
+          <div className="res-matrix-kpi">
+            <span>Components</span>
+            <strong>{matrix?.assessments.length ?? 0}</strong>
+          </div>
+          <div className="res-matrix-kpi">
+            <span>Filled cells</span>
+            <strong>{filledScores}</strong>
+          </div>
+        </div>
+      </section>
+
+      <div className="att-mark-toolbar res-matrix-toolbar">
         <div className="att-field">
           <span>Term</span>
           <select value={termId} onChange={(e) => setTermId(e.target.value)}>
@@ -196,7 +231,7 @@ export function ScoreMatrixPanel({ role }: Props) {
       </div>
 
       {workflowStatus ? (
-        <div className="att-summary-block" style={{ marginBottom: "0.75rem" }}>
+        <div className="att-summary-block res-matrix-workflow">
           <p className="tch-meta">
             Workflow: <strong>{workflowStatus}</strong>
             {matrix?.workflow?.submittedByName
@@ -206,11 +241,11 @@ export function ScoreMatrixPanel({ role }: Props) {
               ? ` · approved by ${matrix.workflow.approvedByName}`
               : ""}
           </p>
-          <div className="setup-actions-row">
+          <div className="setup-actions-row res-matrix-workflow__actions">
             {workflowStatus === "DRAFT" && (role === "teacher" || role === "admin" || role === "staff") ? (
               <button
                 type="button"
-                className="auth-page-submit"
+                className="auth-page-submit res-btn-primary"
                 disabled={workflowBusy}
                 onClick={() => void onWorkflowAction("submit")}
               >
@@ -221,7 +256,7 @@ export function ScoreMatrixPanel({ role }: Props) {
               <>
                 <button
                   type="button"
-                  className="auth-page-submit"
+                  className="auth-page-submit res-btn-primary"
                   disabled={workflowBusy}
                   onClick={() => void onWorkflowAction("approve")}
                 >
@@ -229,7 +264,7 @@ export function ScoreMatrixPanel({ role }: Props) {
                 </button>
                 <button
                   type="button"
-                  className="dash-copy-btn"
+                  className="res-btn res-btn--ghost"
                   disabled={workflowBusy}
                   onClick={() => void onWorkflowAction("publish")}
                 >
@@ -240,7 +275,7 @@ export function ScoreMatrixPanel({ role }: Props) {
             {workflowStatus === "APPROVED" && (role === "admin" || role === "staff") ? (
               <button
                 type="button"
-                className="auth-page-submit"
+                className="auth-page-submit res-btn-primary"
                 disabled={workflowBusy}
                 onClick={() => void onWorkflowAction("publish")}
               >
@@ -250,7 +285,7 @@ export function ScoreMatrixPanel({ role }: Props) {
             {workflowStatus !== "DRAFT" && (role === "admin" || role === "staff") ? (
               <button
                 type="button"
-                className="dash-copy-btn"
+                className="res-btn res-btn--ghost"
                 disabled={workflowBusy}
                 onClick={() => void onWorkflowAction("reopen")}
               >
@@ -271,7 +306,7 @@ export function ScoreMatrixPanel({ role }: Props) {
         <p className="setup-hint">Loading score sheet…</p>
       ) : matrix && matrix.assessments.length > 0 ? (
         <>
-          <div className="res-matrix-wrap">
+          <div className="res-matrix-wrap res-matrix-wrap--modern">
             <table className="res-matrix">
               <thead>
                 <tr>
@@ -311,7 +346,7 @@ export function ScoreMatrixPanel({ role }: Props) {
           <div className="att-save-bar">
             <button
               type="button"
-              className="att-btn att-btn--primary"
+              className="att-btn att-btn--primary res-btn-primary"
               disabled={saving || locked}
               onClick={() => void onSave()}
             >

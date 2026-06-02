@@ -7,6 +7,7 @@ import { ProvisioningModule } from '../provisioning/provisioning.module';
 import { SchoolsModule } from '../schools/schools.module';
 import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 import { UsersModule } from '../users/users.module';
+import { ResultsModule } from '../results/results.module';
 import { PlatformAuthService } from './platform-auth.service';
 import { PlatformController } from './platform.controller';
 import { PlatformBillingService } from './platform-billing.service';
@@ -33,6 +34,7 @@ import { PlatformService } from './platform.service';
     ProvisioningModule,
     UsersModule,
     SubscriptionsModule,
+    ResultsModule,
   ],
   controllers: [PlatformController],
   providers: [PlatformAuthService, PlatformService, PlatformBillingService],

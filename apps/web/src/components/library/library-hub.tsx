@@ -9,6 +9,7 @@ import {
   createLibraryResource,
   deleteLibraryResource,
   getLibraryHub,
+  LIBRARY_AUDIENCE_OPTIONS,
   listLibraryResources,
   LIBRARY_RESOURCE_TYPES,
   publishLibraryResource,
@@ -17,7 +18,10 @@ import {
   toggleLibraryFavorite,
   updateLibraryProgress,
   uploadLibraryFile,
+  fetchLibraryAssetObjectUrl,
+  openLibraryAsset,
   type LibraryHub,
+  type LibraryAudience,
   type LibraryResource,
   type LibraryResourceType,
 } from "@/lib/library";
@@ -39,22 +43,49 @@ function ResourceCard({
   onOpen: (r: LibraryResource) => void;
   onSave: (r: LibraryResource) => void;
 }) {
-  const href =
-    resolveLibraryAssetUrl(resource.fileUrl) ??
-    resource.externalUrl ??
-    `#resource-${resource.id}`;
+  const [coverSrc, setCoverSrc] = useState<string | null>(null);
+
+  useEffect(() => {
+    let revokedUrl: string | null = null;
+    let alive = true;
+    if (!resource.coverUrl) {
+      setCoverSrc(null);
+      return;
+    }
+    void fetchLibraryAssetObjectUrl(resource.coverUrl)
+      .then((url) => {
+        if (!alive) {
+          URL.revokeObjectURL(url);
+          return;
+        }
+        revokedUrl = url;
+        setCoverSrc(url);
+      })
+      .catch(() => setCoverSrc(null));
+    return () => {
+      alive = false;
+      if (revokedUrl) URL.revokeObjectURL(revokedUrl);
+    };
+  }, [resource.coverUrl]);
 
   return (
     <article className="lib-card">
       <div className="lib-card__cover" aria-hidden>
-        {resource.coverUrl ? (
-          <img src={resolveLibraryAssetUrl(resource.coverUrl) ?? ""} alt="" />
+        {coverSrc ? (
+          <img src={coverSrc} alt="" />
         ) : (
           <span>{resource.category.icon ?? "📖"}</span>
         )}
       </div>
       <div className="lib-card__body">
         <span className="lib-card__type">{resource.resourceTypeLabel}</span>
+        <span className="lib-card__audience">
+          {resource.audience === "STUDENTS"
+            ? "Students only"
+            : resource.audience === "TEACHERS"
+              ? "Teachers only"
+              : "Students and teachers"}
+        </span>
         <h3 className="lib-card__title">{resource.title}</h3>
         {resource.subject ? (
           <p className="lib-card__meta">
@@ -72,15 +103,13 @@ function ResourceCard({
         ) : null}
         <div className="lib-card__actions">
           {resource.fileUrl || resource.externalUrl ? (
-            <a
-              href={href}
+            <button
+              type="button"
               className="att-btn att-btn--primary"
-              target={resource.externalUrl ? "_blank" : undefined}
-              rel="noreferrer"
               onClick={() => onOpen(resource)}
             >
               Open
-            </a>
+            </button>
           ) : null}
           {role === "student" ? (
             <button
@@ -113,11 +142,13 @@ export function LibraryHubView({ role, canManage, canUpload }: Props) {
   const [description, setDescription] = useState("");
   const [uploadCategoryId, setUploadCategoryId] = useState("");
   const [resourceType, setResourceType] = useState<LibraryResourceType>("BOOK_PDF");
+  const [audience, setAudience] = useState<LibraryAudience>("BOTH");
   const [subject, setSubject] = useState("");
   const [gradeId, setGradeId] = useState("");
   const [author, setAuthor] = useState("");
   const [externalUrl, setExternalUrl] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [coverFile, setCoverFile] = useState<File | null>(null);
 
   const loadHub = useCallback(async () => {
     setLoading(true);
@@ -166,16 +197,28 @@ export function LibraryHubView({ role, canManage, canUpload }: Props) {
   }
 
   async function handleOpen(resource: LibraryResource) {
-    if (role === "student") {
-      void updateLibraryProgress(resource.id, {
-        progressPercent: Math.min(
-          100,
-          Math.max(resource.progressPercent ?? 0, 10) + 10,
-        ),
-      }).catch(() => undefined);
-    }
-    if (resource.fileUrl) {
-      void recordLibraryDownload(resource.id).catch(() => undefined);
+    setError("");
+    try {
+      if (role === "student") {
+        void updateLibraryProgress(resource.id, {
+          progressPercent: Math.min(
+            100,
+            Math.max(resource.progressPercent ?? 0, 10) + 10,
+          ),
+        }).catch(() => undefined);
+      }
+
+      if (resource.fileUrl) {
+        await openLibraryAsset(resource.fileUrl);
+        void recordLibraryDownload(resource.id).catch(() => undefined);
+        return;
+      }
+
+      if (resource.externalUrl) {
+        window.open(resource.externalUrl, "_blank", "noopener,noreferrer");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not open resource");
     }
   }
 
@@ -190,20 +233,27 @@ export function LibraryHubView({ role, canManage, canUpload }: Props) {
     setSaved("");
     try {
       let fileUrl: string | undefined;
+      let coverUrl: string | undefined;
       if (file) {
         const up = await uploadLibraryFile(file);
         fileUrl = up.fileUrl;
+      }
+      if (coverFile) {
+        const up = await uploadLibraryFile(coverFile);
+        coverUrl = up.fileUrl;
       }
       await createLibraryResource({
         title: title.trim(),
         description: description.trim() || undefined,
         categoryId: uploadCategoryId,
         resourceType,
+        audience,
         subject: subject.trim() || undefined,
         gradeId: gradeId || undefined,
         author: author.trim() || undefined,
         fileUrl,
         externalUrl: externalUrl.trim() || undefined,
+        coverUrl,
       });
       setSaved(
         role === "teacher"
@@ -214,6 +264,8 @@ export function LibraryHubView({ role, canManage, canUpload }: Props) {
       setTitle("");
       setDescription("");
       setFile(null);
+      setCoverFile(null);
+      setAudience("BOTH");
       setExternalUrl("");
       await loadHub();
     } catch (err) {
@@ -515,6 +567,19 @@ export function LibraryHubView({ role, canManage, canUpload }: Props) {
                 </select>
               </label>
               <label>
+                Availability
+                <select
+                  value={audience}
+                  onChange={(e) => setAudience(e.target.value as LibraryAudience)}
+                >
+                  {LIBRARY_AUDIENCE_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
                 Subject
                 <input value={subject} onChange={(e) => setSubject(e.target.value)} />
               </label>
@@ -547,6 +612,14 @@ export function LibraryHubView({ role, canManage, canUpload }: Props) {
                 <input
                   type="file"
                   onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                />
+              </label>
+              <label>
+                Cover image (optional)
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => setCoverFile(e.target.files?.[0] ?? null)}
                 />
               </label>
               <label>

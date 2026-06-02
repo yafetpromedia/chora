@@ -30,6 +30,12 @@ import { ParentTodayOverview } from "@/components/dashboard/today-overview";
 import { StudentIdCardPanel } from "@/components/students/student-id-card-panel";
 import type { AdminDayOverview, ParentDayOverview } from "@/lib/dashboard-day";
 import { hasPermission, Permission } from "@/lib/permissions";
+import {
+  listLibraryResources,
+  resolveLibraryAssetUrl,
+  type LibraryResource,
+} from "@/lib/library";
+import { readSchoolBrand } from "@/lib/school-brand";
 
 type Props = {
   role: UserRole;
@@ -91,6 +97,7 @@ export function RoleDashboard({ role }: Props) {
   const [attendanceAnalytics, setAttendanceAnalytics] = useState<AttendanceAnalytics | null>(null);
   const [financeAnalytics, setFinanceAnalytics] = useState<FinanceAnalytics | null>(null);
   const [parentAlerts, setParentAlerts] = useState<ParentNotification[]>([]);
+  const [studentResources, setStudentResources] = useState<LibraryResource[]>([]);
   const [adminDay, setAdminDay] = useState<AdminDayOverview | null>(null);
   const [adminAnalytics, setAdminAnalytics] = useState<AdminAnalyticsOverview | null>(null);
   const [parentDay, setParentDay] = useState<ParentDayOverview | null>(null);
@@ -130,14 +137,18 @@ export function RoleDashboard({ role }: Props) {
         }
 
         if (role === "student") {
-          const [attendanceData, resultsData, summary] = await Promise.all([
+          const [attendanceData, resultsData, summary, resources] = await Promise.all([
             apiFetch<AttendanceRecord[]>("/attendance/student"),
             apiFetch<ResultRecord[]>("/results/student").catch(() => [] as ResultRecord[]),
             getAttendanceSummary(),
+            listLibraryResources({ status: "PUBLISHED", limit: 4 }).catch(
+              () => [] as LibraryResource[],
+            ),
           ]);
           setAttendance(attendanceData);
           setResults(resultsData);
           setAttendanceSummary(summary);
+          setStudentResources(resources);
         }
 
         if (role === "parent") {
@@ -208,7 +219,7 @@ export function RoleDashboard({ role }: Props) {
     );
   }
 
-  const schoolName = schoolInfo?.name ?? "CampusOne";
+  const schoolName = schoolInfo?.name ?? readSchoolBrand().name ?? "CampusOne";
 
   if (role === "admin") {
     return (
@@ -246,7 +257,78 @@ export function RoleDashboard({ role }: Props) {
       ) : null}
 
       {role === "student" ? (
-        <StudentIdCardPanel source="me" title="My student ID" />
+        <section className="dash-quick-grid" aria-label="Student quick actions">
+          <Link href="/student/results" className="dash-quick-card">
+            <span className="dash-quick-icon" aria-hidden>📊</span>
+            <span className="dash-quick-label">Results</span>
+            <span className="dash-quick-desc">View subject scores and report card.</span>
+          </Link>
+          <Link href="/student/fees" className="dash-quick-card">
+            <span className="dash-quick-icon" aria-hidden>💳</span>
+            <span className="dash-quick-label">Fees</span>
+            <span className="dash-quick-desc">Check balance and payment history.</span>
+          </Link>
+          <Link href="/student/timetable" className="dash-quick-card">
+            <span className="dash-quick-icon" aria-hidden>📅</span>
+            <span className="dash-quick-label">Timetable</span>
+            <span className="dash-quick-desc">See today and weekly class schedule.</span>
+          </Link>
+          <Link href="/student/library" className="dash-quick-card">
+            <span className="dash-quick-icon" aria-hidden>📚</span>
+            <span className="dash-quick-label">eLibrary</span>
+            <span className="dash-quick-desc">Open learning resources and notes.</span>
+          </Link>
+          <Link href="/student/id-card" className="dash-quick-card">
+            <span className="dash-quick-icon" aria-hidden>🪪</span>
+            <span className="dash-quick-label">Campus ID</span>
+            <span className="dash-quick-desc">Open your ID card and print view.</span>
+          </Link>
+        </section>
+      ) : null}
+
+      {role === "student" ? (
+        <section className="dash-panel dash-panel--flat">
+          <div className="dash-panel-head">
+            <h2 className="dash-panel-title">Learning resources</h2>
+            <Link href="/student/library" className="dash-link-btn">
+              Open eLibrary
+            </Link>
+          </div>
+          {studentResources.length === 0 ? (
+            <div className="dash-empty">
+              <div className="dash-empty-icon" aria-hidden>
+                📚
+              </div>
+              <p>No resources yet.</p>
+            </div>
+          ) : (
+            <ul className="dash-list">
+              {studentResources.map((resource) => {
+                const href =
+                  resolveLibraryAssetUrl(resource.fileUrl) ??
+                  resource.externalUrl ??
+                  "/student/library";
+                return (
+                  <li key={resource.id} className="dash-list-item">
+                    <div>
+                      <p className="dash-list-title">{resource.title}</p>
+                      <p className="dash-list-meta">
+                        {resource.category.name} · {resource.resourceTypeLabel}
+                      </p>
+                    </div>
+                    <Link
+                      href={href}
+                      className="dash-link-btn"
+                      target={resource.externalUrl ? "_blank" : undefined}
+                    >
+                      Open
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
       ) : null}
 
       {role === "parent" && parentDay && parentDay.children.length > 1 ? (

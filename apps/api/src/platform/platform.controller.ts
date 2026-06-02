@@ -28,6 +28,9 @@ import {
 import { PlatformAuthService } from './platform-auth.service';
 import { PlatformBillingService } from './platform-billing.service';
 import { PlatformService } from './platform.service';
+import { AssessmentTemplatesService } from '../results/assessment-templates.service';
+import { CreateAssessmentTemplateDto } from '../results/dto/create-assessment-template.dto';
+import { UpdateAssessmentTemplateDto } from '../results/dto/update-assessment-template.dto';
 
 @Controller('platform')
 export class PlatformController {
@@ -35,6 +38,7 @@ export class PlatformController {
     private readonly platformAuthService: PlatformAuthService,
     private readonly platformService: PlatformService,
     private readonly platformBillingService: PlatformBillingService,
+    private readonly assessmentTemplatesService: AssessmentTemplatesService,
   ) {}
 
   @Post('auth/login')
@@ -133,6 +137,40 @@ export class PlatformController {
   @UseGuards(JwtAuthGuard, PlatformGuard)
   updateSchoolPlan(@Param('id') id: string, @Body() dto: UpdateSchoolPlanDto) {
     return this.platformService.updateSchoolPlan(id, dto);
+  }
+
+  @Get('schools/:id/assessment-templates')
+  @UseGuards(JwtAuthGuard, PlatformGuard)
+  listSchoolAssessmentTemplates(@Param('id') id: string) {
+    return this.assessmentTemplatesService.list(id);
+  }
+
+  @Post('schools/:id/assessment-templates')
+  @UseGuards(JwtAuthGuard, PlatformGuard)
+  createSchoolAssessmentTemplate(
+    @Param('id') id: string,
+    @Body() dto: CreateAssessmentTemplateDto,
+  ) {
+    return this.assessmentTemplatesService.create(id, dto);
+  }
+
+  @Patch('schools/:id/assessment-templates/:templateId')
+  @UseGuards(JwtAuthGuard, PlatformGuard)
+  updateSchoolAssessmentTemplate(
+    @Param('id') id: string,
+    @Param('templateId') templateId: string,
+    @Body() dto: UpdateAssessmentTemplateDto,
+  ) {
+    return this.assessmentTemplatesService.update(id, templateId, dto);
+  }
+
+  @Post('schools/:id/assessment-templates/:templateId/delete')
+  @UseGuards(JwtAuthGuard, PlatformGuard)
+  deleteSchoolAssessmentTemplate(
+    @Param('id') id: string,
+    @Param('templateId') templateId: string,
+  ) {
+    return this.assessmentTemplatesService.remove(id, templateId);
   }
 
   @Get('billing/summary')

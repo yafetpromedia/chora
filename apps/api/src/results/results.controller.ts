@@ -28,6 +28,7 @@ import { CreateAcademicYearDto } from '../finance/dto/create-academic-year.dto';
 import { AssignTemplateToClassSubjectDto, AssignTemplateToGradeDto } from './dto/assign-template.dto';
 import { BulkScoresDto } from './dto/bulk-scores.dto';
 import { CreateAssessmentTemplateDto } from './dto/create-assessment-template.dto';
+import { UpdateAssessmentTemplateDto } from './dto/update-assessment-template.dto';
 import { SaveScoreMatrixDto } from './dto/save-score-matrix.dto';
 import { CreateAssessmentDto } from './dto/create-assessment.dto';
 import { CreateClassSubjectDto } from './dto/create-class-subject.dto';
@@ -132,6 +133,22 @@ export class ResultsController {
   @Roles('admin', 'staff', 'teacher')
   getTemplate(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.templatesService.getById(user.schoolId, id);
+  }
+
+  @Patch('assessment-templates/:id')
+  @Roles('admin', 'staff')
+  updateTemplate(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateAssessmentTemplateDto,
+  ) {
+    return this.templatesService.update(user.schoolId, id, dto);
+  }
+
+  @Post('assessment-templates/:id/delete')
+  @Roles('admin', 'staff')
+  deleteTemplate(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.templatesService.remove(user.schoolId, id);
   }
 
   @Post('assessment-templates/:id/assign-grade')
@@ -248,7 +265,7 @@ export class ResultsController {
   }
 
   @Get('terms')
-  @Roles('admin', 'teacher')
+  @Roles('admin', 'teacher', 'student', 'parent')
   listTerms(
     @CurrentUser() user: AuthUser,
     @Query('academicYearId') academicYearId?: string,

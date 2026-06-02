@@ -208,6 +208,12 @@
   color: var(--brand-teal-dark);
 }
 
+.lib-card__audience {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--brand-muted);
+}
+
 .lib-card__title {
   font-size: 0.95rem;
   font-weight: 700;

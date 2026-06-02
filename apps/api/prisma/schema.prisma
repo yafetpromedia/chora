@@ -164,6 +164,12 @@ enum LibraryResourceStatus {
   ARCHIVED
 }
 
+enum LibraryAudience {
+  STUDENTS
+  TEACHERS
+  BOTH
+}
+
 model School {
   id            String         @id
   name          String
@@ -1010,6 +1016,7 @@ model LibraryResource {
   externalUrl   String?
   coverUrl      String?
   resourceType  LibraryResourceType
+  audience      LibraryAudience         @default(BOTH)
   subject       String?
   gradeId       String?
   grade         Grade?                 @relation(fields: [gradeId], references: [id], onDelete: SetNull)

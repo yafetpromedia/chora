@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  LibraryAudience,
   LibraryResourceStatus,
   LibraryResourceType,
   UserRole,
@@ -56,6 +57,7 @@ export class LibraryService {
       externalUrl: string | null;
       coverUrl: string | null;
       resourceType: LibraryResourceType;
+      audience: LibraryAudience;
       subject: string | null;
       author: string | null;
       status: LibraryResourceStatus;
@@ -82,6 +84,7 @@ export class LibraryService {
       coverUrl: r.coverUrl,
       resourceType: r.resourceType,
       resourceTypeLabel: LIBRARY_TYPE_LABELS[r.resourceType],
+      audience: r.audience,
       subject: r.subject,
       author: r.author,
       status: r.status,
@@ -121,6 +124,14 @@ export class LibraryService {
     return LibraryResourceStatus.PUBLISHED;
   }
 
+  private audienceFilter(role: UserRole) {
+    if (role === 'admin' || role === 'staff') return undefined;
+    if (role === 'teacher') {
+      return { in: [LibraryAudience.TEACHERS, LibraryAudience.BOTH] };
+    }
+    return { in: [LibraryAudience.STUDENTS, LibraryAudience.BOTH] };
+  }
+
   async getHub(
     schoolId: string,
     userId: string,
@@ -138,6 +149,9 @@ export class LibraryService {
     const whereBase = {
       schoolId,
       ...(statusFilter ? { status: statusFilter } : {}),
+      ...(this.audienceFilter(role)
+        ? { audience: this.audienceFilter(role) }
+        : {}),
       ...(student
         ? {
             OR: [{ gradeId: null }, { gradeId: student.gradeId }],
@@ -288,6 +302,9 @@ export class LibraryService {
     const where = {
       schoolId,
       status,
+      ...(this.audienceFilter(role)
+        ? { audience: this.audienceFilter(role) }
+        : {}),
       ...(query.categoryId ? { categoryId: query.categoryId } : {}),
       ...(query.resourceType ? { resourceType: query.resourceType } : {}),
       ...(query.gradeId ? { gradeId: query.gradeId } : {}),
@@ -368,6 +385,17 @@ export class LibraryService {
     ) {
       throw new NotFoundException('Resource not found');
     }
+    if (
+      role !== 'admin' &&
+      role !== 'staff' &&
+      ![resource.audience, LibraryAudience.BOTH].some((audience) =>
+        role === 'teacher'
+          ? audience === LibraryAudience.TEACHERS || audience === LibraryAudience.BOTH
+          : audience === LibraryAudience.STUDENTS || audience === LibraryAudience.BOTH,
+      )
+    ) {
+      throw new NotFoundException('Resource not found');
+    }
 
     await this.prisma.libraryResource.update({
       where: { id: resourceId },
@@ -435,6 +463,7 @@ export class LibraryService {
         externalUrl: dto.externalUrl ?? null,
         coverUrl: dto.coverUrl ?? null,
         resourceType: dto.resourceType,
+        audience: dto.audience ?? LibraryAudience.BOTH,
         subject: dto.subject?.trim() || null,
         gradeId: dto.gradeId || null,
         author: dto.author?.trim() || null,
@@ -472,6 +501,7 @@ export class LibraryService {
         ...(dto.resourceType !== undefined
           ? { resourceType: dto.resourceType }
           : {}),
+        ...(dto.audience !== undefined ? { audience: dto.audience } : {}),
         ...(dto.subject !== undefined
           ? { subject: dto.subject?.trim() || null }
           : {}),

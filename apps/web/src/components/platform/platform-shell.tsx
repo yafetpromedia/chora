@@ -18,6 +18,7 @@ const NAV: { id: PlatformSection; label: string; icon: DashIconName }[] = [
   { id: "overview", label: "Overview", icon: "overview" },
   { id: "schools", label: "Schools", icon: "students" },
   { id: "curriculum", label: "Curriculum", icon: "results" },
+  { id: "assessments", label: "Assessments", icon: "results" },
   { id: "billing", label: "Billing", icon: "finance" },
   { id: "invoices", label: "Invoices", icon: "fees" },
   { id: "usage", label: "Usage", icon: "students" },

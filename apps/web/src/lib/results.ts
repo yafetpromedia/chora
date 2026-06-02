@@ -229,6 +229,11 @@ export async function getReportCard(studentProfileId: string, termId: string) {
   return apiFetch<ReportCard>(`/results/report-card?${q}`);
 }
 
+export async function getMyReportCard(termId: string) {
+  const q = new URLSearchParams({ termId });
+  return apiFetch<ReportCard>(`/results/report-card?${q}`);
+}
+
 export function reportCardPrintUrl(studentProfileId: string, termId: string) {
   const q = new URLSearchParams({ studentProfileId, termId });
   return `${getApiBaseUrl()}/results/report-card/html?${q}`;
@@ -237,6 +242,11 @@ export function reportCardPrintUrl(studentProfileId: string, termId: string) {
 export function openReportCardPrint(studentProfileId: string, termId: string) {
   const q = new URLSearchParams({ studentProfileId, termId });
   window.open(`/admin/results/print?${q}`, "_blank");
+}
+
+export function openMyReportCardPrint(termId: string) {
+  const q = new URLSearchParams({ termId });
+  window.open(`/student/results/print?${q}`, "_blank");
 }
 
 export type AssessmentTemplate = {
@@ -306,12 +316,45 @@ export async function createAssessmentTemplate(body: {
   return apiPost<AssessmentTemplate>("/results/assessment-templates", body);
 }
 
+export async function updateAssessmentTemplate(
+  templateId: string,
+  body: {
+    name?: string;
+    description?: string;
+    components?: {
+      name: string;
+      weightPercent: number;
+      maxScore?: number;
+      sortOrder?: number;
+    }[];
+  },
+) {
+  return apiPatch<AssessmentTemplate>(`/results/assessment-templates/${templateId}`, body);
+}
+
+export async function deleteAssessmentTemplate(templateId: string) {
+  return apiPost<{ deleted: boolean; id: string }>(
+    `/results/assessment-templates/${templateId}/delete`,
+    {},
+  );
+}
+
 export async function assignTemplateToGrade(
   templateId: string,
   body: { gradeId: string; subjectId?: string },
 ) {
   return apiPost<AssessmentTemplate>(
     `/results/assessment-templates/${templateId}/assign-grade`,
+    body,
+  );
+}
+
+export async function assignTemplateToClassSubject(
+  classSubjectId: string,
+  body: { templateId: string },
+) {
+  return apiPost<{ classSubjectId: string; templateId: string }>(
+    `/results/class-subjects/${classSubjectId}/template`,
     body,
   );
 }

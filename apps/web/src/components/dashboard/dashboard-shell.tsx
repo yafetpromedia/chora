@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import { apiFetch, type SchoolInfo } from "@/lib/api";
+import { useEffect, useRef, useState } from "react";
+import { apiFetch, apiPost, type Announcement, type SchoolInfo } from "@/lib/api";
 import {
   AUTH_ROLE_KEY,
   AUTH_TOKEN_KEY,
@@ -35,6 +35,12 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
   const [navRole, setNavRole] = useState<UserRole>(role);
   const [nav, setNav] = useState<NavItem[]>([]);
   const [shellReady, setShellReady] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [notifications, setNotifications] = useState<Announcement[]>([]);
+  const [notifyLoading, setNotifyLoading] = useState(false);
+  const [showAllNotifications, setShowAllNotifications] = useState(false);
+  const notifyRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!localStorage.getItem(AUTH_TOKEN_KEY)) {
@@ -71,8 +77,36 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
         /* keep cached brand */
       });
 
+    void apiFetch<{ count: number }>("/announcements/unread-count")
+      .then((res) => setUnreadCount(res.count ?? 0))
+      .catch(() => setUnreadCount(0));
+
     setShellReady(true);
   }, [role, router]);
+
+  useEffect(() => {
+    if (!notificationsOpen) return;
+    function onDocClick(event: MouseEvent) {
+      if (!notifyRef.current) return;
+      if (!notifyRef.current.contains(event.target as Node)) {
+        setNotificationsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, [notificationsOpen]);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      void apiFetch<{ count: number }>("/announcements/unread-count")
+        .then((res) => setUnreadCount(res.count ?? 0))
+        .catch(() => undefined);
+      if (notificationsOpen) {
+        void loadNotifications();
+      }
+    }, 30_000);
+    return () => window.clearInterval(interval);
+  }, [notificationsOpen]);
 
   useEffect(() => {
     function onBrandUpdate() {
@@ -87,6 +121,54 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
   function logout() {
     clearSessionStorage();
     router.push("/login");
+  }
+
+  async function loadNotifications() {
+    setNotifyLoading(true);
+    try {
+      const rows = await apiFetch<Announcement[]>("/announcements");
+      setNotifications(rows);
+    } finally {
+      setNotifyLoading(false);
+    }
+  }
+
+  async function toggleNotifications() {
+    const nextOpen = !notificationsOpen;
+    setNotificationsOpen(nextOpen);
+    if (nextOpen) {
+      await loadNotifications();
+    }
+  }
+
+  async function markAnnouncementRead(item: Announcement) {
+    if (item.isRead) return;
+    try {
+      await apiPost(`/announcements/${item.id}/read`, {});
+      setNotifications((prev) =>
+        prev.map((n) =>
+          n.id === item.id
+            ? { ...n, isRead: true, readAt: new Date().toISOString() }
+            : n,
+        ),
+      );
+      setUnreadCount((prev) => Math.max(0, prev - 1));
+    } catch {
+      /* no-op */
+    }
+  }
+
+  async function markAllNotificationsRead() {
+    if (unreadCount === 0) return;
+    try {
+      await apiPost<{ updated: number }>("/announcements/read-all", {});
+      setNotifications((prev) =>
+        prev.map((item) => ({ ...item, isRead: true, readAt: item.readAt ?? new Date().toISOString() })),
+      );
+      setUnreadCount(0);
+    } catch {
+      /* no-op */
+    }
   }
 
   const roleLabel =
@@ -169,6 +251,74 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
           <div className="dash-topbar-heading">
             <h1 className="dash-topbar-title">{pageTitle}</h1>
             {subtitle ? <p className="dash-topbar-sub">{subtitle}</p> : null}
+          </div>
+          <div className="dash-notify-wrap" ref={notifyRef}>
+            <button
+              type="button"
+              className="dash-notify"
+              title={`${unreadCount} unread announcements`}
+              onClick={() => void toggleNotifications()}
+            >
+              <DashIcon name="alert" className="dash-icon--sm" />
+              {unreadCount > 0 ? (
+                <span className="dash-notify-badge">
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </span>
+              ) : null}
+            </button>
+            {notificationsOpen ? (
+              <section className="dash-notify-panel" aria-label="Notifications">
+                <header className="dash-notify-head">
+                  <h2>Notifications</h2>
+                  <button
+                    type="button"
+                    className="dash-notify-mark-all"
+                    onClick={() => void markAllNotificationsRead()}
+                    disabled={unreadCount === 0}
+                  >
+                    Mark all read
+                  </button>
+                </header>
+                {notifyLoading ? (
+                  <p className="dash-notify-empty">Loading…</p>
+                ) : notifications.length === 0 ? (
+                  <p className="dash-notify-empty">No notifications yet.</p>
+                ) : (
+                  <>
+                  <ul className="dash-notify-list">
+                    {(showAllNotifications ? notifications : notifications.slice(0, 8)).map((item) => (
+                      <li key={item.id}>
+                        <button
+                          type="button"
+                          className={`dash-notify-item${item.isRead ? "" : " dash-notify-item--unread"}`}
+                          onClick={() => void markAnnouncementRead(item)}
+                        >
+                          <p className="dash-notify-title">{item.title}</p>
+                          {item.body ? <p className="dash-notify-body">{item.body}</p> : null}
+                          <p className="dash-notify-time">
+                            {new Date(item.createdAt).toLocaleString()}
+                          </p>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                  <footer className="dash-notify-foot">
+                    {notifications.length > 8 ? (
+                      <button
+                        type="button"
+                        className="dash-notify-view-all"
+                        onClick={() => setShowAllNotifications((v) => !v)}
+                      >
+                        {showAllNotifications ? "Show less" : `View all (${notifications.length})`}
+                      </button>
+                    ) : (
+                      <span className="dash-notify-count">{unreadCount} unread</span>
+                    )}
+                  </footer>
+                  </>
+                )}
+              </section>
+            ) : null}
           </div>
           <button type="button" onClick={logout} className="dash-logout dash-logout--pro">
             <DashIcon name="logout" className="dash-icon--sm" />

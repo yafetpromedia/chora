@@ -90,6 +90,17 @@ export default function AdminResultsPage() {
     >
       {error ? <p className="auth-alert auth-alert--error">{error}</p> : null}
 
+        <section className="att-admin-section" style={{ borderTop: "none", marginTop: 0 }}>
+          <div className="setup-actions-row">
+            <Link href="/admin/results/templates" className="auth-page-submit">
+              Assessment templates
+            </Link>
+          </div>
+          <p className="tch-meta" style={{ marginTop: "0.5rem" }}>
+            Configure worksheet, activity, quiz, test, and assignment weights per grade or class.
+          </p>
+        </section>
+
         {pending.length > 0 ? (
           <section className="att-admin-section" style={{ borderTop: "none", marginTop: 0 }}>
             <h2 className="setup-panel-label">Pending approvals</h2>

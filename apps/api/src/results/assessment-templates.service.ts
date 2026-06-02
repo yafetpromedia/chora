@@ -29,7 +29,12 @@ export class AssessmentTemplatesService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    await this.seedDemoTemplates('school-addis');
+    const schools = await this.prisma.school.findMany({
+      select: { id: true },
+    });
+    for (const school of schools) {
+      await this.seedDemoTemplates(school.id);
+    }
   }
 
   async seedDemoTemplates(schoolId: string) {
@@ -165,6 +170,77 @@ export class AssessmentTemplatesService implements OnModuleInit {
     });
 
     return this.formatTemplate(template);
+  }
+
+  async update(
+    schoolId: string,
+    templateId: string,
+    dto: {
+      name?: string;
+      description?: string;
+      components?: {
+        name: string;
+        weightPercent: number;
+        maxScore?: number;
+        sortOrder?: number;
+      }[];
+    },
+  ) {
+    const existing = await this.prisma.assessmentTemplate.findFirst({
+      where: { id: templateId, schoolId },
+      include: { components: true },
+    });
+    if (!existing) throw new NotFoundException('Assessment template not found');
+
+    if (dto.components) {
+      assertWeightsSumTo100(dto.components);
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.assessmentTemplate.update({
+        where: { id: templateId },
+        data: {
+          ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
+          ...(dto.description !== undefined
+            ? { description: dto.description?.trim() || null }
+            : {}),
+        },
+      });
+
+      if (dto.components) {
+        await tx.assessmentTemplateComponent.deleteMany({
+          where: { templateId },
+        });
+        await tx.assessmentTemplateComponent.createMany({
+          data: dto.components.map((c, i) => ({
+            templateId,
+            name: c.name.trim(),
+            weightPercent: c.weightPercent,
+            maxScore: c.maxScore ?? 100,
+            sortOrder: c.sortOrder ?? i,
+          })),
+        });
+      }
+    });
+
+    return this.getById(schoolId, templateId);
+  }
+
+  async remove(schoolId: string, templateId: string) {
+    const existing = await this.prisma.assessmentTemplate.findFirst({
+      where: { id: templateId, schoolId },
+      include: { _count: { select: { classSubjects: true } } },
+    });
+    if (!existing) throw new NotFoundException('Assessment template not found');
+    if (existing._count.classSubjects > 0) {
+      throw new BadRequestException(
+        'Cannot delete template while it is assigned to class subjects',
+      );
+    }
+    await this.prisma.assessmentTemplate.delete({
+      where: { id: templateId },
+    });
+    return { deleted: true, id: templateId };
   }
 
   async assignToGrade(
