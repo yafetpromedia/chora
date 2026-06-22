@@ -11,8 +11,10 @@
 | Teachers | Profiles, assignments, scoped dashboards |
 | **Academic engine** | Years, terms, subjects, templates, scores, workflow, report cards |
 | Finance | Fees, schedules, manual payment verification |
-| Announcements & notifications | School posts, parent inbox |
-| Platform | Cross-tenant school management |
+| eLibrary | Resources, upload, audience, favorites, reading progress |
+| Announcements & notifications | School posts + bell on all portals; parent fee/attendance inbox |
+| Platform | Cross-tenant schools, curriculum packages (v1), assessment templates |
+| **Content & Curriculum Engine** (planned) | Platform repositories + inheritance + provisioning v2 — [CONTENT-CURRICULUM-ENGINE.md](./CONTENT-CURRICULUM-ENGINE.md) |
 
 Deep dives:
 
@@ -39,7 +41,8 @@ School
 ```
 auth/          schools/       grades/        students/
 teachers/      attendance/    results/       finance/
-permissions/   announcements/ notifications/ platform/
+library/       permissions/   announcements/ notifications/
+platform/      timetable/     dashboards/
 ```
 
 `results/` contains academics, assessment templates, workflow, and report card generation.

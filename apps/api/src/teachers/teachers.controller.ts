@@ -56,12 +56,21 @@ export class TeachersController {
 
   @Get('me/classes')
   @Roles('admin', 'teacher', 'staff')
-  async myClasses(@CurrentUser() user: AuthUser) {
+  async myClasses(
+    @CurrentUser() user: AuthUser,
+    @Query('scope') scope?: string,
+  ) {
     if (user.role === 'teacher') {
-      const grades = await this.teacherScopeService.listGradesForTeacher(
-        user.schoolId,
-        user.id,
-      );
+      const grades =
+        scope === 'homeroom'
+          ? await this.teacherScopeService.listHomeroomGradesForTeacher(
+              user.schoolId,
+              user.id,
+            )
+          : await this.teacherScopeService.listGradesForTeacher(
+              user.schoolId,
+              user.id,
+            );
       return grades.map((g) => ({
         id: g.id,
         name: g.name,

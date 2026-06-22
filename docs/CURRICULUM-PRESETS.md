@@ -1,6 +1,8 @@
-# Curriculum packages & school provisioning
+# Curriculum packages & school provisioning (v1)
 
 CampusOne ships **starter academic packages** so new schools are not empty on day one.
+
+> **Strategic direction:** This module evolves into the full **[Content & Curriculum Engine](./CONTENT-CURRICULUM-ENGINE.md)** — platform repositories, inheritance, and provisioning v2. What follows documents **what runs today**.
 
 ## Flow
 
@@ -44,7 +46,17 @@ Definitions live in `apps/api/src/provisioning/curriculum-packages.data.ts` and 
 
 `GET /schools/curriculum-packages` — list packages for registration UI (no auth).
 
+## v1 limitations (by design)
+
+- Package content is defined in **code** (`curriculum-packages.data.ts`) and synced to DB — not edited in platform UI yet
+- Subjects/library/templates are **copied**, not linked — no `sourceId` / `isCustomized` yet
+- Platform eLibrary files are **not** shared across tenants; each school gets metadata-only starter rows
+- Assessment templates are **not** selected per package at provision time (seeded separately)
+
+See [CONTENT-CURRICULUM-ENGINE.md](./CONTENT-CURRICULUM-ENGINE.md) for the target architecture.
+
 ## Related
 
+- [CONTENT-CURRICULUM-ENGINE.md](./CONTENT-CURRICULUM-ENGINE.md) — platform engine vision & sprint plan
 - [ELIBRARY.md](./ELIBRARY.md) — school eLibrary after provisioning
 - [ACADEMIC-ENGINE.md](./ACADEMIC-ENGINE.md) — results & grading

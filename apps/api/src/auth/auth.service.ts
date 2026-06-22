@@ -83,6 +83,7 @@ export class AuthService {
     return {
       user: {
         id: user.id,
+        username: user.username,
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
@@ -128,12 +129,20 @@ export class AuthService {
     }
 
     const data: {
+      username?: string;
       firstName?: string;
       lastName?: string;
       phone?: string | null;
       passwordHash?: string;
     } = {};
 
+    if (dto.username?.trim()) {
+      data.username = await this.usersService.assertUsernameAvailable(
+        actor.schoolId,
+        dto.username,
+        actor.id,
+      );
+    }
     if (dto.firstName?.trim()) data.firstName = dto.firstName.trim();
     if (dto.lastName?.trim()) data.lastName = dto.lastName.trim();
     if (dto.phone !== undefined) {
@@ -176,12 +185,14 @@ export class AuthService {
     });
 
     const user = await this.usersService.createUser({
+      username: dto.username,
       email: dto.email,
       password: dto.password,
       firstName: dto.adminFirstName,
       lastName: dto.adminLastName,
       role: 'admin',
       schoolId: school.id,
+      schoolJoinCode: school.joinCode,
     });
 
     const payload = await this.toSchoolPayload(user);
@@ -204,7 +215,7 @@ export class AuthService {
       dto.inviteToken,
     );
 
-    if (role === 'student' && !dto.externalRef?.trim()) {
+    if (role === 'student' && !dto.externalRef?.trim() && !dto.username?.trim()) {
       throw new BadRequestException('Student ID is required for student accounts');
     }
 
@@ -215,14 +226,17 @@ export class AuthService {
 
     await this.subscriptionsService.assertCanAddUser(schoolId, role);
 
+    const studentId = dto.externalRef?.trim();
     const user = await this.usersService.createUser({
+      username: role === 'student' && studentId ? studentId : dto.username,
       email: dto.email,
       password: dto.password,
       firstName: dto.firstName,
       lastName: dto.lastName,
       role,
       schoolId,
-      externalRef: dto.externalRef?.trim() || undefined,
+      schoolJoinCode: school.joinCode,
+      externalRef: studentId || undefined,
     });
 
     const payload = await this.toSchoolPayload(user);
@@ -241,20 +255,23 @@ export class AuthService {
   async joinSchool(dto: JoinSchoolDto) {
     const school = await this.schoolsService.findByJoinCode(dto.schoolCode);
 
-    if (dto.role === 'student' && !dto.externalRef?.trim()) {
+    const studentId = dto.externalRef?.trim();
+    if (dto.role === 'student' && !studentId) {
       throw new BadRequestException('Student ID is required for student accounts');
     }
 
     await this.subscriptionsService.assertCanAddUser(school.id, dto.role);
 
     const user = await this.usersService.createUser({
+      username: dto.role === 'student' && studentId ? studentId : dto.username,
       email: dto.email,
       password: dto.password,
       firstName: dto.firstName,
       lastName: dto.lastName,
       role: dto.role,
       schoolId: school.id,
-      externalRef: dto.externalRef?.trim() || undefined,
+      schoolJoinCode: school.joinCode,
+      externalRef: studentId || undefined,
     });
 
     const payload = await this.toSchoolPayload(user);
@@ -303,7 +320,16 @@ export class AuthService {
   }
 
   async login(dto: LoginDto) {
-    const user = await this.usersService.findByLoginIdentifier(dto.email);
+    let schoolId: string | undefined;
+    if (dto.schoolCode?.trim()) {
+      const school = await this.schoolsService.findByJoinCode(dto.schoolCode);
+      schoolId = school.id;
+    }
+
+    const user = await this.usersService.findByLoginIdentifier(
+      dto.username,
+      schoolId,
+    );
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
     }
@@ -353,6 +379,7 @@ export class AuthService {
     id: string;
     schoolId: string;
     role: AuthUser['role'];
+    username: string;
     email: string;
     firstName: string;
     lastName: string;
@@ -365,6 +392,7 @@ export class AuthService {
       permissions: resolved.permissions,
       roleTemplateSlug: resolved.roleTemplateSlug,
       roleTemplateName: resolved.roleTemplateName,
+      username: user.username,
       email: user.email,
       firstName: user.firstName,
       lastName: user.lastName,

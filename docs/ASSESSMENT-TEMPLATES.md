@@ -28,10 +28,13 @@ Weights must total **100%**.
 
 ## Admin workflow
 
-1. **Academics → Results → Assessment templates** (`/admin/results/templates`)
-2. Create or review templates
-3. Assign template to a **grade** (all subjects) or override on a **class subject**
-4. Ensure **class subjects** exist (grade + subject + academic year)
+1. **Sidebar → Assessment templates** (`/admin/results/templates`) — or **Results** → link to templates
+2. **Create template** — name, description, and **components** (worksheet, activity, quiz, test, assignment, etc.)
+3. Set each component: label, **weight %**, **max score** — live total must equal **100%**
+4. **Edit** or **delete** templates; assign to a **grade** (all subjects) or override on a **class subject**
+5. Ensure **class subjects** exist (grade + subject + academic year) via **Subjects → Assign**
+
+The UI uses a shared **component editor** (`template-components-editor.tsx`) with add, remove, and reorder.
 
 ## Teacher workflow
 
@@ -50,16 +53,31 @@ Weighted average uses existing `weightedTermAverage()`:
 
 Example: Activity 8/10 (10%), Final 42/50 (50%) → overall % and letter from grading scale.
 
-## API
+## Platform superadmin
+
+CampusOne staff can manage templates for any school from **`/platform` → Assessments**:
+
+| Method | Path |
+|--------|------|
+| GET | `/platform/schools/:id/assessment-templates` |
+| POST | `/platform/schools/:id/assessment-templates` |
+| PATCH | `/platform/schools/:id/assessment-templates/:templateId` |
+| POST | `/platform/schools/:id/assessment-templates/:templateId/delete` |
+
+## School API (`/results`)
 
 | Method | Path |
 |--------|------|
 | GET | `/results/assessment-templates` |
+| GET | `/results/assessment-templates/:id` |
 | POST | `/results/assessment-templates` |
+| PATCH | `/results/assessment-templates/:id` |
+| POST | `/results/assessment-templates/:id/delete` |
 | POST | `/results/assessment-templates/:id/assign-grade` |
 | POST | `/results/class-subjects/:id/template` |
 | GET | `/results/score-matrix?termId=&classSubjectId=` |
 | POST | `/results/score-matrix` |
+| POST | `/results/workflow/submit` · `approve` · `publish` · `reopen` |
 
 ## Approval workflow
 
@@ -73,6 +91,8 @@ Each **class subject + term** has a `ClassSubjectTermSheet`:
 | `PUBLISHED` | Parents/students can see on report cards |
 
 Teachers **Submit** from the score matrix; admins **Approve** / **Publish** from `/admin/results` (pending queue) or the matrix panel.
+
+**Students** only see results after publish: `/student/results` (report card + browser print at `/student/results/print`).
 
 Full flow: [ACADEMIC-ENGINE.md](./ACADEMIC-ENGINE.md).
 

@@ -6,16 +6,14 @@ import { useRouter } from "next/navigation";
 import { DashboardPage } from "@/components/dashboard/dashboard-page";
 import { listStudents } from "@/lib/school-setup";
 import type { StudentRecord } from "@/lib/api";
+import { PendingApprovalsPanel } from "@/components/results/pending-approvals-panel";
+import { ReportCardCommentsPanel } from "@/components/results/report-card-comments-panel";
 import { ScoreMatrixPanel } from "@/components/results/score-matrix-panel";
 import {
-  approveResultWorkflow,
   getReportCard,
-  listPendingWorkflow,
   listTerms,
   openReportCardPrint,
-  publishResultWorkflow,
   type AcademicTerm,
-  type PendingWorkflowItem,
   type ReportCard,
 } from "@/lib/results";
 import { AUTH_ROLE_KEY, AUTH_TOKEN_KEY, isSchoolWorkspaceRole } from "@/lib/auth";
@@ -27,7 +25,6 @@ export default function AdminResultsPage() {
   const [termId, setTermId] = useState("");
   const [viewStudentId, setViewStudentId] = useState("");
   const [report, setReport] = useState<ReportCard | null>(null);
-  const [pending, setPending] = useState<PendingWorkflowItem[]>([]);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -38,39 +35,16 @@ export default function AdminResultsPage() {
       router.replace("/login");
       return;
     }
-    void Promise.all([listTerms(), listStudents(), listPendingWorkflow()])
-      .then(([t, st, pw]) => {
+    void Promise.all([listTerms(), listStudents()])
+      .then(([t, st]) => {
         setTerms(t);
         setStudents(st);
-        setPending(pw);
         const current = t.find((x) => x.isCurrent) ?? t[0];
         if (current) setTermId(current.id);
         if (st[0]) setViewStudentId(st[0].id);
       })
       .catch((err) => setError(err instanceof Error ? err.message : "Load failed"));
   }, [router]);
-
-  async function refreshPending() {
-    setPending(await listPendingWorkflow());
-  }
-
-  async function onApprove(termId: string, classSubjectId: string) {
-    try {
-      await approveResultWorkflow(termId, classSubjectId);
-      await refreshPending();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Approve failed");
-    }
-  }
-
-  async function onPublish(termId: string, classSubjectId: string) {
-    try {
-      await publishResultWorkflow(termId, classSubjectId);
-      await refreshPending();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Publish failed");
-    }
-  }
 
   async function onPreviewReport() {
     if (!viewStudentId || !termId) return;
@@ -101,41 +75,11 @@ export default function AdminResultsPage() {
           </p>
         </section>
 
-        {pending.length > 0 ? (
-          <section className="att-admin-section" style={{ borderTop: "none", marginTop: 0 }}>
-            <h2 className="setup-panel-label">Pending approvals</h2>
-            <ul className="setup-student-list">
-              {pending.map((p) => {
-                const cs = p.classSubject;
-                const label = `${cs.grade.name}${cs.section ? ` ${cs.section.name}` : ""} — ${cs.subject.name}`;
-                return (
-                  <li key={p.id}>
-                    <strong>{label}</strong> · {p.term.name}
-                    {p.submitter
-                      ? ` · ${p.submitter.firstName} ${p.submitter.lastName}`
-                      : ""}
-                    <div className="setup-actions-row" style={{ marginTop: "0.35rem" }}>
-                      <button
-                        type="button"
-                        className="auth-page-submit"
-                        onClick={() => void onApprove(p.termId, p.classSubjectId)}
-                      >
-                        Approve
-                      </button>
-                      <button
-                        type="button"
-                        className="dash-copy-btn"
-                        onClick={() => void onPublish(p.termId, p.classSubjectId)}
-                      >
-                        Publish
-                      </button>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
-        ) : null}
+        <PendingApprovalsPanel
+          terms={terms}
+          defaultTermId={termId}
+          onError={(message) => setError(message)}
+        />
 
         <section className="att-admin-section" style={{ borderTop: "none", marginTop: 0 }}>
           <h2 className="setup-panel-label">Enter scores (matrix)</h2>
@@ -147,7 +91,21 @@ export default function AdminResultsPage() {
           <p className="tch-meta">
             {terms.map((t) => `${t.name} (${t.academicYear.name})`).join(" · ") || "No terms yet"}
           </p>
+          <p className="setup-hint" style={{ marginTop: "0.5rem" }}>
+            <a href="/admin/academics">Academics hub</a>
+            {" · "}
+            <a href="/admin/results/terms">Manage terms</a>
+            {" · "}
+            <a href="/admin/results/academic-years">Academic years</a>
+          </p>
         </section>
+
+        <ReportCardCommentsPanel
+          terms={terms}
+          students={students}
+          defaultTermId={termId}
+          defaultStudentId={viewStudentId}
+        />
 
         <section className="att-admin-section">
           <h2 className="setup-panel-label">Preview report card</h2>

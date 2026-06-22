@@ -467,8 +467,19 @@ export class AssessmentTemplatesService implements OnModuleInit {
       orderBy: { user: { firstName: 'asc' } },
     });
 
+    const canEditScores =
+      !userId || !role
+        ? true
+        : await this.teacherScope.canEditClassSubjectScores(
+            schoolId,
+            userId,
+            role,
+            classSubjectId,
+          );
+
     return {
       workflow: workflowSheet,
+      canEditScores,
       classSubject: {
         id: cs.id,
         subject: cs.subject.name,
@@ -492,6 +503,7 @@ export class AssessmentTemplatesService implements OnModuleInit {
         maxScore: a.maxScore,
         weightPercent: a.weightPercent,
         sortOrder: a.sortOrder,
+        entryLocked: a.entryLocked,
       })),
       students: students.map((s) => ({
         studentProfileId: s.id,
@@ -515,7 +527,20 @@ export class AssessmentTemplatesService implements OnModuleInit {
     userId?: string,
     role?: string,
   ) {
-    await this.workflow.assertEditable(schoolId, termId, classSubjectId);
+    await this.workflow.assertCanSaveScores(
+      schoolId,
+      termId,
+      classSubjectId,
+      role,
+    );
+    if (userId && role) {
+      await this.teacherScope.assertCanEditClassSubjectScores(
+        schoolId,
+        userId,
+        role,
+        classSubjectId,
+      );
+    }
     await this.getScoreMatrix(schoolId, termId, classSubjectId, userId, role);
 
     const assessmentIds = [...new Set(entries.map((e) => e.assessmentId))];
@@ -527,15 +552,20 @@ export class AssessmentTemplatesService implements OnModuleInit {
         classSubjectId,
       },
     });
-    const maxById = new Map(assessments.map((a) => [a.id, a.maxScore]));
+    const assessmentById = new Map(assessments.map((a) => [a.id, a]));
 
     for (const entry of entries) {
-      const max = maxById.get(entry.assessmentId);
-      if (max == null) {
+      const assessment = assessmentById.get(entry.assessmentId);
+      if (!assessment) {
         throw new BadRequestException('Invalid assessment in matrix');
       }
-      if (entry.score > max) {
-        throw new BadRequestException(`Score cannot exceed ${max}`);
+      if (role === 'teacher' && assessment.entryLocked) {
+        throw new BadRequestException(
+          `${assessment.name} is locked. Ask academic office to unlock it.`,
+        );
+      }
+      if (entry.score > assessment.maxScore) {
+        throw new BadRequestException(`Score cannot exceed ${assessment.maxScore}`);
       }
     }
 
@@ -559,6 +589,33 @@ export class AssessmentTemplatesService implements OnModuleInit {
     );
 
     return { saved: entries.length };
+  }
+
+  async setAssessmentEntryLock(
+    schoolId: string,
+    assessmentId: string,
+    entryLocked: boolean,
+  ) {
+    const assessment = await this.prisma.assessment.findFirst({
+      where: { id: assessmentId, schoolId },
+    });
+    if (!assessment) {
+      throw new NotFoundException('Assessment not found');
+    }
+
+    const updated = await this.prisma.assessment.update({
+      where: { id: assessmentId },
+      data: { entryLocked },
+      select: {
+        id: true,
+        name: true,
+        entryLocked: true,
+        termId: true,
+        classSubjectId: true,
+      },
+    });
+
+    return updated;
   }
 
   private formatTemplate(t: {

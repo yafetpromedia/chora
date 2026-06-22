@@ -28,7 +28,11 @@ export default function AdminLibraryPage() {
   }, [router]);
 
   return (
-    <DashboardPage role="admin" title="eLibrary" eyebrow="Digital hub">
+    <DashboardPage
+      role="admin"
+      title="eLibrary"
+      subtitle="Manage and publish your school's digital learning resources"
+    >
       <LibraryHubView role="admin" canManage={canManage} canUpload={canUpload} />
     </DashboardPage>
   );

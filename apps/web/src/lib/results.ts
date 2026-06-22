@@ -6,6 +6,8 @@ export type AcademicTerm = {
   name: string;
   sortOrder: number;
   isCurrent: boolean;
+  startDate: string;
+  endDate: string;
   academicYear: { name: string };
 };
 
@@ -155,6 +157,17 @@ export async function listTerms(academicYearId?: string) {
   return apiFetch<AcademicTerm[]>(`/results/terms${q}`);
 }
 
+export async function createTerm(body: {
+  academicYearId: string;
+  name: string;
+  startDate: string;
+  endDate: string;
+  sortOrder?: number;
+  isCurrent?: boolean;
+}) {
+  return apiPost<AcademicTerm>("/results/terms", body);
+}
+
 export async function listSubjects() {
   return apiFetch<Subject[]>("/results/subjects");
 }
@@ -229,9 +242,46 @@ export async function getReportCard(studentProfileId: string, termId: string) {
   return apiFetch<ReportCard>(`/results/report-card?${q}`);
 }
 
+export async function upsertTermReport(
+  studentProfileId: string,
+  termId: string,
+  data: { teacherComment?: string; principalComment?: string },
+) {
+  const q = new URLSearchParams({ studentProfileId, termId });
+  return apiPatch(`/results/student-term-reports?${q}`, data);
+}
+
 export async function getMyReportCard(termId: string) {
   const q = new URLSearchParams({ termId });
   return apiFetch<ReportCard>(`/results/report-card?${q}`);
+}
+
+export type StudentScoreUpdate = {
+  id: string;
+  assessmentId: string;
+  assessmentName: string;
+  subject: string;
+  classLabel: string;
+  score: number;
+  maxScore: number;
+  weightPercent: number;
+  percentage: number;
+  termId: string;
+  termName: string;
+  academicYear: string;
+  releasedAt: string;
+};
+
+export async function listMyScoreUpdates(termId?: string) {
+  const q = termId ? `?termId=${encodeURIComponent(termId)}` : "";
+  return apiFetch<StudentScoreUpdate[]>(`/results/student/scores${q}`);
+}
+
+export async function getMyReportCardStatus(termId: string) {
+  const q = new URLSearchParams({ termId });
+  return apiFetch<{ published: boolean; termId: string }>(
+    `/results/student/report-card-status?${q}`,
+  );
 }
 
 export function reportCardPrintUrl(studentProfileId: string, termId: string) {
@@ -246,7 +296,7 @@ export function openReportCardPrint(studentProfileId: string, termId: string) {
 
 export function openMyReportCardPrint(termId: string) {
   const q = new URLSearchParams({ termId });
-  window.open(`/student/results/print?${q}`, "_blank");
+  window.open(`/student/report-card/print?${q}`, "_blank");
 }
 
 export type AssessmentTemplate = {
@@ -274,6 +324,7 @@ export type AssessmentTemplate = {
 
 export type ScoreMatrix = {
   workflow: WorkflowSheet;
+  canEditScores?: boolean;
   classSubject: {
     id: string;
     subject: string;
@@ -291,6 +342,7 @@ export type ScoreMatrix = {
     maxScore: number;
     weightPercent: number;
     sortOrder: number;
+    entryLocked: boolean;
   }[];
   students: {
     studentProfileId: string;
@@ -372,9 +424,45 @@ export async function saveScoreMatrix(body: {
   return apiPost("/results/score-matrix", body);
 }
 
-export async function listPendingWorkflow(status?: ResultWorkflowStatus) {
-  const q = status ? `?status=${status}` : "";
-  return apiFetch<PendingWorkflowItem[]>(`/results/workflow/pending${q}`);
+export async function setAssessmentEntryLock(
+  assessmentId: string,
+  entryLocked: boolean,
+) {
+  return apiPatch<{
+    id: string;
+    name: string;
+    entryLocked: boolean;
+    termId: string;
+    classSubjectId: string;
+  }>(`/results/assessments/${assessmentId}/entry-lock`, { entryLocked });
+}
+
+export async function listPendingWorkflow(params?: {
+  status?: ResultWorkflowStatus;
+  termId?: string;
+}) {
+  const q = new URLSearchParams();
+  if (params?.status) q.set("status", params.status);
+  if (params?.termId) q.set("termId", params.termId);
+  const suffix = q.toString() ? `?${q}` : "";
+  return apiFetch<PendingWorkflowItem[]>(`/results/workflow/pending${suffix}`);
+}
+
+export async function approveResultWorkflowBulk(body?: {
+  termId?: string;
+  sheetIds?: string[];
+}) {
+  return apiPost<{ approved: number }>("/results/workflow/approve-bulk", body ?? {});
+}
+
+export async function publishResultWorkflowBulk(body?: {
+  termId?: string;
+  sheetIds?: string[];
+}) {
+  return apiPost<{ published: number; skipped?: number }>(
+    "/results/workflow/publish-bulk",
+    body ?? {},
+  );
 }
 
 function workflowQuery(termId: string, classSubjectId: string) {

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import type { GradeWithSections, StudentRecord } from "@/lib/api";
 import { resetStudentPortalPassword, updateStudent } from "@/lib/school-setup";
@@ -196,6 +197,14 @@ export function StudentManageDrawer({
                 <h2 id="manage-title" className="stu-manage-hero__title">
                   {displayName}
                 </h2>
+                <p style={{ marginTop: "0.35rem" }}>
+                  <Link
+                    href={`/admin/students/${student.id}/history`}
+                    className="stu-manage-record-link"
+                  >
+                    Open academic record →
+                  </Link>
+                </p>
                 <p className="stu-manage-hero__ids">
                   <span>{student.user.externalRef ?? "—"}</span>
                   {student.fan || student.fcn ? (
@@ -286,7 +295,11 @@ export function StudentManageDrawer({
                 <dl className="stu-portal-login__fields">
                   <div>
                     <dt>Username</dt>
-                    <dd>{student.user.externalRef?.trim() || "—"}</dd>
+                    <dd>
+                      {student.user.username?.trim() ||
+                        student.user.externalRef?.trim() ||
+                        "—"}
+                    </dd>
                   </div>
                   <div>
                     <dt>Password</dt>

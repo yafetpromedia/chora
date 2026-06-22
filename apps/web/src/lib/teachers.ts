@@ -13,6 +13,7 @@ export type TeacherAssignment = {
 
 export type TeacherRecord = {
   userId: string;
+  teacherId: string | null;
   email: string;
   name: string;
   firstName: string;
@@ -20,6 +21,7 @@ export type TeacherRecord = {
   portalRole: string;
   roleTemplateSlug: string | null;
   roleTemplateName: string | null;
+  canTakeAttendance: boolean;
   homeroom: {
     gradeId: string;
     gradeName: string;
@@ -65,9 +67,50 @@ export async function getMyTeacherProfile() {
   return apiFetch<TeacherRecord>("/schools/teachers/me");
 }
 
+export type TeacherDashboardAnalytics = {
+  totalStudents: number;
+  subjectsTeaching: number;
+  classesCount: number;
+  attendanceToday: {
+    marked: number;
+    present: number;
+    total: number;
+    rate: number | null;
+    pendingClasses: number;
+  };
+  attendanceTrend: Array<{
+    date: string;
+    weekday: string;
+    rate: number | null;
+    marked: number;
+    present: number;
+  }>;
+  grading: {
+    termName: string | null;
+    totalAssessments: number;
+    completeAssessments: number;
+    progressPct: number | null;
+    missingScores: number;
+  };
+  classwork: {
+    published: number;
+    draft: number;
+    submissionsToGrade: number;
+  };
+  classPerformance: Array<{
+    classSubjectId: string;
+    label: string;
+    averageScore: number | null;
+    assessedCount: number;
+  }>;
+};
+
 export type TeacherDashboardOverview = {
+  teacherName: string;
+  canTakeAttendance: boolean;
   date: string;
   announcements: number;
+  analytics: TeacherDashboardAnalytics;
   classesToday: number;
   attendancePendingCount: number;
   resultsPendingCount: number;
@@ -139,6 +182,18 @@ export async function getMyTeacherClasses() {
       _count: { students: number };
     }[]
   >("/schools/teachers/me/classes");
+}
+
+export async function getMyTeacherHomeroomClasses() {
+  return apiFetch<
+    {
+      id: string;
+      name: string;
+      sortOrder: number;
+      sections: { id: string; name: string }[];
+      _count: { students: number };
+    }[]
+  >("/schools/teachers/me/classes?scope=homeroom");
 }
 
 export type PermissionCatalogItem = {

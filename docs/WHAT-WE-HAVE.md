@@ -69,10 +69,14 @@ edu-os/
 | `parent` | `/parent` | Guardians |
 | `student` | `/student` | Students — login with **Student ID** or portal email |
 
-**Demo school:** `admin@eduos.local` / `Passw0rd!`  
-Also seeded: `teacher@`, `parent@`, `student@` (same password)
+**Demo school sign-in:** School code `BRIGHT1`, username `admin` / `Passw0rd!`  
+Also seeded usernames: `teacher`, `student`, `parent` (same password). Contact emails remain `*@eduos.local`.
 
-**Student portal login:** Username is the school **Student ID** (`STU-xxxxxxxx`, stored on `User.externalRef`). Login accepts **Student ID or email**. On enroll, a synthetic email is created (`stu-{id}.{joinCode}@students.campusone.app`) and a **temporary password** is shown in **Manage student → Profile** until the student changes their password.
+**Sign-in / sign-up:** Use **username** + password (and **school code** on the login page). **Email** is contact info only (optional on register/join). Legacy login still accepts email or `STU-` / `TCH-` IDs.
+
+**Change username:** Any role → **Profile** (`/admin/profile`, `/teacher/profile`, `/student/profile`, `/parent/profile`) → **Edit profile** → Username field → Save. Must be unique at your school (3–40 chars).
+
+**Student portal:** Username is the school **Student ID** (`STU-xxxxxxxx`). On enroll, a synthetic contact email is created and a **temporary password** is shown in **Manage student → Profile** until the student changes their password.
 
 ---
 
@@ -121,7 +125,17 @@ Schools are not limited to one shared “Admin” login. Each person gets a **ro
 | Feature | Location |
 |---------|----------|
 | List, search, grade filter | `/admin/students` |
+| **Academic record center** | `/admin/students/[id]/history` — tabs: Overview, Attendance, Results, Fees, Discipline, Documents, Transcript, Certificates, Health |
+| Transcript (full academic history vs term report cards) | History → Transcript tab; print at `…/history/print` |
+| Student documents (birth cert, ID, transfer letter, etc.) | History → Documents |
+| Behavior / discipline records | History → Discipline |
+| Health record (blood type, allergies, emergency contact) | History → Health |
+| Certificates (enrollment, completion, graduation, conduct) | History → Certificates; print `…/history/certificate/[id]` |
+| Graduation workflow (requirements → graduate → certificate) | API `POST …/records/graduation` |
+| Student status | `ACTIVE`, `GRADUATED`, `TRANSFERRED`, `WITHDRAWN` |
+| Promotion history (never overwritten) | `StudentEnrollment` + `promotionOutcome` per year |
 | Register / edit / remove | Register drawer + **Manage student** drawer (tabs: Contact, Profile, Parents, Class, ID card) |
+| Link to academic record | Manage drawer → **Open academic record**; list → **Record** |
 | Auto Student ID | `STU-` + 8 random chars on create (override optional) |
 | CSV import | Toolbar |
 | Fayeda verification (mock OTP `123456`) | Register drawer |
@@ -157,6 +171,8 @@ Schools are not limited to one shared “Admin” login. Each person gets a **ro
 | Per-user permission editor | Teachers / staff drawers |
 | **Homeroom** (one class) | Any teacher — set grade/section on `/admin/teachers` (not tied to role name) |
 | **Subject teaching** (other grades) | `/admin/subjects/assign` — assigns `ClassSubject.teacherId` per grade/subject |
+| **Teacher ID** (`TCH-` + 8 chars) + **staff ID cards** (QR `CAMPUS1-T:`) | `/admin/teachers/cards`, `/teacher/id-card`, login with **TCH-** or email |
+| **Classwork** (worksheets & assignments per class) | Teacher `/teacher/classwork` · Student `/student/classwork` |
 | Teacher profile | `TeacherProfile.homeroomGradeId` + `TeacherAssignment` + class subjects |
 | Teacher dashboard | `/teacher` — homeroom, teaching slots, pending attendance & results |
 | **Scoped access** | Homeroom + assignments + subjects they teach — see [TEACHER-SCOPING.md](./TEACHER-SCOPING.md) |
@@ -177,7 +193,9 @@ Full pipeline: **Academic Year → Terms → Subjects → Assessment Templates �
 
 | Feature | Location / API |
 |---------|----------------|
+| **Academics setup hub** (ordered checklist) | `/admin/academics` — sidebar **Academics** |
 | Academic years (create, set current) | `/admin/results/academic-years` |
+| **Terms** (Term 1, 2, 3 per year) | `/admin/results/terms` |
 | End-of-year promotion | `/admin/results/promotion` |
 | School day dashboards (admin, teacher, parent) | `/admin`, `/teacher`, `/parent` |
 | Subject catalog | `/admin/subjects` |
@@ -191,8 +209,26 @@ Full pipeline: **Academic Year → Terms → Subjects → Assessment Templates �
 | Report card (JSON + HTML) | API; print via `/admin/results/print` |
 | Report card content | Weighted averages, rank, attendance %, teacher/principal comments, logo |
 | Parent/student visibility | Report cards only when all class subjects are **PUBLISHED** |
+| Template editor (components, weights, reorder) | `/admin/results/templates` — weights must total **100%** |
+| Platform superadmin templates | `/platform` → **Assessments** — create/edit/delete per school |
+| Student published results | `/student/results` — term report card when published; print at `/student/results/print` |
 
-**Details:** [ACADEMIC-ENGINE.md](./ACADEMIC-ENGINE.md)
+**Teacher entry:** Sidebar → **Results** (`/teacher/results`) — score matrix, save, **Submit for approval**.  
+**Admin publish:** `/admin/results` — pending queue or matrix panel → Approve → Publish.
+
+**Details:** [ACADEMIC-ENGINE.md](./ACADEMIC-ENGINE.md) · [ASSESSMENT-TEMPLATES.md](./ASSESSMENT-TEMPLATES.md)
+
+### eLibrary (Digital Learning Hub)
+
+| Feature | Location |
+|---------|----------|
+| Admin hub (upload, approve, analytics) | `/admin/library` |
+| Teacher hub (upload → pending approval) | `/teacher/library` |
+| Student shelf (browse, favorites, progress) | `/student/library` |
+| Audience targeting | `STUDENTS`, `TEACHERS`, or `BOTH` per resource |
+| File storage | `apps/api/uploads/library/{schoolId}/` (gitignored locally) |
+
+**Details:** [ELIBRARY.md](./ELIBRARY.md)
 
 ### Finance
 
@@ -204,15 +240,27 @@ Full pipeline: **Academic Year → Terms → Subjects → Assessment Templates �
 | Manual bank-transfer verification | Settings bank fields + finance approve/reject ✅ |
 | Telebirr / Chapa live checkout | Roadmap — see [INTEGRATIONS.md](./INTEGRATIONS.md) |
 
-### Announcements & platform
+### Announcements & notifications
 
 | Feature | Location |
 |---------|----------|
-| School announcements | `/admin/announcements` |
-| Parent in-app notifications | API `/notifications` → `/parent` |
-| Platform school management | `/platform` |
+| School announcements (create) | `/admin/announcements` |
+| **Notification bell** (all portals) | Header on admin, staff, teacher, parent, student — lists school announcements with read/unread |
+| Mark read / read all | `POST /announcements/:id/read`, `POST /announcements/read-all` |
+| Parent fee/attendance alerts | API `/notifications` (separate from announcement bell) |
+
+### Platform (CampusOne team)
+
+| Feature | Location |
+|---------|----------|
+| School list, create, suspend | `/platform` |
+| Curriculum packages (v1 catalog + provision) | Platform → **Curriculum** — see [CURRICULUM-PRESETS.md](./CURRICULUM-PRESETS.md) |
+| Assessment templates per school | Platform → **Assessments** |
+| Billing, plans, usage | Platform sections |
 | Subscription plans | TRIAL, STARTER, PROFESSIONAL, ENTERPRISE |
-| Upgrade | `/admin/upgrade` |
+| School upgrade (tenant) | `/admin/upgrade` |
+
+**Next platform layer:** [Content & Curriculum Engine](./CONTENT-CURRICULUM-ENGINE.md) — subject/eLibrary repositories, inheritance, provisioning v2, marketplace (future).
 
 ### Auth & security
 
@@ -222,6 +270,20 @@ Full pipeline: **Academic Year → Terms → Subjects → Assessment Templates �
 - `SchoolTenantGuard` — all school data scoped by `schoolId`
 - Rate limiting, audit logging
 - API JSON body limit **10 MB** (student photos)
+
+### Student portal
+
+| Feature | Location |
+|---------|----------|
+| Overview dashboard | `/student` |
+| Campus ID card | `/student/id-card` |
+| **Published results** + report card print | `/student/results`, `/student/results/print` |
+| Fee balance (read-only) | `/student/fees` |
+| Timetable | `/student/timetable` |
+| eLibrary | `/student/library` |
+| Profile | `/student/profile` |
+
+Login: **Student ID** (`STU-…`) or portal email + password (see Manage student → Profile).
 
 ### Marketing
 
@@ -239,7 +301,9 @@ Full pipeline: **Academic Year → Terms → Subjects → Assessment Templates �
 
 **People:** `TeacherProfile` (`homeroomGradeId`, `homeroomSectionId`), `TeacherAssignment`, `StudentProfile` (`portalTempPassword`), `ParentStudent`
 
-**Operations:** `AttendanceRecord`, `Announcement`, `ParentNotification`
+**Operations:** `AttendanceRecord`, `Announcement`, `AnnouncementRead`, `ParentNotification`
+
+**eLibrary:** `LibraryCategory`, `LibraryResource` (`audience`), `LibraryFavorite`, `LibraryReadingProgress`
 
 **Finance:** `FeeType`, `FeeSchedule`, `StudentFee`, `FeeInstallment`, `Payment`, `PaymentAllocation`
 
@@ -258,12 +322,13 @@ Full pipeline: **Academic Year → Terms → Subjects → Assessment Templates �
 | `teachers` | Staff CRUD, assignments, teacher dashboard |
 | `permissions` | Templates, catalog, staff grants |
 | `attendance` | Roster, bulk, scan, analytics |
-| `results` | Academic years, terms, subjects, templates, score matrix, workflow, report cards |
+| `results` | Academic years, terms, subjects, templates (CRUD), score matrix, workflow, report cards |
 | `timetable` | Weekly schedule, periods, rooms, portal views |
+| `library` | eLibrary hub, resources, upload, favorites, progress |
 | `finance` | Fees, payments, receipts |
-| `announcements` | Posts |
-| `notifications` | Parent inbox |
-| `platform` | Cross-tenant admin |
+| `announcements` | Posts + per-user read tracking |
+| `notifications` | Parent fee/attendance inbox |
+| `platform` | Cross-tenant schools, curriculum, assessment templates |
 | `dashboards` | Dashboard payloads |
 
 ---
@@ -274,21 +339,21 @@ Full pipeline: **Academic Year → Terms → Subjects → Assessment Templates �
 
 **Platform:** `/platform/login`, `/platform`
 
-**Admin:** `/admin`, `/admin/setup`, `/admin/students`, `/admin/students/cards`, `/admin/teachers`, `/admin/staff`, `/admin/subjects`, `/admin/subjects/assign`, `/admin/timetable`, `/admin/attendance`, `/admin/results`, `/admin/results/academic-years`, `/admin/results/promotion`, `/admin/results/subjects`, `/admin/results/templates`, `/admin/results/print`, `/admin/finance`, `/admin/announcements`, `/admin/settings`, `/admin/upgrade`
+**Admin:** `/admin`, `/admin/setup`, `/admin/academics`, `/admin/students`, `/admin/students/cards`, `/admin/teachers`, `/admin/staff`, `/admin/subjects`, `/admin/subjects/assign`, `/admin/timetable`, `/admin/library`, `/admin/attendance`, `/admin/results`, `/admin/results/academic-years`, `/admin/results/terms`, `/admin/results/promotion`, `/admin/results/subjects`, `/admin/results/templates`, `/admin/results/print`, `/admin/finance`, `/admin/billing`, `/admin/announcements`, `/admin/settings`, `/admin/upgrade`
 
 **Print:** `/print/student-id-cards`
 
-**Teacher:** `/teacher`, `/teacher/attendance`, `/teacher/results`, `/teacher/timetable`
+**Teacher:** `/teacher`, `/teacher/attendance`, `/teacher/results`, `/teacher/timetable`, `/teacher/library`
 
 **Parent:** `/parent`, `/parent/fees`, `/parent/timetable`
 
-**Student:** `/student`, `/student/timetable`
+**Student:** `/student`, `/student/id-card`, `/student/results`, `/student/results/print`, `/student/fees`, `/student/timetable`, `/student/library`
 
 ---
 
 ## Web stylesheets
 
-`landing.css`, `auth.css`, `dashboard.css`, `setup.css`, `students.css`, `attendance.css`, `results.css`, `settings.css`, `student-cards.css`, `teachers.css`
+`landing.css`, `auth.css`, `dashboard.css`, `setup.css`, `students.css`, `attendance.css`, `results.css`, `library.css`, `settings.css`, `student-cards.css`, `teachers.css`
 
 ---
 
@@ -301,6 +366,9 @@ Full pipeline: **Academic Year → Terms → Subjects → Assessment Templates �
 | [ASSESSMENT-TEMPLATES.md](./ASSESSMENT-TEMPLATES.md) | Weighted grading per grade |
 | [TEACHER-SCOPING.md](./TEACHER-SCOPING.md) | Assigned classes only |
 | [TIMETABLE.md](./TIMETABLE.md) | Weekly schedules |
+| [ELIBRARY.md](./ELIBRARY.md) | Digital learning hub |
+| [CONTENT-CURRICULUM-ENGINE.md](./CONTENT-CURRICULUM-ENGINE.md) | Platform content layer (vision & sprints) |
+| [CURRICULUM-PRESETS.md](./CURRICULUM-PRESETS.md) | v1 school provisioning today |
 | [INTEGRATIONS.md](./INTEGRATIONS.md) | Fayda, SMS, payments strategy |
 | [TENANT-ARCHITECTURE.md](./TENANT-ARCHITECTURE.md) | Multi-tenant isolation |
 | [PERMISSIONS.md](./PERMISSIONS.md) | Role templates & matrix |
@@ -308,6 +376,7 @@ Full pipeline: **Academic Year → Terms → Subjects → Assessment Templates �
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | System design |
 | [DEPLOYMENT.md](./DEPLOYMENT.md) | Deploy |
 | [../SETUP-WINDOWS.md](../SETUP-WINDOWS.md) | Local setup |
+| [PILOT-READINESS.md](./PILOT-READINESS.md) | Pilot checklist, db sync, e2e, handouts |
 
 ---
 
@@ -316,19 +385,22 @@ Full pipeline: **Academic Year → Terms → Subjects → Assessment Templates �
 ### Usable now
 
 - Register school + setup wizard  
-- Students (Fayeda mock, import, manage drawer, auto Student ID, portal login)  
+- Students (Fayeda mock, import, manage drawer, auto Student ID, portal login, **academic record center**)  
 - **CR80 ID cards** (print/PDF, manage preview, bulk) + QR scan attendance  
 - Manual attendance + analytics  
 - Role templates + filtered navigation + per-user permission grants  
 - Teachers + staff directories; **homeroom + multi-grade subject teaching**  
 - **Teacher scoping** (homeroom, assignments, class subjects)  
-- **Academic engine:** years, subject assignment, templates, score matrix, approval workflow, HTML report cards  
+- **Academic engine:** years, subject assignment, templates (edit/delete, component editor), score matrix, approval workflow, HTML report cards  
+- **Student portal:** published results, fees, eLibrary, campus ID, timetable  
+- **eLibrary** with audience targeting (students / teachers / both)  
+- **Notification bell** on all school portals (announcements + read state)  
 - Settings, invites, finance UI (manual payment verification)  
-- Platform school management  
+- Platform school management + per-school assessment templates  
 
 ### Next (polish & integrations)
 
-- Report card **PDF** export (HTML print works today)  
+- Report card **PDF** — use **Print → Save as PDF** (improved A4 layout); server-side PDF optional later  
 - Subject-specific templates (e.g. Art / PE only)  
 - ~~Academic year promotion~~ ✅ `/admin/results/promotion`  
 - Admissions module UI  
@@ -337,6 +409,8 @@ Full pipeline: **Academic Year → Terms → Subjects → Assessment Templates �
 - Telebirr + Chapa live payments  
 - Live Fayda API + SMS provider  
 - Librarian / admissions officer roles  
+- eLibrary: cloud storage (S3), cover images, AI study assistant (placeholders in UI)  
+- **Content & Curriculum Engine:** platform subject/eLibrary repositories, inheritance, provisioning UI (see [CONTENT-CURRICULUM-ENGINE.md](./CONTENT-CURRICULUM-ENGINE.md))  
 
 ---
 
@@ -366,7 +440,7 @@ Log out and log in again after permission/schema updates.
 
 1. ~~Teacher scoping~~ ✅  
 2. ~~Results, templates, approval workflow, report cards (HTML)~~ ✅  
-3. Academic year promotion + enrollment history  
+3. ~~Academic year promotion + enrollment history~~ ✅ (promotion + **transcript & record center**)  
 4. Report card PDF + subject-specific templates  
 5. Parent communication (routed tickets)  
 6. Chapa + Telebirr online payments  
@@ -375,4 +449,4 @@ Log out and log in again after permission/schema updates.
 
 ## One-line summary
 
-CampusOne is a **multi-tenant school operating system** with tenants, students (Fayeda mock, portal login by Student ID), **CR80 ID cards**, attendance (manual + QR), finance (manual verify), **homeroom + subject teacher** workflows, and a full **academic results engine** (templates, scoping, approval, report cards) plus a **department-based permission workplace** — ready for pilot daily use; next wins are **PDF report cards, timetable, and payment gateways**.
+CampusOne is a **multi-tenant school operating system** with tenants, students (Fayeda mock, portal login by Student ID), **CR80 ID cards**, attendance (manual + QR), finance (manual verify), **homeroom + subject teacher** workflows, a full **academic results engine** (configurable templates, scoping, approval, published student report cards), **eLibrary**, universal **announcement notifications**, and a **department-based permission workplace** — ready for pilot daily use; next wins are **PDF report cards, payment gateways, and parent messaging tickets**.

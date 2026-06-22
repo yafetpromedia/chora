@@ -240,13 +240,18 @@ export class PlatformService {
       data: { status: SchoolStatus.TRIAL },
     });
 
+    const adminUsername =
+      dto.adminEmail.split('@')[0]?.toLowerCase().replace(/[^a-z0-9._-]/g, '') ||
+      'admin';
     const admin = await this.usersService.createUser({
+      username: adminUsername,
       email: dto.adminEmail,
       password: dto.adminPassword,
       firstName: dto.adminFirstName,
       lastName: dto.adminLastName,
       role: 'admin',
       schoolId: school.id,
+      schoolJoinCode: school.joinCode,
     });
 
     return {

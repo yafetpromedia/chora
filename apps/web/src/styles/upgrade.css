@@ -17,12 +17,51 @@
   backdrop-filter: blur(8px);
 }
 
+.upg-hero__eyebrow {
+  margin: 0 0 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--brand-teal-dark);
+}
+
 .upg-hero__title {
-  margin: 0 0 1rem;
-  font-size: clamp(1.35rem, 3vw, 1.65rem);
+  margin: 0 0 0.5rem;
+  font-size: clamp(1.35rem, 3vw, 1.75rem);
   font-weight: 800;
   letter-spacing: -0.03em;
   color: var(--lite-black);
+}
+
+.upg-hero__sub {
+  margin: 0 auto 1rem;
+  max-width: 36rem;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--brand-muted);
+}
+
+.upg-pay-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-top: 0.85rem;
+  padding: 0.4rem 0.85rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #065f46;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  border-radius: 9999px;
+}
+
+.upg-pay-badge__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.25);
 }
 
 .upg-alert,
@@ -110,12 +149,31 @@
   border-radius: 9999px;
 }
 
+.upg-card__badge--current {
+  color: #047857;
+  background: #d1fae5;
+}
+
 .upg-card__name {
   margin: 0;
   font-size: 1.05rem;
   font-weight: 800;
   letter-spacing: -0.02em;
   color: var(--lite-black);
+}
+
+.upg-card__desc {
+  margin: 0.2rem 0 0;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: var(--brand-muted);
+}
+
+.upg-card__checkout-hint {
+  margin: -0.35rem 0 0.75rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #047857;
 }
 
 .upg-card__features {
@@ -187,6 +245,16 @@
   color: #047857;
   background: #ecfdf5;
   border-color: #a7f3d0;
+}
+
+.upg-card__btn--primary {
+  color: #fff;
+  background: linear-gradient(135deg, var(--brand-teal), var(--brand-teal-dark));
+  border-color: transparent;
+}
+
+.upg-card__btn--primary:hover:not(:disabled) {
+  filter: brightness(1.06);
 }
 
 .upg-footnote {

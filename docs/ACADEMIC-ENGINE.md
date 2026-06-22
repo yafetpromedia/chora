@@ -51,7 +51,18 @@ Flow: **Teacher → Submit → Academic Director → Approve → Publish**
 
 ## Teacher UI
 
-- `/teacher/results` — scoped classes only; submit sheets for approval
+- `/teacher/results` — scoped classes only; score matrix, save, submit sheets for approval
+
+## Student UI
+
+- `/student/results` — published report cards only (API enforces `PUBLISHED` workflow on all class subjects for the term)
+- `/student/results/print` — browser print layout for the current term report card
+
+Students do **not** see draft or submitted scores.
+
+## Parent UI
+
+- Report cards follow the same publish rule when exposed via parent APIs (see `/parent` dashboard)
 
 ## Report cards
 
@@ -70,6 +81,13 @@ After `npm run dev:clean`, use `teacher@eduos.local` / `admin@eduos.local` with 
 3. **Teacher** → Results — enter scores → **Submit for approval**.
 4. **Admin** → Results — **Pending approvals** → Approve → Publish.
 5. **Admin** → Preview report card → **Print / PDF** (browser print).
+6. **Student** → Results (`/student/results`) — visible only after step 4 **Publish**.
+
+---
+
+## Notifications (announcements)
+
+All school portals show a **bell** in the dashboard header. It lists school-wide announcements with per-user read tracking (`AnnouncementRead`). This is separate from parent-only `/notifications` (fee/attendance events).
 
 ---
 

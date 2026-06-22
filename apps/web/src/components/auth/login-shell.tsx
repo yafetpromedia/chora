@@ -16,7 +16,7 @@ export function LoginShell({ children, error }: LoginShellProps) {
       topLinkHref="/"
       topLinkLabel="Home"
       error={error}
-      hint="Demo: admin@eduos.local · Passw0rd!"
+      hint="Demo: BRIGHT1 · admin · Passw0rd!"
       footer={
         <nav className="auth-login-links" aria-label="Other sign-in options">
           <Link href="/register">Register your school</Link>

@@ -111,16 +111,18 @@ export default function AdminTimetablePage() {
 
   function setCell(weekday: Weekday, periodNumber: number, patch: Partial<CellDraft>) {
     const key = cellKey(weekday, periodNumber);
-    setCells((prev) => ({
-      ...prev,
-      [key]: {
-        subjectId: "",
-        teacherUserId: "",
-        roomName: "",
-        ...prev[key],
-        ...patch,
-      },
-    }));
+    setCells((prev) => {
+      const existing = prev[key];
+      return {
+        ...prev,
+        [key]: {
+          subjectId: existing?.subjectId ?? "",
+          teacherUserId: existing?.teacherUserId ?? "",
+          roomName: existing?.roomName ?? "",
+          ...patch,
+        },
+      };
+    });
   }
 
   async function onSave() {

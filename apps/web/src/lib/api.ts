@@ -147,6 +147,7 @@ export type StudentRecord = {
     id: string;
     firstName: string;
     lastName: string;
+    username?: string;
     email: string;
     externalRef: string | null;
   };
@@ -180,6 +181,7 @@ export type LoginResponse = {
     roleTemplateName?: string | null;
     permissions?: string[];
     schoolId: string;
+    username: string;
     email: string;
     firstName?: string;
     lastName?: string;
@@ -210,7 +212,8 @@ export type RegisterSchoolPayload = {
   logoUrl?: string;
   adminFirstName: string;
   adminLastName: string;
-  email: string;
+  username: string;
+  email?: string;
   password: string;
   phone?: string;
   country?: string;
@@ -230,7 +233,8 @@ export type JoinSchoolPayload = {
   role: "teacher" | "student" | "parent";
   firstName: string;
   lastName: string;
-  email: string;
+  username: string;
+  email?: string;
   password: string;
   externalRef?: string;
 };
@@ -239,7 +243,8 @@ export type JoinInvitePayload = {
   inviteToken: string;
   firstName: string;
   lastName: string;
-  email: string;
+  username: string;
+  email?: string;
   password: string;
   externalRef?: string;
 };
@@ -356,8 +361,16 @@ async function authPost(path: string, body: unknown): Promise<LoginResponse> {
   return response.json();
 }
 
-export async function login(email: string, password: string): Promise<LoginResponse> {
-  return authPost("/auth/login", { email, password });
+export async function login(
+  username: string,
+  password: string,
+  schoolCode?: string,
+): Promise<LoginResponse> {
+  return authPost("/auth/login", {
+    username,
+    password,
+    ...(schoolCode?.trim() ? { schoolCode: schoolCode.trim().toUpperCase() } : {}),
+  });
 }
 
 export async function registerSchool(payload: RegisterSchoolPayload): Promise<LoginResponse> {
@@ -409,8 +422,39 @@ export async function upgradeSchoolPlan(plan: Exclude<PlanType, "TRIAL">): Promi
   return apiPost<SubscriptionStatus>("/schools/subscription/upgrade", { plan });
 }
 
-export async function loginWithGoogle(credential: string): Promise<LoginResponse> {
-  return authPost("/auth/google", { credential });
+export type BillingPaymentConfig = {
+  chapaEnabled: boolean;
+  currency: "ETB";
+  provider: "chapa";
+};
+
+export async function getBillingPaymentConfig(): Promise<BillingPaymentConfig> {
+  return apiFetch<BillingPaymentConfig>("/schools/billing/payment-config");
+}
+
+export async function startSubscriptionCheckout(body: {
+  plan: Exclude<PlanType, "TRIAL" | "ENTERPRISE">;
+  interval: "month" | "year";
+}) {
+  return apiPost<{
+    checkoutUrl: string;
+    txRef: string;
+    invoiceNumber: string;
+    plan: string;
+    amountEtb: number;
+    interval: string;
+    message: string;
+  }>("/schools/subscription/checkout", body);
+}
+
+export async function verifySubscriptionCheckout(txRef: string) {
+  return apiPost<{
+    status: string;
+    plan: string;
+    planLabel: string;
+    invoiceNumber: string;
+    message: string;
+  }>("/schools/subscription/checkout/verify", { txRef });
 }
 
 async function refreshAccessToken(): Promise<string | null> {

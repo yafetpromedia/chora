@@ -1,4 +1,6 @@
 import { spawnSync } from 'node:child_process';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const argUrl = process.argv[2];
 const databaseUrl = argUrl || process.env.DATABASE_URL;
@@ -12,24 +14,17 @@ if (!databaseUrl) {
 
 process.env.DATABASE_URL = databaseUrl;
 
-const run = (command, args) => {
-  const result = spawnSync(command, args, {
-    stdio: 'inherit',
-    shell: true,
-    env: process.env,
-  });
-
-  if (result.status !== 0) {
-    process.exit(result.status ?? 1);
-  }
-};
+const scriptsDir = path.dirname(fileURLToPath(import.meta.url));
+const syncScript = path.join(scriptsDir, 'db-sync.mjs');
 
 console.log('Using DATABASE_URL for bootstrap...');
-console.log('Generating Prisma client...');
-run('npm', ['run', 'prisma:generate']);
+const sync = spawnSync(process.execPath, [syncScript, databaseUrl], {
+  stdio: 'inherit',
+  env: process.env,
+});
 
-console.log('Applying migrations...');
-run('npm', ['run', 'prisma:migrate:deploy']);
+if (sync.status !== 0) {
+  process.exit(sync.status ?? 1);
+}
 
-console.log('Database bootstrap completed.');
-console.log('Note: demo users are auto-seeded when API starts.');
+console.log('Note: demo users are auto-seeded when the API starts.');

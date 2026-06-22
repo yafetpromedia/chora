@@ -2,6 +2,11 @@ export type PlatformSection =
   | "overview"
   | "schools"
   | "curriculum"
+  | "subjects"
+  | "library"
+  | "messages"
+  | "structures"
+  | "provisioning"
   | "assessments"
   | "billing"
   | "invoices"
@@ -84,9 +89,29 @@ export const SECTION_META: Record<
     title: "Curriculum packages",
     subtitle: "Manage starter packs for school provisioning",
   },
+  subjects: {
+    title: "Subject repository",
+    subtitle: "Master subjects inherited by schools on provision",
+  },
+  library: {
+    title: "eLibrary repository",
+    subtitle: "Master learning resources for curriculum packages",
+  },
+  messages: {
+    title: "Communication templates",
+    subtitle: "SMS, email, and teacher message starters",
+  },
+  structures: {
+    title: "Academic structures",
+    subtitle: "Grade presets for school onboarding",
+  },
+  provisioning: {
+    title: "School provisioning",
+    subtitle: "Audit log when packages are applied to tenants",
+  },
   assessments: {
     title: "Assessment templates",
-    subtitle: "Manage school grading components and weights",
+    subtitle: "Platform catalog and per-school grading structures",
   },
   billing: {
     title: "Billing",

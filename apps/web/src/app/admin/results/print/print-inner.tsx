@@ -1,46 +1,166 @@
 "use client";
 
-import { useEffect, useState } from "react";
+
+
+import { useCallback, useEffect, useState } from "react";
+
 import { useRouter, useSearchParams } from "next/navigation";
+
 import { AUTH_TOKEN_KEY } from "@/lib/auth";
+
 import { reportCardPrintUrl } from "@/lib/results";
 
+
+
 export function ReportCardPrintInner() {
+
   const searchParams = useSearchParams();
+
   const router = useRouter();
+
   const [html, setHtml] = useState("");
+
+  const [error, setError] = useState("");
+
   const studentProfileId = searchParams.get("studentProfileId") ?? "";
+
   const termId = searchParams.get("termId") ?? "";
 
-  useEffect(() => {
+
+
+  const load = useCallback(async () => {
+
     const token = localStorage.getItem(AUTH_TOKEN_KEY);
+
     if (!token || !studentProfileId || !termId) {
+
       router.replace("/login");
+
       return;
+
     }
-    void fetch(reportCardPrintUrl(studentProfileId, termId), {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((res) => {
-        if (!res.ok) throw new Error("Could not load report");
-        return res.text();
-      })
-      .then((text) => {
-        setHtml(text);
-        setTimeout(() => window.print(), 500);
-      })
-      .catch(() => router.replace("/admin/results"));
+
+    setError("");
+
+    try {
+
+      const res = await fetch(reportCardPrintUrl(studentProfileId, termId), {
+
+        headers: { Authorization: `Bearer ${token}` },
+
+      });
+
+      if (!res.ok) throw new Error("Could not load report");
+
+      setHtml(await res.text());
+
+    } catch {
+
+      setError("Report card is not available. Publish results for all class subjects first.");
+
+    }
+
   }, [studentProfileId, termId, router]);
 
-  if (!html) {
-    return <p style={{ padding: "2rem" }}>Preparing report card…</p>;
+
+
+  useEffect(() => {
+
+    void load();
+
+  }, [load]);
+
+
+
+  function onPrint() {
+
+    window.print();
+
   }
 
+
+
+  if (error) {
+
+    return (
+
+      <div className="rc-print-shell">
+
+        <p className="rc-print-error">{error}</p>
+
+        <button type="button" className="rc-print-btn" onClick={() => router.replace("/admin/results")}>
+
+          Back to results
+
+        </button>
+
+      </div>
+
+    );
+
+  }
+
+
+
+  if (!html) {
+
+    return (
+
+      <div className="rc-print-shell">
+
+        <p className="rc-print-loading">Preparing report card…</p>
+
+      </div>
+
+    );
+
+  }
+
+
+
   return (
-    <iframe
-      title="Report card"
-      srcDoc={html}
-      style={{ width: "100%", minHeight: "100vh", border: "none" }}
-    />
+
+    <div className="rc-print-wrap">
+
+      <div className="rc-print-toolbar no-print">
+
+        <p>
+
+          <strong>Save as PDF:</strong> click Print, then choose &quot;Save as PDF&quot; (or Microsoft Print to PDF).
+
+        </p>
+
+        <div className="rc-print-toolbar__actions">
+
+          <button type="button" className="rc-print-btn rc-print-btn--primary" onClick={onPrint}>
+
+            Print / Save PDF
+
+          </button>
+
+          <button type="button" className="rc-print-btn" onClick={() => router.replace("/admin/results")}>
+
+            Close
+
+          </button>
+
+        </div>
+
+      </div>
+
+      <iframe
+
+        title="Report card"
+
+        className="rc-print-frame"
+
+        srcDoc={html}
+
+      />
+
+    </div>
+
   );
+
 }
+

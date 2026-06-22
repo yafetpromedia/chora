@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DashboardPage } from "@/components/dashboard/dashboard-page";
-import { TimetableDayList } from "@/components/timetable/timetable-day-list";
-import { getMyTimetableToday, getMyTimetableWeek } from "@/lib/timetable";
+import { TimetablePortalView } from "@/components/timetable/timetable-portal-view";
+import { getMyTimetableToday, getMyTimetableWeek, type Weekday } from "@/lib/timetable";
 import { AUTH_TOKEN_KEY } from "@/lib/auth";
 
 export default function TeacherTimetablePage() {
@@ -12,6 +12,7 @@ export default function TeacherTimetablePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [todayLabel, setTodayLabel] = useState("");
+  const [todayWeekday, setTodayWeekday] = useState<Weekday | undefined>();
   const [todaySlots, setTodaySlots] = useState<
     Awaited<ReturnType<typeof getMyTimetableToday>>["slots"]
   >([]);
@@ -27,6 +28,7 @@ export default function TeacherTimetablePage() {
     void Promise.all([getMyTimetableToday(), getMyTimetableWeek()])
       .then(([today, week]) => {
         setTodayLabel(today.weekdayLabel);
+        setTodayWeekday(today.weekday);
         setTodaySlots(today.slots);
         setWeekDays(week.days);
       })
@@ -38,34 +40,18 @@ export default function TeacherTimetablePage() {
     <DashboardPage
       role="teacher"
       title="My timetable"
+      subtitle="Today's classes and your full teaching week"
     >
-      <div className="att-page tt-page">
-        {error ? <p className="att-toast att-toast--error">{error}</p> : null}
-        {loading ? (
-          <p className="setup-hint">Loading schedule…</p>
-        ) : (
-          <>
-            <section className="tt-panel">
-              <h2 className="tt-panel__title">Today — {todayLabel}</h2>
-              <TimetableDayList
-                slots={todaySlots}
-                emptyMessage="No classes on your timetable today."
-              />
-            </section>
-            {weekDays.length > 0 ? (
-              <section className="tt-panel">
-                <h2 className="tt-panel__title">Full week</h2>
-                {weekDays.map((day) => (
-                  <div key={day.weekday} className="tt-panel__day">
-                    <h3>{day.weekdayLabel}</h3>
-                    <TimetableDayList slots={day.slots} emptyMessage="" />
-                  </div>
-                ))}
-              </section>
-            ) : null}
-          </>
-        )}
-      </div>
+      <TimetablePortalView
+        loading={loading}
+        error={error}
+        todayLabel={todayLabel}
+        todayWeekday={todayWeekday}
+        todaySlots={todaySlots}
+        weekDays={weekDays}
+        heroSub="See when and where you teach — today and across the week."
+        todayEmptyMessage="No classes on your timetable today. Check the full week or ask your admin to publish the schedule."
+      />
     </DashboardPage>
   );
 }

@@ -1,4 +1,9 @@
-import { ConflictException, Injectable, OnModuleInit } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  OnModuleInit,
+} from '@nestjs/common';
 import { hashSync } from 'bcrypt';
 import { randomBytes } from 'crypto';
 import { UserRole as PrismaUserRole } from '@prisma/client';
@@ -6,12 +11,19 @@ import { UserRole } from '../common/auth.types';
 import { PermissionsService } from '../permissions/permissions.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { isSchoolStudentIdLogin } from '../students/student-card.util';
+import { isSchoolTeacherIdLogin } from '../teachers/staff-card.util';
+import {
+  buildContactEmail,
+  isValidUsername,
+  normalizeUsername,
+} from './username.util';
 
 export interface UserRecord {
   id: string;
   schoolId: string;
   role: UserRole;
   roleTemplateId: string | null;
+  username: string;
   email: string;
   firstName: string;
   lastName: string;
@@ -37,12 +49,14 @@ export class UsersService implements OnModuleInit {
         '1',
         'school-addis',
         'admin',
+        'admin',
         'admin@eduos.local',
         passwordHash,
       ),
       this.makeUserSeed(
         '2',
         'school-addis',
+        'teacher',
         'teacher',
         'teacher@eduos.local',
         passwordHash,
@@ -51,12 +65,14 @@ export class UsersService implements OnModuleInit {
         '3',
         'school-addis',
         'student',
+        'student',
         'student@eduos.local',
         passwordHash,
       ),
       this.makeUserSeed(
         '4',
         'school-addis',
+        'parent',
         'parent',
         'parent@eduos.local',
         passwordHash,
@@ -82,6 +98,7 @@ export class UsersService implements OnModuleInit {
         update: {
           schoolId: user.schoolId,
           role: user.role,
+          username: user.username,
           firstName: user.firstName,
           lastName: user.lastName,
           roleTemplateId: template?.id ?? undefined,
@@ -108,8 +125,24 @@ export class UsersService implements OnModuleInit {
     return user ? this.toUserRecord(user) : undefined;
   }
 
+  async findByUsername(
+    schoolId: string,
+    username: string,
+  ): Promise<UserRecord | undefined> {
+    const normalized = normalizeUsername(username);
+    if (!normalized) return undefined;
+
+    const user = await this.prisma.user.findUnique({
+      where: {
+        schoolId_username: { schoolId, username: normalized },
+      },
+    });
+    return user ? this.toUserRecord(user) : undefined;
+  }
+
   async findByLoginIdentifier(
     identifier: string,
+    schoolId?: string,
   ): Promise<UserRecord | undefined> {
     const trimmed = identifier.trim();
     if (!trimmed) return undefined;
@@ -118,17 +151,79 @@ export class UsersService implements OnModuleInit {
       return this.findByEmail(trimmed);
     }
 
+    const normalized = normalizeUsername(trimmed);
+
+    if (schoolId) {
+      const byUsername = await this.findByUsername(schoolId, normalized);
+      if (byUsername) return byUsername;
+    } else {
+      const matches = await this.prisma.user.findMany({
+        where: { username: normalized },
+        take: 2,
+      });
+      if (matches.length === 1) {
+        return this.toUserRecord(matches[0]!);
+      }
+      if (matches.length > 1) {
+        throw new BadRequestException(
+          'This username exists at more than one school. Enter your school code on the sign-in page.',
+        );
+      }
+    }
+
     if (isSchoolStudentIdLogin(trimmed)) {
       const user = await this.prisma.user.findFirst({
         where: {
           role: PrismaUserRole.student,
-          externalRef: trimmed.toUpperCase(),
+          OR: [
+            { username: normalized },
+            { externalRef: trimmed.toUpperCase() },
+          ],
+          ...(schoolId ? { schoolId } : {}),
         },
       });
       return user ? this.toUserRecord(user) : undefined;
     }
 
-    return this.findByEmail(trimmed);
+    if (isSchoolTeacherIdLogin(trimmed)) {
+      const user = await this.prisma.user.findFirst({
+        where: {
+          role: PrismaUserRole.teacher,
+          OR: [
+            { username: normalized },
+            { externalRef: trimmed.toUpperCase() },
+          ],
+          ...(schoolId ? { schoolId } : {}),
+        },
+      });
+      return user ? this.toUserRecord(user) : undefined;
+    }
+
+    return undefined;
+  }
+
+  async assertUsernameAvailable(
+    schoolId: string,
+    username: string,
+    exceptUserId?: string,
+  ): Promise<string> {
+    const normalized = normalizeUsername(username);
+    if (!isValidUsername(normalized)) {
+      throw new BadRequestException(
+        'Username must be 3–40 characters (letters, numbers, . _ -) or a school ID like STU-…',
+      );
+    }
+    const taken = await this.prisma.user.findFirst({
+      where: {
+        schoolId,
+        username: normalized,
+        ...(exceptUserId ? { NOT: { id: exceptUserId } } : {}),
+      },
+    });
+    if (taken) {
+      throw new ConflictException('Username already taken at this school');
+    }
+    return normalized;
   }
 
   async findById(id: string): Promise<UserRecord | undefined> {
@@ -137,19 +232,53 @@ export class UsersService implements OnModuleInit {
   }
 
   async createUser(input: {
-    email: string;
+    username: string;
+    email?: string;
     password?: string;
     firstName: string;
     lastName: string;
     role: UserRole;
     schoolId: string;
+    schoolJoinCode?: string;
     roleTemplateId?: string;
     roleTemplateSlug?: string;
     externalRef?: string;
   }): Promise<UserRecord> {
-    const email = input.email.toLowerCase();
-    const existing = await this.findByEmail(email);
-    if (existing) {
+    const username = normalizeUsername(input.username);
+    if (!isValidUsername(username)) {
+      throw new BadRequestException(
+        'Username must be 3–40 characters (letters, numbers, . _ -) or a school ID like STU-…',
+      );
+    }
+
+    const existingUsername = await this.findByUsername(
+      input.schoolId,
+      username,
+    );
+    if (existingUsername) {
+      throw new ConflictException('Username already taken at this school');
+    }
+
+    const joinCode =
+      input.schoolJoinCode ??
+      (
+        await this.prisma.school.findUnique({
+          where: { id: input.schoolId },
+          select: { joinCode: true },
+        })
+      )?.joinCode;
+
+    if (!joinCode) {
+      throw new BadRequestException('School not found');
+    }
+
+    const email = (
+      input.email?.trim() ||
+      buildContactEmail(joinCode, username)
+    ).toLowerCase();
+
+    const existingEmail = await this.findByEmail(email);
+    if (existingEmail) {
       throw new ConflictException('Email already registered');
     }
 
@@ -184,6 +313,7 @@ export class UsersService implements OnModuleInit {
     const user = await this.prisma.user.create({
       data: {
         id: `u_${randomBytes(8).toString('hex')}`,
+        username,
         email,
         firstName: input.firstName,
         lastName: input.lastName,
@@ -206,6 +336,7 @@ export class UsersService implements OnModuleInit {
     id: string,
     schoolId: string,
     role: UserRole,
+    username: string,
     email: string,
     passwordHash: string,
   ) {
@@ -213,6 +344,7 @@ export class UsersService implements OnModuleInit {
       id,
       schoolId,
       role: role,
+      username: normalizeUsername(username),
       email,
       firstName: role,
       lastName: 'user',
@@ -225,6 +357,7 @@ export class UsersService implements OnModuleInit {
     schoolId: string;
     role: PrismaUserRole;
     roleTemplateId: string | null;
+    username: string;
     email: string;
     firstName: string;
     lastName: string;
@@ -235,6 +368,7 @@ export class UsersService implements OnModuleInit {
       schoolId: user.schoolId,
       role: user.role as UserRole,
       roleTemplateId: user.roleTemplateId,
+      username: user.username,
       email: user.email,
       firstName: user.firstName,
       lastName: user.lastName,

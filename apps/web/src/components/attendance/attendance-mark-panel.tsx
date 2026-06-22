@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import type { GradeWithSections } from "@/lib/api";
+import { getMyTeacherProfile } from "@/lib/teachers";
 import {
   getAttendanceRoster,
   getAttendanceSettings,
@@ -37,7 +38,42 @@ type LocalStudent = RosterStudent & {
 
 type FilterView = "all" | "exceptions";
 
+function studentInitial(firstName: string, lastName: string) {
+  const letter = (firstName.trim() || lastName.trim()).charAt(0);
+  return (letter || "?").toUpperCase();
+}
+
+function formatStudentName(firstName: string, lastName: string) {
+  const full = `${firstName} ${lastName}`.trim();
+  if (!full) return "Student";
+  return full
+    .toLowerCase()
+    .split(/\s+/)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function formatDisplayDate(iso: string) {
+  try {
+    return new Date(iso + "T12:00:00").toLocaleDateString(undefined, {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+    });
+  } catch {
+    return iso;
+  }
+}
+
 export function AttendanceMarkPanel() {
+  return (
+    <Suspense fallback={<p className="tch-meta">Loading attendance…</p>}>
+      <AttendanceMarkPanelInner />
+    </Suspense>
+  );
+}
+
+function AttendanceMarkPanelInner() {
   const searchParams = useSearchParams();
   const initialGradeId = searchParams.get("gradeId") ?? "";
   const initialSectionId = searchParams.get("sectionId") ?? "";
@@ -89,22 +125,31 @@ export function AttendanceMarkPanel() {
   }, [gradeId, sectionId, date, sessionType, periodNumber]);
 
   useEffect(() => {
-    void Promise.all([listGradesForAttendance(), getAttendanceSettings()])
-      .then(([g, settings]) => {
+    void Promise.all([
+      listGradesForAttendance(),
+      getAttendanceSettings(),
+      getMyTeacherProfile().catch(() => null),
+    ])
+      .then(([g, settings, profile]) => {
         setGrades(g);
         setMode(settings.mode);
         if (settings.mode === "PERIOD") setSessionType("period");
+        const homeroom = profile?.homeroom;
         const preferred =
           initialGradeId && g.some((x) => x.id === initialGradeId)
             ? initialGradeId
-            : g[0]?.id ?? "";
+            : homeroom?.gradeId && g.some((x) => x.id === homeroom.gradeId)
+              ? homeroom.gradeId
+              : g[0]?.id ?? "";
         setGradeId(preferred);
-        if (
-          initialSectionId &&
-          g.find((x) => x.id === preferred)?.sections.some((s) => s.id === initialSectionId)
-        ) {
-          setSectionId(initialSectionId);
-        }
+        const grade = g.find((x) => x.id === preferred);
+        const sectionPreferred =
+          initialSectionId && grade?.sections.some((s) => s.id === initialSectionId)
+            ? initialSectionId
+            : homeroom?.sectionId && grade?.sections.some((s) => s.id === homeroom.sectionId)
+              ? homeroom.sectionId
+              : "";
+        setSectionId(sectionPreferred);
       })
       .catch(() => undefined);
   }, [initialGradeId, initialSectionId]);
@@ -192,17 +237,21 @@ export function AttendanceMarkPanel() {
 
   const exceptionCount = counts.absent + counts.late + counts.excused;
 
+  const classLabel = selectedGrade
+    ? `${selectedGrade.name}${sectionId ? ` · ${selectedGrade.sections.find((s) => s.id === sectionId)?.name ?? ""}` : ""}`
+    : "Select class";
+
   return (
-    <div className="att-page">
-      {error ? <p className="att-toast att-toast--error">{error}</p> : null}
+    <div className="att-v4__workspace">
+      {error ? <p className="att-v4__flash att-v4__flash--err">{error}</p> : null}
       {saved ? (
-        <p className="att-toast" role="status">
+        <p className="att-v4__flash att-v4__flash--ok" role="status">
           Attendance saved. Parents are notified for absences and late arrivals.
         </p>
       ) : null}
 
-      <div className="att-mark-toolbar">
-        <div className="att-field">
+      <section className="att-v4__filters">
+        <div className="att-v4__field">
           <span>Grade</span>
           <select
             value={gradeId}
@@ -220,7 +269,7 @@ export function AttendanceMarkPanel() {
             ))}
           </select>
         </div>
-        <div className="att-field">
+        <div className="att-v4__field">
           <span>Section</span>
           <select value={sectionId} onChange={(e) => setSectionId(e.target.value)}>
             <option value="">All sections</option>
@@ -229,12 +278,12 @@ export function AttendanceMarkPanel() {
             ))}
           </select>
         </div>
-        <div className="att-field">
+        <div className="att-v4__field">
           <span>Date</span>
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
         </div>
         {mode === "BOTH" ? (
-          <div className="att-field">
+          <div className="att-v4__field">
             <span>Session</span>
             <select value={sessionType} onChange={(e) => setSessionType(e.target.value as "daily" | "period")}>
               <option value="daily">Daily</option>
@@ -244,7 +293,7 @@ export function AttendanceMarkPanel() {
         ) : null}
         {(sessionType === "period" || mode === "PERIOD") && (
           <>
-            <div className="att-field">
+            <div className="att-v4__field">
               <span>Period</span>
               <select value={periodNumber} onChange={(e) => setPeriodNumber(Number(e.target.value))}>
                 {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
@@ -252,134 +301,194 @@ export function AttendanceMarkPanel() {
                 ))}
               </select>
             </div>
-            <div className="att-field att-field--wide">
+            <div className="att-v4__field att-v4__field--wide">
               <span>Subject</span>
               <input placeholder="Math, English…" value={subject} onChange={(e) => setSubject(e.target.value)} />
             </div>
           </>
         )}
-        <div className="att-mark-actions">
-          <button type="button" className="att-btn att-btn--ghost" onClick={markAllPresent}>
-            All present
-          </button>
-        </div>
-      </div>
+      </section>
 
-      {students.length > 0 && (
-        <div className="att-progress">
-          <div className="att-progress__head">
-            <span>{selectedGrade?.name}{sectionId && selectedGrade ? ` · ${selectedGrade.sections.find((s) => s.id === sectionId)?.name}` : ""}</span>
-            <span>{presentRate}% attendance · {students.length} students</span>
-          </div>
-          <div className="att-progress__bar">
-            <div className="att-progress__fill" style={{ width: `${presentRate}%` }} />
-          </div>
-          <div className="att-progress__legend">
-            <span><span className="att-legend-dot att-legend-dot--present" />{counts.present} present</span>
-            <span><span className="att-legend-dot att-legend-dot--absent" />{counts.absent} absent</span>
-            <span><span className="att-legend-dot att-legend-dot--late" />{counts.late} late</span>
-            <span><span className="att-legend-dot att-legend-dot--excused" />{counts.excused} excused</span>
-          </div>
-        </div>
-      )}
-
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", alignItems: "center" }}>
-        <input
-          className="att-search"
-          type="search"
-          placeholder="Search student…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        <button
-          type="button"
-          className={`att-filter-chip${viewFilter === "all" ? " att-filter-chip--on" : ""}`}
-          onClick={() => setViewFilter("all")}
-        >
-          All ({students.length})
-        </button>
-        <button
-          type="button"
-          className={`att-filter-chip${viewFilter === "exceptions" ? " att-filter-chip--on" : ""}`}
-          onClick={() => setViewFilter("exceptions")}
-        >
-          Exceptions ({exceptionCount})
-        </button>
-      </div>
-
-      {loading ? (
-        <div className="att-empty">
-          <p className="att-empty__title">Loading class roster…</p>
-        </div>
-      ) : filtered.length === 0 ? (
-        <div className="att-empty">
-          <p className="att-empty__title">
-            {students.length === 0 ? "No students in this class" : "No matches"}
-          </p>
-        </div>
-      ) : (
-        <div className="att-roster-grid">
-          {filtered.map((s) => (
-            <article
-              key={s.studentProfileId}
-              className={`att-student-card att-student-card--${s.localStatus}`}
+      {students.length > 0 ? (
+        <section className="att-manual__summary">
+          <div className="att-manual__summary-top">
+            <div>
+              <h2 className="att-manual__class">{classLabel}</h2>
+              <p className="att-manual__meta">
+                {students.length} student{students.length === 1 ? "" : "s"} · {formatDisplayDate(date)}
+              </p>
+            </div>
+            <button
+              type="button"
+              className="att-v4__btn att-v4__btn--ghost att-manual__all-present"
+              onClick={markAllPresent}
             >
-              <div className="att-student-card__top">
-                <div>
-                  <div className="att-student-card__name">
-                    {s.firstName} {s.lastName}
-                  </div>
-                  {s.sectionName ? (
-                    <div className="att-student-card__meta">Section {s.sectionName}</div>
-                  ) : null}
-                </div>
-              </div>
-              <div className="att-status-pills">
-                {STATUSES.map((st) => (
-                  <button
-                    key={st}
-                    type="button"
-                    className={`att-status-pill att-status-pill--${st}${s.localStatus === st ? " att-status-pill--on" : ""}`}
-                    onClick={() => setStatus(s.studentProfileId, st)}
-                  >
-                    {STATUS_LABEL[st]}
-                  </button>
-                ))}
-              </div>
-              {s.localStatus === "absent" ? (
-                <div className="att-reason-row">
-                  {REASONS.map((r) => (
-                    <button
-                      key={r.value}
-                      type="button"
-                      className={`att-reason-chip${s.localReason === r.value ? " att-reason-chip--on" : ""}`}
-                      onClick={() => setReason(s.studentProfileId, r.value)}
-                    >
-                      {r.label}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-            </article>
-          ))}
-        </div>
-      )}
+              Mark all present
+            </button>
+          </div>
+          <div className="att-manual__kpis">
+            <div className="att-manual__kpi att-manual__kpi--rate">
+              <span className="att-manual__kpi-value">{presentRate}%</span>
+              <span className="att-manual__kpi-label">Attendance</span>
+            </div>
+            <div className="att-manual__kpi att-manual__kpi--present">
+              <span className="att-manual__kpi-value">{counts.present}</span>
+              <span className="att-manual__kpi-label">Present</span>
+            </div>
+            <div className="att-manual__kpi att-manual__kpi--absent">
+              <span className="att-manual__kpi-value">{counts.absent}</span>
+              <span className="att-manual__kpi-label">Absent</span>
+            </div>
+            <div className="att-manual__kpi att-manual__kpi--late">
+              <span className="att-manual__kpi-value">{counts.late}</span>
+              <span className="att-manual__kpi-label">Late</span>
+            </div>
+            <div className="att-manual__kpi att-manual__kpi--excused">
+              <span className="att-manual__kpi-value">{counts.excused}</span>
+              <span className="att-manual__kpi-label">Excused</span>
+            </div>
+          </div>
+          <div className="att-manual__progress" aria-hidden>
+            <div className="att-manual__progress-fill" style={{ width: `${presentRate}%` }} />
+          </div>
+        </section>
+      ) : null}
 
-      {students.length > 0 && (
-        <div className="att-save-bar">
-          <span className="att-save-bar__hint">
-            Tap status pills to mark · {exceptionCount} exception{exceptionCount !== 1 ? "s" : ""}
-          </span>
+      <section className="att-manual__roster">
+        <header className="att-manual__roster-head">
+          <input
+            className="att-manual__search"
+            type="search"
+            placeholder="Search student…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          <div className="att-manual__view-tabs" role="tablist" aria-label="Roster filter">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={viewFilter === "all"}
+              className={`att-manual__view-tab${viewFilter === "all" ? " att-manual__view-tab--on" : ""}`}
+              onClick={() => setViewFilter("all")}
+            >
+              All
+              <span className="att-manual__view-count">{students.length}</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={viewFilter === "exceptions"}
+              className={`att-manual__view-tab${viewFilter === "exceptions" ? " att-manual__view-tab--on" : ""}`}
+              onClick={() => setViewFilter("exceptions")}
+            >
+              Exceptions
+              <span className="att-manual__view-count">{exceptionCount}</span>
+            </button>
+          </div>
+        </header>
+
+        {loading ? (
+          <div className="att-manual__empty">
+            <span className="att-manual__empty-spinner" aria-hidden />
+            <p>Loading class roster…</p>
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="att-manual__empty">
+            <p className="att-manual__empty-title">
+              {students.length === 0 ? "No students in this class" : "No matches"}
+            </p>
+            <span>
+              {students.length === 0
+                ? "Choose another grade or section above."
+                : "Try a different search or show all students."}
+            </span>
+          </div>
+        ) : (
+          <ul className="att-manual__list">
+            {filtered.map((s) => (
+              <li
+                key={s.studentProfileId}
+                className={`att-manual__row att-manual__row--${s.localStatus}`}
+              >
+                <div className="att-manual__row-main">
+                  <div className="att-manual__student">
+                    <span
+                      className={`att-manual__avatar att-manual__avatar--${s.localStatus}`}
+                      aria-hidden
+                    >
+                      {studentInitial(s.firstName, s.lastName)}
+                    </span>
+                    <div className="att-manual__identity">
+                      <p className="att-manual__name">
+                        {formatStudentName(s.firstName, s.lastName)}
+                      </p>
+                      {s.sectionName ? (
+                        <p className="att-manual__section">Section {s.sectionName}</p>
+                      ) : null}
+                    </div>
+                  </div>
+                  <div
+                    className="att-manual__segment"
+                    role="group"
+                    aria-label={`Status for ${formatStudentName(s.firstName, s.lastName)}`}
+                  >
+                    {STATUSES.map((st) => (
+                      <button
+                        key={st}
+                        type="button"
+                        className={`att-manual__segment-btn att-manual__segment-btn--${st}${s.localStatus === st ? " att-manual__segment-btn--on" : ""}`}
+                        onClick={() => setStatus(s.studentProfileId, st)}
+                        aria-pressed={s.localStatus === st}
+                      >
+                        {STATUS_LABEL[st]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {s.localStatus === "absent" ? (
+                  <div className="att-manual__reasons">
+                    <span className="att-manual__reasons-label">Reason</span>
+                    <div className="att-manual__reason-chips">
+                      {REASONS.map((r) => (
+                        <button
+                          key={r.value}
+                          type="button"
+                          className={`att-manual__reason${s.localReason === r.value ? " att-manual__reason--on" : ""}`}
+                          onClick={() => setReason(s.studentProfileId, r.value)}
+                        >
+                          {r.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      {students.length > 0 ? (
+        <footer className="att-manual__footer">
+          <div className="att-manual__footer-info">
+            <strong>{students.length}</strong> students
+            <span className="att-manual__footer-dot" aria-hidden>·</span>
+            <span>
+              {exceptionCount === 0
+                ? "Everyone marked present"
+                : `${exceptionCount} exception${exceptionCount === 1 ? "" : "s"} to save`}
+            </span>
+          </div>
           <button
             type="button"
-            className="att-btn att-btn--primary"
+            className="att-v4__btn att-v4__btn--primary att-manual__save"
             disabled={saving}
             onClick={() => void onSave()}
           >
-            {saving ? "Saving…" : `Save attendance${exceptionCount > 0 ? ` (${exceptionCount})` : ""}`}
+            {saving ? "Saving…" : "Save attendance"}
           </button>
-        </div>
-      )}
+        </footer>
+      ) : null}
     </div>
   );
 }

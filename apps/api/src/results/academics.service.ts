@@ -221,7 +221,40 @@ export class AcademicsService implements OnModuleInit {
         schoolId,
         name: dto.name.trim(),
         code: dto.code.trim().toUpperCase(),
+        isSystem: false,
+        isCustomized: true,
       },
+    });
+  }
+
+  async updateSubject(
+    schoolId: string,
+    subjectId: string,
+    dto: { name?: string },
+  ) {
+    const existing = await this.prisma.subject.findFirst({
+      where: { id: subjectId, schoolId },
+    });
+    if (!existing) {
+      throw new NotFoundException('Subject not found');
+    }
+
+    const name = dto.name?.trim();
+    const data: {
+      name?: string;
+      isCustomized?: boolean;
+    } = {};
+
+    if (name) {
+      data.name = name;
+      if (existing.isSystem && name !== existing.name) {
+        data.isCustomized = true;
+      }
+    }
+
+    return this.prisma.subject.update({
+      where: { id: subjectId },
+      data,
     });
   }
 
@@ -381,18 +414,11 @@ export class AcademicsService implements OnModuleInit {
     role?: string,
   ) {
     if (userId && role === 'teacher') {
-      const cs = await this.prisma.classSubject.findFirst({
-        where: { id: dto.classSubjectId, schoolId },
-      });
-      if (!cs) {
-        throw new NotFoundException('Class subject not found');
-      }
-      await this.assertTeacherClassSubject(
+      await this.teacherScope.assertCanEditClassSubjectScores(
         schoolId,
         userId,
         role,
-        cs.gradeId,
-        cs.sectionId,
+        dto.classSubjectId,
       );
     }
 
@@ -477,12 +503,11 @@ export class AcademicsService implements OnModuleInit {
     }
 
     if (userId && role === 'teacher') {
-      await this.assertTeacherClassSubject(
+      await this.teacherScope.assertCanEditClassSubjectScores(
         schoolId,
         userId,
         role,
-        assessment.classSubject.gradeId,
-        assessment.classSubject.sectionId,
+        assessment.classSubjectId,
       );
     }
 
@@ -694,6 +719,26 @@ export class AcademicsService implements OnModuleInit {
     });
   }
 
+  async getTermSubjectResults(
+    schoolId: string,
+    studentProfileId: string,
+    termId: string,
+    gradeId: string,
+    sectionId: string | null,
+    academicYearId: string,
+  ) {
+    const bands = await this.getBands(schoolId);
+    return this.computeSubjectResults(
+      schoolId,
+      studentProfileId,
+      termId,
+      gradeId,
+      sectionId,
+      academicYearId,
+      bands,
+    );
+  }
+
   private async computeSubjectResults(
     schoolId: string,
     studentProfileId: string,
@@ -782,26 +827,45 @@ export class AcademicsService implements OnModuleInit {
   <meta charset="utf-8"/>
   <title>Report Card — ${report.student.name}</title>
   <style>
-    body { font-family: Georgia, serif; max-width: 800px; margin: 2rem auto; color: #1a2e2e; }
-    h1 { color: #2a6f6f; margin: 0; font-size: 1.5rem; }
-    .meta { color: #666; margin: 0.5rem 0 1.5rem; font-size: 0.9rem; }
-    table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
-    th, td { border: 1px solid #ccc; padding: 0.5rem 0.75rem; text-align: left; }
-    th { background: #e8f4f4; }
-    .summary { background: #f4f9f9; padding: 1rem; border-radius: 8px; margin-top: 1.5rem; }
-    .comment { margin-top: 1rem; font-size: 0.95rem; }
-    .sig { margin-top: 2.5rem; display: flex; justify-content: space-between; }
-    .sig div { border-top: 1px solid #333; width: 40%; padding-top: 0.25rem; font-size: 0.85rem; }
-    @media print { body { margin: 0.5in; } }
+    * { box-sizing: border-box; }
+    body { font-family: "Segoe UI", system-ui, sans-serif; max-width: 210mm; margin: 0 auto; padding: 16mm; color: #0f172a; background: #fff; }
+    .rc-header { display: flex; gap: 1rem; align-items: flex-start; border-bottom: 3px solid #0d5c63; padding-bottom: 1rem; margin-bottom: 1rem; }
+    .rc-header h1 { color: #0d5c63; margin: 0; font-size: 1.35rem; font-weight: 800; }
+    .meta { color: #64748b; margin: 0.35rem 0 0; font-size: 0.85rem; }
+    .rc-student { background: #f0f9fa; border-radius: 10px; padding: 0.85rem 1rem; margin-bottom: 1rem; font-size: 0.92rem; }
+    .rc-student strong { font-size: 1.05rem; color: #0a3d42; }
+    table { width: 100%; border-collapse: collapse; margin: 0.5rem 0 1rem; font-size: 0.88rem; }
+    th, td { border: 1px solid #cbd5e1; padding: 0.45rem 0.65rem; text-align: left; vertical-align: top; }
+    th { background: #0d5c63; color: #fff; font-weight: 700; }
+    tr:nth-child(even) td { background: #f8fafc; }
+    .summary { background: #f0f9fa; padding: 1rem 1.1rem; border-radius: 10px; border: 1px solid rgba(13, 92, 99, 0.15); }
+    .summary p { margin: 0.35rem 0; }
+    .comment { margin-top: 0.85rem; font-size: 0.9rem; line-height: 1.5; }
+    .sig { margin-top: 2rem; display: flex; justify-content: space-between; gap: 2rem; }
+    .sig div { border-top: 1px solid #334155; flex: 1; padding-top: 0.35rem; font-size: 0.8rem; color: #475569; }
+    .rc-footer { font-size: 0.75rem; color: #94a3b8; margin-top: 1rem; }
+    @page { size: A4; margin: 12mm; }
+    @media print {
+      body { padding: 0; margin: 0; }
+      .summary { break-inside: avoid; }
+      table { break-inside: auto; }
+      tr { break-inside: avoid; }
+    }
   </style>
 </head>
 <body>
-  ${logo}
-  <h1>${report.school.name}</h1>
-  <p class="meta">Official Report Card · ${report.term.academicYear} · ${report.term.name}</p>
-  <p><strong>${report.student.name}</strong><br/>
-  ${report.student.grade}${report.student.section ? ` · Section ${report.student.section}` : ''}
-  ${report.student.studentId ? `<br/>ID: ${report.student.studentId}` : ''}</p>
+  <header class="rc-header">
+    <div>${logo}</div>
+    <div>
+      <h1>${report.school.name}</h1>
+      <p class="meta">Official report card · ${report.term.academicYear} · ${report.term.name}</p>
+    </div>
+  </header>
+  <div class="rc-student">
+    <strong>${report.student.name}</strong><br/>
+    ${report.student.grade}${report.student.section ? ` · Section ${report.student.section}` : ''}
+    ${report.student.studentId ? `<br/>Student ID: ${report.student.studentId}` : ''}
+  </div>
   <table>
     <thead><tr><th>Subject</th><th>Assessments</th><th>Average</th><th>Grade</th></tr></thead>
     <tbody>${rows || '<tr><td colspan="4">No scores recorded yet.</td></tr>'}</tbody>
@@ -817,10 +881,98 @@ export class AcademicsService implements OnModuleInit {
       <div>Homeroom teacher signature</div>
       <div>Principal signature</div>
     </div>
-    <p style="font-size:0.8rem;color:#888;margin-top:1rem">Generated ${new Date(report.generatedAt).toLocaleString()}</p>
+    <p class="rc-footer">Generated ${new Date(report.generatedAt).toLocaleString()} · CampusOne</p>
   </div>
 </body>
 </html>`;
+  }
+
+  async listStudentReleasedScores(
+    schoolId: string,
+    studentProfileId: string,
+    termId?: string,
+  ) {
+    const profile = await this.prisma.studentProfile.findFirst({
+      where: { id: studentProfileId, schoolId },
+    });
+    if (!profile) {
+      throw new NotFoundException('Student not found');
+    }
+
+    const rows = await this.prisma.studentAssessmentScore.findMany({
+      where: {
+        studentProfileId,
+        assessment: {
+          schoolId,
+          entryLocked: true,
+          ...(termId ? { termId } : {}),
+        },
+      },
+      include: {
+        assessment: {
+          include: {
+            term: {
+              select: {
+                id: true,
+                name: true,
+                academicYear: { select: { name: true } },
+              },
+            },
+            classSubject: {
+              include: {
+                subject: { select: { name: true } },
+                grade: { select: { name: true } },
+                section: { select: { name: true } },
+              },
+            },
+          },
+        },
+      },
+      orderBy: { updatedAt: 'desc' },
+    });
+
+    return rows.map((row) => {
+      const cs = row.assessment.classSubject;
+      const section = cs.section?.name ? ` ${cs.section.name}` : '';
+      return {
+        id: row.id,
+        assessmentId: row.assessmentId,
+        assessmentName: row.assessment.name,
+        subject: cs.subject.name,
+        classLabel: `${cs.grade.name}${section}`,
+        score: row.score,
+        maxScore: row.assessment.maxScore,
+        weightPercent: row.assessment.weightPercent,
+        percentage: Math.round((row.score / row.assessment.maxScore) * 100),
+        termId: row.assessment.term.id,
+        termName: row.assessment.term.name,
+        academicYear: row.assessment.term.academicYear.name,
+        releasedAt: row.updatedAt.toISOString(),
+      };
+    });
+  }
+
+  async getReportCardAvailability(
+    schoolId: string,
+    studentProfileId: string,
+    termId: string,
+    role: string,
+  ) {
+    if (role === 'admin' || role === 'staff' || role === 'teacher') {
+      return { published: true, termId };
+    }
+
+    try {
+      await this.workflow.assertAllClassSubjectsPublished(
+        schoolId,
+        studentProfileId,
+        termId,
+        role,
+      );
+      return { published: true, termId };
+    } catch {
+      return { published: false, termId };
+    }
   }
 
   async resolveProfileId(

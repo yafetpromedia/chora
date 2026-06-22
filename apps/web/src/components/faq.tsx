@@ -13,8 +13,8 @@ const FAQS = [
     a: "Yes. Plans are listed in USD and ETB. When you are on a paid plan, CampusOne can invoice your school in the currency you choose.",
   },
   {
-    q: "Do parents need a separate app?",
-    a: "No app store download required. Parents use a mobile-friendly web portal for attendance, results, fees, and announcements.",
+    q: "Do parents need to download an app?",
+    a: "They can use the CampusOne app on Google Play or the App Store, or sign in through the mobile-friendly web portal. Same school code and login either way.",
   },
   {
     q: "What happens when the trial ends?",
@@ -31,17 +31,17 @@ export function Faq() {
   const reduce = useReducedMotion();
 
   return (
-    <section id="faq" className="lp-section">
-      <p className="section-label">FAQ</p>
-      <h2 className="lp-section__title">Questions school leaders ask</h2>
-      <div className="lp-faq-list">
+    <section id="faq" className="lp3-section lp3-faq">
+      <span className="lp3-eyebrow">FAQ</span>
+      <h2 className="lp3-heading">Questions school leaders ask</h2>
+      <div className="lp3-faq__list">
         {FAQS.map((item, i) => {
           const isOpen = open === i;
           return (
-            <div key={item.q} className="lp-faq-item card overflow-hidden">
+            <div key={item.q} className="lp3-faq__item">
               <button
                 type="button"
-                className="lp-faq-item__trigger"
+                className="lp3-faq__trigger"
                 onClick={() => setOpen(isOpen ? null : i)}
                 aria-expanded={isOpen}
               >
@@ -63,7 +63,7 @@ export function Faq() {
                     exit={{ height: 0, opacity: 0 }}
                     transition={{ duration: 0.22 }}
                   >
-                    <p className="lp-faq-item__answer">{item.a}</p>
+                    <p className="lp3-faq__answer">{item.a}</p>
                   </motion.div>
                 ) : null}
               </AnimatePresence>

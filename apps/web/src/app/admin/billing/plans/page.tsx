@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { DashboardPage } from "@/components/dashboard/dashboard-page";
 import {
   BillingControlsBar,
@@ -17,12 +17,15 @@ import {
   type ResolvedPlanPricing,
 } from "@/lib/plan-catalog";
 import {
+  getBillingPaymentConfig,
   getSchoolSubscription,
   listPlans,
+  startSubscriptionCheckout,
+  verifySubscriptionCheckout,
+  type BillingPaymentConfig,
   type PlanOption,
   type PlanType,
   type SubscriptionStatus,
-  upgradeSchoolPlan,
 } from "@/lib/api";
 import { AUTH_ROLE_KEY, AUTH_TOKEN_KEY } from "@/lib/auth";
 
@@ -55,16 +58,23 @@ function pricingFromPlan(
   };
 }
 
+function checkoutAmountEtb(plan: PlanOption, interval: BillingInterval): number {
+  const factor = interval === "year" ? YEARLY_MULTIPLIER : 1;
+  return (plan.etbMonthly ?? 0) * factor;
+}
+
 export default function SchoolPlansPage() {
   const [subscription, setSubscription] = useState<SubscriptionStatus | null>(null);
   const [plans, setPlans] = useState<PlanOption[]>([]);
+  const [paymentConfig, setPaymentConfig] = useState<BillingPaymentConfig | null>(null);
   const [loading, setLoading] = useState(true);
-  const [upgrading, setUpgrading] = useState<PlanType | null>(null);
+  const [checkingOut, setCheckingOut] = useState<PlanType | null>(null);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [billingInterval, setBillingInterval] = useState<BillingInterval>("month");
   const [displayCurrency, setDisplayCurrency] = useState<DisplayCurrency>("usd");
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   useEffect(() => {
     const token = localStorage.getItem(AUTH_TOKEN_KEY);
@@ -74,10 +84,11 @@ export default function SchoolPlansPage() {
       return;
     }
 
-    void Promise.all([getSchoolSubscription(), listPlans()])
-      .then(([sub, planList]) => {
+    void Promise.all([getSchoolSubscription(), listPlans(), getBillingPaymentConfig()])
+      .then(([sub, planList, config]) => {
         setSubscription(sub);
         setPlans(planList);
+        setPaymentConfig(config);
       })
       .catch((err) => {
         setError(err instanceof Error ? err.message : "Could not load plans");
@@ -85,18 +96,57 @@ export default function SchoolPlansPage() {
       .finally(() => setLoading(false));
   }, [router]);
 
-  async function onUpgrade(plan: Exclude<PlanType, "TRIAL">) {
-    setUpgrading(plan);
+  useEffect(() => {
+    const chapaReturn = searchParams.get("chapa_return");
+    const txRef = searchParams.get("tx_ref")?.trim();
+    if (chapaReturn !== "1" || !txRef) return;
+
+    setCheckingOut("STARTER");
+    setError("");
+    void verifySubscriptionCheckout(txRef)
+      .then(async (res) => {
+        setSuccess(res.message);
+        const sub = await getSchoolSubscription();
+        setSubscription(sub);
+      })
+      .catch((err) =>
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Payment not confirmed yet. Wait a moment and refresh.",
+        ),
+      )
+      .finally(() => {
+        setCheckingOut(null);
+        router.replace("/admin/billing/plans");
+      });
+  }, [searchParams, router]);
+
+  const chapaEnabled = paymentConfig?.chapaEnabled ?? false;
+
+  const currentPlanLabel = useMemo(
+    () => subscription?.planLabel ?? "—",
+    [subscription?.planLabel],
+  );
+
+  async function onSelectPlan(plan: Exclude<PlanType, "TRIAL" | "ENTERPRISE">) {
+    if (!chapaEnabled) {
+      setError("Online payments are not configured. Contact CampusOne support.");
+      return;
+    }
+
+    setCheckingOut(plan);
     setError("");
     setSuccess("");
     try {
-      const updated = await upgradeSchoolPlan(plan);
-      setSubscription(updated);
-      setSuccess(`You're on ${updated.planLabel} now.`);
+      const res = await startSubscriptionCheckout({
+        plan,
+        interval: billingInterval,
+      });
+      window.location.href = res.checkoutUrl;
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Upgrade failed");
-    } finally {
-      setUpgrading(null);
+      setError(err instanceof Error ? err.message : "Checkout failed");
+      setCheckingOut(null);
     }
   }
 
@@ -106,7 +156,7 @@ export default function SchoolPlansPage() {
         <SchoolBillingNav />
         <div className="upg-loading">
           <span className="upg-loading__spinner" aria-hidden />
-          <p>Loading…</p>
+          <p>Loading plans…</p>
         </div>
       </DashboardPage>
     );
@@ -118,13 +168,26 @@ export default function SchoolPlansPage() {
 
       <div className="upg" data-upgrade-page>
         <header className="upg-hero">
-          <h1 className="upg-hero__title">Pick a plan</h1>
+          <p className="upg-hero__eyebrow">CampusOne subscription</p>
+          <h1 className="upg-hero__title">Choose your plan</h1>
+          <p className="upg-hero__sub">
+            You are on <strong>{currentPlanLabel}</strong>.
+            {chapaEnabled
+              ? " Pay securely with Chapa to activate or change your plan."
+              : " Online checkout is being configured."}
+          </p>
           <BillingControlsBar
             interval={billingInterval}
             onIntervalChange={setBillingInterval}
             currency={displayCurrency}
             onCurrencyChange={setDisplayCurrency}
           />
+          {chapaEnabled ? (
+            <div className="upg-pay-badge" aria-label="Payment via Chapa">
+              <span className="upg-pay-badge__dot" />
+              Secure checkout · Chapa · ETB
+            </div>
+          ) : null}
         </header>
 
         {error ? (
@@ -137,8 +200,7 @@ export default function SchoolPlansPage() {
         <div className="upg-grid">
           {plans.map((plan) => {
             const key = plan.plan as PaidPlan;
-            const features =
-              plan.features?.length ? plan.features : [];
+            const features = plan.features?.length ? plan.features : [];
             const meta = PLAN_CATALOG[key];
             const pricing =
               plan.usdMonthly != null
@@ -146,20 +208,32 @@ export default function SchoolPlansPage() {
                 : getPlanPricing(key, billingInterval);
             const isCurrent = subscription?.plan === plan.plan;
             const isFeatured = meta?.featured ?? false;
+            const isEnterprise = plan.plan === "ENTERPRISE";
+            const payAmount = checkoutAmountEtb(plan, billingInterval);
+            const isCheckingOut = checkingOut === plan.plan;
 
             return (
               <article
                 key={plan.plan}
                 className={`upg-card${isFeatured ? " upg-card--featured" : ""}${isCurrent ? " upg-card--current" : ""}`}
               >
-                {isFeatured ? <span className="upg-card__badge">Popular</span> : null}
+                {isCurrent ? (
+                  <span className="upg-card__badge upg-card__badge--current">Current plan</span>
+                ) : isFeatured ? (
+                  <span className="upg-card__badge">Popular</span>
+                ) : null}
 
                 <h2 className="upg-card__name">{plan.label}</h2>
-                <p className="sbill-muted" style={{ margin: "-0.5rem 0 0.75rem" }}>
-                  {plan.description}
-                </p>
+                <p className="upg-card__desc">{plan.description}</p>
 
                 <PlanPriceDisplay pricing={pricing} currency={displayCurrency} />
+
+                {!isEnterprise && chapaEnabled && !isCurrent ? (
+                  <p className="upg-card__checkout-hint">
+                    Charged {payAmount.toLocaleString("en-ET")} ETB
+                    {billingInterval === "year" ? " / year" : " / month"}
+                  </p>
+                ) : null}
 
                 <ul className="upg-card__features">
                   {features.slice(0, 5).map((f) => (
@@ -169,17 +243,27 @@ export default function SchoolPlansPage() {
 
                 <button
                   type="button"
-                  className={`upg-card__btn${isCurrent ? " upg-card__btn--current" : ""}`}
-                  disabled={isCurrent || upgrading !== null || plan.plan === "ENTERPRISE"}
-                  onClick={() => void onUpgrade(key)}
+                  className={`upg-card__btn${isCurrent ? " upg-card__btn--current" : ""}${isFeatured && !isCurrent ? " upg-card__btn--primary" : ""}`}
+                  disabled={
+                    isCurrent ||
+                    isCheckingOut ||
+                    isEnterprise ||
+                    (!chapaEnabled && !isEnterprise)
+                  }
+                  onClick={() => {
+                    if (isEnterprise || isCurrent) return;
+                    void onSelectPlan(key as Exclude<PlanType, "TRIAL" | "ENTERPRISE">);
+                  }}
                 >
-                  {plan.plan === "ENTERPRISE"
+                  {isEnterprise
                     ? "Contact sales"
                     : isCurrent
-                      ? "Current"
-                      : upgrading === plan.plan
-                        ? "…"
-                        : "Select"}
+                      ? "Current plan"
+                      : isCheckingOut
+                        ? "Opening Chapa…"
+                        : chapaEnabled
+                          ? "Pay & activate"
+                          : "Unavailable"}
                 </button>
               </article>
             );
@@ -187,7 +271,9 @@ export default function SchoolPlansPage() {
         </div>
 
         <p className="upg-footnote">
-          No card required during trial · Plans activate instantly
+          {chapaEnabled
+            ? "Payments are processed by Chapa. Your plan activates immediately after successful payment."
+            : "Configure CHAPA_SECRET_KEY on the API server to enable checkout."}
         </p>
       </div>
     </DashboardPage>

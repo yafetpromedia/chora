@@ -3,6 +3,7 @@ import { apiFetch, apiPatch } from "@/lib/api";
 export type UserProfile = {
   user: {
     id: string;
+    username: string;
     email: string;
     firstName: string;
     lastName: string;
@@ -29,6 +30,7 @@ export type UserProfile = {
 };
 
 export type UpdateProfilePayload = {
+  username?: string;
   firstName?: string;
   lastName?: string;
   phone?: string;

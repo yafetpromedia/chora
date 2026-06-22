@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Header,
+  Param,
   Patch,
   Post,
   Query,
@@ -22,6 +23,8 @@ import { SchoolPermission } from '../common/permissions/school-permissions';
 import { AttendanceModeDto } from '../schools/dto/attendance-mode.dto';
 import { SchoolsService } from '../schools/schools.service';
 import { BulkAttendanceDto } from './dto/bulk-attendance.dto';
+import { CreateAttendancePermissionDto } from './dto/create-attendance-permission.dto';
+import { ReviewAttendancePermissionDto } from './dto/review-attendance-permission.dto';
 import { ScanAttendanceDto } from './dto/scan-attendance.dto';
 import { AttendanceService } from './attendance.service';
 
@@ -136,6 +139,72 @@ export class AttendanceController {
   @RequirePermissions(SchoolPermission.ATTENDANCE_ANALYTICS)
   analytics(@CurrentUser() user: AuthUser, @Query('date') date?: string) {
     return this.attendanceService.getAnalytics(user.schoolId, date);
+  }
+
+  @Post('permission-requests')
+  @Roles('student', 'parent')
+  createPermissionRequest(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: CreateAttendancePermissionDto,
+  ) {
+    return this.attendanceService.createPermissionRequest(
+      user.schoolId,
+      user.id,
+      user.role,
+      dto,
+    );
+  }
+
+  @Get('permission-requests/mine')
+  @Roles('student', 'parent')
+  myPermissionRequests(
+    @CurrentUser() user: AuthUser,
+    @Query('studentProfileId') studentProfileId?: string,
+  ) {
+    return this.attendanceService.listMyPermissionRequests(
+      user.schoolId,
+      user.id,
+      user.role,
+      studentProfileId,
+    );
+  }
+
+  @Get('permission-requests')
+  @Roles('teacher', 'admin')
+  @RequirePermissions(SchoolPermission.ATTENDANCE_MANAGE)
+  listPermissionRequests(
+    @CurrentUser() user: AuthUser,
+    @Query('gradeId') gradeId: string,
+    @Query('sectionId') sectionId: string | undefined,
+    @Query('status') status?: 'PENDING' | 'APPROVED' | 'REJECTED',
+    @Query('date') date?: string,
+  ) {
+    return this.attendanceService.listPermissionRequestsForTeacher(
+      user.schoolId,
+      user.id,
+      user.role,
+      gradeId,
+      sectionId,
+      status,
+      date,
+    );
+  }
+
+  @Patch('permission-requests/:id/review')
+  @Roles('teacher', 'admin')
+  @RequirePermissions(SchoolPermission.ATTENDANCE_MANAGE)
+  reviewPermissionRequest(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: ReviewAttendancePermissionDto,
+  ) {
+    return this.attendanceService.reviewPermissionRequest(
+      user.schoolId,
+      user.id,
+      user.role,
+      id,
+      dto,
+    );
   }
 
   @Get('export')

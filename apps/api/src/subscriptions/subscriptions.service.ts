@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -9,9 +10,12 @@ import {
   PlatformInvoiceStatus,
   UserRole,
 } from '@prisma/client';
+import { ChapaService } from '../payments/chapa.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { PlanCatalogService } from './plan-catalog.service';
 import { UPGRADE_PLANS } from './plan-limits';
+
+const YEARLY_BILLING_MULTIPLIER = 10;
 
 export type SubscriptionStatus = {
   plan: Plan;
@@ -38,6 +42,7 @@ export class SubscriptionsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly planCatalog: PlanCatalogService,
+    private readonly chapaService: ChapaService,
   ) {}
 
   async createTrial(schoolId: string) {
@@ -171,9 +176,23 @@ export class SubscriptionsService {
     return status;
   }
 
+  getPaymentConfig() {
+    return {
+      chapaEnabled: this.chapaService.isConfigured(),
+      currency: 'ETB' as const,
+      provider: 'chapa' as const,
+    };
+  }
+
   async upgradePlan(schoolId: string, plan: Plan) {
     if (!UPGRADE_PLANS.includes(plan)) {
       throw new ForbiddenException('Invalid upgrade plan');
+    }
+
+    if (this.chapaService.isConfigured()) {
+      throw new BadRequestException(
+        'Use subscription checkout to pay and activate your plan.',
+      );
     }
 
     const sub = await this.prisma.subscription.findUnique({
@@ -191,6 +210,247 @@ export class SubscriptionsService {
         trialEndsAt: null,
       },
     });
+  }
+
+  async initializePlanCheckout(
+    schoolId: string,
+    adminId: string,
+    plan: Plan,
+    interval: 'month' | 'year',
+  ) {
+    if (!this.chapaService.isConfigured()) {
+      throw new BadRequestException('Chapa payments are not configured');
+    }
+    if (!UPGRADE_PLANS.includes(plan)) {
+      throw new ForbiddenException('Invalid plan for checkout');
+    }
+
+    const status = await this.getStatus(schoolId);
+    if (status.plan === plan) {
+      throw new BadRequestException('You are already on this plan');
+    }
+
+    const catalog = await this.planCatalog.findAll();
+    const planRow = catalog.find((p) => p.plan === plan);
+    if (!planRow || planRow.etbMonthly <= 0) {
+      throw new BadRequestException('Plan pricing is not available');
+    }
+
+    const factor = interval === 'year' ? YEARLY_BILLING_MULTIPLIER : 1;
+    const amountEtb = planRow.etbMonthly * factor;
+    const amountUsd = planRow.usdMonthly * factor;
+
+    const [admin, school] = await Promise.all([
+      this.prisma.user.findUnique({
+        where: { id: adminId },
+        select: {
+          email: true,
+          firstName: true,
+          lastName: true,
+          phone: true,
+        },
+      }),
+      this.prisma.school.findUnique({
+        where: { id: schoolId },
+        select: { name: true },
+      }),
+    ]);
+    if (!admin) {
+      throw new NotFoundException('Admin account not found');
+    }
+
+    await this.prisma.platformInvoice.updateMany({
+      where: {
+        schoolId,
+        status: PlatformInvoiceStatus.SENT,
+        paymentReference: { not: null },
+      },
+      data: { status: PlatformInvoiceStatus.VOID },
+    });
+
+    const invoiceNumber = await this.nextInvoiceNumber();
+    const txRef = `C1SUB-${invoiceNumber}`;
+    const now = new Date();
+    const periodEnd = new Date(now);
+    if (interval === 'year') {
+      periodEnd.setFullYear(periodEnd.getFullYear() + 1);
+    } else {
+      periodEnd.setMonth(periodEnd.getMonth() + 1);
+    }
+
+    const invoice = await this.prisma.platformInvoice.create({
+      data: {
+        schoolId,
+        invoiceNumber,
+        plan,
+        periodStart: now,
+        periodEnd,
+        dueAt: now,
+        amountUsd,
+        amountEtb,
+        currency: BillingCurrency.ETB,
+        status: PlatformInvoiceStatus.SENT,
+        paymentReference: txRef,
+        billingInterval: interval,
+        initiatedBy: adminId,
+        notes: `CampusOne ${planRow.label} plan (${interval}ly)`,
+      },
+    });
+
+    const webAppUrl = process.env.WEB_APP_URL?.trim() || 'http://localhost:3000';
+    const apiUrl = process.env.API_PUBLIC_URL?.trim() || 'http://localhost:3001';
+    const phone = this.normalizeEthiopianPhone(admin.phone);
+    const intervalLabel = interval === 'year' ? 'annual' : 'monthly';
+
+    try {
+      const { checkout_url } = await this.chapaService.initializeTransaction({
+        amount: String(amountEtb),
+        currency: 'ETB',
+        email: admin.email,
+        first_name: admin.firstName,
+        last_name: admin.lastName,
+        ...(phone ? { phone_number: phone } : {}),
+        tx_ref: txRef,
+        callback_url: `${apiUrl}/payments/chapa/callback`,
+        return_url: `${webAppUrl}/admin/billing/plans?chapa_return=1&tx_ref=${encodeURIComponent(txRef)}`,
+        customization: {
+          title: `${school?.name ?? 'CampusOne'} — ${planRow.label}`,
+          description: `${intervalLabel} subscription`,
+        },
+      });
+
+      return {
+        checkoutUrl: checkout_url,
+        txRef,
+        invoiceNumber,
+        plan: planRow.label,
+        amountEtb,
+        interval,
+        message: 'Redirecting to Chapa secure checkout…',
+      };
+    } catch (err) {
+      await this.prisma.platformInvoice.update({
+        where: { id: invoice.id },
+        data: { status: PlatformInvoiceStatus.VOID },
+      });
+      throw new BadRequestException(
+        err instanceof Error ? err.message : 'Could not start Chapa checkout',
+      );
+    }
+  }
+
+  async verifyPlanCheckoutForSchool(schoolId: string, txRef: string) {
+    const invoice = await this.findCheckoutInvoice(txRef);
+    if (!invoice || invoice.schoolId !== schoolId) {
+      throw new NotFoundException('Checkout not found');
+    }
+
+    if (invoice.status === PlatformInvoiceStatus.PAID) {
+      const subscription = await this.getStatus(schoolId);
+      return {
+        status: 'COMPLETED',
+        plan: subscription.plan,
+        planLabel: subscription.planLabel,
+        invoiceNumber: invoice.invoiceNumber,
+        message: 'Your plan is active.',
+      };
+    }
+
+    await this.completePlanCheckout(txRef);
+    const subscription = await this.getStatus(schoolId);
+    return {
+      status: 'COMPLETED',
+      plan: subscription.plan,
+      planLabel: subscription.planLabel,
+      invoiceNumber: invoice.invoiceNumber,
+      message: `Welcome to ${subscription.planLabel}! Your subscription is now active.`,
+    };
+  }
+
+  async completePlanCheckout(txRef: string) {
+    const invoice = await this.findCheckoutInvoice(txRef);
+    if (!invoice) {
+      throw new NotFoundException('Checkout not found');
+    }
+
+    if (invoice.status === PlatformInvoiceStatus.PAID) {
+      return this.getStatus(invoice.schoolId);
+    }
+    if (invoice.status !== PlatformInvoiceStatus.SENT) {
+      throw new BadRequestException('Checkout is no longer pending');
+    }
+    if (!invoice.plan) {
+      throw new BadRequestException('Checkout has no plan attached');
+    }
+
+    const verified = await this.chapaService.verifyTransaction(txRef);
+    if (verified.status !== 'success') {
+      throw new BadRequestException('Payment was not successful');
+    }
+
+    const paidEtb = Math.round(parseFloat(verified.amount));
+    if (paidEtb !== invoice.amountEtb) {
+      throw new BadRequestException('Paid amount does not match invoice');
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.platformInvoice.update({
+        where: { id: invoice.id },
+        data: {
+          status: PlatformInvoiceStatus.PAID,
+          paidAt: new Date(),
+          paymentReference: `${txRef}|${verified.reference}`,
+        },
+      });
+      await tx.subscription.update({
+        where: { schoolId: invoice.schoolId },
+        data: {
+          plan: invoice.plan!,
+          isActive: true,
+          trialEndsAt: null,
+        },
+      });
+    });
+
+    return this.getStatus(invoice.schoolId);
+  }
+
+  private findCheckoutInvoice(txRef: string) {
+    return this.prisma.platformInvoice.findFirst({
+      where: {
+        OR: [
+          { paymentReference: txRef },
+          { paymentReference: { startsWith: `${txRef}|` } },
+        ],
+      },
+    });
+  }
+
+  private async nextInvoiceNumber(): Promise<string> {
+    const year = new Date().getFullYear();
+    const prefix = `INV-${year}-`;
+    const latest = await this.prisma.platformInvoice.findFirst({
+      where: { invoiceNumber: { startsWith: prefix } },
+      orderBy: { invoiceNumber: 'desc' },
+      select: { invoiceNumber: true },
+    });
+    let seq = 1;
+    if (latest?.invoiceNumber) {
+      const part = latest.invoiceNumber.slice(prefix.length);
+      const n = Number.parseInt(part, 10);
+      if (Number.isFinite(n)) seq = n + 1;
+    }
+    return `${prefix}${String(seq).padStart(5, '0')}`;
+  }
+
+  private normalizeEthiopianPhone(phone: string | null | undefined): string | null {
+    if (!phone?.trim()) return null;
+    const digits = phone.replace(/\D/g, '');
+    if (digits.length === 10 && /^0[79]/.test(digits)) return digits;
+    if (digits.length === 12 && digits.startsWith('251')) {
+      return `0${digits.slice(3)}`;
+    }
+    return null;
   }
 
   async adminSetSchoolPlan(

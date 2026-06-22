@@ -1,0 +1,435 @@
+/* CampusOne — portal timetable */
+
+.tt-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  width: 100%;
+  min-width: 0;
+}
+
+.tt-alert {
+  padding: 0.75rem 1rem;
+  border-radius: 0.75rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.tt-alert--error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+}
+
+.tt-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 3rem 1rem;
+  color: var(--brand-muted);
+}
+
+.tt-loading__spinner {
+  width: 2rem;
+  height: 2rem;
+  border: 3px solid rgba(13, 148, 136, 0.15);
+  border-top-color: var(--brand-teal);
+  border-radius: 50%;
+  animation: tt-spin 0.7s linear infinite;
+}
+
+@keyframes tt-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.tt-hero {
+  display: grid;
+  gap: 1rem;
+  padding: 1.2rem 1.25rem;
+  border-radius: 1.15rem;
+  background: linear-gradient(145deg, var(--brand-ink) 0%, var(--brand-teal-dark) 52%, var(--brand-teal) 100%);
+  color: #fff;
+  box-shadow: 0 14px 40px rgba(30, 74, 74, 0.2);
+  min-width: 0;
+}
+
+@media (min-width: 860px) {
+  .tt-hero {
+    grid-template-columns: 1fr auto;
+    align-items: end;
+    padding: 1.35rem 1.5rem;
+  }
+}
+
+.tt-hero__main {
+  min-width: 0;
+}
+
+.tt-hero__brand {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin-bottom: 0.65rem;
+}
+
+.tt-hero__chip {
+  display: inline-flex;
+  padding: 0.28rem 0.65rem;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  border-radius: 999px;
+  color: #ccfbf1;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.tt-hero__icon {
+  width: 2.5rem;
+  height: 2.5rem;
+  display: grid;
+  place-items: center;
+  border-radius: 0.75rem;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.tt-hero__icon svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.tt-hero__title {
+  margin: 0 0 0.35rem;
+  font-size: clamp(1.1rem, 2.5vw, 1.45rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
+}
+
+.tt-hero__sub {
+  margin: 0;
+  font-size: 0.84rem;
+  opacity: 0.9;
+  line-height: 1.45;
+}
+
+.tt-hero__stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.tt-stat {
+  min-width: 5.25rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(6px);
+}
+
+.tt-stat__value {
+  display: block;
+  font-size: 1.25rem;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.tt-stat__label {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.78;
+}
+
+.tt-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.tt-card {
+  background: #fff;
+  border: 1px solid var(--brand-border);
+  border-radius: 1rem;
+  padding: 1.1rem 1.15rem;
+  box-shadow: 0 2px 16px rgba(42, 111, 111, 0.06);
+  min-width: 0;
+}
+
+.tt-card--today {
+  border-left: 3px solid var(--brand-teal);
+}
+
+.tt-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.tt-card__title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--lite-black);
+}
+
+.tt-card__sub {
+  margin: 0.2rem 0 0;
+  font-size: 0.78rem;
+  color: var(--brand-muted);
+}
+
+.tt-card__badge {
+  flex-shrink: 0;
+  padding: 0.25rem 0.6rem;
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--brand-teal-dark);
+  background: var(--brand-surface);
+  border: 1px solid var(--brand-border);
+  border-radius: 999px;
+}
+
+/* Timeline (today) */
+.tt-timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.tt-timeline__item {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.85rem;
+  align-items: start;
+  padding: 0.85rem 0.95rem;
+  border-radius: 0.9rem;
+  background: linear-gradient(180deg, #fff 0%, var(--brand-surface) 100%);
+  border: 1px solid var(--brand-border);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.tt-timeline__item:hover {
+  border-color: rgba(13, 148, 136, 0.35);
+  box-shadow: 0 4px 16px rgba(13, 148, 136, 0.1);
+}
+
+.tt-timeline__period {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  min-width: 4.5rem;
+  padding: 0.45rem 0.5rem;
+  border-radius: 0.65rem;
+  background: #fff;
+  border: 1px solid var(--brand-border);
+  text-align: center;
+}
+
+.tt-timeline__period strong {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: var(--brand-teal-dark);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.tt-timeline__period span {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--brand-muted);
+  line-height: 1.3;
+}
+
+.tt-timeline__body {
+  min-width: 0;
+}
+
+.tt-timeline__subject {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--lite-black);
+  line-height: 1.3;
+}
+
+.tt-timeline__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.45rem;
+}
+
+.tt-timeline__tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.18rem 0.5rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--brand-teal-dark);
+  background: #fff;
+  border: 1px solid var(--brand-border);
+  border-radius: 999px;
+}
+
+.tt-timeline__child {
+  margin: 0.4rem 0 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--brand-muted);
+}
+
+/* Week grid */
+.tt-week-grid {
+  display: grid;
+  gap: 0.65rem;
+  grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
+}
+
+@media (min-width: 1200px) {
+  .tt-week-grid {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+  }
+}
+
+.tt-week-day {
+  display: flex;
+  flex-direction: column;
+  min-height: 8rem;
+  padding: 0.75rem 0.8rem;
+  border-radius: 0.85rem;
+  background: #fff;
+  border: 1px solid var(--brand-border);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.tt-week-day--today {
+  border-color: var(--brand-teal);
+  background: linear-gradient(180deg, #fff 0%, var(--brand-surface) 100%);
+  box-shadow: 0 4px 16px rgba(13, 148, 136, 0.12);
+}
+
+.tt-week-day__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
+  margin-bottom: 0.55rem;
+  padding-bottom: 0.45rem;
+  border-bottom: 1px solid var(--brand-border);
+}
+
+.tt-week-day__name {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: var(--lite-black);
+}
+
+.tt-week-day--today .tt-week-day__name {
+  color: var(--brand-teal-dark);
+}
+
+.tt-week-day__count {
+  font-size: 0.62rem;
+  font-weight: 800;
+  color: var(--brand-muted);
+}
+
+.tt-week-day__slots {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  flex: 1;
+}
+
+.tt-week-day__slot {
+  padding: 0.45rem 0.5rem;
+  border-radius: 0.55rem;
+  background: var(--brand-surface);
+  border: 1px solid transparent;
+}
+
+.tt-week-day__slot strong {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: var(--lite-black);
+  line-height: 1.25;
+}
+
+.tt-week-day__slot span {
+  display: block;
+  margin-top: 0.12rem;
+  font-size: 0.64rem;
+  color: var(--brand-muted);
+}
+
+.tt-week-day__empty {
+  margin: auto 0 0;
+  font-size: 0.72rem;
+  color: var(--brand-muted);
+  text-align: center;
+  padding: 0.5rem 0;
+}
+
+/* Empty state */
+.tt-empty {
+  padding: 2rem 1.25rem;
+  text-align: center;
+  border-radius: 1rem;
+  border: 2px dashed var(--brand-border);
+  background: var(--brand-surface);
+}
+
+.tt-empty__icon {
+  width: 2.75rem;
+  height: 2.75rem;
+  margin: 0 auto 0.75rem;
+  display: grid;
+  place-items: center;
+  border-radius: 0.85rem;
+  color: var(--brand-teal-dark);
+  background: #fff;
+  border: 1px solid var(--brand-border);
+}
+
+.tt-empty__icon svg {
+  width: 1.35rem;
+  height: 1.35rem;
+}
+
+.tt-empty__title {
+  margin: 0;
+  font-weight: 800;
+  color: var(--lite-black);
+}
+
+.tt-empty__sub {
+  margin: 0.45rem 0 0;
+  font-size: 0.86rem;
+  color: var(--brand-muted);
+  line-height: 1.5;
+}

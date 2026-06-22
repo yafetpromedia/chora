@@ -2,14 +2,18 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { Announcement, apiFetch, apiPost } from "@/lib/api";
+import { draftAnnouncement, getAiStatus } from "@/lib/ai";
 import { DashboardPage } from "@/components/dashboard/dashboard-page";
 
 export default function AdminAnnouncementsPage() {
   const [items, setItems] = useState<Announcement[]>([]);
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [aiConfigured, setAiConfigured] = useState(false);
   const [loading, setLoading] = useState(true);
   const [posting, setPosting] = useState(false);
+  const [drafting, setDrafting] = useState(false);
   const [error, setError] = useState("");
 
   async function refresh() {
@@ -17,7 +21,12 @@ export default function AdminAnnouncementsPage() {
   }
 
   useEffect(() => {
-    void refresh()
+    void Promise.all([
+      refresh(),
+      getAiStatus()
+        .then((s) => setAiConfigured(s.configured))
+        .catch(() => setAiConfigured(false)),
+    ])
       .catch((err) => setError(err instanceof Error ? err.message : "Load failed"))
       .finally(() => setLoading(false));
   }, []);
@@ -30,11 +39,34 @@ export default function AdminAnnouncementsPage() {
       await apiPost("/announcements", { title: title.trim(), body: body.trim() });
       setTitle("");
       setBody("");
+      setAiPrompt("");
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not post");
     } finally {
       setPosting(false);
+    }
+  }
+
+  async function onAiDraft() {
+    const prompt = aiPrompt.trim();
+    if (!prompt) {
+      setError("Describe the announcement you want the AI to draft.");
+      return;
+    }
+    setDrafting(true);
+    setError("");
+    try {
+      const res = await draftAnnouncement({
+        prompt,
+        audience: "parents, teachers, and students",
+      });
+      setTitle(res.title);
+      setBody(res.body);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "AI draft failed");
+    } finally {
+      setDrafting(false);
     }
   }
 
@@ -47,7 +79,34 @@ export default function AdminAnnouncementsPage() {
       {error ? <p className="auth-alert auth-alert--error">{error}</p> : null}
 
       <form onSubmit={(e) => void onSubmit(e)} className="dash-form-card">
-        <h3 className="dash-form-card-title">New announcement</h3>
+        <div className="ai-announce-head">
+          <h3 className="dash-form-card-title">New announcement</h3>
+          {aiConfigured ? <span className="lib-ai-badge">Powered by AI</span> : null}
+        </div>
+
+        {aiConfigured ? (
+          <div className="ai-announce-draft">
+            <label>
+              <span>Draft with AI</span>
+              <textarea
+                className="auth-input auth-input--login auth-input--login-plain dash-textarea"
+                placeholder="e.g. School closed Friday for staff training; buses run as usual Monday…"
+                rows={2}
+                value={aiPrompt}
+                onChange={(e) => setAiPrompt(e.target.value)}
+              />
+            </label>
+            <button
+              type="button"
+              className="dash-copy-btn"
+              disabled={drafting}
+              onClick={() => void onAiDraft()}
+            >
+              {drafting ? "Drafting…" : "Generate draft"}
+            </button>
+          </div>
+        ) : null}
+
         <input
           className="auth-input auth-input--login auth-input--login-plain"
           placeholder="Title — e.g. School closed Friday"

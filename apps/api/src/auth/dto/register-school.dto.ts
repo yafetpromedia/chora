@@ -37,8 +37,13 @@ export class RegisterSchoolDto {
   @MinLength(1)
   adminLastName!: string;
 
+  @IsString()
+  @MinLength(3)
+  username!: string;
+
   @IsEmail()
-  email!: string;
+  @IsOptional()
+  email?: string;
 
   @IsString()
   @MinLength(8)

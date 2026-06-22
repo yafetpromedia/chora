@@ -20,7 +20,11 @@ export default function StudentLibraryPage() {
   }, [router]);
 
   return (
-    <DashboardPage role="student" title="eLibrary" eyebrow="Learn">
+    <DashboardPage
+      role="student"
+      title="eLibrary"
+      subtitle="Read, download, and save materials from your teachers"
+    >
       <LibraryHubView role="student" />
     </DashboardPage>
   );

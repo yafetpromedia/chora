@@ -119,10 +119,28 @@ export class CurriculumCatalogService implements OnModuleInit {
     const pkg = await this.prisma.curriculumPackage.findUnique({
       where: { key },
       include: {
-        subjects: { orderBy: { sortOrder: 'asc' } },
+        academicStructure: true,
+        subjects: {
+          orderBy: { sortOrder: 'asc' },
+          include: { platformSubject: true },
+        },
         departments: { orderBy: { sortOrder: 'asc' } },
-        libraryItems: { orderBy: { sortOrder: 'asc' } },
-        templates: { orderBy: { sortOrder: 'asc' } },
+        libraryItems: {
+          orderBy: { sortOrder: 'asc' },
+          include: { platformLibraryResource: true },
+        },
+        templates: {
+          orderBy: { sortOrder: 'asc' },
+          include: { platformMessageTemplate: true },
+        },
+        assessmentTemplates: {
+          orderBy: { sortOrder: 'asc' },
+          include: {
+            platformAssessmentTemplate: {
+              include: { components: { orderBy: { sortOrder: 'asc' } } },
+            },
+          },
+        },
       },
     });
     if (!pkg) {

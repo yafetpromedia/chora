@@ -7,6 +7,8 @@ import { SchoolTenantGuard } from '../common/guards/school-tenant.guard';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { CreateInviteDto } from './dto/create-invite.dto';
+import { SubscriptionCheckoutDto } from './dto/subscription-checkout.dto';
+import { VerifySubscriptionCheckoutDto } from './dto/verify-subscription-checkout.dto';
 import { UpgradePlanDto } from './dto/upgrade-plan.dto';
 import { UpdateSchoolSettingsDto } from './dto/update-school-settings.dto';
 import { InvitesService } from './invites.service';
@@ -109,6 +111,41 @@ export class SchoolsController {
   @Get('plans')
   listPlans() {
     return this.subscriptionsService.listPlans();
+  }
+
+  @Get('billing/payment-config')
+  @UseGuards(JwtAuthGuard, SchoolTenantGuard, RolesGuard)
+  @Roles('admin')
+  paymentConfig() {
+    return this.subscriptionsService.getPaymentConfig();
+  }
+
+  @Post('subscription/checkout')
+  @UseGuards(JwtAuthGuard, SchoolTenantGuard, RolesGuard)
+  @Roles('admin')
+  startCheckout(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: SubscriptionCheckoutDto,
+  ) {
+    return this.subscriptionsService.initializePlanCheckout(
+      user.schoolId,
+      user.id,
+      dto.plan,
+      dto.interval,
+    );
+  }
+
+  @Post('subscription/checkout/verify')
+  @UseGuards(JwtAuthGuard, SchoolTenantGuard, RolesGuard)
+  @Roles('admin')
+  verifyCheckout(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: VerifySubscriptionCheckoutDto,
+  ) {
+    return this.subscriptionsService.verifyPlanCheckoutForSchool(
+      user.schoolId,
+      dto.txRef,
+    );
   }
 
   @Post('subscription/upgrade')

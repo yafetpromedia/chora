@@ -33,7 +33,7 @@ export function StudentReportCardPrintInner() {
         setHtml(text);
         setTimeout(() => window.print(), 500);
       })
-      .catch(() => router.replace("/student/results"));
+      .catch(() => router.replace("/student/report-card"));
   }, [termId, router]);
 
   if (!html) {

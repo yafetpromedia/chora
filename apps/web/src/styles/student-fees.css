@@ -1,0 +1,576 @@
+/* CampusOne — student fees portal */
+
+.stu-fees {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.stu-fees__hero {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.2rem 1.25rem;
+  border-radius: 1.15rem;
+  background: linear-gradient(145deg, var(--brand-ink) 0%, var(--brand-teal-dark) 52%, var(--brand-teal) 100%);
+  color: #fff;
+  box-shadow: 0 14px 40px rgba(30, 74, 74, 0.2);
+}
+
+.stu-fees__hero-glow {
+  position: absolute;
+  top: -40%;
+  right: -8%;
+  width: 50%;
+  height: 140%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.14) 0%, transparent 68%);
+  pointer-events: none;
+}
+
+.stu-fees__hero-inner {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 1rem;
+}
+
+@media (min-width: 768px) {
+  .stu-fees__hero-inner {
+    grid-template-columns: 1fr auto;
+    align-items: end;
+  }
+}
+
+.stu-fees__hero-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin-bottom: 0.55rem;
+}
+
+.stu-fees__chip {
+  display: inline-flex;
+  padding: 0.28rem 0.65rem;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  border-radius: 999px;
+  color: #ccfbf1;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.stu-fees__hero-icon {
+  width: 2.35rem;
+  height: 2.35rem;
+  display: grid;
+  place-items: center;
+  border-radius: 0.7rem;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.stu-fees__hero-icon svg {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
+.stu-fees__hero-title {
+  margin: 0 0 0.3rem;
+  font-size: clamp(1.1rem, 2.5vw, 1.45rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
+}
+
+.stu-fees__hero-sub {
+  margin: 0;
+  font-size: 0.84rem;
+  opacity: 0.9;
+}
+
+.stu-fees__balance {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: 0.85rem;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(6px);
+}
+
+.stu-fees__balance-label {
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  opacity: 0.8;
+}
+
+.stu-fees__balance-value {
+  font-size: clamp(1.35rem, 3vw, 1.75rem);
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.stu-fees__balance-tag {
+  margin-top: 0.15rem;
+  padding: 0.18rem 0.5rem;
+  font-size: 0.62rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-radius: 999px;
+}
+
+.stu-fees__balance-tag--clear {
+  color: #065f46;
+  background: #d1fae5;
+}
+
+.stu-fees__hero-stats {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.stu-fees__stat {
+  min-width: 4.75rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.stu-fees__stat strong {
+  display: block;
+  font-size: 0.88rem;
+  font-weight: 800;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.stu-fees__stat span {
+  display: block;
+  margin-top: 0.12rem;
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.78;
+}
+
+.stu-fees__stat--accent {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.stu-fees__progress {
+  position: relative;
+  z-index: 1;
+}
+
+.stu-fees__progress-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+  font-size: 0.72rem;
+  opacity: 0.9;
+}
+
+.stu-fees__progress-head strong {
+  font-weight: 800;
+}
+
+.stu-fees__progress-bar {
+  height: 0.45rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  overflow: hidden;
+}
+
+.stu-fees__progress-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #6ee7b7, #34d399);
+  transition: width 0.35s ease;
+}
+
+.stu-fees__tips {
+  display: grid;
+  gap: 0.65rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+@media (max-width: 900px) {
+  .stu-fees__tips {
+    grid-template-columns: 1fr;
+  }
+}
+
+.stu-fees__tip {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  padding: 0.85rem 0.95rem;
+  border-radius: 0.9rem;
+  background: #fff;
+  border: 1px solid var(--brand-border);
+  box-shadow: 0 2px 12px rgba(42, 111, 111, 0.05);
+}
+
+.stu-fees__tip-icon {
+  flex-shrink: 0;
+  width: 2.25rem;
+  height: 2.25rem;
+  display: grid;
+  place-items: center;
+  border-radius: 0.65rem;
+  color: var(--brand-teal-dark);
+  background: var(--brand-surface);
+  border: 1px solid var(--brand-border);
+}
+
+.stu-fees__tip strong {
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: var(--lite-black);
+  margin-bottom: 0.15rem;
+}
+
+.stu-fees__tip p {
+  margin: 0;
+  font-size: 0.76rem;
+  line-height: 1.45;
+  color: var(--brand-muted);
+}
+
+.stu-fees__grid {
+  display: grid;
+  gap: 1rem;
+  align-items: start;
+}
+
+@media (min-width: 960px) {
+  .stu-fees__grid {
+    grid-template-columns: 1.1fr 0.9fr;
+  }
+}
+
+.stu-fees__card {
+  padding: clamp(1rem, 2.5vw, 1.15rem);
+  background: #fff;
+  border: 1px solid var(--brand-border);
+  border-radius: 1rem;
+  box-shadow: 0 2px 16px rgba(42, 111, 111, 0.06);
+  min-width: 0;
+}
+
+.stu-fees__card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.9rem;
+}
+
+.stu-fees__card-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--lite-black);
+}
+
+.stu-fees__card-sub {
+  margin: 0.2rem 0 0;
+  font-size: 0.78rem;
+  color: var(--brand-muted);
+}
+
+.stu-fees__count {
+  flex-shrink: 0;
+  min-width: 1.65rem;
+  height: 1.65rem;
+  display: grid;
+  place-items: center;
+  padding: 0 0.4rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: var(--brand-teal-dark);
+  background: var(--brand-surface);
+  border: 1px solid var(--brand-border);
+  border-radius: 999px;
+}
+
+.stu-fees__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.35rem;
+  padding: 2rem 1.25rem;
+  border-radius: 0.85rem;
+  background: linear-gradient(180deg, var(--brand-surface) 0%, #fff 100%);
+  border: 1px dashed var(--brand-border);
+}
+
+.stu-fees__empty-icon {
+  width: 3rem;
+  height: 3rem;
+  display: grid;
+  place-items: center;
+  margin-bottom: 0.25rem;
+  border-radius: 0.85rem;
+  color: var(--brand-teal);
+  background: #fff;
+  border: 1px solid var(--brand-border);
+}
+
+.stu-fees__empty h4 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--lite-black);
+}
+
+.stu-fees__empty p {
+  margin: 0;
+  max-width: 20rem;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--brand-muted);
+}
+
+.stu-fees__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.stu-fees__row {
+  position: relative;
+  display: flex;
+  gap: 0.55rem;
+  padding: 0.8rem 0.85rem 0.8rem 0.95rem;
+  border: 1px solid var(--brand-border);
+  border-radius: 0.85rem;
+  background: #fff;
+  overflow: hidden;
+}
+
+.stu-fees__row-accent {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--brand-teal);
+}
+
+.stu-fees__row-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.stu-fees__row-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.65rem;
+}
+
+.stu-fees__row-title {
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: var(--lite-black);
+}
+
+.stu-fees__row-meta {
+  margin: 0.12rem 0 0;
+  font-size: 0.74rem;
+  color: var(--brand-muted);
+}
+
+.stu-fees__badge {
+  flex-shrink: 0;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.64rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-radius: 999px;
+}
+
+.stu-fees__badge--pending {
+  color: #1d4ed8;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+}
+
+.stu-fees__badge--partial {
+  color: #b45309;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+}
+
+.stu-fees__badge--paid {
+  color: #047857;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+}
+
+.stu-fees__badge--overdue {
+  color: #b91c1c;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+}
+
+.stu-fees__badge--scholarship {
+  color: #6d28d9;
+  background: #f5f3ff;
+  border: 1px solid #ddd6fe;
+}
+
+.stu-fees__row-amounts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin-top: 0.55rem;
+  padding-top: 0.55rem;
+  border-top: 1px solid var(--brand-border);
+}
+
+.stu-fees__amount-label {
+  display: block;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--brand-muted);
+  margin-bottom: 0.1rem;
+}
+
+.stu-fees__row-amounts strong {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: var(--lite-black);
+}
+
+.stu-fees__pay-row {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid var(--brand-border);
+  border-radius: 0.85rem;
+  background: var(--brand-surface);
+}
+
+.stu-fees__pay-icon {
+  flex-shrink: 0;
+  width: 2.25rem;
+  height: 2.25rem;
+  display: grid;
+  place-items: center;
+  border-radius: 0.65rem;
+  color: var(--brand-teal-dark);
+  background: #fff;
+  border: 1px solid var(--brand-border);
+}
+
+.stu-fees__pay-icon svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.stu-fees__pay-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.stu-fees__pay-amount {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: var(--lite-black);
+}
+
+.stu-fees__pay-meta {
+  margin: 0.1rem 0 0;
+  font-size: 0.74rem;
+  color: var(--brand-muted);
+}
+
+.stu-fees__pay-method {
+  flex-shrink: 0;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.64rem;
+  font-weight: 800;
+  color: var(--brand-teal-dark);
+  background: #fff;
+  border: 1px solid var(--brand-border);
+  border-radius: 999px;
+}
+
+.stu-fees__loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 3rem 1rem;
+  color: var(--brand-muted);
+}
+
+.stu-fees__spinner {
+  width: 2rem;
+  height: 2rem;
+  border: 3px solid rgba(13, 148, 136, 0.15);
+  border-top-color: var(--brand-teal);
+  border-radius: 50%;
+  animation: stu-fees-spin 0.7s linear infinite;
+}
+
+@keyframes stu-fees-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.stu-fees__alert {
+  padding: 0.75rem 1rem;
+  border-radius: 0.75rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.stu-fees__alert--error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+}
+
+@media (max-width: 520px) {
+  .stu-fees__row-amounts {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .stu-fees__row-amounts > div:last-child {
+    grid-column: 1 / -1;
+  }
+}

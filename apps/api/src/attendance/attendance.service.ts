@@ -5,6 +5,8 @@ import {
 } from '@nestjs/common';
 import {
   AttendanceMode,
+  AttendancePermissionStatus,
+  AttendancePermissionType,
   AttendanceReason,
   AttendanceStatus,
   Prisma,
@@ -12,6 +14,8 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { BulkAttendanceDto } from './dto/bulk-attendance.dto';
+import { CreateAttendancePermissionDto } from './dto/create-attendance-permission.dto';
+import { ReviewAttendancePermissionDto } from './dto/review-attendance-permission.dto';
 import { ScanAttendanceDto } from './dto/scan-attendance.dto';
 import { parseCardScanPayload } from '../students/student-card.util';
 import { TeacherScopeService } from '../teachers/teacher-scope.service';
@@ -45,8 +49,13 @@ export class AttendanceService {
     gradeId: string,
     sectionId?: string | null,
   ) {
-    const scopes = await this.teacherScope.getClassScopes(schoolId, userId, role);
-    this.teacherScope.assertCanAccessClass(scopes, gradeId, sectionId);
+    await this.teacherScope.assertHomeroomClassForAttendance(
+      schoolId,
+      userId,
+      role,
+      gradeId,
+      sectionId,
+    );
   }
 
   async getSettings(schoolId: string) {
@@ -290,14 +299,25 @@ export class AttendanceService {
     }
 
     if (student.gradeId !== dto.gradeId) {
+      const selectedGrade = await this.prisma.grade.findUnique({
+        where: { id: dto.gradeId },
+        select: { name: true },
+      });
+      const name = `${student.user.firstName} ${student.user.lastName}`;
       throw new BadRequestException(
-        `${student.user.firstName} ${student.user.lastName} is not in this grade`,
+        `${name} is in ${student.grade.name}, not ${selectedGrade?.name ?? 'the selected grade'}. Check the homeroom grade filter.`,
       );
     }
 
     if (dto.sectionId && student.sectionId !== dto.sectionId) {
+      const selectedSection = await this.prisma.section.findUnique({
+        where: { id: dto.sectionId },
+        select: { name: true },
+      });
+      const name = `${student.user.firstName} ${student.user.lastName}`;
+      const studentSection = student.section?.name ?? 'another section';
       throw new BadRequestException(
-        `${student.user.firstName} ${student.user.lastName} is not in this section`,
+        `${name} is in ${studentSection}, not ${selectedSection?.name ?? 'the selected section'}. Check the section filter.`,
       );
     }
 
@@ -570,5 +590,322 @@ export class AttendanceService {
       .join('\n');
 
     return header + rows;
+  }
+
+  private formatPermissionRequest(row: {
+    id: string;
+    type: AttendancePermissionType;
+    date: Date;
+    reason: AttendanceReason | null;
+    note: string | null;
+    status: AttendancePermissionStatus;
+    reviewNote: string | null;
+    reviewedAt: Date | null;
+    createdAt: Date;
+    studentProfile: {
+      id: string;
+      gradeId: string;
+      sectionId: string | null;
+      user: { firstName: string; lastName: string };
+      grade: { name: string };
+      section: { name: string } | null;
+    };
+    requester: { firstName: string; lastName: string; role: string };
+  }) {
+    return {
+      id: row.id,
+      type: row.type,
+      date: row.date.toISOString().slice(0, 10),
+      reason: row.reason,
+      note: row.note,
+      status: row.status,
+      reviewNote: row.reviewNote,
+      reviewedAt: row.reviewedAt,
+      createdAt: row.createdAt,
+      studentProfileId: row.studentProfile.id,
+      studentName: `${row.studentProfile.user.firstName} ${row.studentProfile.user.lastName}`.trim(),
+      gradeName: row.studentProfile.grade.name,
+      sectionName: row.studentProfile.section?.name ?? null,
+      requestedBy: `${row.requester.firstName} ${row.requester.lastName}`.trim(),
+      requestedByRole: row.requester.role,
+    };
+  }
+
+  private async assertParentStudentAccess(
+    parentId: string,
+    studentProfileId: string,
+  ) {
+    const link = await this.prisma.parentStudent.findUnique({
+      where: {
+        parentId_studentId: { parentId, studentId: studentProfileId },
+      },
+    });
+    if (!link) {
+      throw new BadRequestException('You are not linked to this student');
+    }
+  }
+
+  private attendanceStatusForPermissionType(type: AttendancePermissionType) {
+    if (type === AttendancePermissionType.LATE) {
+      return AttendanceStatus.late;
+    }
+    if (type === AttendancePermissionType.ABSENCE) {
+      return AttendanceStatus.absent;
+    }
+    return AttendanceStatus.excused;
+  }
+
+  async createPermissionRequest(
+    schoolId: string,
+    userId: string,
+    role: string,
+    dto: CreateAttendancePermissionDto,
+  ) {
+    let studentProfileId: string;
+
+    if (role === 'student') {
+      studentProfileId = await this.resolveStudentProfileId(
+        schoolId,
+        userId,
+        role,
+      );
+    } else if (role === 'parent') {
+      if (!dto.studentProfileId) {
+        throw new BadRequestException('studentProfileId is required');
+      }
+      await this.assertParentStudentAccess(userId, dto.studentProfileId);
+      studentProfileId = dto.studentProfileId;
+    } else {
+      throw new BadRequestException('Only students or parents can submit requests');
+    }
+
+    const profile = await this.prisma.studentProfile.findFirst({
+      where: { id: studentProfileId, schoolId },
+    });
+    if (!profile) {
+      throw new NotFoundException('Student not found');
+    }
+
+    const day = parseDateOnly(dto.date);
+    const existing = await this.prisma.attendancePermissionRequest.findFirst({
+      where: {
+        schoolId,
+        studentProfileId,
+        date: day,
+        status: AttendancePermissionStatus.PENDING,
+      },
+    });
+    if (existing) {
+      throw new BadRequestException(
+        'A pending permission request already exists for this date',
+      );
+    }
+
+    const row = await this.prisma.attendancePermissionRequest.create({
+      data: {
+        schoolId,
+        studentProfileId,
+        requestedByUserId: userId,
+        type: dto.type,
+        date: day,
+        reason: dto.reason ?? null,
+        note: dto.note?.trim() || null,
+      },
+      include: {
+        studentProfile: {
+          include: {
+            user: { select: { firstName: true, lastName: true } },
+            grade: { select: { name: true } },
+            section: { select: { name: true } },
+          },
+        },
+        requester: { select: { firstName: true, lastName: true, role: true } },
+      },
+    });
+
+    return this.formatPermissionRequest(row);
+  }
+
+  async listMyPermissionRequests(
+    schoolId: string,
+    userId: string,
+    role: string,
+    studentProfileId?: string,
+  ) {
+    let profileId: string;
+    if (role === 'student') {
+      profileId = await this.resolveStudentProfileId(schoolId, userId, role);
+    } else if (role === 'parent') {
+      if (!studentProfileId) {
+        throw new BadRequestException('studentProfileId is required');
+      }
+      await this.assertParentStudentAccess(userId, studentProfileId);
+      profileId = studentProfileId;
+    } else {
+      throw new BadRequestException('Not supported for this role');
+    }
+
+    const rows = await this.prisma.attendancePermissionRequest.findMany({
+      where: { schoolId, studentProfileId: profileId },
+      orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
+      take: 30,
+      include: {
+        studentProfile: {
+          include: {
+            user: { select: { firstName: true, lastName: true } },
+            grade: { select: { name: true } },
+            section: { select: { name: true } },
+          },
+        },
+        requester: { select: { firstName: true, lastName: true, role: true } },
+      },
+    });
+
+    return rows.map((r) => this.formatPermissionRequest(r));
+  }
+
+  async listPermissionRequestsForTeacher(
+    schoolId: string,
+    userId: string,
+    role: string,
+    gradeId: string,
+    sectionId: string | undefined,
+    status?: AttendancePermissionStatus,
+    date?: string,
+  ) {
+    await this.assertClassAccess(schoolId, userId, role, gradeId, sectionId);
+
+    const students = await this.prisma.studentProfile.findMany({
+      where: {
+        schoolId,
+        gradeId,
+        ...(sectionId ? { sectionId } : {}),
+      },
+      select: { id: true },
+    });
+
+    const rows = await this.prisma.attendancePermissionRequest.findMany({
+      where: {
+        schoolId,
+        studentProfileId: { in: students.map((s) => s.id) },
+        ...(status ? { status } : {}),
+        ...(date ? { date: parseDateOnly(date) } : {}),
+      },
+      orderBy: [{ status: 'asc' }, { date: 'asc' }, { createdAt: 'asc' }],
+      include: {
+        studentProfile: {
+          include: {
+            user: { select: { firstName: true, lastName: true } },
+            grade: { select: { name: true } },
+            section: { select: { name: true } },
+          },
+        },
+        requester: { select: { firstName: true, lastName: true, role: true } },
+      },
+    });
+
+    return rows.map((r) => this.formatPermissionRequest(r));
+  }
+
+  async reviewPermissionRequest(
+    schoolId: string,
+    userId: string,
+    role: string,
+    requestId: string,
+    dto: ReviewAttendancePermissionDto,
+  ) {
+    if (
+      dto.status !== AttendancePermissionStatus.APPROVED &&
+      dto.status !== AttendancePermissionStatus.REJECTED
+    ) {
+      throw new BadRequestException('status must be APPROVED or REJECTED');
+    }
+
+    const existing = await this.prisma.attendancePermissionRequest.findFirst({
+      where: { id: requestId, schoolId },
+      include: {
+        studentProfile: {
+          include: {
+            user: { select: { firstName: true, lastName: true } },
+            grade: { select: { name: true } },
+            section: { select: { name: true } },
+          },
+        },
+        requester: { select: { firstName: true, lastName: true, role: true } },
+      },
+    });
+    if (!existing) {
+      throw new NotFoundException('Permission request not found');
+    }
+    if (existing.status !== AttendancePermissionStatus.PENDING) {
+      throw new BadRequestException('This request was already reviewed');
+    }
+
+    await this.assertClassAccess(
+      schoolId,
+      userId,
+      role,
+      existing.studentProfile.gradeId,
+      existing.studentProfile.sectionId,
+    );
+
+    const row = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.attendancePermissionRequest.update({
+        where: { id: requestId },
+        data: {
+          status: dto.status,
+          reviewedByUserId: userId,
+          reviewedAt: new Date(),
+          reviewNote: dto.reviewNote?.trim() || null,
+        },
+        include: {
+          studentProfile: {
+            include: {
+              user: { select: { firstName: true, lastName: true } },
+              grade: { select: { name: true } },
+              section: { select: { name: true } },
+            },
+          },
+          requester: { select: { firstName: true, lastName: true, role: true } },
+        },
+      });
+
+      if (dto.status === AttendancePermissionStatus.APPROVED) {
+        const markStatus = this.attendanceStatusForPermissionType(existing.type);
+        const reason =
+          markStatus === AttendanceStatus.absent
+            ? (existing.reason ?? AttendanceReason.other)
+            : existing.reason;
+
+        await tx.attendanceRecord.upsert({
+          where: {
+            schoolId_studentProfileId_date_periodNumber: {
+              schoolId,
+              studentProfileId: existing.studentProfileId,
+              date: existing.date,
+              periodNumber: 0,
+            },
+          },
+          create: {
+            schoolId,
+            studentProfileId: existing.studentProfileId,
+            date: existing.date,
+            periodNumber: 0,
+            status: markStatus,
+            reason: reason ?? null,
+            recordedBy: userId,
+          },
+          update: {
+            status: markStatus,
+            reason: reason ?? null,
+            recordedBy: userId,
+          },
+        });
+      }
+
+      return updated;
+    });
+
+    return this.formatPermissionRequest(row);
   }
 }

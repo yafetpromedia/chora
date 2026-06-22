@@ -9,6 +9,8 @@ export type NavItem = {
   roles: UserRole[];
   /** If set, user must have this permission (staff/registrar/finance). */
   permission?: string;
+  /** Teacher-only: show only when homeroom is assigned. */
+  homeroomOnly?: boolean;
 };
 
 export const DASHBOARD_NAV: NavItem[] = [
@@ -34,11 +36,25 @@ export const DASHBOARD_NAV: NavItem[] = [
     permission: Permission.STUDENTS_READ,
   },
   {
+    href: "/admin/academics",
+    label: "Academics",
+    icon: "calendar",
+    roles: ["admin", "staff"],
+    permission: Permission.RESULTS_READ,
+  },
+  {
     href: "/admin/teachers",
     label: "Teachers",
     icon: "teachers",
     roles: ["admin", "staff"],
     permission: Permission.TEACHERS_READ,
+  },
+  {
+    href: "/admin/subjects/assign",
+    label: "Assign subjects",
+    icon: "results",
+    roles: ["admin", "staff"],
+    permission: Permission.RESULTS_READ,
   },
   {
     href: "/admin/subjects",
@@ -123,10 +139,19 @@ export const DASHBOARD_NAV: NavItem[] = [
     roles: ["admin", "staff"],
   },
   { href: "/teacher", label: "Overview", icon: "overview", roles: ["teacher"] },
-  { href: "/teacher/attendance", label: "Attendance", icon: "attendance", roles: ["teacher"] },
+  {
+    href: "/teacher/attendance",
+    label: "Attendance",
+    icon: "attendance",
+    roles: ["teacher"],
+    homeroomOnly: true,
+  },
   { href: "/teacher/results", label: "Results", icon: "results", roles: ["teacher"] },
+  { href: "/teacher/classwork", label: "Assignments", icon: "library", roles: ["teacher"] },
+  { href: "/teacher/worksheets", label: "Worksheets", icon: "results", roles: ["teacher"] },
   { href: "/teacher/timetable", label: "Timetable", icon: "calendar", roles: ["teacher"] },
   { href: "/teacher/library", label: "eLibrary", icon: "library", roles: ["teacher"] },
+  { href: "/teacher/id-card", label: "Staff ID", icon: "students", roles: ["teacher"] },
   { href: "/teacher/profile", label: "Profile", icon: "profile", roles: ["teacher"] },
   { href: "/parent", label: "Overview", icon: "overview", roles: ["parent"] },
   { href: "/parent/fees", label: "Fees", icon: "fees", roles: ["parent"] },
@@ -134,16 +159,23 @@ export const DASHBOARD_NAV: NavItem[] = [
   { href: "/parent/profile", label: "Profile", icon: "profile", roles: ["parent"] },
   { href: "/student", label: "Overview", icon: "overview", roles: ["student"] },
   { href: "/student/id-card", label: "Campus ID", icon: "students", roles: ["student"] },
+  { href: "/student/attendance", label: "Attendance", icon: "attendance", roles: ["student"] },
   { href: "/student/results", label: "Results", icon: "results", roles: ["student"] },
+  { href: "/student/report-card", label: "Report card", icon: "chart", roles: ["student"] },
+  { href: "/student/classwork", label: "Assignments", icon: "library", roles: ["student"] },
+  { href: "/student/worksheets", label: "Worksheets", icon: "results", roles: ["student"] },
   { href: "/student/fees", label: "Fees", icon: "fees", roles: ["student"] },
   { href: "/student/timetable", label: "Timetable", icon: "calendar", roles: ["student"] },
   { href: "/student/library", label: "eLibrary", icon: "library", roles: ["student"] },
   { href: "/student/profile", label: "Profile", icon: "profile", roles: ["student"] },
 ];
 
-export function navForRole(role: UserRole) {
+export function navForRole(role: UserRole, options?: { canTakeAttendance?: boolean }) {
   return DASHBOARD_NAV.filter((n) => {
     if (!n.roles.includes(role)) return false;
+    if (n.homeroomOnly && role === "teacher" && !options?.canTakeAttendance) {
+      return false;
+    }
     if (n.permission && (role === "admin" || role === "staff")) {
       return hasPermission(n.permission);
     }
@@ -157,9 +189,32 @@ export function isNavActive(pathname: string, href: string) {
   }
   // If we have nested routes that should not mark the parent item as active,
   // handle them explicitly here.
+  if (href === "/admin/academics") {
+    return (
+      pathname === href ||
+      pathname.startsWith("/admin/results/academic-years") ||
+      pathname.startsWith("/admin/results/terms")
+    );
+  }
+  if (href === "/admin/subjects") {
+    return (
+      (pathname === href || pathname.startsWith(`${href}/`)) &&
+      !pathname.startsWith("/admin/subjects/assign")
+    );
+  }
   if (href === "/admin/results") {
-    // When browsing assessment templates, highlight that item only.
-    return pathname === href || pathname.startsWith(`${href}/`) && !pathname.startsWith(`${href}/templates`);
+    return (
+      (pathname === href || pathname.startsWith(`${href}/`)) &&
+      !pathname.startsWith("/admin/results/templates") &&
+      !pathname.startsWith("/admin/results/academic-years") &&
+      !pathname.startsWith("/admin/results/terms")
+    );
+  }
+  if (href === "/student/results") {
+    return (
+      (pathname === href || pathname.startsWith(`${href}/`)) &&
+      !pathname.startsWith("/student/report-card")
+    );
   }
   return pathname === href || pathname.startsWith(`${href}/`);
 }

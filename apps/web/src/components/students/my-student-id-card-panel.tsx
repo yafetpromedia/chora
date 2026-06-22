@@ -1,15 +1,39 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { DashIcon } from "@/components/dashboard/dash-icons";
 import { StudentIdCardView } from "@/components/students/student-id-card";
 import { StudentIdCardModal } from "@/components/students/student-id-card-modal";
 import { getMyStudentIdCard, type StudentIdCard } from "@/lib/student-cards";
+
+function IdCardIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <rect x="2" y="5" width="20" height="14" rx="2" />
+      <circle cx="8" cy="12" r="2" />
+      <path d="M14 10h4M14 14h4" />
+    </svg>
+  );
+}
+
+function classLabel(card: StudentIdCard) {
+  return `${card.grade}${card.section ? ` · ${card.section}` : ""}`;
+}
 
 export function MyStudentIdCardPanel() {
   const [card, setCard] = useState<StudentIdCard | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [showBack, setShowBack] = useState(false);
+  const [previewBack, setPreviewBack] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
 
   useEffect(() => {
@@ -20,52 +44,157 @@ export function MyStudentIdCardPanel() {
   }, []);
 
   if (loading) {
-    return <p className="setup-hint">Loading your campus ID…</p>;
+    return (
+      <div className="tid-loading">
+        <div className="tid-loading__spinner" aria-hidden />
+        <p>Loading your campus ID…</p>
+      </div>
+    );
   }
 
   if (error) {
-    return (
-      <p className="att-toast att-toast--error">
-        {error}. Contact your school office if this persists.
-      </p>
-    );
+    return <p className="tid-alert tid-alert--error">{error}. Contact your school office if this persists.</p>;
   }
 
   if (!card) return null;
 
+  const displayId = card.studentId ?? card.cardCode;
+
   return (
-    <section className="sid-my-panel">
-      <div className="sid-my-panel__head no-print">
-        <div>
-          <h2 className="sid-my-panel__title">My campus ID</h2>
-          <p className="sid-my-panel__sub">
-            Show this card at the gate or in class — teachers scan the QR for attendance.
+    <div className="tid-page sid-portal">
+      <header className="tid-hero">
+        <div className="tid-hero__main">
+          <div className="tid-hero__brand">
+            <span className="tid-hero__chip">Student ID</span>
+            <span className="tid-hero__icon" aria-hidden>
+              <IdCardIcon />
+            </span>
+          </div>
+          <h2 className="tid-hero__title">{card.name}</h2>
+          <p className="tid-hero__sub">
+            {classLabel(card)} · Valid through {card.validThrough}
           </p>
         </div>
-        <div className="sid-my-panel__actions">
-          <label className="sid-modal__toggle">
+        <div className="tid-hero__stats">
+          <div className="tid-stat">
+            <span className="tid-stat__value">{displayId}</span>
+            <span className="tid-stat__label">Student ID</span>
+          </div>
+          <div className="tid-stat">
+            <span className="tid-stat__value">{card.cardCode}</span>
+            <span className="tid-stat__label">Card code</span>
+          </div>
+          <div className="tid-stat">
+            <span className="tid-stat__value">{card.academicYear}</span>
+            <span className="tid-stat__label">Academic year</span>
+          </div>
+        </div>
+      </header>
+
+      <div className="sid-portal__tips no-print">
+        <article className="sid-portal__tip">
+          <span className="sid-portal__tip-icon" aria-hidden>
+            <DashIcon name="attendance" className="dash-icon--sm" />
+          </span>
+          <div>
+            <strong>Gate &amp; class</strong>
+            <p>Show this card at the school gate or when asked in class.</p>
+          </div>
+        </article>
+        <article className="sid-portal__tip">
+          <span className="sid-portal__tip-icon" aria-hidden>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18">
+              <rect x="3" y="3" width="7" height="7" />
+              <rect x="14" y="3" width="7" height="7" />
+              <rect x="3" y="14" width="7" height="7" />
+              <path d="M14 14h.01M17 14h.01M20 14h.01M14 17h.01M17 17h.01M20 17h.01M14 20h.01M17 20h.01M20 20h.01" />
+            </svg>
+          </span>
+          <div>
+            <strong>Attendance scan</strong>
+            <p>Teachers scan the QR on the back of your card for roll call.</p>
+          </div>
+        </article>
+        <article className="sid-portal__tip">
+          <span className="sid-portal__tip-icon" aria-hidden>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18">
+              <polyline points="6 9 6 2 18 2 18 9" />
+              <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+              <rect x="6" y="14" width="12" height="8" />
+            </svg>
+          </span>
+          <div>
+            <strong>Print or save</strong>
+            <p>Open full view to print both sides or save as PDF.</p>
+          </div>
+        </article>
+      </div>
+
+      <section className="tid-card tid-card--actions no-print">
+        <div className="tid-card__head">
+          <div>
+            <h3 className="tid-card__title">Card options</h3>
+            <p className="tid-card__sub">Preview the back side or open the print layout</p>
+          </div>
+        </div>
+        <div className="tid-actions">
+          <label className="tid-toggle">
             <input
               type="checkbox"
-              checked={showBack}
-              onChange={(e) => setShowBack(e.target.checked)}
+              checked={previewBack}
+              onChange={(e) => setPreviewBack(e.target.checked)}
             />
-            Back of card
+            <span className="tid-toggle__track" aria-hidden />
+            <span className="tid-toggle__label">Show back of card</span>
           </label>
-          <button
-            type="button"
-            className="att-btn att-btn--primary"
-            onClick={() => setModalOpen(true)}
-          >
-            Full view · Print
-          </button>
+          <div className="sid-portal__action-btns">
+            <button
+              type="button"
+              className="tid-btn tid-btn--ghost"
+              onClick={() => setModalOpen(true)}
+            >
+              Full view
+            </button>
+            <button
+              type="button"
+              className="tid-btn tid-btn--primary"
+              onClick={() =>
+                window.open(
+                  `/print/student-id-card?id=${encodeURIComponent(card.studentProfileId)}&duplex=1`,
+                  "_blank",
+                )
+              }
+            >
+              Open print view
+            </button>
+          </div>
         </div>
-      </div>
-      <div className="sid-my-panel__card">
-        <StudentIdCardView card={card} showBack={showBack} />
-      </div>
-      <p className="sid-my-panel__hint no-print">
-        Open full view to print both sides or save as PDF. Lost your card? Ask the school office
-        for a replacement.
+      </section>
+
+      <section className="tid-card tid-card--preview">
+        <div className="tid-card__head">
+          <div>
+            <h3 className="tid-card__title">Your campus ID</h3>
+            <p className="tid-card__sub">
+              ISO CR80 — barcode on front, QR on back for attendance scanning.
+            </p>
+          </div>
+          <span className="tid-card__badge">
+            {previewBack ? "Front + back" : "Front"}
+          </span>
+        </div>
+        <div className="tid-preview-stage sid-portal__stage">
+          <StudentIdCardView
+            card={card}
+            showBack={previewBack}
+            className={previewBack ? "sid-wrap--duplex" : undefined}
+          />
+        </div>
+      </section>
+
+      <p className="tid-footnote no-print">
+        Lost your card? Ask the school office for a replacement. Do not share photos of your ID
+        publicly — it contains personal details.
       </p>
 
       {modalOpen ? (
@@ -77,6 +206,6 @@ export function MyStudentIdCardPanel() {
           downloadHint
         />
       ) : null}
-    </section>
+    </div>
   );
 }

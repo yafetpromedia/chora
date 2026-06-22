@@ -7,10 +7,14 @@ import "../styles/auth.css";
 import "../styles/dashboard.css";
 import "../styles/setup.css";
 import "../styles/students.css";
+import "../styles/student-records.css";
 import "../styles/attendance.css";
 import "../styles/settings.css";
 import "../styles/student-cards.css";
+import "../styles/classwork.css";
+import "../styles/timetable.css";
 import "../styles/teachers.css";
+import "../styles/teacher-dashboard.css";
 import "../styles/results.css";
 import "../styles/platform.css";
 import "../styles/profile.css";
@@ -18,6 +22,11 @@ import "../styles/workspace.css";
 import "../styles/upgrade.css";
 import "../styles/billing.css";
 import "../styles/library.css";
+import "../styles/ai.css";
+import "../styles/academics.css";
+import "../styles/student-fees.css";
+import "../styles/student-dashboard.css";
+import "../styles/parents.css";
 
 const figtree = Figtree({
   subsets: ["latin"],

@@ -12,10 +12,22 @@ The eLibrary is a standalone digital hub (not the LMS). It centralizes books, no
 | Teacher | `/teacher/library`  |
 | Admin   | `/admin/library`    |
 
+## Audience
+
+Each resource has an **`audience`** field:
+
+| Value | Who sees it |
+|-------|-------------|
+| `STUDENTS` | Student shelf only |
+| `TEACHERS` | Teacher hub only |
+| `BOTH` | All roles (default) |
+
+Set when creating or editing a resource in the admin/teacher upload flow. Migration: `20260602121500_library_audience`.
+
 ## API (`/schools/library`)
 
 - `GET /hub` — categories, featured, recent, stats (admin), student shelf
-- `GET /resources` — search (`q`, `categoryId`, `gradeId`, `resourceType`)
+- `GET /resources` — search (`q`, `categoryId`, `gradeId`, `resourceType`, `audience`)
 - `POST /resources` — create (admin/staff publish; teacher → pending)
 - `POST /resources/:id/publish` — approve (requires `library.manage`)
 - `POST /upload` — file → `uploads/library/{schoolId}/`

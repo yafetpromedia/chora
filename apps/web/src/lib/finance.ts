@@ -91,7 +91,7 @@ export type ParentFeesDue = {
   totalDueCents: number;
   pendingSubmissions: PendingPaymentSubmission[];
   paymentInstructions: {
-    methods: string[];
+    methods: Array<"CHAPA" | "BANK_TRANSFER">;
     note: string;
     bank: {
       bankName: string;
@@ -188,6 +188,26 @@ export async function getParentFinanceOverview() {
 
 export async function getParentFeesDue(profileId: string) {
   return apiFetch<ParentFeesDue>(`/finance/parent/students/${profileId}/due`);
+}
+
+export async function initializeChapaPayment(
+  profileId: string,
+  amountCents: number,
+) {
+  return apiPost<{
+    checkoutUrl: string;
+    txRef: string;
+    receiptNumber: string;
+    message: string;
+  }>(`/finance/parent/students/${profileId}/chapa/initialize`, { amountCents });
+}
+
+export async function verifyChapaPayment(txRef: string) {
+  return apiPost<{
+    status: string;
+    receiptNumber: string;
+    message: string;
+  }>("/finance/parent/chapa/verify", { txRef });
 }
 
 export async function submitParentPayment(

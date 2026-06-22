@@ -8,10 +8,14 @@
     "dev:api": "npm run dev --workspace apps/api",
     "dev": "concurrently \"npm run dev:web\" \"npm run dev:api\"",
     "ports:free": "powershell -NoProfile -Command \"$ports=3000,3001; foreach ($p in $ports) { Get-NetTCPConnection -LocalPort $p -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue } }; Write-Host 'Ports 3000 and 3001 cleared.'\"",
-    "dev:clean": "npm run ports:free && npm run dev",
+    "web:cache:clear": "powershell -NoProfile -Command \"Remove-Item -Recurse -Force apps/web/.next -ErrorAction SilentlyContinue; Write-Host 'Cleared apps/web/.next'\"",
+    "dev:clean": "npm run ports:free && npm run web:cache:clear && npm run dev",
     "build": "npm run build --workspace apps/web && npm run build --workspace apps/api",
     "lint": "npm run lint --workspace apps/web && npm run lint --workspace apps/api",
-    "test": "npm run test --workspace apps/api"
+    "test": "npm run test --workspace apps/api",
+    "test:e2e": "npm run test:e2e --workspace apps/api",
+    "db:sync": "npm run db:sync --workspace apps/api",
+    "health": "powershell -NoProfile -Command \"try { (Invoke-WebRequest -UseBasicParsing http://localhost:3001/health).Content } catch { Write-Error 'API not running on :3001' }\""
   },
   "keywords": [],
   "author": "",

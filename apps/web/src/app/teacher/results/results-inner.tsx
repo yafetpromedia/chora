@@ -1,13 +1,15 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { DashboardPage } from "@/components/dashboard/dashboard-page";
 import { ScoreMatrixPanel } from "@/components/results/score-matrix-panel";
 import { AUTH_ROLE_KEY, AUTH_TOKEN_KEY } from "@/lib/auth";
 
 export function TeacherResultsInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const initialClassSubjectId = searchParams.get("classSubjectId");
 
   useEffect(() => {
     if (!localStorage.getItem(AUTH_TOKEN_KEY)) {
@@ -21,12 +23,8 @@ export function TeacherResultsInner() {
   }, [router]);
 
   return (
-    <DashboardPage
-      role="teacher"
-      title="Enter scores"
-      eyebrow="CampusOne"
-    >
-      <ScoreMatrixPanel role="teacher" />
+    <DashboardPage role="teacher" title="Scores">
+      <ScoreMatrixPanel role="teacher" initialClassSubjectId={initialClassSubjectId} />
     </DashboardPage>
   );
 }

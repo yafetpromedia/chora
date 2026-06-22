@@ -59,7 +59,7 @@ export function AuthShell({
               <div className="auth-demo-box" role="note">
                 <p className="auth-demo-title">Demo workspace</p>
                 <p className="auth-demo-text">
-                  Admin: <strong>admin@eduos.local</strong> / <strong>Passw0rd!</strong>
+                  Demo: <strong>BRIGHT1</strong> · <strong>admin</strong> / <strong>Passw0rd!</strong>
                   <br />
                   Join code: <strong>BRIGHT1</strong> (for /join)
                 </p>

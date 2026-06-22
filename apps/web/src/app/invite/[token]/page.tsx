@@ -18,6 +18,7 @@ export default function InvitePage() {
   const [loadError, setLoadError] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [studentId, setStudentId] = useState("");
@@ -41,7 +42,9 @@ export default function InvitePage() {
       inviteToken: token,
       firstName: firstName.trim(),
       lastName: lastName.trim(),
-      email: email.trim(),
+      username:
+        preview.role === "student" ? studentId.trim() : username.trim(),
+      email: email.trim() || undefined,
       password,
       externalRef: preview.role === "student" ? studentId.trim() : undefined,
     })
@@ -129,14 +132,23 @@ export default function InvitePage() {
                   />
                 </div>
 
+                {preview.role !== "student" ? (
+                  <AuthInput
+                    id="invite-username"
+                    label="Username"
+                    icon="user"
+                    value={username}
+                    onChange={setUsername}
+                    required
+                  />
+                ) : null}
                 <AuthInput
                   id="invite-email"
-                  label="Email"
+                  label="Email (contact)"
                   type="email"
                   icon="email"
                   value={email}
                   onChange={setEmail}
-                  required
                 />
                 <AuthInput
                   id="invite-password"

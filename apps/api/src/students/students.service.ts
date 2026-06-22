@@ -19,6 +19,8 @@ import {
 } from './student-card.util';
 import { FayedaService } from '../fayeda/fayeda.service';
 import { AcademicEnrollmentService } from '../results/academic-enrollment.service';
+import { UsersService } from '../users/users.service';
+import { UpdateParentAccountDto } from './dto/update-parent-account.dto';
 
 export type StudentRow = {
   firstName: string;
@@ -45,6 +47,7 @@ export class StudentsService {
         firstName: true,
         lastName: true,
         email: true,
+        username: true,
         externalRef: true,
       },
     },
@@ -71,6 +74,7 @@ export class StudentsService {
     private readonly subscriptionsService: SubscriptionsService,
     private readonly fayedaService: FayedaService,
     private readonly enrollment: AcademicEnrollmentService,
+    private readonly usersService: UsersService,
   ) {}
 
   async list(schoolId: string) {
@@ -110,6 +114,7 @@ export class StudentsService {
 
     return parents.map((p) => ({
       userId: p.id,
+      username: p.username,
       email: p.email,
       phone: p.phone,
       firstName: p.firstName,
@@ -131,6 +136,79 @@ export class StudentsService {
         };
       }),
     }));
+  }
+
+  private async getParentUser(schoolId: string, userId: string) {
+    const user = await this.prisma.user.findFirst({
+      where: { id: userId, schoolId, role: UserRole.parent },
+    });
+    if (!user) {
+      throw new NotFoundException('Parent account not found');
+    }
+    return user;
+  }
+
+  async resetParentPassword(schoolId: string, userId: string) {
+    const user = await this.getParentUser(schoolId, userId);
+    const tempPassword = this.generateTempPassword();
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { passwordHash: hashSync(tempPassword, 10) },
+    });
+
+    return {
+      username: user.username,
+      email: user.email,
+      tempPassword,
+    };
+  }
+
+  async updateParentAccount(
+    schoolId: string,
+    userId: string,
+    dto: UpdateParentAccountDto,
+  ) {
+    const user = await this.getParentUser(schoolId, userId);
+    const data: { username?: string; passwordHash?: string } = {};
+
+    if (dto.username?.trim()) {
+      data.username = await this.usersService.assertUsernameAvailable(
+        schoolId,
+        dto.username,
+        userId,
+      );
+    }
+
+    if (dto.password?.trim()) {
+      data.passwordHash = hashSync(dto.password.trim(), 10);
+    }
+
+    if (Object.keys(data).length === 0) {
+      throw new BadRequestException('Nothing to update');
+    }
+
+    const updated = await this.prisma.user.update({
+      where: { id: user.id },
+      data,
+      select: {
+        id: true,
+        username: true,
+        email: true,
+        phone: true,
+        firstName: true,
+        lastName: true,
+      },
+    });
+
+    return {
+      userId: updated.id,
+      username: updated.username,
+      email: updated.email,
+      phone: updated.phone,
+      name: `${updated.firstName} ${updated.lastName}`.trim(),
+      passwordUpdated: !!dto.password?.trim(),
+    };
   }
 
   async getOne(schoolId: string, profileId: string) {
@@ -194,11 +272,15 @@ export class StudentsService {
       const userData: {
         firstName?: string;
         lastName?: string;
+        username?: string;
         externalRef?: string;
       } = {};
       if (dto.firstName) userData.firstName = dto.firstName.trim();
       if (dto.lastName) userData.lastName = dto.lastName.trim();
-      if (updatedStudentId) userData.externalRef = updatedStudentId;
+      if (updatedStudentId) {
+        userData.externalRef = updatedStudentId;
+        userData.username = updatedStudentId;
+      }
 
       if (Object.keys(userData).length > 0) {
         await tx.user.update({
@@ -280,7 +362,9 @@ export class StudentsService {
   async resetPortalPassword(schoolId: string, profileId: string) {
     const profile = await this.getOne(schoolId, profileId);
     const portalUsername =
-      profile.user.externalRef?.trim() || profile.user.email;
+      profile.user.username ||
+      profile.user.externalRef?.trim() ||
+      profile.user.email;
     const tempPassword = this.generateTempPassword();
 
     await this.prisma.$transaction([
@@ -448,6 +532,7 @@ export class StudentsService {
           id: `u_${randomBytes(8).toString('hex')}`,
           schoolId,
           role: UserRole.student,
+          username: schoolStudentId,
           email: studentEmail,
           firstName: (fayedaFields.firstName ?? dto.firstName).trim(),
           lastName: (fayedaFields.lastName ?? dto.lastName).trim(),
@@ -1106,11 +1191,13 @@ export class StudentsService {
         UserRole.parent,
       );
       tempPassword = this.generateTempPassword();
+      const parentUsername = `p${normalizedPhone.replace(/\D/g, '').slice(-12) || randomBytes(4).toString('hex')}`;
       user = await tx.user.create({
         data: {
           id: `u_${randomBytes(8).toString('hex')}`,
           schoolId,
           role: UserRole.parent,
+          username: parentUsername,
           email,
           phone: normalizedPhone,
           firstName: first,

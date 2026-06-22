@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { PromotionOutcome, StudentRecordStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AcademicEnrollmentService } from './academic-enrollment.service';
 import { ExecutePromotionDto } from './dto/execute-promotion.dto';
@@ -148,10 +149,27 @@ export class AcademicPromotionService {
               gradeId: map.fromGradeId,
               sectionId: student.sectionId,
               isCurrent: false,
+              promotionOutcome: PromotionOutcome.PROMOTED,
             },
           });
 
           if (!map.toGradeId) {
+            await tx.studentEnrollment.update({
+              where: {
+                studentProfileId_academicYearId: {
+                  studentProfileId: student.id,
+                  academicYearId: fromYear.id,
+                },
+              },
+              data: { promotionOutcome: PromotionOutcome.GRADUATED },
+            });
+            await tx.studentProfile.update({
+              where: { id: student.id },
+              data: {
+                status: StudentRecordStatus.GRADUATED,
+                graduatedAt: new Date(),
+              },
+            });
             summary.graduated += 1;
             continue;
           }
@@ -194,6 +212,7 @@ export class AcademicPromotionService {
               gradeId: map.toGradeId,
               sectionId: newSectionId,
               isCurrent: true,
+              promotionOutcome: PromotionOutcome.ENROLLED,
             },
           });
 

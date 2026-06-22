@@ -5,6 +5,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DashboardPage } from "@/components/dashboard/dashboard-page";
 import { AdminInvitePanel } from "@/components/auth/admin-invite-panel";
+import { PilotHandoutPanel } from "@/components/admin/pilot-handout-panel";
 import { TrialBanner } from "@/components/trial-banner";
 import {
   downloadAttendanceExport,
@@ -391,6 +392,10 @@ export default function AdminSettingsPage() {
               </p>
               <AdminInvitePanel />
             </section>
+            <PilotHandoutPanel
+              schoolName={school.name}
+              joinCode={school.joinCode}
+            />
           </>
         )}
 

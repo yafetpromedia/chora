@@ -38,6 +38,8 @@ import { UpdateClassSubjectDto } from './dto/update-class-subject.dto';
 import { UpsertResultDto } from './dto/upsert-result.dto';
 import { UpsertTermReportDto } from './dto/upsert-term-report.dto';
 import { ExecutePromotionDto } from './dto/execute-promotion.dto';
+import { BulkWorkflowDto } from './dto/bulk-workflow.dto';
+import { SetAssessmentEntryLockDto } from './dto/set-assessment-entry-lock.dto';
 import { WorkflowNotesDto } from './dto/workflow-notes.dto';
 import { ResultsService } from './results.service';
 
@@ -112,6 +114,47 @@ export class ResultsController {
         ? user.id
         : studentId;
     return this.resultsService.listByStudent(id, user.schoolId);
+  }
+
+  @Get('student/scores')
+  @Roles('student', 'parent')
+  async studentReleasedScores(
+    @CurrentUser() user: AuthUser,
+    @Query('termId') termId?: string,
+    @Query('studentProfileId') studentProfileId?: string,
+  ) {
+    const profileId = await this.academicsService.resolveProfileId(
+      user.role,
+      user.id,
+      user.schoolId,
+      studentProfileId,
+    );
+    return this.academicsService.listStudentReleasedScores(
+      user.schoolId,
+      profileId,
+      termId,
+    );
+  }
+
+  @Get('student/report-card-status')
+  @Roles('student', 'parent')
+  async studentReportCardStatus(
+    @CurrentUser() user: AuthUser,
+    @Query('termId') termId: string,
+    @Query('studentProfileId') studentProfileId?: string,
+  ) {
+    const profileId = await this.academicsService.resolveProfileId(
+      user.role,
+      user.id,
+      user.schoolId,
+      studentProfileId,
+    );
+    return this.academicsService.getReportCardAvailability(
+      user.schoolId,
+      profileId,
+      termId,
+      user.role,
+    );
   }
 
   @Get('assessment-templates')
@@ -210,6 +253,20 @@ export class ResultsController {
     );
   }
 
+  @Patch('assessments/:id/entry-lock')
+  @Roles('admin', 'staff')
+  setAssessmentEntryLock(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: SetAssessmentEntryLockDto,
+  ) {
+    return this.templatesService.setAssessmentEntryLock(
+      user.schoolId,
+      id,
+      dto.entryLocked,
+    );
+  }
+
   @Post('score-matrix')
   @Roles('admin', 'staff', 'teacher')
   saveScoreMatrix(
@@ -291,6 +348,16 @@ export class ResultsController {
     return this.academicsService.createSubject(user.schoolId, dto);
   }
 
+  @Patch('subjects/:id')
+  @Roles('admin', 'staff')
+  updateSubject(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: { name?: string },
+  ) {
+    return this.academicsService.updateSubject(user.schoolId, id, dto);
+  }
+
   @Get('class-subjects')
   @Roles('admin', 'teacher')
   listClassSubjects(
@@ -343,8 +410,9 @@ export class ResultsController {
   listPendingWorkflow(
     @CurrentUser() user: AuthUser,
     @Query('status') status?: ResultWorkflowStatus,
+    @Query('termId') termId?: string,
   ) {
-    return this.workflowService.listPending(user.schoolId, status);
+    return this.workflowService.listPending(user.schoolId, status, termId);
   }
 
   @Post('workflow/submit')
@@ -360,6 +428,34 @@ export class ResultsController {
       classSubjectId,
       user.id,
       user.role,
+    );
+  }
+
+  @Post('workflow/approve-bulk')
+  @Roles('admin', 'staff')
+  approveWorkflowBulk(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: BulkWorkflowDto,
+  ) {
+    return this.workflowService.approveBulk(
+      user.schoolId,
+      user.id,
+      dto.termId,
+      dto.sheetIds,
+    );
+  }
+
+  @Post('workflow/publish-bulk')
+  @Roles('admin', 'staff')
+  publishWorkflowBulk(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: BulkWorkflowDto,
+  ) {
+    return this.workflowService.publishBulk(
+      user.schoolId,
+      user.id,
+      dto.termId,
+      dto.sheetIds,
     );
   }
 

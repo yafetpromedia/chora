@@ -8,6 +8,11 @@ import { UsersService } from '../users/users.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateTeacherDto } from './dto/create-teacher.dto';
 import { UpdateTeacherDto } from './dto/update-teacher.dto';
+import {
+  buildTeacherCardScanPayload,
+  generateSchoolTeacherId,
+  generateTeacherCardCode,
+} from './staff-card.util';
 
 @Injectable()
 export class TeachersService {
@@ -113,7 +118,9 @@ export class TeachersService {
       throw new BadRequestException('Unknown role template');
     }
 
+    const teacherId = await this.allocateTeacherId(schoolId);
     const user = await this.usersService.createUser({
+      username: teacherId,
       email: dto.email,
       password: dto.password,
       firstName: dto.firstName,
@@ -121,6 +128,7 @@ export class TeachersService {
       role: template.portalRole,
       schoolId,
       roleTemplateId: template.id,
+      externalRef: teacherId,
     });
 
     if (template.portalRole === UserRole.teacher) {
@@ -315,16 +323,232 @@ export class TeachersService {
     }
   }
 
+  async ensureTeacherIdsAndCards(schoolId: string) {
+    const teachers = await this.prisma.user.findMany({
+      where: { schoolId, role: UserRole.teacher },
+      include: { teacherProfile: true },
+    });
+    let idsUpdated = 0;
+    let cardsUpdated = 0;
+    for (const u of teachers) {
+      if (!u.externalRef) {
+        const teacherId = await this.allocateTeacherId(schoolId);
+        await this.prisma.user.update({
+          where: { id: u.id },
+          data: { externalRef: teacherId },
+        });
+        idsUpdated++;
+      }
+      if (u.teacherProfile && !u.teacherProfile.cardCode) {
+        const cardCode = await this.allocateTeacherCardCode(schoolId);
+        await this.prisma.teacherProfile.update({
+          where: { id: u.teacherProfile.id },
+          data: { cardCode },
+        });
+        cardsUpdated++;
+      }
+    }
+    return { idsUpdated, cardsUpdated, total: teachers.length };
+  }
+
+  async getTeacherIdCard(schoolId: string, userId: string) {
+    const user = await this.prisma.user.findFirst({
+      where: { id: userId, schoolId, role: UserRole.teacher },
+      include: {
+        roleTemplate: true,
+        teacherProfile: {
+          include: {
+            homeroomGrade: { select: { name: true } },
+            homeroomSection: { select: { name: true } },
+          },
+        },
+      },
+    });
+    if (!user?.teacherProfile) {
+      throw new NotFoundException('Teacher not found');
+    }
+    const profile = user.teacherProfile;
+    if (!user.externalRef) {
+      const teacherId = await this.allocateTeacherId(schoolId);
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { externalRef: teacherId },
+      });
+      user.externalRef = teacherId;
+    }
+    await this.ensureTeacherProfileCardCode(profile, schoolId);
+    const school = await this.loadSchoolForCard(schoolId);
+    return this.formatTeacherIdCard(
+      { ...user, teacherProfile: profile },
+      school,
+    );
+  }
+
+  async listTeacherIdCards(schoolId: string) {
+    await this.ensureTeacherIdsAndCards(schoolId);
+    const users = await this.prisma.user.findMany({
+      where: {
+        schoolId,
+        role: UserRole.teacher,
+        teacherProfile: { cardCode: { not: null } },
+      },
+      include: {
+        roleTemplate: true,
+        teacherProfile: {
+          include: {
+            homeroomGrade: { select: { name: true } },
+            homeroomSection: { select: { name: true } },
+          },
+        },
+      },
+      orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
+    });
+    const school = await this.loadSchoolForCard(schoolId);
+    return users
+      .filter(
+        (u): u is typeof u & { teacherProfile: NonNullable<typeof u.teacherProfile> } =>
+          !!u.teacherProfile?.cardCode,
+      )
+      .map((u) => this.formatTeacherIdCard(u, school));
+  }
+
+  private async loadSchoolForCard(schoolId: string) {
+    const school = await this.prisma.school.findUnique({
+      where: { id: schoolId },
+      select: {
+        name: true,
+        logoUrl: true,
+        joinCode: true,
+        phone: true,
+        address: true,
+        email: true,
+      },
+    });
+    const currentYear = await this.prisma.academicYear.findFirst({
+      where: { schoolId, isCurrent: true },
+      select: { name: true },
+    });
+    const year = new Date().getFullYear();
+    return {
+      name: school?.name ?? 'CampusOne',
+      logoUrl: school?.logoUrl ?? null,
+      joinCode: school?.joinCode ?? '',
+      phone: school?.phone ?? null,
+      address: school?.address ?? null,
+      email: school?.email ?? null,
+      academicYearName: currentYear?.name ?? String(year),
+    };
+  }
+
+  private formatTeacherIdCard(
+    user: {
+      id: string;
+      email: string;
+      phone: string | null;
+      firstName: string;
+      lastName: string;
+      externalRef: string | null;
+      roleTemplate: { name: string } | null;
+      teacherProfile: {
+        id: string;
+        photoUrl: string | null;
+        cardCode: string | null;
+        homeroomGrade: { name: string } | null;
+        homeroomSection: { name: string } | null;
+      };
+    },
+    school: {
+      name: string;
+      logoUrl: string | null;
+      joinCode: string;
+      phone: string | null;
+      address: string | null;
+      email: string | null;
+      academicYearName: string;
+    },
+  ) {
+    const cardCode = user.teacherProfile.cardCode!;
+    const homeroom =
+      user.teacherProfile.homeroomGrade != null
+        ? `${user.teacherProfile.homeroomGrade.name}${
+            user.teacherProfile.homeroomSection
+              ? ` · ${user.teacherProfile.homeroomSection.name}`
+              : ''
+          }`
+        : null;
+    return {
+      teacherProfileId: user.teacherProfile.id,
+      userId: user.id,
+      cardCode,
+      scanPayload: buildTeacherCardScanPayload(cardCode),
+      name: `${user.firstName} ${user.lastName}`.trim(),
+      firstName: user.firstName,
+      lastName: user.lastName,
+      photoUrl: user.teacherProfile.photoUrl,
+      teacherId: user.externalRef,
+      email: user.email,
+      phone: user.phone,
+      roleLabel: user.roleTemplate?.name ?? 'Teacher',
+      homeroom,
+      schoolName: school.name,
+      schoolLogoUrl: school.logoUrl,
+      schoolJoinCode: school.joinCode,
+      schoolPhone: school.phone,
+      schoolAddress: school.address,
+      schoolEmail: school.email,
+      academicYear: school.academicYearName,
+      issuedAt: new Date().toISOString(),
+      validThrough: `${school.academicYearName}`,
+    };
+  }
+
+  private async ensureTeacherProfileCardCode(
+    profile: { id: string; cardCode: string | null },
+    schoolId: string,
+  ) {
+    if (profile.cardCode) return;
+    const cardCode = await this.allocateTeacherCardCode(schoolId);
+    await this.prisma.teacherProfile.update({
+      where: { id: profile.id },
+      data: { cardCode },
+    });
+    profile.cardCode = cardCode;
+  }
+
+  private async allocateTeacherId(schoolId: string) {
+    for (let attempt = 0; attempt < 20; attempt++) {
+      const candidate = generateSchoolTeacherId();
+      const exists = await this.prisma.user.findFirst({
+        where: { schoolId, externalRef: candidate },
+      });
+      if (!exists) return candidate;
+    }
+    throw new BadRequestException('Could not allocate teacher ID');
+  }
+
+  private async allocateTeacherCardCode(schoolId: string) {
+    for (let attempt = 0; attempt < 20; attempt++) {
+      const candidate = generateTeacherCardCode();
+      const exists = await this.prisma.teacherProfile.findFirst({
+        where: { schoolId, cardCode: candidate },
+      });
+      if (!exists) return candidate;
+    }
+    throw new BadRequestException('Could not allocate teacher card code');
+  }
+
   private formatStaff(
     user: {
     id: string;
     email: string;
+    externalRef?: string | null;
     firstName: string;
     lastName: string;
     role: string;
     roleTemplate: { slug: string; name: string } | null;
     teacherProfile: {
       id: string;
+      cardCode?: string | null;
       homeroomGrade: { id: string; name: string } | null;
       homeroomSection: { id: string; name: string } | null;
       assignments: {
@@ -349,12 +573,14 @@ export class TeachersService {
     return {
       userId: user.id,
       email: user.email,
+      teacherId: user.externalRef ?? null,
       name: `${user.firstName} ${user.lastName}`.trim(),
       firstName: user.firstName,
       lastName: user.lastName,
       portalRole: user.role,
       roleTemplateSlug: user.roleTemplate?.slug ?? null,
       roleTemplateName: user.roleTemplate?.name ?? null,
+      canTakeAttendance: !!p?.homeroomGrade,
       homeroom: p?.homeroomGrade
         ? {
             gradeId: p.homeroomGrade.id,

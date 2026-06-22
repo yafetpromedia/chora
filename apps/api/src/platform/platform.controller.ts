@@ -31,6 +31,15 @@ import { PlatformService } from './platform.service';
 import { AssessmentTemplatesService } from '../results/assessment-templates.service';
 import { CreateAssessmentTemplateDto } from '../results/dto/create-assessment-template.dto';
 import { UpdateAssessmentTemplateDto } from '../results/dto/update-assessment-template.dto';
+import {
+  AddPackageSubjectDto,
+  CreatePlatformSubjectDto,
+  UpdateCurriculumPackageDto,
+  UpdatePlatformSubjectDto,
+} from './dto/platform-subject.dto';
+import { PlatformContentService } from './platform-content.service';
+import { PlatformCurriculumAdminService } from './platform-curriculum-admin.service';
+import { PlatformSubjectsService } from './platform-subjects.service';
 
 @Controller('platform')
 export class PlatformController {
@@ -39,6 +48,9 @@ export class PlatformController {
     private readonly platformService: PlatformService,
     private readonly platformBillingService: PlatformBillingService,
     private readonly assessmentTemplatesService: AssessmentTemplatesService,
+    private readonly platformSubjectsService: PlatformSubjectsService,
+    private readonly curriculumAdmin: PlatformCurriculumAdminService,
+    private readonly platformContent: PlatformContentService,
   ) {}
 
   @Post('auth/login')
@@ -95,6 +107,144 @@ export class PlatformController {
   @UseGuards(JwtAuthGuard, PlatformGuard)
   getCurriculumPackage(@Param('key') key: string) {
     return this.platformService.getCurriculumPackage(key);
+  }
+
+  @Patch('curriculum-packages/:key')
+  @UseGuards(JwtAuthGuard, PlatformGuard)
+  updateCurriculumPackage(
+    @Param('key') key: string,
+    @Body() dto: UpdateCurriculumPackageDto,
+  ) {
+    return this.curriculumAdmin.updatePackage(key, dto);
+  }
+
+  @Post('curriculum-packages/:key/subjects')
+  @UseGuards(JwtAuthGuard, PlatformGuard)
+  addPackageSubject(
+    @Param('key') key: string,
+    @Body() dto: AddPackageSubjectDto,
+  ) {
+    return this.curriculumAdmin.addSubjectToPackage(key, dto);
+  }
+
+  @Post('curriculum-packages/:key/subjects/:packageSubjectId/remove')
+  @UseGuards(JwtAuthGuard, PlatformGuard)
+  removePackageSubject(
+    @Param('key') key: string,
+    @Param('packageSubjectId') packageSubjectId: string,
+  ) {
+    return this.curriculumAdmin.removeSubjectFromPackage(key, packageSubjectId);
+  }
+
+  @Post('catalog/sync')
+  @UseGuards(JwtAuthGuard, PlatformGuard)
+  syncCatalog() {
+    return this.curriculumAdmin.syncCatalogFromCode();
+  }
+
+  @Get('subjects')
+  @UseGuards(JwtAuthGuard, PlatformGuard)
+  listPlatformSubjects(@Query('includeArchived') includeArchived?: string) {
+    return this.platformSubjectsService.list(includeArchived === 'true');
+  }
+
+  @Get('subjects/:id')
+  @UseGuards(JwtAuthGuard, PlatformGuard)
+  getPlatformSubject(@Param('id') id: string) {
+    return this.platformSubjectsService.getById(id);
+  }
+
+  @Post('subjects')
+  @UseGuards(JwtAuthGuard, PlatformGuard)
+  createPlatformSubject(@Body() dto: CreatePlatformSubjectDto) {
+    return this.platformSubjectsService.create(dto);
+  }
+
+  @Patch('subjects/:id')
+  @UseGuards(JwtAuthGuard, PlatformGuard)
+  updatePlatformSubject(
+    @Param('id') id: string,
+    @Body() dto: UpdatePlatformSubjectDto,
+  ) {
+    return this.platformSubjectsService.update(id, dto);
+  }
+
+  @Post('subjects/:id/archive')
+  @UseGuards(JwtAuthGuard, PlatformGuard)
+  archivePlatformSubject(@Param('id') id: string) {
+    return this.platformSubjectsService.archive(id);
+  }
+
+  @Post('subjects/sync')
+  @UseGuards(JwtAuthGuard, PlatformGuard)
+  syncPlatformSubjects() {
+    return this.platformSubjectsService.syncFromPackageDefinitions();
+  }
+
+  @Get('provisioning-logs')
+  @UseGuards(JwtAuthGuard, PlatformGuard)
+  listProvisioningLogs(
+    @Query('schoolId') schoolId?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.curriculumAdmin.listProvisioningLogs(
+      schoolId,
+      limit ? Number(limit) : 50,
+    );
+  }
+
+  @Post('content/sync')
+  @UseGuards(JwtAuthGuard, PlatformGuard)
+  syncPlatformContent() {
+    return this.platformContent.syncAll();
+  }
+
+  @Get('academic-structures')
+  @UseGuards(JwtAuthGuard, PlatformGuard)
+  listAcademicStructures(@Query('includeArchived') includeArchived?: string) {
+    return this.platformContent.listStructures(includeArchived === 'true');
+  }
+
+  @Get('library/categories')
+  @UseGuards(JwtAuthGuard, PlatformGuard)
+  listPlatformLibraryCategories() {
+    return this.platformContent.listLibraryCategories();
+  }
+
+  @Get('library/resources')
+  @UseGuards(JwtAuthGuard, PlatformGuard)
+  listPlatformLibraryResources(@Query('includeArchived') includeArchived?: string) {
+    return this.platformContent.listLibraryResources(includeArchived === 'true');
+  }
+
+  @Get('message-templates')
+  @UseGuards(JwtAuthGuard, PlatformGuard)
+  listPlatformMessageTemplates(@Query('includeArchived') includeArchived?: string) {
+    return this.platformContent.listMessageTemplates(includeArchived === 'true');
+  }
+
+  @Get('assessment-templates/catalog')
+  @UseGuards(JwtAuthGuard, PlatformGuard)
+  listPlatformAssessmentCatalog(@Query('includeArchived') includeArchived?: string) {
+    return this.platformContent.listAssessmentTemplates(includeArchived === 'true');
+  }
+
+  @Get('assessment-templates/catalog/:id')
+  @UseGuards(JwtAuthGuard, PlatformGuard)
+  getPlatformAssessmentCatalogItem(@Param('id') id: string) {
+    return this.platformContent.getAssessmentTemplate(id);
+  }
+
+  @Post('schools/:id/copy-assessment-template/:platformTemplateId')
+  @UseGuards(JwtAuthGuard, PlatformGuard)
+  copyAssessmentToSchool(
+    @Param('id') schoolId: string,
+    @Param('platformTemplateId') platformTemplateId: string,
+  ) {
+    return this.platformContent.copyAssessmentTemplateToSchool(
+      schoolId,
+      platformTemplateId,
+    );
   }
 
   @Post('schools')

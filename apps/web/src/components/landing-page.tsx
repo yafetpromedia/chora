@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { motion, useReducedMotion } from "framer-motion";
-import { AnimatedNav, NavBrand, NavLinks } from "@/components/animated-nav";
 import { BackToTop } from "@/components/back-to-top";
 import { Faq } from "@/components/faq";
+import { AppStoreBadges } from "@/components/landing/app-store-badges";
+import { LandingAppSection } from "@/components/landing/landing-app-section";
+import { LandingNav } from "@/components/landing/landing-nav";
 import { LandingPricing } from "@/components/landing/landing-pricing";
 import { Reveal, Stagger, StaggerItem } from "@/components/motion/reveal";
 import { ProductPreview } from "@/components/product-preview";
@@ -16,273 +17,256 @@ import {
   IconParents,
   IconSecurity,
 } from "@/components/feature-icons";
-import { MobileNav } from "@/components/mobile-nav";
-import { TrustMarquee } from "@/components/trust-marquee";
 import type { ReactNode } from "react";
 
-const FEATURES: { title: string; desc: string; icon: ReactNode }[] = [
+const CAPABILITIES = [
+  "Attendance",
+  "Report cards",
+  "Fee collection",
+  "Parent portal",
+  "Campus ID",
+  "Timetable",
+  "eLibrary",
+  "AI study assistant",
+  "Announcements",
+  "USD & ETB billing",
+  "Staff roles",
+];
+
+const FEATURES: {
+  title: string;
+  desc: string;
+  icon: ReactNode;
+  wide?: boolean;
+}[] = [
   {
-    title: "Attendance",
-    desc: "Daily or period roll call, QR campus cards, and instant parent visibility.",
+    title: "Attendance that parents see",
+    desc: "Daily or period roll call, QR campus cards, and same-day visibility for families.",
     icon: <IconAttendance />,
+    wide: true,
   },
   {
     title: "Results & report cards",
-    desc: "Templates, approvals, and printable report cards per term.",
+    desc: "Term templates, teacher entry, approvals, and printable report cards.",
     icon: <IconGrades />,
   },
   {
     title: "Fees & finance",
-    desc: "Fee schedules, partial payments, and Telebirr-ready collection workflows.",
+    desc: "Schedules, partial payments, and Telebirr-ready collection workflows.",
     icon: <IconParents />,
   },
   {
+    title: "eLibrary & AI study help",
+    desc: "Digital shelf plus an AI assistant to summarize, quiz, and translate lessons.",
+    icon: <IconGrades />,
+  },
+  {
     title: "Announcements",
-    desc: "School-wide or class messages — families see updates without phone trees.",
+    desc: "School-wide or class messages without phone trees or group chats.",
     icon: <IconAnnouncements />,
   },
   {
     title: "Staff & permissions",
-    desc: "Registrar, finance, teachers — each role sees only what they need.",
+    desc: "Registrar, finance, and teachers each see only what their role needs.",
     icon: <IconAdmin />,
   },
   {
-    title: "Secure & multi-tenant",
-    desc: "Each school is isolated. JWT auth, role templates, PostgreSQL-backed.",
+    title: "Secure multi-tenant",
+    desc: "Every school is isolated with JWT auth and role-based access.",
     icon: <IconSecurity />,
+    wide: true,
   },
 ];
 
 const PORTALS = [
-  { role: "Admin", desc: "Enrollment, billing, analytics, and school setup", href: "/login" },
-  { role: "Teacher", desc: "Attendance, grades, and class communication", href: "/login" },
-  { role: "Student", desc: "Timetable, results, and campus ID", href: "/login" },
-  { role: "Parent", desc: "Fees, attendance, and announcements for your children", href: "/login" },
+  { n: "01", role: "Admin", desc: "Enrollment, billing, setup, and analytics", href: "/login" },
+  { n: "02", role: "Teacher", desc: "Attendance, grades, classwork, and timetable", href: "/login" },
+  { n: "03", role: "Student", desc: "Campus ID, results, assignments, and fees", href: "/login" },
+  { n: "04", role: "Parent", desc: "Child attendance, fees, results, and notices", href: "/login" },
 ];
-
-const PILLARS = [
-  {
-    title: "Stop juggling spreadsheets",
-    desc: "One database for students, staff, grades, and fees — not five WhatsApp groups and a shared Excel file.",
-  },
-  {
-    title: "Parents stay in the loop",
-    desc: "Families log in to see attendance and results the same day — fewer “what happened at school?” calls.",
-  },
-  {
-    title: "Built for how you bill",
-    desc: "List prices in USD and ETB. Platform invoicing when you move to a paid plan.",
-  },
-];
-
-function HeroContent() {
-  const reduce = useReducedMotion();
-  const container = {
-    hidden: {},
-    show: { transition: { staggerChildren: reduce ? 0 : 0.08 } },
-  };
-  const item = {
-    hidden: { opacity: 0, y: 20 },
-    show: { opacity: 1, y: 0, transition: { duration: 0.45, ease: "easeOut" as const } },
-  };
-
-  return (
-    <motion.div variants={container} initial="hidden" animate="show" className="lp-hero__copy">
-      <motion.p variants={item} className="lp-hero__kicker">
-        School operations platform
-      </motion.p>
-
-      <motion.h1 variants={item} className="lp-hero__title">
-        Run your school on one system — from attendance to parent fees.
-      </motion.h1>
-
-      <motion.p variants={item} className="lp-hero__lead">
-        CampusOne is a multi-tenant platform for Ethiopian and international schools: admins,
-        teachers, students, and parents each get a focused portal. Start with a 14-day trial, then
-        scale on plans that match your size.
-      </motion.p>
-
-      <motion.div variants={item} className="lp-hero__ctas">
-        <Link href="/register" className="btn-brand">
-          Start your school — free trial
-        </Link>
-        <a href="#pricing" className="btn-ghost">
-          See pricing
-        </a>
-      </motion.div>
-
-      <motion.ul variants={item} className="lp-hero__checks" aria-label="Highlights">
-        <li>14-day trial · no card required</li>
-        <li>USD &amp; ETB plan pricing</li>
-        <li>Live in days, not months</li>
-      </motion.ul>
-    </motion.div>
-  );
-}
 
 export function LandingPage() {
-  const reduce = useReducedMotion();
-
   return (
-    <div className="page-shell lp-page">
-      <AnimatedNav>
-        <div className="lp-nav-inner">
-          <NavBrand />
-          <NavLinks />
-          <div className="lp-nav-actions">
-            <Link href="/login" className="nav-link hidden text-sm font-semibold sm:block">
-              Sign in
-            </Link>
-            <Link href="/register" className="btn-brand lp-nav-cta hidden md:inline-flex">
-              Start free trial
-            </Link>
-            <MobileNav />
-          </div>
-        </div>
-      </AnimatedNav>
+    <div className="lp3">
+      <LandingNav />
 
-      <main className="lp-main">
-        <section className="lp-hero">
-          <div className="lp-hero__grid">
-            <HeroContent />
-            <div id="preview" className="lp-hero__preview">
-              {!reduce ? (
-                <motion.div
-                  className="preview-glow"
-                  aria-hidden
-                  animate={{ opacity: [0.5, 0.75, 0.5] }}
-                  transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
-                />
-              ) : null}
+      <main>
+        <section className="lp3-hero">
+          <div className="lp3-hero__bg" aria-hidden />
+          <div className="lp3-container lp3-hero__grid">
+            <div className="lp3-hero__copy">
+              <span className="lp3-hero__chip">School operations platform</span>
+              <h1 className="lp3-hero__title">
+                One platform for your whole campus
+              </h1>
+              <p className="lp3-hero__lead">
+                CampusOne helps Ethiopian and international schools run attendance, results, fees,
+                and family communication — with dedicated portals for admins, teachers, students,
+                and parents.
+              </p>
+              <div className="lp3-hero__actions">
+                <Link href="/register" className="lp3-btn lp3-btn--primary">
+                  Start free trial
+                </Link>
+                <a href="#pricing" className="lp3-btn lp3-btn--ghost lp3-btn--on-dark">
+                  View pricing
+                </a>
+              </div>
+              <p className="lp3-hero__note">14-day trial · No card required · USD &amp; ETB plans</p>
+              <div className="lp3-hero__stores">
+                <span>For parents &amp; students</span>
+                <AppStoreBadges variant="dark" />
+              </div>
+            </div>
+
+            <div id="preview" className="lp3-hero__visual">
               <ProductPreview />
             </div>
           </div>
         </section>
 
-        <TrustMarquee />
-
-        <Reveal>
-          <section className="lp-section lp-pillars">
-            <div className="lp-section__head">
-              <p className="section-label">Why CampusOne</p>
-              <h2 className="lp-section__title">Software that matches how schools actually work</h2>
-            </div>
-            <div className="lp-pillars__grid">
-              {PILLARS.map((p) => (
-                <article key={p.title} className="lp-pillar card">
-                  <h3 className="lp-pillar__title">{p.title}</h3>
-                  <p className="lp-pillar__desc">{p.desc}</p>
-                </article>
-              ))}
-            </div>
-          </section>
-        </Reveal>
-
-        <section id="features" className="lp-section">
-          <Reveal>
-            <div className="lp-section__head">
-              <p className="section-label">Platform</p>
-              <h2 className="lp-section__title">Everything on one campus, one login per role</h2>
-              <p className="lp-section__sub">
-                Modules schools use every day — not a bloated ERP you never finish implementing.
-              </p>
-            </div>
-          </Reveal>
-          <Stagger className="features-grid lp-features">
-            {FEATURES.map((f) => (
-              <StaggerItem key={f.title}>
-                <article className="feature-card card h-full lp-feature-card">
-                  <div className="feature-icon-box">{f.icon}</div>
-                  <h3 className="feature-card-title">{f.title}</h3>
-                  <p className="feature-card-desc">{f.desc}</p>
-                </article>
-              </StaggerItem>
+        <section className="lp3-strip" aria-label="Platform capabilities">
+          <div className="lp3-strip__track">
+            {[...CAPABILITIES, ...CAPABILITIES].map((item, i) => (
+              <span key={`${item}-${i}`} className="lp3-strip__pill">
+                {item}
+              </span>
             ))}
-          </Stagger>
+          </div>
         </section>
 
-        <section id="portals" className="lp-section">
-          <Reveal>
-            <div className="lp-section__head">
-              <p className="section-label">Portals</p>
-              <h2 className="lp-section__title">Four experiences, one source of truth</h2>
-              <p className="lp-section__sub">
-                Same student record whether a teacher marks attendance or a parent checks fees.
-              </p>
-            </div>
-          </Reveal>
-          <Stagger className="portals-grid">
-            {PORTALS.map((p) => (
-              <StaggerItem key={p.role}>
-                <Link href={p.href} className="lp-portal card block h-full no-underline">
-                  <span className="lp-portal__role">{p.role}</span>
-                  <p className="lp-portal__desc">{p.desc}</p>
-                  <span className="lp-portal__link">Sign in →</span>
-                </Link>
-              </StaggerItem>
-            ))}
-          </Stagger>
-        </section>
-
-        <section id="pricing" className="lp-section">
-          <Reveal>
-            <div className="lp-section__head lp-section__head--center">
-              <p className="section-label">Pricing</p>
-              <h2 className="lp-section__title">Clear plans. No surprise modules.</h2>
-              <p className="lp-section__sub">
-                Try every core feature on trial. Upgrade when you are ready — billed monthly or
-                annually.
-              </p>
-            </div>
-          </Reveal>
-          <Reveal>
-            <LandingPricing />
-          </Reveal>
-        </section>
-
-        <Reveal>
-          <Faq />
-        </Reveal>
-
-        <Reveal>
-          <section className="lp-cta">
-            <div className="lp-cta__inner">
-              <h2 className="lp-cta__title">Ready to replace the spreadsheet stack?</h2>
-              <p className="lp-cta__sub">
-                Create your school in minutes. Invite teachers and import students when you are
-                ready.
-              </p>
-              <div className="lp-cta__actions">
-                <Link href="/register" className="btn-brand">
-                  Start free trial
-                </Link>
-                <Link href="/login" className="lp-cta__secondary">
-                  I already have an account
-                </Link>
+        <section id="features" className="lp3-section">
+          <div className="lp3-container">
+            <Reveal>
+              <div className="lp3-section__head">
+                <span className="lp3-eyebrow">Platform</span>
+                <h2 className="lp3-heading">Built for real school workflows</h2>
+                <p className="lp3-lead">
+                  Not a bloated ERP — the modules your registrar, teachers, and finance team use
+                  every day.
+                </p>
               </div>
-            </div>
-          </section>
-        </Reveal>
+            </Reveal>
+            <Stagger className="lp3-bento">
+              {FEATURES.map((f) => (
+                <StaggerItem key={f.title}>
+                  <article className={`lp3-bento__card${f.wide ? " lp3-bento__card--wide" : ""}`}>
+                    <div className="lp3-bento__icon">{f.icon}</div>
+                    <h3>{f.title}</h3>
+                    <p>{f.desc}</p>
+                  </article>
+                </StaggerItem>
+              ))}
+            </Stagger>
+          </div>
+        </section>
 
-        <footer className="lp-footer">
-          <div className="lp-footer__brand">
-            <span className="logo-mark" aria-hidden>
-              C1
-            </span>
+        <LandingAppSection />
+
+        <section id="portals" className="lp3-section lp3-section--muted">
+          <div className="lp3-container">
+            <Reveal>
+              <div className="lp3-section__head">
+                <span className="lp3-eyebrow">Portals</span>
+                <h2 className="lp3-heading">Four roles. One source of truth.</h2>
+                <p className="lp3-lead">
+                  The same student record whether a teacher marks attendance or a parent checks fees.
+                </p>
+              </div>
+            </Reveal>
+            <Stagger className="lp3-portals">
+              {PORTALS.map((p) => (
+                <StaggerItem key={p.role}>
+                  <Link href={p.href} className="lp3-portal">
+                    <span className="lp3-portal__n">{p.n}</span>
+                    <h3>{p.role}</h3>
+                    <p>{p.desc}</p>
+                    <span className="lp3-portal__link">Sign in →</span>
+                  </Link>
+                </StaggerItem>
+              ))}
+            </Stagger>
+          </div>
+        </section>
+
+        <section id="pricing" className="lp3-section">
+          <div className="lp3-container">
+            <Reveal>
+              <div className="lp3-section__head lp3-section__head--center">
+                <span className="lp3-eyebrow">Pricing</span>
+                <h2 className="lp3-heading">Simple plans that scale with you</h2>
+                <p className="lp3-lead">
+                  Try every core feature on trial. Upgrade when you are ready — monthly or annual
+                  billing.
+                </p>
+              </div>
+            </Reveal>
+            <Reveal>
+              <LandingPricing />
+            </Reveal>
+          </div>
+        </section>
+
+        <div className="lp3-container">
+          <Reveal>
+            <Faq />
+          </Reveal>
+        </div>
+
+        <section className="lp3-cta">
+          <div className="lp3-container">
+            <Reveal>
+              <div className="lp3-cta__panel">
+                <div className="lp3-cta__copy">
+                  <h2>Ready to modernize your school?</h2>
+                  <p>
+                    Create your school in minutes, invite staff, import students, and share the app
+                    with families.
+                  </p>
+                  <div className="lp3-cta__actions">
+                    <Link href="/register" className="lp3-btn lp3-btn--primary">
+                      Start free trial
+                    </Link>
+                    <Link href="/login" className="lp3-btn lp3-btn--ghost lp3-btn--on-dark">
+                      Sign in
+                    </Link>
+                  </div>
+                </div>
+                <div className="lp3-cta__app">
+                  <p>Download CampusOne</p>
+                  <AppStoreBadges variant="dark" layout="stack" />
+                </div>
+              </div>
+            </Reveal>
+          </div>
+        </section>
+      </main>
+
+      <footer className="lp3-footer">
+        <div className="lp3-container lp3-footer__grid">
+          <div className="lp3-footer__brand">
+            <span className="lp3-nav__mark">C1</span>
             <div>
               <strong>CampusOne</strong>
-              <p>Multi-school education platform</p>
+              <p>School management for admins, teachers, students &amp; parents.</p>
             </div>
           </div>
-          <nav className="lp-footer__nav" aria-label="Footer">
+          <nav className="lp3-footer__nav" aria-label="Footer">
             <Link href="/register">Register school</Link>
-            <Link href="/login">School sign in</Link>
+            <Link href="/login">Sign in</Link>
             <Link href="/join">Join with code</Link>
+            <a href="#app">Mobile app</a>
             <Link href="/platform/login">Platform admin</Link>
           </nav>
-          <p className="lp-footer__copy">© {new Date().getFullYear()} CampusOne</p>
-        </footer>
-      </main>
+          <div className="lp3-footer__stores">
+            <AppStoreBadges />
+          </div>
+          <p className="lp3-footer__copy">
+            © {new Date().getFullYear()} CampusOne. All rights reserved.{" "}
+            <span className="lp3-footer__ai">Powered by AI</span>
+          </p>
+        </div>
+      </footer>
 
       <BackToTop />
     </div>

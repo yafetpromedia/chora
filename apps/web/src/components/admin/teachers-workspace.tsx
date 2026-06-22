@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { DashIcon } from "@/components/dashboard/dash-icons";
 import { listGrades } from "@/lib/school-setup";
 import type { GradeWithSections } from "@/lib/api";
 import { TEACHER_ROLE_SLUGS } from "@/lib/people";
@@ -25,6 +26,12 @@ function initials(name: string) {
     .toUpperCase();
 }
 
+function displayName(t: TeacherRecord) {
+  const parts = [t.firstName, t.lastName].filter(Boolean).join(" ").trim();
+  const raw = parts || t.name;
+  return raw.replace(/\b\w+/g, (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+}
+
 function homeroomLine(h: TeacherRecord["homeroom"]) {
   if (!h) return null;
   return `${h.gradeName}${h.sectionName ? ` · ${h.sectionName}` : ""}`;
@@ -36,6 +43,30 @@ function assignSubjectsHref(teacher: TeacherRecord) {
   if (teacher.homeroom?.sectionId) q.set("sectionId", teacher.homeroom.sectionId);
   q.set("teacherId", teacher.userId);
   return `/admin/subjects/assign?${q}`;
+}
+
+function roleLabel(t: TeacherRecord) {
+  return (
+    t.roleTemplateName ??
+    (t.roleTemplateSlug ? ROLE_TEMPLATE_LABELS[t.roleTemplateSlug] : "Teacher")
+  );
+}
+
+function SubjectSlots({ slots }: { slots: TeacherRecord["teachingSlots"] }) {
+  if (!slots?.length) return <span className="tch-v2__muted">No subjects yet</span>;
+  return (
+    <ul className="tch-v2__slots">
+      {slots.map((slot, i) => (
+        <li key={`${slot.gradeName}-${slot.subjectName}-${i}`}>
+          <span className="tch-v2__badge tch-v2__badge--subject">{slot.subjectName}</span>
+          <span className="tch-v2__muted">
+            {slot.gradeName}
+            {slot.sectionName ? ` · ${slot.sectionName}` : ""}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 export function TeachersWorkspace() {
@@ -59,16 +90,19 @@ export function TeachersWorkspace() {
   const [homeroomSectionId, setHomeroomSectionId] = useState("");
 
   const homeroomGrade = grades.find((g) => g.id === homeroomGradeId);
-  const homeroomNeedsSection =
-    hasHomeroom && (homeroomGrade?.sections.length ?? 0) > 0;
+  const homeroomNeedsSection = hasHomeroom && (homeroomGrade?.sections.length ?? 0) > 0;
+
+  const homeroomCount = people.filter((t) => t.homeroom).length;
+  const subjectsCount = people.filter((t) => (t.teachingSlots?.length ?? 0) > 0).length;
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return people;
     return people.filter(
       (t) =>
-        t.name.toLowerCase().includes(q) ||
+        displayName(t).toLowerCase().includes(q) ||
         t.email.toLowerCase().includes(q) ||
+        (t.teacherId ?? "").toLowerCase().includes(q) ||
         (t.homeroom?.gradeName ?? "").toLowerCase().includes(q) ||
         (t.teachingSlots ?? []).some((s) =>
           `${s.gradeName} ${s.subjectName}`.toLowerCase().includes(q),
@@ -135,8 +169,7 @@ export function TeachersWorkspace() {
     try {
       const homeroomPayload = {
         homeroomGradeId: hasHomeroom && homeroomGradeId ? homeroomGradeId : null,
-        homeroomSectionId:
-          hasHomeroom && homeroomSectionId ? homeroomSectionId : null,
+        homeroomSectionId: hasHomeroom && homeroomSectionId ? homeroomSectionId : null,
       };
       if (editTarget) {
         await updateTeacher(editTarget.userId, {
@@ -164,130 +197,195 @@ export function TeachersWorkspace() {
     }
   }
 
-  return (
-    <div className="att-page tch-workspace">
-      {error ? <p className="att-toast att-toast--error">{error}</p> : null}
-
-      <div className="tch-workflow">
-        <div className="tch-workflow__step tch-workflow__step--active">
-          <span className="tch-workflow__num">1</span>
-          <div>
-            <strong>Teachers & homeroom</strong>
-            <span>Add staff and assign one homeroom class per teacher.</span>
-          </div>
-        </div>
-        <div className="tch-workflow__arrow" aria-hidden>
-          →
-        </div>
-        <Link href="/admin/subjects/assign" className="tch-workflow__step">
-          <span className="tch-workflow__num">2</span>
-          <div>
-            <strong>Subject classes</strong>
-            <span>Pick grade & section, then assign Math, English, etc.</span>
-          </div>
-        </Link>
-      </div>
-
-      <div className="tch-toolbar tch-toolbar--modern">
-        <button type="button" className="att-btn att-btn--primary" onClick={openCreate}>
-          + Add teacher
+  function renderActions(t: TeacherRecord, compact?: boolean) {
+    return (
+      <div className={`tch-v2__actions${compact ? " tch-v2__actions--compact" : ""}`}>
+        <button type="button" className="tch-v2__action" onClick={() => openEdit(t)}>
+          Homeroom
         </button>
-        <label className="tch-search">
-          <span className="sr-only">Search teachers</span>
+        <Link href={assignSubjectsHref(t)} className="tch-v2__action tch-v2__action--primary">
+          Subjects
+        </Link>
+        {t.teacherId ? (
+          <a
+            href={`/print/teacher-id-card?userId=${t.userId}&duplex=1`}
+            className="tch-v2__action"
+            target="_blank"
+            rel="noreferrer"
+          >
+            ID card
+          </a>
+        ) : null}
+      </div>
+    );
+  }
+
+  return (
+    <div className="tch-v2">
+      {error ? (
+        <div className="tch-v2__alert tch-v2__alert--err" role="alert">
+          {error}
+        </div>
+      ) : null}
+
+      <header className="tch-v2__hero">
+        <div className="tch-v2__hero-glow" aria-hidden />
+        <div className="tch-v2__hero-inner">
+          <div className="tch-v2__hero-main">
+            <span className="tch-v2__chip">Faculty</span>
+            <h2 className="tch-v2__hero-title">Teachers &amp; homeroom</h2>
+            <p className="tch-v2__hero-sub">
+              Add staff, assign homeroom classes, then link subject teaching per grade.
+            </p>
+          </div>
+          <div className="tch-v2__hero-stats">
+            <div className="tch-v2__stat">
+              <strong>{people.length}</strong>
+              <span>Teachers</span>
+            </div>
+            <div className="tch-v2__stat">
+              <strong>{homeroomCount}</strong>
+              <span>Homeroom</span>
+            </div>
+            <div className="tch-v2__stat">
+              <strong>{subjectsCount}</strong>
+              <span>Teaching</span>
+            </div>
+            <div className="tch-v2__stat tch-v2__stat--accent">
+              <strong>{filtered.length}</strong>
+              <span>Showing</span>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <div className="tch-v2__toolbar">
+        <label className="tch-v2__search">
+          <DashIcon name="teachers" className="dash-icon--sm" />
           <input
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search name, email, class…"
+            placeholder="Search name, email, class, subject…"
           />
         </label>
-        <Link href="/admin/subjects/assign" className="att-btn att-btn--ghost">
-          Subject assignment
-        </Link>
+        <div className="tch-v2__toolbar-actions">
+          <Link href="/admin/subjects/assign" className="tch-v2__btn tch-v2__btn--ghost">
+            Subject assignment
+          </Link>
+          <Link href="/admin/teachers/cards" className="tch-v2__btn tch-v2__btn--ghost">
+            ID cards
+          </Link>
+          <button type="button" className="tch-v2__btn tch-v2__btn--primary" onClick={openCreate}>
+            + Add teacher
+          </button>
+        </div>
       </div>
 
       {loading ? (
-        <p className="tch-meta">Loading teachers…</p>
+        <div className="tch-v2__loading">
+          <span className="tch-v2__spinner" aria-hidden />
+          <p>Loading teachers…</p>
+        </div>
       ) : filtered.length === 0 ? (
-        <div className="tch-empty">
-          <p>{people.length === 0 ? "No teachers yet." : "No teachers match your search."}</p>
+        <div className="tch-v2__empty">
+          <DashIcon name="teachers" className="dash-icon--lg" />
+          <h3>{people.length === 0 ? "No teachers yet" : "No matches"}</h3>
+          <p>
+            {people.length === 0
+              ? "Add your first teacher, then assign homeroom and subjects."
+              : "Try a different search term."}
+          </p>
           {people.length === 0 ? (
-            <button type="button" className="att-btn att-btn--primary" onClick={openCreate}>
-              Add your first teacher
+            <button type="button" className="tch-v2__btn tch-v2__btn--primary" onClick={openCreate}>
+              Add teacher
             </button>
           ) : null}
         </div>
       ) : (
-        <div className="tch-grid">
-          {filtered.map((t) => {
-            const slots = t.teachingSlots ?? [];
-            const roleLabel =
-              t.roleTemplateName ??
-              (t.roleTemplateSlug
-                ? ROLE_TEMPLATE_LABELS[t.roleTemplateSlug]
-                : "Teacher");
-            return (
-              <article key={t.userId} className="tch-card">
-                <div className="tch-card__top">
-                  <div className="tch-card__avatar" aria-hidden>
-                    {initials(t.name)}
-                  </div>
-                  <div className="tch-card__identity">
-                    <h3 className="tch-card__name">{t.name}</h3>
-                    <p className="tch-card__email">{t.email}</p>
-                    <span className="tch-role-pill">{roleLabel}</span>
-                  </div>
-                </div>
+        <>
+          <div className="tch-v2__table-wrap tch-v2__desktop-only">
+            <table className="tch-v2__table">
+              <thead>
+                <tr>
+                  <th>Teacher</th>
+                  <th>Homeroom</th>
+                  <th>Subject classes</th>
+                  <th aria-label="Actions" />
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((t) => (
+                  <tr key={t.userId}>
+                    <td>
+                      <div className="tch-v2__teacher">
+                        <span className="tch-v2__avatar" aria-hidden>
+                          {initials(displayName(t))}
+                        </span>
+                        <div>
+                          <strong className="tch-v2__name">{displayName(t)}</strong>
+                          <span className="tch-v2__meta">
+                            {t.teacherId ? `${t.teacherId} · ` : ""}
+                            {t.email}
+                          </span>
+                          <span className="tch-v2__badge tch-v2__badge--role">{roleLabel(t)}</span>
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      {t.homeroom ? (
+                        <span className="tch-v2__badge tch-v2__badge--homeroom">
+                          {homeroomLine(t.homeroom)}
+                        </span>
+                      ) : (
+                        <span className="tch-v2__muted">Not assigned</span>
+                      )}
+                    </td>
+                    <td>
+                      <SubjectSlots slots={t.teachingSlots} />
+                    </td>
+                    <td>{renderActions(t)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
-                <div className="tch-card__block">
-                  <span className="tch-card__label">Homeroom</span>
+          <div className="tch-v2__cards tch-v2__mobile-only">
+            {filtered.map((t) => (
+              <article key={t.userId} className="tch-v2__card">
+                <header className="tch-v2__card-head">
+                  <span className="tch-v2__avatar" aria-hidden>
+                    {initials(displayName(t))}
+                  </span>
+                  <div>
+                    <strong className="tch-v2__name">{displayName(t)}</strong>
+                    <span className="tch-v2__meta">{t.email}</span>
+                    {t.teacherId ? (
+                      <span className="tch-v2__meta">{t.teacherId}</span>
+                    ) : null}
+                    <span className="tch-v2__badge tch-v2__badge--role">{roleLabel(t)}</span>
+                  </div>
+                </header>
+                <div className="tch-v2__card-block">
+                  <span className="tch-v2__card-label">Homeroom</span>
                   {t.homeroom ? (
-                    <p className="tch-card__homeroom">
-                      <span className="tch-badge tch-badge--homeroom">Advisory</span>
+                    <span className="tch-v2__badge tch-v2__badge--homeroom">
                       {homeroomLine(t.homeroom)}
-                    </p>
+                    </span>
                   ) : (
-                    <p className="tch-meta">Not assigned</p>
+                    <span className="tch-v2__muted">Not assigned</span>
                   )}
                 </div>
-
-                <div className="tch-card__block">
-                  <span className="tch-card__label">Subject classes</span>
-                  {slots.length > 0 ? (
-                    <ul className="tch-slot-list">
-                      {slots.map((slot, i) => (
-                        <li key={`${slot.gradeName}-${slot.subjectName}-${i}`}>
-                          <span className="tch-badge tch-badge--subject">
-                            {slot.subjectName}
-                          </span>
-                          <span className="tch-slot-class">
-                            {slot.gradeName}
-                            {slot.sectionName ? ` · ${slot.sectionName}` : ""}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="tch-meta">No subjects linked yet</p>
-                  )}
+                <div className="tch-v2__card-block">
+                  <span className="tch-v2__card-label">Subject classes</span>
+                  <SubjectSlots slots={t.teachingSlots} />
                 </div>
-
-                <div className="tch-card__actions">
-                  <button
-                    type="button"
-                    className="att-btn att-btn--ghost"
-                    onClick={() => openEdit(t)}
-                  >
-                    Homeroom
-                  </button>
-                  <Link href={assignSubjectsHref(t)} className="att-btn att-btn--primary">
-                    Assign subjects
-                  </Link>
-                </div>
+                {renderActions(t, true)}
               </article>
-            );
-          })}
-        </div>
+            ))}
+          </div>
+        </>
       )}
 
       {drawerOpen ? (
@@ -380,9 +478,7 @@ export function TeachersWorkspace() {
                 <section className="tch-drawer-section tch-drawer-section--readonly">
                   <h3 className="tch-drawer-section__title">Account</h3>
                   <p className="tch-drawer-readonly">
-                    <strong>
-                      {editTarget.firstName} {editTarget.lastName}
-                    </strong>
+                    <strong>{displayName(editTarget)}</strong>
                     <span>{editTarget.email}</span>
                   </p>
                 </section>
@@ -397,12 +493,12 @@ export function TeachersWorkspace() {
                     onChange={(e) => setRoleTemplateSlug(e.target.value)}
                   >
                     {templates
-                      .filter((t) =>
-                        (TEACHER_ROLE_SLUGS as readonly string[]).includes(t.slug),
+                      .filter((tpl) =>
+                        (TEACHER_ROLE_SLUGS as readonly string[]).includes(tpl.slug),
                       )
-                      .map((t) => (
-                        <option key={t.slug} value={t.slug}>
-                          {t.name}
+                      .map((tpl) => (
+                        <option key={tpl.slug} value={tpl.slug}>
+                          {tpl.name}
                         </option>
                       ))}
                   </select>
@@ -468,7 +564,7 @@ export function TeachersWorkspace() {
                   </>
                 ) : (
                   <p className="tch-meta">
-                    Homeroom is the class this teacher leads daily (one grade & section).
+                    Homeroom is the class this teacher leads daily (one grade &amp; section).
                   </p>
                 )}
               </section>
@@ -477,8 +573,7 @@ export function TeachersWorkspace() {
                 <section className="tch-drawer-section tch-drawer-section--link">
                   <h3 className="tch-drawer-section__title">Subject teaching</h3>
                   <p className="tch-meta">
-                    Assign Math, Science, etc. for each grade on the subject assignment
-                    board.
+                    Assign Math, Science, etc. for each grade on the subject assignment board.
                   </p>
                   <Link
                     href={assignSubjectsHref(editTarget)}

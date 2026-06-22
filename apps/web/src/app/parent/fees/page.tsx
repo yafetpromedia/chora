@@ -1,13 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { DashboardPage } from "@/components/dashboard/dashboard-page";
 import {
   formatEtb,
   getParentFeesDue,
   getParentFinanceOverview,
+  initializeChapaPayment,
   submitParentPayment,
+  verifyChapaPayment,
   type ParentFeesDue,
   type ParentFinanceOverview,
 } from "@/lib/finance";
@@ -15,11 +17,13 @@ import { AUTH_ROLE_KEY, AUTH_TOKEN_KEY } from "@/lib/auth";
 
 export default function ParentFeesPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [overview, setOverview] = useState<ParentFinanceOverview | null>(null);
   const [selectedId, setSelectedId] = useState("");
   const [due, setDue] = useState<ParentFeesDue | null>(null);
   const [loading, setLoading] = useState(true);
   const [paying, setPaying] = useState(false);
+  const [chapaPaying, setChapaPaying] = useState(false);
   const [showPayForm, setShowPayForm] = useState(false);
   const [reference, setReference] = useState("");
   const [payAmount, setPayAmount] = useState("");
@@ -51,6 +55,33 @@ export default function ParentFeesPage() {
       .catch((err) => setError(err instanceof Error ? err.message : "Load failed"));
   }, [selectedId]);
 
+  useEffect(() => {
+    const chapaReturn = searchParams.get("chapa_return");
+    const txRef = searchParams.get("tx_ref")?.trim();
+    if (chapaReturn !== "1" || !txRef) return;
+
+    setPaying(true);
+    setError("");
+    void verifyChapaPayment(txRef)
+      .then((res) => {
+        setMessage(`${res.message}\n\nReceipt #: ${res.receiptNumber}`);
+        if (selectedId) {
+          return getParentFeesDue(selectedId).then(setDue);
+        }
+      })
+      .catch((err) =>
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Could not confirm Chapa payment yet. Try again in a moment.",
+        ),
+      )
+      .finally(() => {
+        setPaying(false);
+        router.replace("/parent/fees");
+      });
+  }, [searchParams, router, selectedId]);
+
   function onProofFile(file: File | null) {
     if (!file) {
       setProofPreview(null);
@@ -63,6 +94,25 @@ export default function ParentFeesPage() {
     const reader = new FileReader();
     reader.onload = () => setProofPreview(reader.result as string);
     reader.readAsDataURL(file);
+  }
+
+  async function onPayWithChapa() {
+    if (!due || !selectedId) return;
+    const amountCents = Math.round(parseFloat(payAmount) * 100);
+    if (!Number.isFinite(amountCents) || amountCents < 1) {
+      setError("Enter a valid amount");
+      return;
+    }
+    setChapaPaying(true);
+    setError("");
+    setMessage("");
+    try {
+      const res = await initializeChapaPayment(selectedId, amountCents);
+      window.location.href = res.checkoutUrl;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Chapa checkout failed");
+      setChapaPaying(false);
+    }
   }
 
   async function onSubmitPayment() {
@@ -186,14 +236,35 @@ export default function ParentFeesPage() {
               {due.items.length > 0 ? (
                 <>
                   {!showPayForm ? (
-                    <button
-                      type="button"
-                      className="auth-page-submit"
-                      style={{ marginTop: "1rem" }}
-                      onClick={() => setShowPayForm(true)}
-                    >
-                      Pay fee (bank transfer)
-                    </button>
+                    <div style={{ marginTop: "1rem", display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
+                      {due.paymentInstructions.methods.includes("CHAPA") ? (
+                        <>
+                          <label className="att-field" style={{ flex: "1 1 100%", margin: 0 }}>
+                            <span>Amount to pay (ETB)</span>
+                            <input
+                              className="auth-input auth-input--login auth-input--login-plain"
+                              value={payAmount}
+                              onChange={(e) => setPayAmount(e.target.value)}
+                            />
+                          </label>
+                          <button
+                            type="button"
+                            className="auth-page-submit"
+                            disabled={chapaPaying || paying}
+                            onClick={() => void onPayWithChapa()}
+                          >
+                            {chapaPaying ? "Opening Chapa…" : "Pay with Chapa"}
+                          </button>
+                        </>
+                      ) : null}
+                      <button
+                        type="button"
+                        className={due.paymentInstructions.methods.includes("CHAPA") ? "att-btn att-btn--ghost" : "auth-page-submit"}
+                        onClick={() => setShowPayForm(true)}
+                      >
+                        Pay by bank transfer
+                      </button>
+                    </div>
                   ) : (
                     <div className="dash-panel dash-panel--flat" style={{ marginTop: "1rem" }}>
                       <h3 className="setup-panel-label">Bank transfer</h3>

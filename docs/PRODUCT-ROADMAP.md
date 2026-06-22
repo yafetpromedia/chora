@@ -82,8 +82,10 @@ Academic Year → Term → ClassSubject → AssessmentTemplate → Scores
   → Report card (weighted average, rank, attendance, comments, HTML print)
 ```
 
-- Admin: `/admin/results`, `/admin/results/academic-years`, `/admin/results/subjects`, `/admin/results/templates`
-- Teacher: `/teacher/results` (scoped)
+- Admin: `/admin/results`, `/admin/results/academic-years`, `/admin/results/subjects`, `/admin/results/templates` (component editor, edit/delete)
+- Teacher: `/teacher/results` (scoped score matrix)
+- Student: `/student/results` (published only) + print view
+- Platform: `/platform` → Assessments (per-school template management)
 - See [ACADEMIC-ENGINE.md](./ACADEMIC-ENGINE.md), [ASSESSMENT-TEMPLATES.md](./ASSESSMENT-TEMPLATES.md)
 
 **Still on roadmap:**
@@ -103,6 +105,33 @@ Academic Year → Term → ClassSubject → AssessmentTemplate → Scores
 - API: `GET /results/promotion/preview`, `POST /results/promotion/execute`, `POST /results/enrollments/sync`
 
 **Next:** auto-copy class subjects & fee schedules into new year.
+
+---
+
+## Priority 7: Content & Curriculum Engine (next major platform sprint)
+
+Turn provisioning from a **one-time copy** into a **platform operating layer**. Full design: [CONTENT-CURRICULUM-ENGINE.md](./CONTENT-CURRICULUM-ENGINE.md).
+
+| Phase | Deliverable |
+|-------|-------------|
+| 1 | Platform Curriculum Packages — DB/UI authority (extend existing `CurriculumPackage`) |
+| 2 | Platform Subject Repository → school copies |
+| 3 | Platform eLibrary Repository — upload once, inherit to schools |
+| 4 | Provisioning Engine v2 + `SchoolProvisioningLog` |
+| 5 | Inheritance (`sourceId`, `isCustomized`) + safe sync |
+| 6 | Marketplace (installable packs) — revenue, later |
+
+**Foundation already shipped:** `SchoolProvisioningService`, `CurriculumPackage` models, package picker at register, platform Assessments per school, communication templates in packages.
+
+**Goal:** Registration → fully configured school in **&lt; 5 minutes** without manual subject/template setup.
+
+---
+
+## Priority 4b: Student portal & eLibrary ✅ (core)
+
+- Student: `/student/results`, `/student/fees`, `/student/library`, `/student/id-card`, `/student/timetable`
+- eLibrary: admin/teacher/student hubs, `LibraryAudience`, local file upload — [ELIBRARY.md](./ELIBRARY.md)
+- Announcement **notification bell** on all school portals (read/unread)
 
 ---
 
@@ -144,11 +173,13 @@ Telebirr + Chapa: parent pays → webhook confirms → balance + receipt.
 | 2 | Academic engine: templates, workflow, report cards | ✅ Core done |
 | 3 | Academic year promotion + enrollment history | ✅ Core done |
 | 3b | Unified school-day dashboards | ✅ Admin / teacher / parent |
+| 3c | Student portal (results, fees, library) + announcement bell | ✅ Core done |
 | 4 | Report card PDF, subject templates, parent messaging | Planned |
-| 5 | Timetable | ✅ Initial (`/admin/timetable`, portal views) |
+| 5 | Timetable | ✅ `/admin/timetable` + portal views |
 | 6 | Chapa + Telebirr live | Planned |
+| 7 | Content & Curriculum Engine (phases 1–4) | Planned — see [CONTENT-CURRICULUM-ENGINE.md](./CONTENT-CURRICULUM-ENGINE.md) |
 
-After sprint 3–4, CampusOne is viable for a full academic year at a private school in Ethiopia.
+After sprint 3–4, CampusOne is viable for a full academic year at a private school in Ethiopia. Sprint 7 makes **onboarding scale** for many schools without per-tenant manual setup.
 
 ---
 

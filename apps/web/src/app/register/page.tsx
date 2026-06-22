@@ -29,6 +29,7 @@ export default function RegisterSchoolPage() {
   const [schoolEmail, setSchoolEmail] = useState("");
   const [adminFirstName, setAdminFirstName] = useState("");
   const [adminLastName, setAdminLastName] = useState("");
+  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [country, setCountry] = useState("");
@@ -57,7 +58,8 @@ export default function RegisterSchoolPage() {
         schoolEmail: schoolEmail.trim() || undefined,
         adminFirstName: adminFirstName.trim(),
         adminLastName: adminLastName.trim(),
-        email: email.trim(),
+        username: username.trim(),
+        email: email.trim() || undefined,
         password,
         phone: phone.trim() || undefined,
         country: country.trim() || undefined,
@@ -187,20 +189,28 @@ export default function RegisterSchoolPage() {
           required
         />
 
-        <div className="auth-page-span-full">
-          <AuthInput
-            id="admin-email"
-            label="Your login email"
-            type="email"
-            icon="email"
-            variant="login"
-            autoComplete="email"
-            placeholder="you@school.edu"
-            value={email}
-            onChange={setEmail}
-            required
-          />
-        </div>
+        <AuthInput
+          id="admin-username"
+          label="Your username"
+          icon="user"
+          variant="login"
+          autoComplete="username"
+          placeholder="e.g. jane.admin"
+          value={username}
+          onChange={setUsername}
+          required
+        />
+        <AuthInput
+          id="admin-email"
+          label="Your email (contact)"
+          type="email"
+          icon="email"
+          variant="login"
+          autoComplete="email"
+          placeholder="you@school.edu"
+          value={email}
+          onChange={setEmail}
+        />
 
         <AuthInput
           id="school-phone"

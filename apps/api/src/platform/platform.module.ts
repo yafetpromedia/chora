@@ -11,6 +11,10 @@ import { ResultsModule } from '../results/results.module';
 import { PlatformAuthService } from './platform-auth.service';
 import { PlatformController } from './platform.controller';
 import { PlatformBillingService } from './platform-billing.service';
+import { PlatformContentSyncService } from './platform-content-sync.service';
+import { PlatformContentService } from './platform-content.service';
+import { PlatformCurriculumAdminService } from './platform-curriculum-admin.service';
+import { PlatformSubjectsService } from './platform-subjects.service';
 import { PlatformService } from './platform.service';
 
 @Module({
@@ -31,13 +35,26 @@ import { PlatformService } from './platform.service';
     }),
     forwardRef(() => AuthModule),
     SchoolsModule,
-    ProvisioningModule,
+    forwardRef(() => ProvisioningModule),
     UsersModule,
     SubscriptionsModule,
     ResultsModule,
   ],
   controllers: [PlatformController],
-  providers: [PlatformAuthService, PlatformService, PlatformBillingService],
-  exports: [PlatformAuthService],
+  providers: [
+    PlatformAuthService,
+    PlatformService,
+    PlatformBillingService,
+    PlatformSubjectsService,
+    PlatformCurriculumAdminService,
+    PlatformContentSyncService,
+    PlatformContentService,
+  ],
+  exports: [
+    PlatformAuthService,
+    PlatformSubjectsService,
+    PlatformContentService,
+    PlatformContentSyncService,
+  ],
 })
 export class PlatformModule {}

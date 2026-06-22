@@ -187,9 +187,9 @@ export function PlatformSettings({ user, onOpenProfile }: Props) {
             <DashIcon name="attendance" className="dash-icon--xs" />
             Billing visibility & trial tracking
           </li>
-          <li>
-            <span className="plat-checklist__pending" />
-            Payment gateway integration (Chapa / Telebirr)
+          <li className="plat-checklist__done">
+            <DashIcon name="attendance" className="dash-icon--xs" />
+            Chapa payment gateway (parent fees &amp; plan checkout)
           </li>
           <li>
             <span className="plat-checklist__pending" />

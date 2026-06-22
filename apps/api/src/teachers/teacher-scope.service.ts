@@ -1,4 +1,8 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -68,6 +72,73 @@ export class TeacherScopeService {
     return this.dedupeScopes(scopes);
   }
 
+  /** Subject teacher assigned on ClassSubject — homeroom-only teachers may view but not edit. */
+  async canEditClassSubjectScores(
+    schoolId: string,
+    userId: string,
+    role: string,
+    classSubjectId: string,
+  ): Promise<boolean> {
+    if (role === UserRole.admin || role === UserRole.staff) {
+      return true;
+    }
+    if (role !== UserRole.teacher) {
+      return false;
+    }
+
+    const cs = await this.prisma.classSubject.findFirst({
+      where: { id: classSubjectId, schoolId },
+      select: { teacherId: true },
+    });
+    return cs?.teacherId === userId;
+  }
+
+  async assertCanEditClassSubjectScores(
+    schoolId: string,
+    userId: string,
+    role: string,
+    classSubjectId: string,
+  ) {
+    if (role !== UserRole.teacher) {
+      return;
+    }
+
+    const cs = await this.prisma.classSubject.findFirst({
+      where: { id: classSubjectId, schoolId },
+      select: { teacherId: true },
+    });
+    if (!cs) {
+      throw new NotFoundException('Class subject not found');
+    }
+
+    if (cs.teacherId !== userId) {
+      throw new ForbiddenException(
+        'Only the assigned subject teacher can enter or change scores',
+      );
+    }
+  }
+
+  async assertHomeroomTeacher(
+    schoolId: string,
+    userId: string,
+    role: string,
+  ) {
+    if (role !== UserRole.teacher) {
+      return;
+    }
+
+    const profile = await this.prisma.teacherProfile.findUnique({
+      where: { userId },
+      select: { schoolId: true, homeroomGradeId: true },
+    });
+
+    if (!profile || profile.schoolId !== schoolId || !profile.homeroomGradeId) {
+      throw new ForbiddenException(
+        'Only homeroom teachers can mark attendance',
+      );
+    }
+  }
+
   assertCanAccessClass(
     scopes: ClassScope[] | null,
     gradeId: string,
@@ -94,6 +165,76 @@ export class TeacherScopeService {
     if (!allowed) {
       throw new ForbiddenException(
         'You do not have access to this class',
+      );
+    }
+  }
+
+  /** Homeroom grade/section only — used for attendance marking. */
+  async listHomeroomGradesForTeacher(schoolId: string, userId: string) {
+    const profile = await this.prisma.teacherProfile.findUnique({
+      where: { userId },
+      select: {
+        schoolId: true,
+        homeroomGradeId: true,
+        homeroomSectionId: true,
+      },
+    });
+
+    if (
+      !profile ||
+      profile.schoolId !== schoolId ||
+      !profile.homeroomGradeId
+    ) {
+      return [];
+    }
+
+    const grade = await this.prisma.grade.findFirst({
+      where: { schoolId, id: profile.homeroomGradeId },
+      include: { sections: { orderBy: { name: 'asc' } } },
+    });
+
+    if (!grade) {
+      return [];
+    }
+
+    const sections = profile.homeroomSectionId
+      ? grade.sections.filter((s) => s.id === profile.homeroomSectionId)
+      : grade.sections;
+
+    return [{ ...grade, sections }];
+  }
+
+  async assertHomeroomClassForAttendance(
+    schoolId: string,
+    userId: string,
+    role: string,
+    gradeId: string,
+    sectionId?: string | null,
+  ) {
+    await this.assertHomeroomTeacher(schoolId, userId, role);
+
+    if (role !== UserRole.teacher) {
+      return;
+    }
+
+    const profile = await this.prisma.teacherProfile.findUnique({
+      where: { userId },
+      select: { homeroomGradeId: true, homeroomSectionId: true },
+    });
+
+    if (!profile?.homeroomGradeId || profile.homeroomGradeId !== gradeId) {
+      throw new ForbiddenException(
+        'Attendance is only for your homeroom class',
+      );
+    }
+
+    if (
+      profile.homeroomSectionId &&
+      sectionId &&
+      profile.homeroomSectionId !== sectionId
+    ) {
+      throw new ForbiddenException(
+        'Attendance is only for your homeroom section',
       );
     }
   }

@@ -22,7 +22,9 @@ import { CreateFeeScheduleDto } from './dto/create-fee-schedule.dto';
 import { RecordPaymentDto } from './dto/record-payment.dto';
 import { RejectPaymentDto } from './dto/reject-payment.dto';
 import { SendRemindersDto } from './dto/send-reminders.dto';
+import { InitializeChapaPaymentDto } from './dto/initialize-chapa-payment.dto';
 import { SubmitParentPaymentDto } from './dto/submit-parent-payment.dto';
+import { VerifyChapaPaymentDto } from './dto/verify-chapa-payment.dto';
 import { FinanceService } from './finance.service';
 
 @Controller('finance')
@@ -208,6 +210,33 @@ export class FinanceController {
       user.schoolId,
       profileId,
       dto,
+    );
+  }
+
+  @Post('parent/students/:profileId/chapa/initialize')
+  @Roles('parent')
+  initializeChapa(
+    @CurrentUser() user: AuthUser,
+    @Param('profileId') profileId: string,
+    @Body() dto: InitializeChapaPaymentDto,
+  ) {
+    return this.financeService.initializeChapaPayment(
+      user.id,
+      user.schoolId,
+      profileId,
+      dto.amountCents,
+    );
+  }
+
+  @Post('parent/chapa/verify')
+  @Roles('parent')
+  verifyChapa(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: VerifyChapaPaymentDto,
+  ) {
+    return this.financeService.verifyChapaPaymentForParent(
+      user.id,
+      dto.txRef,
     );
   }
 }

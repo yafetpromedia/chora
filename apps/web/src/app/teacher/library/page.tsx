@@ -24,7 +24,11 @@ export default function TeacherLibraryPage() {
   }, [router]);
 
   return (
-    <DashboardPage role="teacher" title="eLibrary" eyebrow="Resources">
+    <DashboardPage
+      role="teacher"
+      title="eLibrary"
+      subtitle="Books, notes, exams, and learning materials for your school"
+    >
       <LibraryHubView role="teacher" canUpload={canUpload} />
     </DashboardPage>
   );

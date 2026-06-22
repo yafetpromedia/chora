@@ -1,13 +1,13 @@
 import { apiFetch, apiPatch, apiPost, getApiBaseUrl, type GradeWithSections } from "@/lib/api";
 import { AUTH_ROLE_KEY, AUTH_TOKEN_KEY } from "@/lib/auth";
 import { listGrades } from "@/lib/school-setup";
-import { getMyTeacherClasses } from "@/lib/teachers";
+import { getMyTeacherHomeroomClasses } from "@/lib/teachers";
 
 export async function listGradesForAttendance(): Promise<GradeWithSections[]> {
   const role =
     typeof window !== "undefined" ? localStorage.getItem(AUTH_ROLE_KEY) : null;
   if (role === "teacher") {
-    return getMyTeacherClasses();
+    return getMyTeacherHomeroomClasses();
   }
   return listGrades();
 }
@@ -17,6 +17,28 @@ export type AttendanceMode = "DAILY" | "PERIOD" | "BOTH";
 export type AttendanceStatus = "present" | "absent" | "late" | "excused";
 
 export type AttendanceReason = "sick" | "family_emergency" | "unexcused" | "other";
+
+export type AttendancePermissionType = "ABSENCE" | "LATE" | "EARLY_LEAVE" | "OTHER";
+
+export type AttendancePermissionStatus = "PENDING" | "APPROVED" | "REJECTED";
+
+export type AttendancePermissionRequest = {
+  id: string;
+  type: AttendancePermissionType;
+  date: string;
+  reason: AttendanceReason | null;
+  note: string | null;
+  status: AttendancePermissionStatus;
+  reviewNote: string | null;
+  reviewedAt: string | null;
+  createdAt: string;
+  studentProfileId: string;
+  studentName: string;
+  gradeName: string;
+  sectionName: string | null;
+  requestedBy: string;
+  requestedByRole: string;
+};
 
 export type RosterStudent = {
   studentProfileId: string;
@@ -134,6 +156,50 @@ export async function listParentNotifications() {
 export function attendanceExportUrl(from: string, to: string) {
   const q = new URLSearchParams({ from, to });
   return `${getApiBaseUrl()}/attendance/export?${q}`;
+}
+
+export function createAttendancePermissionRequest(body: {
+  type: AttendancePermissionType;
+  date: string;
+  reason?: AttendanceReason;
+  note?: string;
+  studentProfileId?: string;
+}) {
+  return apiPost<AttendancePermissionRequest>("/attendance/permission-requests", body);
+}
+
+export function listMyAttendancePermissionRequests(studentProfileId?: string) {
+  const q = studentProfileId
+    ? `?studentProfileId=${encodeURIComponent(studentProfileId)}`
+    : "";
+  return apiFetch<AttendancePermissionRequest[]>(
+    `/attendance/permission-requests/mine${q}`,
+  );
+}
+
+export function listAttendancePermissionRequests(params: {
+  gradeId: string;
+  sectionId?: string;
+  status?: AttendancePermissionStatus;
+  date?: string;
+}) {
+  const q = new URLSearchParams({ gradeId: params.gradeId });
+  if (params.sectionId) q.set("sectionId", params.sectionId);
+  if (params.status) q.set("status", params.status);
+  if (params.date) q.set("date", params.date);
+  return apiFetch<AttendancePermissionRequest[]>(
+    `/attendance/permission-requests?${q}`,
+  );
+}
+
+export function reviewAttendancePermissionRequest(
+  id: string,
+  body: { status: "APPROVED" | "REJECTED"; reviewNote?: string },
+) {
+  return apiPatch<AttendancePermissionRequest>(
+    `/attendance/permission-requests/${id}/review`,
+    body,
+  );
 }
 
 export function downloadAttendanceExport(from: string, to: string) {

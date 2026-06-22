@@ -12,6 +12,7 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
+import { ChapaService } from '../payments/chapa.service';
 import { DEFAULT_FEE_TYPES } from './finance.constants';
 import { AssignGradeFeesDto } from './dto/assign-grade-fees.dto';
 import { CreateAcademicYearDto } from './dto/create-academic-year.dto';
@@ -39,6 +40,7 @@ export class FinanceService implements OnModuleInit {
   constructor(
     private readonly prisma: PrismaService,
     private readonly subscriptionsService: SubscriptionsService,
+    private readonly chapaService: ChapaService,
   ) {}
 
   async onModuleInit() {
@@ -778,6 +780,20 @@ export class FinanceService implements OnModuleInit {
 
     const hasBank =
       !!school?.bankName?.trim() && !!school?.bankAccountNumber?.trim();
+    const chapaEnabled = this.chapaService.isConfigured();
+    const methods = [
+      ...(chapaEnabled ? (['CHAPA'] as const) : []),
+      'BANK_TRANSFER',
+    ];
+
+    let note =
+      school?.paymentInstructions?.trim() ||
+      'Pay online with Chapa or transfer to the school account below, then submit your reference for verification.';
+    if (!chapaEnabled) {
+      note =
+        school?.paymentInstructions?.trim() ||
+        'Transfer to the school account below, then submit your reference number and payment screenshot. Finance will verify and issue a receipt.';
+    }
 
     return {
       student: summary.student,
@@ -785,10 +801,8 @@ export class FinanceService implements OnModuleInit {
       totalDueCents: dueItems.reduce((s, i) => s + i.amountCents, 0),
       pendingSubmissions: pendingPayments,
       paymentInstructions: {
-        methods: ['BANK_TRANSFER'],
-        note:
-          school?.paymentInstructions?.trim() ||
-          'Transfer to the school account below, then submit your reference number and payment screenshot. Finance will verify and issue a receipt.',
+        methods,
+        note,
         bank: hasBank
           ? {
               bankName: school!.bankName!,
@@ -798,6 +812,186 @@ export class FinanceService implements OnModuleInit {
           : null,
       },
     };
+  }
+
+  async initializeChapaPayment(
+    parentId: string,
+    schoolId: string,
+    studentProfileId: string,
+    amountCents: number,
+  ) {
+    if (!this.chapaService.isConfigured()) {
+      throw new BadRequestException('Chapa online payments are not configured');
+    }
+
+    await this.assertParentAccess(parentId, studentProfileId);
+    await this.subscriptionsService.assertActive(schoolId);
+
+    const [parent, school, summary] = await Promise.all([
+      this.prisma.user.findUnique({
+        where: { id: parentId },
+        select: {
+          email: true,
+          firstName: true,
+          lastName: true,
+          phone: true,
+        },
+      }),
+      this.prisma.school.findUnique({
+        where: { id: schoolId },
+        select: { name: true },
+      }),
+      this.getStudentFinanceSummary(schoolId, studentProfileId),
+    ]);
+
+    if (!parent) {
+      throw new NotFoundException('Parent account not found');
+    }
+    if (amountCents > summary.outstandingCents) {
+      throw new BadRequestException(
+        `Amount cannot exceed outstanding balance (${formatEtb(summary.outstandingCents)})`,
+      );
+    }
+
+    const receiptNumber = await this.nextReceiptNumber(schoolId);
+    const txRef = `C1-${receiptNumber}`;
+
+    const payment = await this.prisma.payment.create({
+      data: {
+        schoolId,
+        studentProfileId,
+        receiptNumber,
+        amountCents,
+        method: PaymentMethod.CHAPA,
+        status: PaymentStatus.PENDING,
+        reference: txRef,
+        submittedBy: parentId,
+        notes: 'Chapa online payment — awaiting confirmation',
+      },
+    });
+
+    const webAppUrl = process.env.WEB_APP_URL?.trim() || 'http://localhost:3000';
+    const apiUrl = process.env.API_PUBLIC_URL?.trim() || 'http://localhost:3001';
+    const phone = this.normalizeEthiopianPhone(parent.phone);
+
+    let checkout_url: string;
+    try {
+      ({ checkout_url } = await this.chapaService.initializeTransaction({
+      amount: String(amountCents / 100),
+      currency: 'ETB',
+      email: parent.email,
+      first_name: parent.firstName,
+      last_name: parent.lastName,
+      ...(phone ? { phone_number: phone } : {}),
+      tx_ref: txRef,
+      callback_url: `${apiUrl}/payments/chapa/callback`,
+      return_url: `${webAppUrl}/parent/fees?chapa_return=1&tx_ref=${encodeURIComponent(txRef)}`,
+      customization: {
+        title: school?.name ?? 'School fee payment',
+        description: `Fee payment for ${summary.student.name}`,
+      },
+    }));
+    } catch (err) {
+      await this.prisma.payment.delete({ where: { id: payment.id } });
+      throw new BadRequestException(
+        err instanceof Error ? err.message : 'Chapa checkout could not be started',
+      );
+    }
+
+    return {
+      checkoutUrl: checkout_url,
+      txRef,
+      receiptNumber,
+      message: 'Redirecting to Chapa checkout…',
+    };
+  }
+
+  async verifyChapaPaymentForParent(parentId: string, txRef: string) {
+    const payment = await this.findChapaPaymentByTxRef(txRef, parentId);
+    if (!payment) {
+      throw new NotFoundException('Payment not found');
+    }
+
+    if (payment.status === PaymentStatus.COMPLETED) {
+      return {
+        status: 'COMPLETED',
+        receiptNumber: payment.receiptNumber,
+        message: 'Payment confirmed. Receipt is ready.',
+        receipt: await this.getPaymentReceipt(payment.schoolId, payment.id),
+      };
+    }
+
+    if (payment.status !== PaymentStatus.PENDING) {
+      throw new BadRequestException('Payment is no longer pending');
+    }
+
+    const receipt = await this.completeChapaPayment(txRef);
+    return {
+      status: 'COMPLETED',
+      receiptNumber: payment.receiptNumber,
+      message: 'Payment confirmed. Thank you!',
+      receipt,
+    };
+  }
+
+  async completeChapaPayment(txRef: string) {
+    const payment = await this.findChapaPaymentByTxRef(txRef);
+    if (!payment) {
+      throw new NotFoundException('Chapa payment not found');
+    }
+    if (payment.status === PaymentStatus.COMPLETED) {
+      return this.getPaymentReceipt(payment.schoolId, payment.id);
+    }
+    if (payment.status !== PaymentStatus.PENDING) {
+      throw new BadRequestException('Payment is not pending');
+    }
+
+    const verified = await this.chapaService.verifyTransaction(txRef);
+    if (verified.status !== 'success') {
+      throw new BadRequestException('Chapa payment was not successful');
+    }
+
+    const paidCents = Math.round(parseFloat(verified.amount) * 100);
+    if (paidCents !== payment.amountCents) {
+      throw new BadRequestException('Paid amount does not match expected fee');
+    }
+
+    await this.prisma.payment.update({
+      where: { id: payment.id },
+      data: {
+        reference: `${txRef}|${verified.reference}`,
+        notes: `Chapa payment confirmed (ref ${verified.reference})`,
+      },
+    });
+
+    return this.approvePendingPayment(
+      payment.schoolId,
+      payment.id,
+      payment.submittedBy ?? 'chapa',
+    );
+  }
+
+  private findChapaPaymentByTxRef(txRef: string, parentId?: string) {
+    return this.prisma.payment.findFirst({
+      where: {
+        method: PaymentMethod.CHAPA,
+        ...(parentId ? { submittedBy: parentId } : {}),
+        OR: [
+          { reference: txRef },
+          { reference: { startsWith: `${txRef}|` } },
+        ],
+      },
+    });
+  }
+
+  private normalizeEthiopianPhone(phone: string | null | undefined): string | null {
+    if (!phone?.trim()) return null;
+    const digits = phone.replace(/\D/g, '');
+    if (digits.length === 10 && /^0[79]/.test(digits)) return digits;
+    if (digits.length === 12 && digits.startsWith('251')) {
+      return `0${digits.slice(3)}`;
+    }
+    return null;
   }
 
   async submitParentPayment(

@@ -31,7 +31,23 @@ const DEFAULT_COMPONENTS: TemplateComponentDraft[] = [
   { name: "Assignment", weightPercent: 30, maxScore: 30 },
 ];
 
+type CatalogRow = {
+  id: string;
+  key: string;
+  name: string;
+  description: string | null;
+  gradeMin: number | null;
+  gradeMax: number | null;
+  components: TemplateComponent[];
+  _count: { packageLinks: number; schoolTemplates: number };
+};
+
+type AssessTab = "catalog" | "school";
+
 export function PlatformAssessments({ schools }: { schools: PlatformSchoolRow[] }) {
+  const [tab, setTab] = useState<AssessTab>("catalog");
+  const [catalog, setCatalog] = useState<CatalogRow[]>([]);
+  const [catalogLoading, setCatalogLoading] = useState(true);
   const [schoolId, setSchoolId] = useState("");
   const [templates, setTemplates] = useState<TemplateRow[]>([]);
   const [name, setName] = useState("School default template");
@@ -46,6 +62,14 @@ export function PlatformAssessments({ schools }: { schools: PlatformSchoolRow[] 
       setSchoolId(schools[0].id);
     }
   }, [schoolId, schools]);
+
+  useEffect(() => {
+    setCatalogLoading(true);
+    void platformFetch<CatalogRow[]>("/platform/assessment-templates/catalog")
+      .then(setCatalog)
+      .catch(() => setCatalog([]))
+      .finally(() => setCatalogLoading(false));
+  }, []);
 
   async function loadTemplates(targetSchoolId: string) {
     if (!targetSchoolId) return;
@@ -143,20 +167,95 @@ export function PlatformAssessments({ schools }: { schools: PlatformSchoolRow[] 
     }
   }
 
+  async function copyCatalogToSchool(platformTemplateId: string) {
+    if (!schoolId) return;
+    setError("");
+    try {
+      await platformFetch(
+        `/platform/schools/${schoolId}/copy-assessment-template/${platformTemplateId}`,
+        { method: "POST", body: JSON.stringify({}) },
+      );
+      await loadTemplates(schoolId);
+      setTab("school");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Copy failed");
+    }
+  }
+
   return (
     <div className="plat-section">
       <header className="plat-section-hero">
         <div>
-          <p className="plat-section-hero__eyebrow">Academics control</p>
+          <p className="plat-section-hero__eyebrow">Content & Curriculum Engine</p>
           <h2 className="plat-section-hero__title">Assessment templates</h2>
           <p className="plat-section-hero__sub">
-            Superadmin can create and adjust school templates for worksheet, activity, quiz, test, and assignment structures.
+            Platform catalog copied on school provision; override per school when needed.
           </p>
         </div>
       </header>
 
       {error ? <p className="auth-alert auth-alert--error">{error}</p> : null}
 
+      <div className="plat-filter-tabs plat-curriculum-tabs" role="tablist">
+        <button
+          type="button"
+          className={`plat-filter-tab${tab === "catalog" ? " plat-filter-tab--active" : ""}`}
+          onClick={() => setTab("catalog")}
+        >
+          Platform catalog
+        </button>
+        <button
+          type="button"
+          className={`plat-filter-tab${tab === "school" ? " plat-filter-tab--active" : ""}`}
+          onClick={() => setTab("school")}
+        >
+          Per school
+        </button>
+      </div>
+
+      {tab === "catalog" ? (
+        <section className="plat-panel">
+          {catalogLoading ? (
+            <p className="plat-panel__hint">Loading catalog…</p>
+          ) : (
+            <div className="dash-list">
+              {catalog.map((t) => (
+                <article key={t.id} className="res-template-card">
+                  <strong>{t.name}</strong>
+                  <p className="tch-meta">
+                    <code>{t.key}</code>
+                    {t.gradeMin != null && t.gradeMax != null
+                      ? ` · Grades ${t.gradeMin}–${t.gradeMax}`
+                      : ""}
+                  </p>
+                  <div className="res-template-card__components">
+                    {t.components.map((c) => (
+                      <span key={c.id} className="res-template-pill">
+                        {c.name} {c.weightPercent}%
+                      </span>
+                    ))}
+                  </div>
+                  <p className="tch-meta">
+                    {t._count.packageLinks} package(s) · {t._count.schoolTemplates} school(s)
+                  </p>
+                  {schoolId ? (
+                    <button
+                      type="button"
+                      className="dash-copy-btn"
+                      onClick={() => void copyCatalogToSchool(t.id)}
+                    >
+                      Copy to selected school
+                    </button>
+                  ) : null}
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+      ) : null}
+
+      {tab === "school" ? (
+      <>
       <section className="plat-panel">
         <label className="att-field att-field--wide">
           <span>School</span>
@@ -245,6 +344,8 @@ export function PlatformAssessments({ schools }: { schools: PlatformSchoolRow[] 
           </div>
         </form>
       </section>
+      </>
+      ) : null}
     </div>
   );
 }

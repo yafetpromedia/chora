@@ -190,31 +190,6 @@
 .auth-demo-title { margin: 0; font-size: 0.8rem; font-weight: 700; color: var(--brand-teal-dark); }
 .auth-demo-text { margin: 0.35rem 0 0; font-size: 0.875rem; line-height: 1.55; color: var(--brand-muted); }
 
-.auth-google-wrap { position: relative; width: 100%; }
-.auth-google-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.65rem;
-  width: 100%;
-  min-height: 48px;
-  padding: 0.75rem 1rem;
-  font-family: inherit;
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--lite-black);
-  background: #fff;
-  border: 1.5px solid var(--brand-border);
-  border-radius: 0.75rem;
-  cursor: pointer;
-}
-.auth-google-overlay {
-  position: absolute;
-  inset: 0;
-  opacity: 0.01;
-  overflow: hidden;
-}
-
 .auth-separator {
   display: flex;
   align-items: center;
@@ -890,32 +865,6 @@
   color: var(--brand-muted);
 }
 
-/* Login Google — full width, compact */
-.auth-google-wrap--login {
-  width: 100%;
-}
-
-.auth-google-btn--login {
-  flex-direction: row;
-  width: 100%;
-  min-height: 42px;
-  padding: 0.5rem 0.75rem;
-  font-size: 0.875rem;
-  border-radius: 0.6rem;
-  border: 1px solid var(--brand-border);
-  background: #fff;
-  box-shadow: none;
-}
-
-.auth-google-btn--login .auth-google-text {
-  font-size: 0.875rem;
-  color: var(--lite-black);
-}
-
-.auth-google-wrap--login .auth-google-overlay {
-  border-radius: 0.6rem;
-}
-
 /* ── Login page — nav + single sign-in card ── */
 .auth-login-scene {
   min-height: 100dvh;
@@ -1127,34 +1076,6 @@
   box-shadow: none;
 }
 
-.auth-login-scene .auth-page-separator {
-  margin: 1.15rem 0;
-}
-
-.auth-login-scene .auth-page-separator span {
-  font-size: 0.875rem;
-}
-
-.auth-login-scene .auth-google-btn--login {
-  min-height: 52px;
-  font-size: 1rem;
-  border-radius: 0.75rem;
-  border-color: #e5e7eb;
-}
-
-.auth-login-scene .auth-google-btn--login .auth-google-text {
-  font-size: 1rem;
-}
-
-.auth-login-scene .auth-google-badge {
-  margin-left: 0.35rem;
-  font-size: 0.65rem;
-  padding: 0.1rem 0.35rem;
-  border-radius: 0.25rem;
-  background: #fef3c7;
-  color: #92400e;
-}
-
 .auth-login-card__more {
   margin-top: 1.35rem;
   padding-top: 1.35rem;
@@ -1234,13 +1155,8 @@
 
   .auth-login-scene .auth-input--login,
   .auth-login-scene select.auth-input--login,
-  .auth-login-scene .auth-page-submit,
-  .auth-login-scene .auth-google-btn--login {
+  .auth-login-scene .auth-page-submit {
     min-height: 44px;
-    font-size: 0.9375rem;
-  }
-
-  .auth-login-scene .auth-google-btn--login .auth-google-text {
     font-size: 0.9375rem;
   }
 

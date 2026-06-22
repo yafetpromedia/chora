@@ -27,25 +27,35 @@ starts both after clearing ports 3000 and 3001.
 
 1. In pgAdmin: create database **`edu_os`** on **Local Postgres** (port **8000** on this PC)
 2. Edit `apps/api/.env` — set your postgres password in `DATABASE_URL`
-3. Run:
+3. Sync database (migrations, with safe fallback):
    ```powershell
-   cd apps\api
-   npm run db:setup
-   npm run dev
+   cd C:\xampp\htdocs\school\edu-os
+   npm run db:sync
    ```
-4. In another terminal:
+4. Run:
    ```powershell
-   cd apps\web
-   npm run dev
+   npm run dev:clean
    ```
+   Or two terminals: `npm run dev:api` and `npm run dev:web`.
 5. Open http://localhost:3000/login
 
-**School portal:** `admin@eduos.local` / `Passw0rd!`  
+**School portal:** School code `BRIGHT1`, username `admin` / `Passw0rd!`  
 **Platform admin:** http://localhost:3000/platform/login — `platform@campusone.local` / `Passw0rd!`
 
 See [docs/WHAT-WE-HAVE.md](./docs/WHAT-WE-HAVE.md) for a full feature list.  
+See [docs/PILOT-READINESS.md](./docs/PILOT-READINESS.md) before onboarding a real school.  
 See [docs/ACADEMIC-ENGINE.md](./docs/ACADEMIC-ENGINE.md) for results, workflow, and report cards.  
+See [docs/ASSESSMENT-TEMPLATES.md](./docs/ASSESSMENT-TEMPLATES.md) for configurable worksheets, quizzes, tests, and weights.  
+See [docs/ELIBRARY.md](./docs/ELIBRARY.md) for the student/teacher digital library.  
 See [docs/TENANT-ARCHITECTURE.md](./docs/TENANT-ARCHITECTURE.md) for the 2-layer SaaS model.
+
+**Quick portal paths after login:**
+
+| Role | Common tasks |
+|------|----------------|
+| Admin | Results → `/admin/results` · Templates → `/admin/results/templates` · eLibrary → `/admin/library` |
+| Teacher | Enter scores → `/teacher/results` · Attendance scan → `/teacher/attendance` |
+| Student | Published report card → `/student/results` · Fees → `/student/fees` · Library → `/student/library` |
 
 ## After pulling permission / schema updates
 
@@ -97,5 +107,20 @@ CampusOne is a **website** — open it in **Chrome or Safari** on your phone. It
    School login: `/login` · Platform: `/platform/login`
 
 6. If login still fails, run `npm run ports:free` then `npm run dev:clean` (fixes API `EADDRINUSE` on 3001). Allow **Windows Firewall** for ports **3000** and **3001** on private networks.
+
+### New page shows 404 in dev (e.g. `/teacher/timetable`)
+
+The route file exists; dev Turbopack sometimes keeps a **stale cache** after new pages are added.
+
+1. Stop the dev terminal (`Ctrl+C`).
+2. Run:
+   ```powershell
+   cd C:\xampp\htdocs\school\edu-os
+   npm run dev:clean
+   ```
+   (`dev:clean` clears ports, deletes `apps/web/.next`, and restarts.)
+3. Hard-refresh the browser (`Ctrl+Shift+R`).
+
+**Note:** Use only the root `edu-os/package-lock.json` — do not add a separate `apps/web/package-lock.json` (it breaks Next.js route discovery in dev).
 
 **Note:** Your phone must stay on the **same Wi‑Fi** as the PC. For access from anywhere (not just home Wi‑Fi), deploy to a public server or use a tunnel (e.g. ngrok) later.

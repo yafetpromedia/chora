@@ -15,6 +15,7 @@ export interface AuthUser {
   permissions: PermissionKey[];
   roleTemplateSlug: string | null;
   roleTemplateName: string | null;
+  username: string;
   email: string;
   firstName: string;
   lastName: string;

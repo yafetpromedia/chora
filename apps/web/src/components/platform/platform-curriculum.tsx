@@ -30,7 +30,7 @@ type PackageDetail = PackageRow & {
     resourceType: string;
     subject?: string | null;
   }[];
-  templates: { key: string; name: string; channel: string }[];
+  templates: { key: string; name: string; channel: string; body: string }[];
 };
 
 type DetailTab = "overview" | "subjects" | "structure" | "library" | "templates";
@@ -80,6 +80,10 @@ export function PlatformCurriculum() {
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [editingMeta, setEditingMeta] = useState(false);
+  const [editLabel, setEditLabel] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [catalogSyncing, setCatalogSyncing] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -157,6 +161,53 @@ export function PlatformCurriculum() {
     }
     return map;
   }, [detail]);
+
+  useEffect(() => {
+    if (!detail) return;
+    setEditLabel(detail.label);
+    setEditDescription(detail.description ?? "");
+  }, [detail]);
+
+  async function savePackageMeta() {
+    if (!detail) return;
+    setError("");
+    try {
+      await platformFetch(`/platform/curriculum-packages/${detail.key}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          label: editLabel.trim(),
+          description: editDescription.trim() || null,
+        }),
+      });
+      setEditingMeta(false);
+      await load();
+      const refreshed = await platformFetch<PackageDetail>(
+        `/platform/curriculum-packages/${detail.key}`,
+      );
+      setDetail(refreshed);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Save failed");
+    }
+  }
+
+  async function syncCatalog() {
+    setCatalogSyncing(true);
+    setError("");
+    try {
+      await platformFetch("/platform/catalog/sync", { method: "POST" });
+      await load();
+      if (selectedKey) {
+        const refreshed = await platformFetch<PackageDetail>(
+          `/platform/curriculum-packages/${selectedKey}`,
+        );
+        setDetail(refreshed);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Catalog sync failed");
+    } finally {
+      setCatalogSyncing(false);
+    }
+  }
 
   async function copyKey() {
     if (!detail) return;
@@ -271,9 +322,17 @@ export function PlatformCurriculum() {
         <button
           type="button"
           className="plat-btn plat-btn--ghost"
+          disabled={catalogSyncing}
+          onClick={() => void syncCatalog()}
+        >
+          {catalogSyncing ? "Syncing…" : "Sync catalog"}
+        </button>
+        <button
+          type="button"
+          className="plat-btn plat-btn--ghost"
           onClick={() => void load()}
         >
-          Refresh catalog
+          Refresh
         </button>
       </div>
 
@@ -349,6 +408,15 @@ export function PlatformCurriculum() {
                   </div>
                 </div>
                 <div className="plat-curriculum-main__actions">
+                  {!detail.isBlank ? (
+                    <button
+                      type="button"
+                      className="plat-btn plat-btn--ghost plat-btn--xs"
+                      onClick={() => setEditingMeta((v) => !v)}
+                    >
+                      {editingMeta ? "Cancel edit" : "Edit package"}
+                    </button>
+                  ) : null}
                   <button
                     type="button"
                     className="plat-btn plat-btn--ghost plat-btn--xs"
@@ -358,6 +426,29 @@ export function PlatformCurriculum() {
                   </button>
                 </div>
               </header>
+
+              {editingMeta && !detail.isBlank ? (
+                <div className="plat-curriculum-form plat-curriculum-form--meta">
+                  <input
+                    value={editLabel}
+                    onChange={(e) => setEditLabel(e.target.value)}
+                    placeholder="Package label"
+                  />
+                  <textarea
+                    value={editDescription}
+                    onChange={(e) => setEditDescription(e.target.value)}
+                    placeholder="Description"
+                    rows={2}
+                  />
+                  <button
+                    type="button"
+                    className="plat-btn plat-btn--primary plat-btn--xs"
+                    onClick={() => void savePackageMeta()}
+                  >
+                    Save package
+                  </button>
+                </div>
+              ) : null}
 
               {detail.isBlank ? (
                 <div className="plat-curriculum-blank">

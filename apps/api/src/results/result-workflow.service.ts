@@ -67,6 +67,33 @@ export class ResultWorkflowService {
     return sheet;
   }
 
+  /** Teachers edit unlocked components until admin locks them; only published is fully frozen. */
+  async assertCanSaveScores(
+    schoolId: string,
+    termId: string,
+    classSubjectId: string,
+    role?: string,
+  ) {
+    const sheet = await this.getOrCreateSheet(schoolId, termId, classSubjectId);
+
+    if (role === 'teacher') {
+      if (sheet.status === ResultWorkflowStatus.PUBLISHED) {
+        throw new BadRequestException(
+          'This score sheet is published and cannot be edited.',
+        );
+      }
+      return sheet;
+    }
+
+    if (sheet.status === ResultWorkflowStatus.PUBLISHED) {
+      throw new BadRequestException(
+        'Published sheets cannot be edited. Reopen the sheet first.',
+      );
+    }
+
+    return sheet;
+  }
+
   async submit(
     schoolId: string,
     termId: string,
@@ -79,6 +106,17 @@ export class ResultWorkflowService {
 
     if (sheet.status !== ResultWorkflowStatus.DRAFT) {
       throw new BadRequestException('Only draft sheets can be submitted');
+    }
+
+    const savedScores = await this.countSheetScores(
+      schoolId,
+      termId,
+      classSubjectId,
+    );
+    if (savedScores === 0) {
+      throw new BadRequestException(
+        'Enter and save at least one score before submitting',
+      );
     }
 
     const updated = await this.prisma.classSubjectTermSheet.update({
@@ -140,6 +178,8 @@ export class ResultWorkflowService {
       );
     }
 
+    await this.assertSheetHasScores(schoolId, termId, classSubjectId);
+
     const updated = await this.prisma.classSubjectTermSheet.update({
       where: { id: sheet.id },
       data: {
@@ -183,11 +223,112 @@ export class ResultWorkflowService {
     return this.formatSheet(updated);
   }
 
-  listPending(schoolId: string, status?: ResultWorkflowStatus) {
+  async approveBulk(
+    schoolId: string,
+    userId: string,
+    termId?: string,
+    sheetIds?: string[],
+  ) {
+    const result = await this.prisma.classSubjectTermSheet.updateMany({
+      where: {
+        schoolId,
+        status: ResultWorkflowStatus.SUBMITTED,
+        ...(termId ? { termId } : {}),
+        ...(sheetIds?.length ? { id: { in: sheetIds } } : {}),
+      },
+      data: {
+        status: ResultWorkflowStatus.APPROVED,
+        approvedBy: userId,
+        approvedAt: new Date(),
+      },
+    });
+    return { approved: result.count };
+  }
+
+  async publishBulk(
+    schoolId: string,
+    userId: string,
+    termId?: string,
+    sheetIds?: string[],
+  ) {
+    const candidates = await this.prisma.classSubjectTermSheet.findMany({
+      where: {
+        schoolId,
+        status: {
+          in: [
+            ResultWorkflowStatus.APPROVED,
+            ResultWorkflowStatus.SUBMITTED,
+          ],
+        },
+        ...(termId ? { termId } : {}),
+        ...(sheetIds?.length ? { id: { in: sheetIds } } : {}),
+      },
+      select: { id: true, termId: true, classSubjectId: true, status: true },
+    });
+
+    const publishable: typeof candidates = [];
+    for (const sheet of candidates) {
+      const count = await this.countSheetScores(
+        schoolId,
+        sheet.termId,
+        sheet.classSubjectId,
+      );
+      if (count > 0) publishable.push(sheet);
+    }
+
+    if (publishable.length === 0) {
+      return {
+        published: 0,
+        skipped: candidates.length,
+      };
+    }
+
+    const now = new Date();
+    const publishableIds = publishable.map((s) => s.id);
+
+    const [fromApproved, fromSubmitted] = await this.prisma.$transaction([
+      this.prisma.classSubjectTermSheet.updateMany({
+        where: {
+          id: { in: publishableIds },
+          status: ResultWorkflowStatus.APPROVED,
+        },
+        data: {
+          status: ResultWorkflowStatus.PUBLISHED,
+          publishedBy: userId,
+          publishedAt: now,
+        },
+      }),
+      this.prisma.classSubjectTermSheet.updateMany({
+        where: {
+          id: { in: publishableIds },
+          status: ResultWorkflowStatus.SUBMITTED,
+        },
+        data: {
+          status: ResultWorkflowStatus.PUBLISHED,
+          publishedBy: userId,
+          publishedAt: now,
+          approvedBy: userId,
+          approvedAt: now,
+        },
+      }),
+    ]);
+
+    return {
+      published: fromApproved.count + fromSubmitted.count,
+      skipped: candidates.length - publishable.length,
+    };
+  }
+
+  listPending(
+    schoolId: string,
+    status?: ResultWorkflowStatus,
+    termId?: string,
+  ) {
     return this.prisma.classSubjectTermSheet.findMany({
       where: {
         schoolId,
         ...(status ? { status } : { status: ResultWorkflowStatus.SUBMITTED }),
+        ...(termId ? { termId } : {}),
       },
       orderBy: { submittedAt: 'desc' },
       include: {
@@ -256,6 +397,35 @@ export class ResultWorkflowService {
     }
   }
 
+  private countSheetScores(
+    schoolId: string,
+    termId: string,
+    classSubjectId: string,
+  ) {
+    return this.prisma.studentAssessmentScore.count({
+      where: {
+        assessment: { schoolId, termId, classSubjectId },
+      },
+    });
+  }
+
+  private async assertSheetHasScores(
+    schoolId: string,
+    termId: string,
+    classSubjectId: string,
+  ) {
+    const count = await this.countSheetScores(
+      schoolId,
+      termId,
+      classSubjectId,
+    );
+    if (count === 0) {
+      throw new BadRequestException(
+        'Cannot publish — no scores have been entered for this class',
+      );
+    }
+  }
+
   private async assertTeacherAccess(
     schoolId: string,
     classSubjectId: string,
@@ -264,13 +434,12 @@ export class ResultWorkflowService {
   ) {
     if (role !== 'teacher') return;
 
-    const cs = await this.prisma.classSubject.findFirst({
-      where: { id: classSubjectId, schoolId },
-    });
-    if (!cs) throw new NotFoundException('Class subject not found');
-
-    const scopes = await this.teacherScope.getClassScopes(schoolId, userId, role);
-    this.teacherScope.assertCanAccessClass(scopes, cs.gradeId, cs.sectionId);
+    await this.teacherScope.assertCanEditClassSubjectScores(
+      schoolId,
+      userId,
+      role,
+      classSubjectId,
+    );
   }
 
   private formatSheet(sheet: {

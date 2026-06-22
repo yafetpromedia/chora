@@ -28,6 +28,7 @@ export function NavLinks() {
   return (
     <nav className="hidden gap-8 text-sm font-semibold md:flex">
       <a href="#features" className="nav-link">Product</a>
+      <a href="#app" className="nav-link">Mobile app</a>
       <a href="#portals" className="nav-link">Portals</a>
       <a href="#pricing" className="nav-link">Pricing</a>
       <a href="#faq" className="nav-link">FAQ</a>

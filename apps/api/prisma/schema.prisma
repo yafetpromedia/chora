@@ -45,6 +45,19 @@ enum AttendanceReason {
   other
 }
 
+enum AttendancePermissionType {
+  ABSENCE
+  LATE
+  EARLY_LEAVE
+  OTHER
+}
+
+enum AttendancePermissionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 enum Plan {
   TRIAL
   STARTER
@@ -143,6 +156,24 @@ enum Weekday {
   SUNDAY
 }
 
+enum ClassworkType {
+  WORKSHEET
+  ASSIGNMENT
+}
+
+enum ClassworkStatus {
+  DRAFT
+  PUBLISHED
+  CLOSED
+}
+
+enum ClassworkSubmissionStatus {
+  PENDING
+  SUBMITTED
+  LATE
+  GRADED
+}
+
 enum LibraryResourceType {
   BOOK_PDF
   EPUB
@@ -204,6 +235,7 @@ model School {
   libraryResources      LibraryResource[]
   departments           SchoolDepartment[]
   messageTemplates      SchoolMessageTemplate[]
+  provisioningLogs      SchoolProvisioningLog[]
   feeTypes       FeeType[]
   feeSchedules   FeeSchedule[]
   roleTemplates  RoleTemplate[]
@@ -302,10 +334,13 @@ model PlatformInvoice {
   status        PlatformInvoiceStatus @default(DRAFT)
   issuedAt      DateTime              @default(now())
   dueAt         DateTime
-  paidAt        DateTime?
-  notes         String?               @db.Text
-  createdAt     DateTime              @default(now())
-  updatedAt     DateTime              @updatedAt
+  paidAt            DateTime?
+  notes             String?               @db.Text
+  paymentReference  String?               @unique
+  billingInterval   String?
+  initiatedBy       String?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
 
   @@index([schoolId])
   @@index([status])
@@ -372,6 +407,7 @@ model User {
   roleTemplateId  String?
   roleTemplate    RoleTemplate?       @relation(fields: [roleTemplateId], references: [id], onDelete: SetNull)
   permissionGrants UserPermissionGrant[]
+  username        String
   email           String              @unique
   phone           String?
   firstName       String
@@ -393,12 +429,63 @@ model User {
   announcements   Announcement[]      @relation("AnnouncementCreatedBy")
   reads           AnnouncementRead[]
   libraryUploads  LibraryResource[]   @relation("LibraryUploadedBy")
+  studentDocumentsUploaded StudentDocument[] @relation("StudentDocumentUploadedBy")
+  behaviorRecordsRecorded  BehaviorRecord[]  @relation("BehaviorRecordedBy")
+  certificatesIssued       StudentCertificate[] @relation("CertificateIssuedBy")
+  classworkCreated         ClassworkAssignment[] @relation("ClassworkCreatedBy")
+  classworkGraded          ClassworkSubmission[] @relation("ClassworkGradedBy")
+  attendancePermissionsRequested AttendancePermissionRequest[] @relation("AttendancePermissionRequester")
+  attendancePermissionsReviewed  AttendancePermissionRequest[] @relation("AttendancePermissionReviewer")
   createdAt       DateTime            @default(now())
   updatedAt       DateTime            @updatedAt
 
+  @@unique([schoolId, username])
   @@index([schoolId, role])
   @@index([schoolId, staffRole])
   @@index([phone])
+}
+
+enum StudentRecordStatus {
+  ACTIVE
+  GRADUATED
+  TRANSFERRED
+  WITHDRAWN
+}
+
+enum PromotionOutcome {
+  ENROLLED
+  PASSED
+  PROMOTED
+  RETAINED
+  GRADUATED
+}
+
+enum StudentDocumentType {
+  BIRTH_CERTIFICATE
+  NATIONAL_ID
+  PASSPORT
+  TRANSFER_LETTER
+  RECOMMENDATION_LETTER
+  MEDICAL
+  PHOTO
+  OTHER
+}
+
+enum BehaviorRecordType {
+  LATE_ARRIVAL
+  ABSENT_WITHOUT_REASON
+  DISRUPTIVE
+  EXCELLENT_CONDUCT
+  WARNING
+  SUSPENSION
+  OTHER
+}
+
+enum StudentCertificateType {
+  ENROLLMENT
+  COMPLETION
+  GRADUATION
+  CONDUCT
 }
 
 model StudentProfile {
@@ -410,6 +497,8 @@ model StudentProfile {
   grade              Grade                @relation(fields: [gradeId], references: [id])
   sectionId          String?
   section            Section?             @relation(fields: [sectionId], references: [id])
+  status             StudentRecordStatus  @default(ACTIVE)
+  graduatedAt        DateTime?
   gender             Gender?
   middleName         String?
   dateOfBirth        DateTime?
@@ -436,6 +525,12 @@ model StudentProfile {
   enrollments         StudentEnrollment[]
   libraryFavorites    LibraryFavorite[]
   libraryProgress     LibraryReadingProgress[]
+  documents           StudentDocument[]
+  behaviorRecords     BehaviorRecord[]
+  healthRecord        StudentHealthRecord?
+  certificates        StudentCertificate[]
+  classworkSubmissions ClassworkSubmission[]
+  attendancePermissionRequests AttendancePermissionRequest[]
 
   @@unique([schoolId, fan])
   @@unique([schoolId, fcn])
@@ -472,6 +567,29 @@ model AttendanceRecord {
 
   @@unique([schoolId, studentProfileId, date, periodNumber])
   @@index([schoolId, date])
+  @@index([studentProfileId, date])
+}
+
+model AttendancePermissionRequest {
+  id                String                     @id @default(cuid())
+  schoolId          String
+  studentProfileId  String
+  studentProfile    StudentProfile             @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+  requestedByUserId String
+  requester         User                       @relation("AttendancePermissionRequester", fields: [requestedByUserId], references: [id])
+  type              AttendancePermissionType
+  date              DateTime                   @db.Date
+  reason            AttendanceReason?
+  note              String?                    @db.Text
+  status            AttendancePermissionStatus @default(PENDING)
+  reviewedByUserId  String?
+  reviewer          User?                      @relation("AttendancePermissionReviewer", fields: [reviewedByUserId], references: [id])
+  reviewedAt        DateTime?
+  reviewNote        String?                    @db.Text
+  createdAt         DateTime                   @default(now())
+  updatedAt         DateTime                   @updatedAt
+
+  @@index([schoolId, status, date])
   @@index([studentProfileId, date])
 }
 
@@ -525,17 +643,22 @@ model AcademicTerm {
 }
 
 model Subject {
-  id            String         @id @default(cuid())
-  schoolId      String
-  school        School         @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  name          String
-  code          String
+  id                 String           @id @default(cuid())
+  schoolId           String
+  school             School           @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  name               String
+  code               String
+  isSystem           Boolean          @default(false)
+  platformSubjectId  String?
+  platformSubject    PlatformSubject? @relation(fields: [platformSubjectId], references: [id], onDelete: SetNull)
+  isCustomized       Boolean          @default(false)
   classSubjects              ClassSubject[]
   teacherAssignments         TeacherAssignment[]
   assessmentTemplateGrades   AssessmentTemplateGrade[]
   timetableEntries           TimetableEntry[]
 
   @@unique([schoolId, code])
+  @@index([platformSubjectId])
 }
 
 model ClassSubject {
@@ -556,6 +679,7 @@ model ClassSubject {
   assessmentTemplateId String?
   assessmentTemplate   AssessmentTemplate?  @relation(fields: [assessmentTemplateId], references: [id], onDelete: SetNull)
   termSheets           ClassSubjectTermSheet[]
+  classworkAssignments ClassworkAssignment[]
 
   @@unique([schoolId, subjectId, gradeId, sectionId, academicYearId])
   @@index([schoolId, gradeId])
@@ -603,20 +727,25 @@ model StudentTermReport {
 }
 
 model AssessmentTemplate {
-  id            String                      @id @default(cuid())
-  schoolId      String
-  school        School                      @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  name          String
-  description   String?
-  isDefault     Boolean                     @default(false)
-  components    AssessmentTemplateComponent[]
-  gradeLinks    AssessmentTemplateGrade[]
-  classSubjects ClassSubject[]
-  createdAt     DateTime                    @default(now())
-  updatedAt     DateTime                    @updatedAt
+  id                           String                      @id @default(cuid())
+  schoolId                     String
+  school                       School                      @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  name                         String
+  description                  String?
+  isDefault                    Boolean                     @default(false)
+  isSystem                     Boolean                     @default(false)
+  platformAssessmentTemplateId String?
+  platformAssessmentTemplate   PlatformAssessmentTemplate? @relation(fields: [platformAssessmentTemplateId], references: [id], onDelete: SetNull)
+  isCustomized                 Boolean                     @default(false)
+  components                   AssessmentTemplateComponent[]
+  gradeLinks                   AssessmentTemplateGrade[]
+  classSubjects                ClassSubject[]
+  createdAt                    DateTime                    @default(now())
+  updatedAt                    DateTime                    @updatedAt
 
   @@unique([schoolId, name])
   @@index([schoolId])
+  @@index([platformAssessmentTemplateId])
 }
 
 model AssessmentTemplateComponent {
@@ -655,6 +784,8 @@ model Assessment {
   maxScore       Int                      @default(100)
   weightPercent  Int                      @default(100)
   sortOrder      Int                      @default(0)
+  /// When true, teachers cannot enter or edit scores for this component.
+  entryLocked    Boolean                  @default(true)
   scores         StudentAssessmentScore[]
 
   @@unique([termId, classSubjectId, name])
@@ -827,12 +958,62 @@ model TeacherProfile {
   homeroomGrade     Grade?              @relation("TeacherHomeroomGrade", fields: [homeroomGradeId], references: [id], onDelete: SetNull)
   homeroomSectionId String?
   homeroomSection   Section?            @relation("TeacherHomeroomSection", fields: [homeroomSectionId], references: [id], onDelete: SetNull)
+  photoUrl          String?
+  cardCode          String?
   assignments       TeacherAssignment[]
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
 
+  @@unique([schoolId, cardCode])
   @@index([schoolId])
   @@index([homeroomGradeId, homeroomSectionId])
+}
+
+model ClassworkAssignment {
+  id              String           @id @default(cuid())
+  schoolId        String
+  classSubjectId  String
+  classSubject    ClassSubject     @relation(fields: [classSubjectId], references: [id], onDelete: Cascade)
+  createdByUserId String
+  createdBy       User             @relation("ClassworkCreatedBy", fields: [createdByUserId], references: [id], onDelete: Cascade)
+  title           String
+  description     String?          @db.Text
+  type            ClassworkType
+  dueAt           DateTime?
+  fileUrl         String?
+  fileName        String?
+  maxScore        Int              @default(100)
+  status          ClassworkStatus  @default(DRAFT)
+  publishedAt     DateTime?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  submissions     ClassworkSubmission[]
+
+  @@index([schoolId, classSubjectId, status])
+  @@index([schoolId, createdByUserId])
+}
+
+model ClassworkSubmission {
+  id               String                    @id @default(cuid())
+  assignmentId     String
+  assignment       ClassworkAssignment       @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  studentProfileId String
+  studentProfile   StudentProfile            @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+  status           ClassworkSubmissionStatus @default(PENDING)
+  submittedAt      DateTime?
+  fileUrl          String?
+  fileName         String?
+  note             String?                   @db.Text
+  score            Int?
+  feedback         String?                   @db.Text
+  gradedAt         DateTime?
+  gradedByUserId   String?
+  gradedBy         User?                     @relation("ClassworkGradedBy", fields: [gradedByUserId], references: [id], onDelete: SetNull)
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
+
+  @@unique([assignmentId, studentProfileId])
+  @@index([studentProfileId])
 }
 
 model TeacherAssignment {
@@ -857,21 +1038,84 @@ model TeacherAssignment {
 
 /// Historical placement per academic year (do not overwrite when promoting).
 model StudentEnrollment {
-  id               String         @id @default(cuid())
+  id               String            @id @default(cuid())
   studentProfileId String
-  studentProfile   StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+  studentProfile   StudentProfile    @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
   schoolId         String
   academicYearId   String
-  academicYear     AcademicYear   @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+  academicYear     AcademicYear      @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
   gradeId          String
-  grade            Grade          @relation(fields: [gradeId], references: [id], onDelete: Cascade)
+  grade            Grade             @relation(fields: [gradeId], references: [id], onDelete: Cascade)
   sectionId        String?
-  section          Section?       @relation(fields: [sectionId], references: [id], onDelete: SetNull)
-  isCurrent        Boolean        @default(false)
-  enrolledAt       DateTime       @default(now())
+  section          Section?          @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  isCurrent        Boolean           @default(false)
+  promotionOutcome PromotionOutcome  @default(ENROLLED)
+  promotionNote    String?           @db.Text
+  enrolledAt       DateTime          @default(now())
 
   @@unique([studentProfileId, academicYearId])
   @@index([schoolId, academicYearId, isCurrent])
+}
+
+model StudentDocument {
+  id               String              @id @default(cuid())
+  schoolId         String
+  studentProfileId String
+  studentProfile   StudentProfile      @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+  type             StudentDocumentType
+  title            String?
+  fileUrl          String
+  uploadedById     String?
+  uploadedBy       User?               @relation("StudentDocumentUploadedBy", fields: [uploadedById], references: [id], onDelete: SetNull)
+  uploadedAt       DateTime            @default(now())
+
+  @@index([studentProfileId])
+  @@index([schoolId, studentProfileId])
+}
+
+model BehaviorRecord {
+  id               String             @id @default(cuid())
+  schoolId         String
+  studentProfileId String
+  studentProfile   StudentProfile     @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+  date             DateTime           @db.Date
+  type             BehaviorRecordType
+  note             String?            @db.Text
+  recordedById     String
+  recordedBy       User               @relation("BehaviorRecordedBy", fields: [recordedById], references: [id])
+  createdAt        DateTime           @default(now())
+
+  @@index([studentProfileId, date])
+  @@index([schoolId, studentProfileId])
+}
+
+model StudentHealthRecord {
+  id                    String         @id @default(cuid())
+  studentProfileId      String         @unique
+  studentProfile        StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+  bloodType             String?
+  emergencyContactName  String?
+  emergencyContactPhone String?
+  allergies             String?        @db.Text
+  medicalConditions     String?        @db.Text
+  medicationNotes       String?        @db.Text
+  updatedAt             DateTime       @updatedAt
+}
+
+model StudentCertificate {
+  id                 String                 @id @default(cuid())
+  schoolId           String
+  studentProfileId   String
+  studentProfile     StudentProfile         @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+  type               StudentCertificateType
+  certificateNumber  String
+  issuedAt           DateTime               @default(now())
+  issuedById         String?
+  issuedBy           User?                  @relation("CertificateIssuedBy", fields: [issuedById], references: [id], onDelete: SetNull)
+  meta               Json?
+
+  @@index([studentProfileId])
+  @@index([schoolId, certificateNumber])
 }
 
 model FeeType {
@@ -1005,37 +1249,42 @@ model LibraryCategory {
 }
 
 model LibraryResource {
-  id            String                 @id @default(cuid())
-  schoolId      String
-  school        School                 @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  categoryId    String
-  category      LibraryCategory        @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  title         String
-  description   String?                @db.Text
-  fileUrl       String?
-  externalUrl   String?
-  coverUrl      String?
-  resourceType  LibraryResourceType
-  audience      LibraryAudience         @default(BOTH)
-  subject       String?
-  gradeId       String?
-  grade         Grade?                 @relation(fields: [gradeId], references: [id], onDelete: SetNull)
-  author        String?
-  status        LibraryResourceStatus  @default(PUBLISHED)
-  uploadedById  String?
-  uploadedBy    User?                  @relation("LibraryUploadedBy", fields: [uploadedById], references: [id], onDelete: SetNull)
-  publishedAt   DateTime?
-  downloadCount Int                    @default(0)
-  viewCount     Int                    @default(0)
-  favorites     LibraryFavorite[]
-  progress      LibraryReadingProgress[]
-  createdAt     DateTime               @default(now())
-  updatedAt     DateTime               @updatedAt
+  id                       String                  @id @default(cuid())
+  schoolId                 String
+  school                   School                  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  categoryId               String
+  category                 LibraryCategory         @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  title                    String
+  description              String?                 @db.Text
+  fileUrl                  String?
+  externalUrl              String?
+  coverUrl                 String?
+  resourceType             LibraryResourceType
+  audience                 LibraryAudience         @default(BOTH)
+  subject                  String?
+  gradeId                  String?
+  grade                    Grade?                  @relation(fields: [gradeId], references: [id], onDelete: SetNull)
+  author                   String?
+  status                   LibraryResourceStatus   @default(PUBLISHED)
+  isSystem                 Boolean                 @default(false)
+  platformLibraryResourceId String?
+  platformLibraryResource  PlatformLibraryResource? @relation(fields: [platformLibraryResourceId], references: [id], onDelete: SetNull)
+  isCustomized             Boolean                 @default(false)
+  uploadedById             String?
+  uploadedBy               User?                   @relation("LibraryUploadedBy", fields: [uploadedById], references: [id], onDelete: SetNull)
+  publishedAt              DateTime?
+  downloadCount            Int                     @default(0)
+  viewCount                Int                     @default(0)
+  favorites                LibraryFavorite[]
+  progress                 LibraryReadingProgress[]
+  createdAt                DateTime                @default(now())
+  updatedAt                DateTime                @updatedAt
 
   @@index([schoolId, status])
   @@index([schoolId, categoryId])
   @@index([schoolId, gradeId])
   @@index([schoolId, resourceType])
+  @@index([platformLibraryResourceId])
 }
 
 model LibraryFavorite {
@@ -1065,37 +1314,177 @@ model LibraryReadingProgress {
   @@index([studentProfileId])
 }
 
+// ── Platform content layer ──
+
+enum ProvisioningStepStatus {
+  SUCCESS
+  SKIPPED
+  FAILED
+}
+
+model PlatformSubject {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  description String?  @db.Text
+  icon        String?
+  curriculum  String?
+  level       String?
+  gradeMin    Int?
+  gradeMax    Int?
+  isArchived  Boolean  @default(false)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  packageLinks   CurriculumPackageSubject[]
+  schoolSubjects Subject[]
+}
+
+model PlatformAcademicStructure {
+  id          String      @id @default(cuid())
+  key         String      @unique
+  label       String
+  description String?     @db.Text
+  gradePreset GradePreset
+  isArchived  Boolean     @default(false)
+  sortOrder   Int         @default(0)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  packages CurriculumPackage[]
+}
+
+model PlatformLibraryCategory {
+  id          String                  @id @default(cuid())
+  slug        String                  @unique
+  name        String
+  icon        String?
+  description String?
+  sortOrder   Int                     @default(0)
+  resources   PlatformLibraryResource[]
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+}
+
+model PlatformLibraryResource {
+  id           String                  @id @default(cuid())
+  categoryId   String
+  category     PlatformLibraryCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  title        String
+  description  String?                 @db.Text
+  fileUrl      String?
+  externalUrl  String?
+  coverUrl     String?
+  resourceType LibraryResourceType
+  audience     LibraryAudience         @default(BOTH)
+  subject      String?
+  gradeLabel   String?
+  isArchived   Boolean                 @default(false)
+  sortOrder    Int                     @default(0)
+  createdAt    DateTime                @default(now())
+  updatedAt    DateTime                @updatedAt
+
+  packageLinks    CurriculumPackageLibraryItem[]
+  schoolResources LibraryResource[]
+}
+
+model PlatformMessageTemplate {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  name        String
+  channel     String
+  body        String   @db.Text
+  description String?  @db.Text
+  isArchived  Boolean  @default(false)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  packageLinks   CurriculumPackageTemplate[]
+  schoolTemplates SchoolMessageTemplate[]
+}
+
+model PlatformAssessmentTemplate {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  name        String
+  description String?  @db.Text
+  gradeMin    Int?
+  gradeMax    Int?
+  isArchived  Boolean  @default(false)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  components     PlatformAssessmentTemplateComponent[]
+  packageLinks   CurriculumPackageAssessmentTemplate[]
+  schoolTemplates AssessmentTemplate[]
+}
+
+model PlatformAssessmentTemplateComponent {
+  id            String                     @id @default(cuid())
+  templateId    String
+  template      PlatformAssessmentTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  name          String
+  weightPercent Int
+  maxScore      Int                        @default(100)
+  sortOrder     Int                        @default(0)
+
+  @@unique([templateId, name])
+}
+
+model SchoolProvisioningLog {
+  id         String                 @id @default(cuid())
+  schoolId   String
+  school     School                 @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  packageKey String?
+  step       String
+  status     ProvisioningStepStatus
+  message    String?                @db.Text
+  meta       Json?
+  createdAt  DateTime               @default(now())
+
+  @@index([schoolId, createdAt])
+}
+
 // ── Platform curriculum catalog (master presets) ──
 
 model CurriculumPackage {
-  id           String   @id @default(cuid())
-  key          String   @unique
-  label        String
-  description  String?  @db.Text
-  gradePreset  GradePreset?
-  schoolType   SchoolType?
-  isActive     Boolean  @default(true)
-  isBlank      Boolean  @default(false)
-  sortOrder    Int      @default(0)
-  subjects     CurriculumPackageSubject[]
-  departments  CurriculumPackageDepartment[]
-  libraryItems CurriculumPackageLibraryItem[]
-  templates    CurriculumPackageTemplate[]
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                  String   @id @default(cuid())
+  key                 String   @unique
+  label               String
+  description         String?  @db.Text
+  gradePreset         GradePreset?
+  schoolType          SchoolType?
+  academicStructureId String?
+  academicStructure   PlatformAcademicStructure? @relation(fields: [academicStructureId], references: [id], onDelete: SetNull)
+  isActive            Boolean  @default(true)
+  isBlank             Boolean  @default(false)
+  sortOrder           Int      @default(0)
+  subjects            CurriculumPackageSubject[]
+  departments         CurriculumPackageDepartment[]
+  libraryItems        CurriculumPackageLibraryItem[]
+  templates           CurriculumPackageTemplate[]
+  assessmentTemplates CurriculumPackageAssessmentTemplate[]
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 }
 
 model CurriculumPackageSubject {
-  id        String            @id @default(cuid())
-  packageId String
-  package   CurriculumPackage @relation(fields: [packageId], references: [id], onDelete: Cascade)
-  code      String
-  name      String
-  level     String?
-  sortOrder Int               @default(0)
+  id                String            @id @default(cuid())
+  packageId         String
+  package           CurriculumPackage @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  platformSubjectId String?
+  platformSubject   PlatformSubject?  @relation(fields: [platformSubjectId], references: [id], onDelete: SetNull)
+  code              String
+  name              String
+  level             String?
+  sortOrder         Int               @default(0)
 
   @@unique([packageId, code])
   @@index([packageId])
+  @@index([platformSubjectId])
 }
 
 model CurriculumPackageDepartment {
@@ -1109,31 +1498,49 @@ model CurriculumPackageDepartment {
 }
 
 model CurriculumPackageLibraryItem {
-  id           String              @id @default(cuid())
-  packageId    String
-  package      CurriculumPackage   @relation(fields: [packageId], references: [id], onDelete: Cascade)
-  title        String
-  description  String?             @db.Text
-  resourceType LibraryResourceType
-  categorySlug String
-  subject      String?
-  gradeLabel   String?
-  sortOrder    Int                 @default(0)
+  id                       String                   @id @default(cuid())
+  packageId                String
+  package                  CurriculumPackage        @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  platformLibraryResourceId String?
+  platformLibraryResource  PlatformLibraryResource? @relation(fields: [platformLibraryResourceId], references: [id], onDelete: SetNull)
+  title                    String
+  description              String?                  @db.Text
+  resourceType             LibraryResourceType
+  categorySlug             String
+  subject                  String?
+  gradeLabel               String?
+  sortOrder                Int                      @default(0)
 
   @@index([packageId])
+  @@index([platformLibraryResourceId])
 }
 
 model CurriculumPackageTemplate {
-  id        String            @id @default(cuid())
-  packageId String
-  package   CurriculumPackage @relation(fields: [packageId], references: [id], onDelete: Cascade)
-  key       String
-  name      String
-  channel   String
-  body      String            @db.Text
-  sortOrder Int               @default(0)
+  id                        String                   @id @default(cuid())
+  packageId                 String
+  package                   CurriculumPackage        @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  platformMessageTemplateId String?
+  platformMessageTemplate   PlatformMessageTemplate? @relation(fields: [platformMessageTemplateId], references: [id], onDelete: SetNull)
+  key                       String
+  name                      String
+  channel                   String
+  body                      String                   @db.Text
+  sortOrder                 Int                      @default(0)
 
   @@unique([packageId, key])
+  @@index([platformMessageTemplateId])
+}
+
+model CurriculumPackageAssessmentTemplate {
+  id                           String                     @id @default(cuid())
+  packageId                    String
+  package                      CurriculumPackage          @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  platformAssessmentTemplateId String
+  platformAssessmentTemplate   PlatformAssessmentTemplate @relation(fields: [platformAssessmentTemplateId], references: [id], onDelete: Cascade)
+  sortOrder                    Int                        @default(0)
+
+  @@unique([packageId, platformAssessmentTemplateId])
+  @@index([packageId])
 }
 
 model SchoolDepartment {
@@ -1148,14 +1555,19 @@ model SchoolDepartment {
 }
 
 model SchoolMessageTemplate {
-  id       String @id @default(cuid())
-  schoolId String
-  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  key      String
-  name     String
-  channel  String
-  body     String @db.Text
+  id                        String                   @id @default(cuid())
+  schoolId                  String
+  school                    School                   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  key                       String
+  name                      String
+  channel                   String
+  body                      String                   @db.Text
+  isSystem                  Boolean                  @default(false)
+  platformMessageTemplateId String?
+  platformMessageTemplate   PlatformMessageTemplate? @relation(fields: [platformMessageTemplateId], references: [id], onDelete: SetNull)
+  isCustomized              Boolean                  @default(false)
 
   @@unique([schoolId, key])
   @@index([schoolId])
+  @@index([platformMessageTemplateId])
 }

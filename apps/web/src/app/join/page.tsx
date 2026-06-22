@@ -16,6 +16,7 @@ export default function JoinSchoolPage() {
   const [role, setRole] = useState<JoinRole>("student");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [studentId, setStudentId] = useState("");
@@ -45,7 +46,9 @@ export default function JoinSchoolPage() {
         role,
         firstName: firstName.trim(),
         lastName: lastName.trim(),
-        email: email.trim(),
+        username:
+          role === "student" ? studentId.trim() : username.trim(),
+        email: email.trim() || undefined,
         password,
         externalRef: role === "student" ? studentId.trim() : undefined,
       }),
@@ -126,9 +129,22 @@ export default function JoinSchoolPage() {
           required
         />
 
+        {role !== "student" ? (
+          <AuthInput
+            id="join-username"
+            label="Username"
+            icon="user"
+            variant="login"
+            autoComplete="username"
+            placeholder="Choose a username"
+            value={username}
+            onChange={setUsername}
+            required
+          />
+        ) : null}
         <AuthInput
           id="join-email"
-          label="Email"
+          label="Email (contact)"
           type="email"
           icon="email"
           variant="login"
@@ -136,7 +152,6 @@ export default function JoinSchoolPage() {
           placeholder="you@email.com"
           value={email}
           onChange={setEmail}
-          required
         />
         <AuthInput
           id="join-password"

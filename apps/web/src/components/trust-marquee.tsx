@@ -5,6 +5,7 @@ const CAPABILITIES = [
   "Period attendance",
   "Report cards",
   "Fee schedules",
+  "iOS & Android app",
   "Parent portal",
   "Staff roles",
   "Campus ID cards",

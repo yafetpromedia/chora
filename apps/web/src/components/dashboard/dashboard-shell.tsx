@@ -17,7 +17,9 @@ import {
 } from "@/lib/school-brand";
 import { SchoolBrandLockup } from "./school-brand-lockup";
 import { DashIcon } from "./dash-icons";
+import { getMyTeacherProfile } from "@/lib/teachers";
 import { isNavActive, navForRole, type NavItem } from "./nav-config";
+import { AiChatWidget } from "@/components/ai/ai-chat-widget";
 
 type Props = {
   role: UserRole;
@@ -58,7 +60,20 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
     }
     const effectiveRole = stored ?? role;
     setNavRole(effectiveRole);
-    setNav(navForRole(effectiveRole));
+
+    if (effectiveRole === "teacher") {
+      void getMyTeacherProfile()
+        .then((profile) => {
+          setNav(
+            navForRole(effectiveRole, {
+              canTakeAttendance: profile.canTakeAttendance,
+            }),
+          );
+        })
+        .catch(() => setNav(navForRole(effectiveRole)));
+    } else {
+      setNav(navForRole(effectiveRole));
+    }
     const brand = readSchoolBrand();
     setSchoolName(brand.name);
     setSchoolLogoUrl(brand.logoUrl);
@@ -327,6 +342,7 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
         </header>
         <div className="dash-content dash-content--pro">{children}</div>
       </div>
+      <AiChatWidget role={navRole} />
     </div>
   );
 }

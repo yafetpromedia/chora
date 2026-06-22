@@ -19,7 +19,7 @@ export default function StudentIdCardPage() {
     <DashboardPage
       role="student"
       title="Campus ID card"
-      eyebrow="Student"
+      subtitle="Official student identification for your school"
     >
       <MyStudentIdCardPanel />
     </DashboardPage>

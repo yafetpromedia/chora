@@ -1,13 +1,27 @@
 import { Injectable } from '@nestjs/common';
-import { UserRole } from '@prisma/client';
+import {
+  AttendanceStatus,
+  ClassworkStatus,
+  ClassworkSubmissionStatus,
+  UserRole,
+} from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { TimetableService } from '../timetable/timetable.service';
 import { TeacherScopeService } from './teacher-scope.service';
 
-function todayUtc(): Date {
+function todayUtc(offsetDays = 0): Date {
   const d = new Date();
   d.setUTCHours(0, 0, 0, 0);
+  d.setUTCDate(d.getUTCDate() - offsetDays);
   return d;
+}
+
+function isPresent(status: AttendanceStatus) {
+  return (
+    status === AttendanceStatus.present ||
+    status === AttendanceStatus.late ||
+    status === AttendanceStatus.excused
+  );
 }
 
 @Injectable()
@@ -27,7 +41,11 @@ export class TeacherDashboardService {
       select: { id: true, name: true },
     });
 
-    const [profile, grades, announcements, currentTerm] = await Promise.all([
+    const [user, profile, grades, announcements, currentTerm] = await Promise.all([
+      this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { firstName: true, lastName: true },
+      }),
       this.prisma.teacherProfile.findUnique({
         where: { userId },
         include: {
@@ -88,6 +106,8 @@ export class TeacherDashboardService {
       }
     }
 
+    const canTakeAttendance = !!profile?.homeroomGradeId;
+
     const attendancePending: {
       gradeId: string;
       sectionId: string | null;
@@ -97,7 +117,11 @@ export class TeacherDashboardService {
       pendingCount: number;
     }[] = [];
 
-    for (const bucket of classBuckets) {
+    const homeroomBuckets = canTakeAttendance
+      ? classBuckets.filter((b) => b.isHomeroom)
+      : [];
+
+    for (const bucket of homeroomBuckets) {
       if (bucket.studentCount === 0) continue;
 
       const studentIds = await this.prisma.studentProfile.findMany({
@@ -231,10 +255,26 @@ export class TeacherDashboardService {
       orderBy: [{ grade: { sortOrder: 'asc' } }, { subject: { name: 'asc' } }],
     });
 
+    const analytics = await this.buildAnalytics(
+      schoolId,
+      userId,
+      canTakeAttendance ? homeroomBuckets : [],
+      teachingSlots,
+      resultsPending,
+      attendancePending,
+      currentTerm,
+      canTakeAttendance,
+    );
+
     return {
+      teacherName: user
+        ? `${user.firstName} ${user.lastName}`.trim()
+        : 'Teacher',
+      canTakeAttendance,
       date: dateLabel,
       academicYear: currentYear,
       announcements,
+      analytics,
       classesToday: classBuckets.length,
       attendancePendingCount: attendancePending.length,
       resultsPendingCount: resultsPending.length,
@@ -264,6 +304,243 @@ export class TeacherDashboardService {
         subjectName: cs.subject.name,
       })),
       todaySchedule,
+    };
+  }
+
+  private async buildAnalytics(
+    schoolId: string,
+    userId: string,
+    classBuckets: {
+      gradeId: string;
+      sectionId: string | null;
+      studentCount: number;
+    }[],
+    teachingSlots: {
+      id: string;
+      grade: { id: string; name: string };
+      section: { id: string; name: string } | null;
+      subject: { name: string };
+    }[],
+    resultsPending: { missingCount: number }[],
+    attendancePending: unknown[],
+    currentTerm: { id: string; name: string } | null,
+    canTakeAttendance: boolean,
+  ) {
+    const rosterProfiles =
+      teachingSlots.length > 0
+        ? await this.prisma.studentProfile.findMany({
+            where: {
+              schoolId,
+              OR: teachingSlots.map((cs) => ({
+                gradeId: cs.grade.id,
+                ...(cs.section?.id ? { sectionId: cs.section.id } : {}),
+              })),
+            },
+            select: { id: true },
+          })
+        : [];
+    const totalStudents = new Set(rosterProfiles.map((p) => p.id)).size;
+
+    const homeroomProfiles =
+      canTakeAttendance && classBuckets.length > 0
+        ? await this.prisma.studentProfile.findMany({
+            where: {
+              schoolId,
+              OR: classBuckets.map((b) => ({
+                gradeId: b.gradeId,
+                ...(b.sectionId ? { sectionId: b.sectionId } : {}),
+              })),
+            },
+            select: { id: true },
+          })
+        : [];
+    const homeroomStudentIds = homeroomProfiles.map((s) => s.id);
+
+    let markedToday = 0;
+    let presentToday = 0;
+    const attendanceTrend: {
+      date: string;
+      weekday: string;
+      rate: number | null;
+      marked: number;
+      present: number;
+    }[] = [];
+
+    if (canTakeAttendance) {
+      const today = todayUtc();
+      const todayRecords =
+        homeroomStudentIds.length > 0
+          ? await this.prisma.attendanceRecord.findMany({
+              where: {
+                schoolId,
+                date: today,
+                periodNumber: 0,
+                studentProfileId: { in: homeroomStudentIds },
+              },
+              select: { status: true },
+            })
+          : [];
+      markedToday = todayRecords.length;
+      presentToday = todayRecords.filter((r) => isPresent(r.status)).length;
+
+      for (let i = 6; i >= 0; i--) {
+        const d = todayUtc(i);
+        const records =
+          homeroomStudentIds.length > 0
+            ? await this.prisma.attendanceRecord.findMany({
+                where: {
+                  schoolId,
+                  date: d,
+                  periodNumber: 0,
+                  studentProfileId: { in: homeroomStudentIds },
+                },
+                select: { status: true },
+              })
+            : [];
+        const marked = records.length;
+        const present = records.filter((r) => isPresent(r.status)).length;
+        attendanceTrend.push({
+          date: d.toISOString().slice(0, 10),
+          weekday: d.toLocaleDateString('en-US', { weekday: 'short' }),
+          rate: marked > 0 ? Math.round((present / marked) * 100) : null,
+          marked,
+          present,
+        });
+      }
+    }
+
+    let gradingTotal = 0;
+    let gradingComplete = 0;
+    let missingScores = resultsPending.reduce((s, r) => s + r.missingCount, 0);
+
+    if (currentTerm && teachingSlots.length > 0) {
+      const assessments = await this.prisma.assessment.findMany({
+        where: {
+          schoolId,
+          termId: currentTerm.id,
+          classSubjectId: { in: teachingSlots.map((s) => s.id) },
+        },
+        include: { scores: { select: { studentProfileId: true } } },
+      });
+      gradingTotal = assessments.length;
+      for (const a of assessments) {
+        const cs = teachingSlots.find((t) => t.id === a.classSubjectId);
+        if (!cs) continue;
+        const totalStudentsInClass = await this.prisma.studentProfile.count({
+          where: {
+            schoolId,
+            gradeId: cs.grade.id,
+            ...(cs.section?.id ? { sectionId: cs.section.id } : {}),
+          },
+        });
+        if (
+          totalStudentsInClass > 0 &&
+          a.scores.length >= totalStudentsInClass
+        ) {
+          gradingComplete += 1;
+        }
+      }
+    }
+
+    const classSubjectIds = teachingSlots.map((s) => s.id);
+    const classworkRows =
+      classSubjectIds.length > 0
+        ? await this.prisma.classworkAssignment.findMany({
+            where: {
+              schoolId,
+              classSubjectId: { in: classSubjectIds },
+            },
+            include: {
+              submissions: {
+                where: {
+                  status: {
+                    in: [
+                      ClassworkSubmissionStatus.SUBMITTED,
+                      ClassworkSubmissionStatus.LATE,
+                    ],
+                  },
+                  score: null,
+                },
+                select: { id: true },
+              },
+            },
+          })
+        : [];
+
+    const classPerformance: {
+      classSubjectId: string;
+      label: string;
+      averageScore: number | null;
+      assessedCount: number;
+    }[] = [];
+
+    if (currentTerm) {
+      for (const cs of teachingSlots.slice(0, 6)) {
+        const scores = await this.prisma.studentAssessmentScore.findMany({
+          where: {
+            assessment: {
+              schoolId,
+              termId: currentTerm.id,
+              classSubjectId: cs.id,
+            },
+          },
+          select: { score: true },
+        });
+        const avg =
+          scores.length > 0
+            ? Math.round(
+                scores.reduce((s, r) => s + r.score, 0) / scores.length,
+              )
+            : null;
+        classPerformance.push({
+          classSubjectId: cs.id,
+          label: `${cs.grade.name}${cs.section ? ` ${cs.section.name}` : ''} · ${cs.subject.name}`,
+          averageScore: avg,
+          assessedCount: scores.length,
+        });
+      }
+    }
+
+    const gradingProgress =
+      gradingTotal > 0
+        ? Math.round((gradingComplete / gradingTotal) * 100)
+        : null;
+
+    return {
+      totalStudents,
+      subjectsTeaching: teachingSlots.length,
+      classesCount: classBuckets.length,
+      attendanceToday: {
+        marked: markedToday,
+        present: presentToday,
+        total: canTakeAttendance
+          ? classBuckets.reduce((s, b) => s + b.studentCount, 0)
+          : 0,
+        rate:
+          canTakeAttendance && markedToday > 0
+            ? Math.round((presentToday / markedToday) * 100)
+            : null,
+        pendingClasses: canTakeAttendance ? attendancePending.length : 0,
+      },
+      attendanceTrend,
+      grading: {
+        termName: currentTerm?.name ?? null,
+        totalAssessments: gradingTotal,
+        completeAssessments: gradingComplete,
+        progressPct: gradingProgress,
+        missingScores,
+      },
+      classwork: {
+        published: classworkRows.filter((r) => r.status === ClassworkStatus.PUBLISHED)
+          .length,
+        draft: classworkRows.filter((r) => r.status === ClassworkStatus.DRAFT)
+          .length,
+        submissionsToGrade: classworkRows.reduce(
+          (s, r) => s + r.submissions.length,
+          0,
+        ),
+      },
+      classPerformance,
     };
   }
 }

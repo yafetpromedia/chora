@@ -1,0 +1,31 @@
+"use client";
+
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { DashboardPage } from "@/components/dashboard/dashboard-page";
+import { StudentReportCardPanel } from "@/components/results/student-report-card-panel";
+import { AUTH_ROLE_KEY, AUTH_TOKEN_KEY } from "@/lib/auth";
+
+export default function StudentReportCardPage() {
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!localStorage.getItem(AUTH_TOKEN_KEY)) {
+      router.replace("/login");
+      return;
+    }
+    if (localStorage.getItem(AUTH_ROLE_KEY) !== "student") {
+      router.replace(`/${localStorage.getItem(AUTH_ROLE_KEY) ?? "login"}`);
+    }
+  }, [router]);
+
+  return (
+    <DashboardPage
+      role="student"
+      title="Report card"
+      subtitle="Your official term or year-end academic summary"
+    >
+      <StudentReportCardPanel />
+    </DashboardPage>
+  );
+}

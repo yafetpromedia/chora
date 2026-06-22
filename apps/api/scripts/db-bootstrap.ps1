@@ -19,8 +19,7 @@ Write-Host "Generating Prisma client..." -ForegroundColor Cyan
 npm run prisma:generate
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-Write-Host "Applying migrations..." -ForegroundColor Cyan
-npm run prisma:migrate:deploy
+& "$PSScriptRoot\db-sync.ps1" -DatabaseUrl $DatabaseUrl
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 Write-Host "Database bootstrap completed." -ForegroundColor Green

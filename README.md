@@ -83,11 +83,23 @@ NEXT_PUBLIC_GOOGLE_CLIENT_ID=your-google-oauth-client-id
 | `student@eduos.local` | `Passw0rd!` | Student (seed account) |
 | `parent@eduos.local` | `Passw0rd!` | Parent |
 
-**Enrolled students:** sign in at `/login` with **Student ID** (`STU-…`) or portal email + password from **Manage student → Profile**.
+**Enrolled students:** sign in at `/login` with **Student ID** (`STU-…`) or portal email + password from **Manage student → Profile**. Student workspace: results (after admin publish), fees, eLibrary, campus ID, timetable.
+
+**Platform (CampusOne team):** http://localhost:3000/platform/login — `platform@campusone.local` / `Passw0rd!`
 
 School join code for `/join`: **`BRIGHT1`**
 
-**Full feature list:** [docs/WHAT-WE-HAVE.md](./docs/WHAT-WE-HAVE.md)
+**Documentation:**
+
+| Doc | Topic |
+|-----|--------|
+| [docs/WHAT-WE-HAVE.md](./docs/WHAT-WE-HAVE.md) | Full feature inventory |
+| [docs/ACADEMIC-ENGINE.md](./docs/ACADEMIC-ENGINE.md) | Results workflow & report cards |
+| [docs/ASSESSMENT-TEMPLATES.md](./docs/ASSESSMENT-TEMPLATES.md) | Weighted grading per grade |
+| [docs/ELIBRARY.md](./docs/ELIBRARY.md) | Digital learning hub |
+| [docs/CONTENT-CURRICULUM-ENGINE.md](./docs/CONTENT-CURRICULUM-ENGINE.md) | Platform content layer (roadmap) |
+| [docs/CURRICULUM-PRESETS.md](./docs/CURRICULUM-PRESETS.md) | School provisioning (v1) |
+| [SETUP-WINDOWS.md](./SETUP-WINDOWS.md) | Windows / port / phone access |
 
 ## Scripts
 

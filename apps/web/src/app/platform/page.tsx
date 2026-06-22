@@ -3,6 +3,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PlatformCurriculum } from "@/components/platform/platform-curriculum";
+import { PlatformSubjects } from "@/components/platform/platform-subjects";
+import { PlatformLibraryRepo } from "@/components/platform/platform-library-repo";
+import { PlatformMessages } from "@/components/platform/platform-messages";
+import { PlatformStructures } from "@/components/platform/platform-structures";
+import { PlatformProvisioning } from "@/components/platform/platform-provisioning";
 import { PlatformAssessments } from "@/components/platform/platform-assessments";
 import { PlatformBilling } from "@/components/platform/platform-billing";
 import { PlatformInvoices } from "@/components/platform/platform-invoices";
@@ -103,6 +108,11 @@ export default function PlatformDashboardPage() {
             />
           ) : null}
           {section === "curriculum" ? <PlatformCurriculum /> : null}
+          {section === "subjects" ? <PlatformSubjects /> : null}
+          {section === "library" ? <PlatformLibraryRepo /> : null}
+          {section === "messages" ? <PlatformMessages /> : null}
+          {section === "structures" ? <PlatformStructures /> : null}
+          {section === "provisioning" ? <PlatformProvisioning /> : null}
           {section === "assessments" ? <PlatformAssessments schools={schools} /> : null}
           {section === "billing" ? (
             <PlatformBilling

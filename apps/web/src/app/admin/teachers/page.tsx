@@ -21,11 +21,7 @@ export default function AdminTeachersPage() {
   }, [router]);
 
   return (
-    <DashboardPage
-      role={shellRole}
-      title="Teachers"
-      eyebrow="School admin"
-    >
+    <DashboardPage role={shellRole} title="Teachers">
       <TeachersWorkspace />
     </DashboardPage>
   );
