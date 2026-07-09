@@ -599,10 +599,30 @@
   background: var(--lite-black);
 }
 
+.lp3-nav__mobile-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  border: none;
+  padding: 0;
+  background: rgba(15, 45, 45, 0.45);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+@media (min-width: 900px) {
+  .lp3-nav__mobile-backdrop {
+    display: none;
+  }
+}
+
 .lp3-nav__mobile {
   position: fixed;
-  inset: 4rem 0 0;
-  z-index: 99;
+  top: 4rem;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 95;
   display: flex;
   flex-direction: column;
   gap: 1rem;

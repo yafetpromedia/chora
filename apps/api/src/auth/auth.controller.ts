@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { AuthUser } from '../common/auth.types';
 import { SchoolTenantGuard } from '../common/guards/school-tenant.guard';
@@ -10,6 +10,7 @@ import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RegisterSchoolDto } from './dto/register-school.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import { VerifyStudentEnrollmentDto } from './dto/verify-student-enrollment.dto';
 import { JwtAuthGuard } from './jwt-auth.guard';
 
 @Controller('auth')
@@ -19,6 +20,16 @@ export class AuthController {
   @Post('login')
   login(@Body() dto: LoginDto) {
     return this.authService.login(dto);
+  }
+
+  @Get('school-code/:code')
+  validateSchoolCode(@Param('code') code: string) {
+    return this.authService.validateSchoolCode(code);
+  }
+
+  @Post('verify-student')
+  verifyStudent(@Body() dto: VerifyStudentEnrollmentDto) {
+    return this.authService.verifyStudentEnrollment(dto);
   }
 
   @Post('register-school')

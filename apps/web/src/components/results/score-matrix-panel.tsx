@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { DashIcon } from "@/components/dashboard/dash-icons";
 import {
   approveResultWorkflow,
@@ -23,6 +24,16 @@ type Props = {
   initialClassSubjectId?: string | null;
 };
 
+const ALL = "__all__";
+
+function useHydrated() {
+  return useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
+}
+
 const WORKFLOW_LABELS: Record<ResultWorkflowStatus, string> = {
   DRAFT: "Draft",
   SUBMITTED: "Submitted",
@@ -30,8 +41,31 @@ const WORKFLOW_LABELS: Record<ResultWorkflowStatus, string> = {
   PUBLISHED: "Published",
 };
 
-function classLabel(cs: ClassSubject) {
-  return `${cs.grade.name}${cs.section ? ` · ${cs.section.name}` : ""} — ${cs.subject.name}`;
+function heroTitle(
+  cs: ClassSubject | undefined,
+  gradeName: string,
+  subjectId: string,
+  subjectName: string | null,
+  sectionId: string,
+  sectionName: string | null,
+) {
+  if (subjectId === ALL && sectionId === ALL) {
+    return `${gradeName} — All subjects · All sections`;
+  }
+  if (subjectId === ALL) {
+    const section = sectionName ? ` · ${sectionName}` : "";
+    return `${gradeName}${section} — All subjects`;
+  }
+  if (sectionId === ALL) {
+    return `${gradeName} — ${subjectName ?? "Subject"} · All sections`;
+  }
+  if (!cs) return "Enter scores";
+  const section = cs.section ? ` · ${cs.section.name}` : "";
+  return `${cs.grade.name}${section} — ${cs.subject.name}`;
+}
+
+function sectionKey(cs: ClassSubject) {
+  return cs.section?.id ?? "";
 }
 
 function studentInitials(name: string) {
@@ -115,11 +149,18 @@ function rowAverage(
 }
 
 export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
+  const hydrated = useHydrated();
   const [terms, setTerms] = useState<AcademicTerm[]>([]);
   const [classSubjects, setClassSubjects] = useState<ClassSubject[]>([]);
   const [termId, setTermId] = useState("");
+  const [gradeId, setGradeId] = useState("");
+  const [subjectId, setSubjectId] = useState("");
+  const [sectionId, setSectionId] = useState("");
   const [classSubjectId, setClassSubjectId] = useState("");
   const [matrix, setMatrix] = useState<ScoreMatrix | null>(null);
+  const [aggregatedSheets, setAggregatedSheets] = useState<
+    { classSubject: ClassSubject; matrix: ScoreMatrix }[]
+  >([]);
   const [draft, setDraft] = useState<Record<string, Record<string, number>>>({});
   const [loading, setLoading] = useState(false);
   const [booting, setBooting] = useState(true);
@@ -143,22 +184,147 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
         setClassSubjects(cs);
         const curTerm = t.find((x) => x.isCurrent) ?? t[0];
         if (curTerm) setTermId(curTerm.id);
-        const match =
+
+        const initial =
           initialClassSubjectId && cs.some((c) => c.id === initialClassSubjectId)
-            ? initialClassSubjectId
-            : null;
-        if (match) setClassSubjectId(match);
-        else if (cs[0]) setClassSubjectId(cs[0].id);
+            ? cs.find((c) => c.id === initialClassSubjectId)!
+            : cs[0];
+
+        if (initial) {
+          setGradeId(initial.grade.id);
+          setSubjectId(initial.subject.id);
+          setSectionId(sectionKey(initial));
+          setClassSubjectId(initial.id);
+        }
       })
       .catch(() => setError("Could not load classes or terms"))
       .finally(() => setBooting(false));
   }, [initialClassSubjectId]);
+
+  const grades = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const cs of classSubjects) {
+      if (!map.has(cs.grade.id)) map.set(cs.grade.id, cs.grade.name);
+    }
+    return [...map.entries()].map(([id, name]) => ({ id, name }));
+  }, [classSubjects]);
+
+  const subjectsForGrade = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const cs of classSubjects.filter((c) => c.grade.id === gradeId)) {
+      if (!map.has(cs.subject.id)) map.set(cs.subject.id, cs.subject.name);
+    }
+    return [...map.entries()].map(([id, name]) => ({ id, name }));
+  }, [classSubjects, gradeId]);
+
+  const sectionsForFilter = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const cs of classSubjects.filter((c) => {
+      if (c.grade.id !== gradeId) return false;
+      if (subjectId !== ALL && c.subject.id !== subjectId) return false;
+      return true;
+    })) {
+      const key = sectionKey(cs);
+      if (!map.has(key)) map.set(key, cs.section?.name ?? "—");
+    }
+    return [...map.entries()].map(([id, name]) => ({ id, name }));
+  }, [classSubjects, gradeId, subjectId]);
+
+  const hasSections = sectionsForFilter.some((s) => s.id !== "");
+
+  const activeClassSubjects = useMemo(
+    () =>
+      classSubjects.filter((c) => {
+        if (c.grade.id !== gradeId) return false;
+        if (subjectId !== ALL && c.subject.id !== subjectId) return false;
+        if (sectionId !== ALL && sectionKey(c) !== sectionId) return false;
+        return true;
+      }),
+    [classSubjects, gradeId, subjectId, sectionId],
+  );
+
+  const isAggregated = subjectId === ALL || sectionId === ALL;
+
+  function syncClassSubject(
+    grade: string,
+    subject: string,
+    section: string,
+  ) {
+    const match = classSubjects.find(
+      (c) =>
+        c.grade.id === grade &&
+        c.subject.id === subject &&
+        sectionKey(c) === section,
+    );
+    setClassSubjectId(match?.id ?? "");
+  }
+
+  function selectGrade(id: string) {
+    setGradeId(id);
+    const gradeSubjects = classSubjects.filter((c) => c.grade.id === id);
+    const first = gradeSubjects[0];
+    if (!first) {
+      setSubjectId("");
+      setSectionId("");
+      setClassSubjectId("");
+      return;
+    }
+    const nextSubject = first.subject.id;
+    setSubjectId(nextSubject);
+    const match = gradeSubjects.find((c) => c.subject.id === nextSubject) ?? first;
+    const nextSection = sectionKey(match);
+    setSectionId(nextSection);
+    syncClassSubject(id, nextSubject, nextSection);
+  }
+
+  function selectSubject(id: string) {
+    setSubjectId(id);
+    if (id === ALL || sectionId === ALL) {
+      setClassSubjectId("");
+      return;
+    }
+    syncClassSubject(gradeId, id, sectionId);
+  }
+
+  function selectSection(id: string) {
+    setSectionId(id);
+    if (id === ALL || subjectId === ALL) {
+      setClassSubjectId("");
+      return;
+    }
+    syncClassSubject(gradeId, subjectId, id);
+  }
+
+  const controlsDisabled = !hydrated || booting;
+
+  const loadAggregated = useCallback(async () => {
+    if (!termId || activeClassSubjects.length === 0) return;
+    setLoading(true);
+    setError("");
+    setSaved(false);
+    setMatrix(null);
+    try {
+      const results = await Promise.all(
+        activeClassSubjects.map(async (cs) => ({
+          classSubject: cs,
+          matrix: await getScoreMatrix(termId, cs.id),
+        })),
+      );
+      setAggregatedSheets(results);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not load scores");
+      setAggregatedSheets([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [termId, activeClassSubjects]);
 
   const loadMatrix = useCallback(async () => {
     if (!termId || !classSubjectId) return;
     setLoading(true);
     setError("");
     setSaved(false);
+    setAggregatedSheets([]);
     try {
       const data = await getScoreMatrix(termId, classSubjectId);
       setMatrix(data);
@@ -179,8 +345,22 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
   }, [termId, classSubjectId]);
 
   useEffect(() => {
-    if (!booting && termId && classSubjectId) void loadMatrix();
-  }, [booting, termId, classSubjectId, loadMatrix]);
+    if (booting || !termId) return;
+    if (isAggregated && activeClassSubjects.length > 0) void loadAggregated();
+    else if (!isAggregated && classSubjectId) void loadMatrix();
+    else {
+      setMatrix(null);
+      setAggregatedSheets([]);
+    }
+  }, [
+    booting,
+    termId,
+    classSubjectId,
+    isAggregated,
+    activeClassSubjects,
+    loadMatrix,
+    loadAggregated,
+  ]);
 
   function isComponentEntryLocked(assessmentId: string) {
     if (role === "admin" || role === "staff") return false;
@@ -305,24 +485,23 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
 
   const selectedCs = classSubjects.find((c) => c.id === classSubjectId);
   const selectedTerm = terms.find((t) => t.id === termId);
+  const selectedGrade = grades.find((g) => g.id === gradeId);
+  const selectedSubjectName =
+    subjectId === ALL
+      ? null
+      : subjectsForGrade.find((s) => s.id === subjectId)?.name ?? null;
+  const selectedSectionName =
+    sectionId === ALL
+      ? null
+      : sectionsForFilter.find((s) => s.id === sectionId)?.name ?? null;
 
-  const { filledScores, totalCells, completionPct } = useMemo(() => {
-    if (!matrix) return { filledScores: 0, totalCells: 0, completionPct: 0 };
-    const total = matrix.students.length * matrix.assessments.length;
-    const filled = matrix.students.reduce((sum, st) => {
-      return (
-        sum +
-        matrix.assessments.filter(
-          (a) => getScoreValue(st.studentProfileId, a.id) != null,
-        ).length
-      );
-    }, 0);
-    return {
-      filledScores: filled,
-      totalCells: total,
-      completionPct: total > 0 ? Math.round((filled / total) * 100) : 0,
-    };
-  }, [matrix, draft]);
+  const displayMatrix = isAggregated ? null : matrix;
+
+  const hasSheet = isAggregated
+    ? aggregatedSheets.some(
+        (s) => s.matrix.assessments.length > 0 && s.matrix.students.length > 0,
+      )
+    : !!(matrix && matrix.assessments.length > 0 && matrix.students.length > 0);
 
   const canSubmit =
     canEditScores &&
@@ -377,8 +556,154 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
     );
   }
 
-  const hasSheet =
-    matrix && matrix.assessments.length > 0 && matrix.students.length > 0;
+  function sheetRowAverage(sheet: ScoreMatrix, studentProfileId: string) {
+    let weighted = 0;
+    let totalWeight = 0;
+    for (const a of sheet.assessments) {
+      const student = sheet.students.find((s) => s.studentProfileId === studentProfileId);
+      const saved = student?.scores.find((s) => s.assessmentId === a.id);
+      const score = saved?.score ?? null;
+      if (score != null && a.maxScore > 0) {
+        const pct = (score / a.maxScore) * 100;
+        weighted += pct * a.weightPercent;
+        totalWeight += a.weightPercent;
+      }
+    }
+    if (totalWeight === 0) return null;
+    return Math.round(weighted / totalWeight);
+  }
+
+  function renderReadonlyScoreCell(score: number | null, maxScore: number) {
+    const hasValue = score != null;
+    return (
+      <span
+        className={`res-scores-readonly${hasValue ? " res-scores-readonly--filled" : ""}`}
+      >
+        {hasValue ? (
+          <>
+            <strong>{score}</strong>
+            <span className="res-scores-readonly__max">/{maxScore}</span>
+          </>
+        ) : (
+          "—"
+        )}
+      </span>
+    );
+  }
+
+  function renderScoreSheetTable(sheet: ScoreMatrix, readOnly: boolean) {
+    return (
+      <>
+        <div className="res-scores-sheet__table">
+          <table className="res-scores-table">
+            <thead>
+              <tr>
+                <th className="res-scores-table__student-col">Student</th>
+                {sheet.assessments.map((a) => (
+                  <th key={a.id}>
+                    <span className="res-scores-table__col-name">{a.name}</span>
+                    <span className="res-scores-table__col-meta">
+                      /{a.maxScore} · {a.weightPercent}%
+                    </span>
+                  </th>
+                ))}
+                <th className="res-scores-table__avg-col">Avg</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sheet.students.map((st) => {
+                const avg = readOnly
+                  ? sheetRowAverage(sheet, st.studentProfileId)
+                  : studentRowAverage(st.studentProfileId);
+                return (
+                  <tr key={st.studentProfileId}>
+                    <td className="res-scores-table__student">
+                      <span className="res-scores-table__avatar" aria-hidden>
+                        {studentInitials(st.name)}
+                      </span>
+                      <span className="res-scores-table__student-name">{st.name}</span>
+                    </td>
+                    {sheet.assessments.map((a) => {
+                      const saved = st.scores.find((s) => s.assessmentId === a.id);
+                      return (
+                        <td key={a.id} className="res-scores-table__cell">
+                          {readOnly ? (
+                            renderReadonlyScoreCell(saved?.score ?? null, a.maxScore)
+                          ) : (
+                            renderScoreCell(st.studentProfileId, a.id, a.maxScore)
+                          )}
+                        </td>
+                      );
+                    })}
+                    <td className="res-scores-table__avg">
+                      {avg != null ? `${avg}%` : "—"}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <div className="res-scores-sheet__mobile">
+          {sheet.students.map((st) => {
+            const avg = readOnly
+              ? sheetRowAverage(sheet, st.studentProfileId)
+              : studentRowAverage(st.studentProfileId);
+            return (
+              <article key={st.studentProfileId} className="res-scores-row-card">
+                <header className="res-scores-row-card__head">
+                  <span className="res-scores-table__avatar">{studentInitials(st.name)}</span>
+                  <div>
+                    <h4>{st.name}</h4>
+                    <p>{avg != null ? `Average ${avg}%` : "No scores yet"}</p>
+                  </div>
+                </header>
+                <div className="res-scores-row-card__grid">
+                  {sheet.assessments.map((a) => {
+                    const saved = st.scores.find((s) => s.assessmentId === a.id);
+                    return (
+                      <label key={a.id} className="res-scores-row-card__field">
+                        <span>
+                          {a.name} <em>/{a.maxScore}</em>
+                        </span>
+                        {readOnly ? (
+                          renderReadonlyScoreCell(saved?.score ?? null, a.maxScore)
+                        ) : (
+                          renderScoreCell(st.studentProfileId, a.id, a.maxScore)
+                        )}
+                      </label>
+                    );
+                  })}
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      </>
+    );
+  }
+
+  const { filledScores, totalCells, completionPct } = useMemo(() => {
+    const sources = isAggregated
+      ? aggregatedSheets.map((s) => s.matrix)
+      : matrix
+        ? [matrix]
+        : [];
+    if (sources.length === 0) return { filledScores: 0, totalCells: 0, completionPct: 0 };
+    let total = 0;
+    let filled = 0;
+    for (const m of sources) {
+      total += m.students.length * m.assessments.length;
+      for (const st of m.students) {
+        filled += st.scores.filter((sc) => sc.score != null).length;
+      }
+    }
+    return {
+      filledScores: filled,
+      totalCells: total,
+      completionPct: total > 0 ? Math.round((filled / total) * 100) : 0,
+    };
+  }, [isAggregated, aggregatedSheets, matrix]);
 
   const statusInfo = workflowStatus
     ? statusMessage(workflowStatus, matrix?.workflow, role)
@@ -400,86 +725,203 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
         </div>
       ) : null}
 
-      <header className="res-scores-hero">
-        <div className="res-scores-hero__main">
-          <h2 className="res-scores-hero__title">
-            {selectedCs ? classLabel(selectedCs) : canEditScores ? "Enter scores" : "View scores"}
-          </h2>
-          <p className="res-scores-hero__sub">
-            {selectedTerm?.name ?? "Select term"}
-            {matrix?.template ? ` · ${matrix.template.name}` : ""}
-            {viewOnlyHomeroom ? " · View only (homeroom)" : ""}
-          </p>
-          {workflowStatus ? (
-            <span
-              className={`res-scores-workflow-pill res-scores-workflow-pill--${workflowStatus.toLowerCase()}`}
+      <div className="res-scores-head">
+        <header className="res-scores-hero">
+          <div className="res-scores-hero__main">
+            <p className="res-scores-hero__eyebrow">Class score sheet</p>
+            <h2 className="res-scores-hero__title">
+              {heroTitle(
+                selectedCs,
+                selectedGrade?.name ?? "Grade",
+                subjectId,
+                selectedSubjectName,
+                sectionId,
+                selectedSectionName,
+              )}
+              {!canEditScores && selectedCs ? " (view)" : ""}
+            </h2>
+            <p className="res-scores-hero__sub">
+              {selectedTerm?.name ?? "Select term"}
+              {matrix?.template ? ` · ${matrix.template.name}` : ""}
+              {viewOnlyHomeroom ? " · View only (homeroom)" : ""}
+            </p>
+            {workflowStatus && !isAggregated ? (
+              <span
+                className={`res-scores-workflow-pill res-scores-workflow-pill--${workflowStatus.toLowerCase()}`}
+              >
+                {WORKFLOW_LABELS[workflowStatus]}
+              </span>
+            ) : null}
+          </div>
+          <div className="res-scores-stats">
+            <div className="res-scores-stat">
+              <strong className="res-scores-stat__value">
+                {isAggregated
+                  ? aggregatedSheets.reduce((n, s) => n + s.matrix.students.length, 0)
+                  : (displayMatrix?.students.length ?? 0)}
+              </strong>
+              <span className="res-scores-stat__label">Students</span>
+            </div>
+            <div className="res-scores-stat">
+              <strong className="res-scores-stat__value">
+                {isAggregated
+                  ? activeClassSubjects.length
+                  : (displayMatrix?.assessments.length ?? 0)}
+              </strong>
+              <span className="res-scores-stat__label">
+                {isAggregated ? "Classes" : "Components"}
+              </span>
+            </div>
+            <div className="res-scores-stat res-scores-stat--accent">
+              <strong className="res-scores-stat__value">{completionPct}%</strong>
+              <span className="res-scores-stat__label">Complete</span>
+            </div>
+          </div>
+        </header>
+
+        <div className="res-scores-toolbar res-scores-toolbar--quad">
+          <label className="res-scores-field">
+            <span>Term</span>
+            <select
+              value={termId}
+              onChange={(e) => setTermId(e.target.value)}
+              disabled={controlsDisabled}
             >
-              {WORKFLOW_LABELS[workflowStatus]}
-            </span>
+              {terms.length === 0 ? <option value="">No terms</option> : null}
+              {terms.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                  {t.isCurrent ? " (current)" : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="res-scores-field">
+            <span>Grade</span>
+            <select
+              value={gradeId}
+              onChange={(e) => selectGrade(e.target.value)}
+              disabled={controlsDisabled || grades.length === 0}
+            >
+              {grades.length === 0 ? <option value="">No grades</option> : null}
+              {grades.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="res-scores-field res-scores-field--wide">
+            <span>Subject</span>
+            <select
+              value={subjectId}
+              onChange={(e) => selectSubject(e.target.value)}
+              disabled={controlsDisabled || subjectsForGrade.length === 0}
+            >
+              <option value={ALL}>All subjects</option>
+              {subjectsForGrade.length === 0 ? (
+                <option value="">No subjects assigned</option>
+              ) : null}
+              {subjectsForGrade.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          {hasSections ? (
+            <div className="res-scores-field res-scores-field--section">
+              <span>Section</span>
+              <div className="res-scores-segment" role="tablist" aria-label="Class section">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={sectionId === ALL}
+                  className={`res-scores-segment__btn${
+                    sectionId === ALL ? " res-scores-segment__btn--active" : ""
+                  }`}
+                  disabled={controlsDisabled}
+                  onClick={() => selectSection(ALL)}
+                >
+                  All
+                </button>
+                {sectionsForFilter
+                  .filter((s) => s.id !== "")
+                  .map((s) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={sectionId === s.id}
+                      className={`res-scores-segment__btn${
+                        sectionId === s.id ? " res-scores-segment__btn--active" : ""
+                      }`}
+                      disabled={controlsDisabled}
+                      onClick={() => selectSection(s.id)}
+                    >
+                      {s.name}
+                    </button>
+                  ))}
+              </div>
+            </div>
           ) : null}
         </div>
-        <div className="res-scores-stats">
-          <div className="res-scores-stat">
-            <strong className="res-scores-stat__value">{matrix?.students.length ?? 0}</strong>
-            <span className="res-scores-stat__label">Students</span>
-          </div>
-          <div className="res-scores-stat">
-            <strong className="res-scores-stat__value">{matrix?.assessments.length ?? 0}</strong>
-            <span className="res-scores-stat__label">Components</span>
-          </div>
-          <div className="res-scores-stat res-scores-stat--accent">
-            <strong className="res-scores-stat__value">{completionPct}%</strong>
-            <span className="res-scores-stat__label">Complete</span>
-          </div>
-        </div>
-      </header>
-
-      <div className="res-scores-toolbar">
-        <label className="res-scores-field">
-          <span>Term</span>
-          <select value={termId} onChange={(e) => setTermId(e.target.value)} disabled={booting}>
-            {terms.length === 0 ? <option value="">No terms</option> : null}
-            {terms.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-                {t.isCurrent ? " (current)" : ""}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="res-scores-field res-scores-field--wide">
-          <span>Class</span>
-          <select
-            value={classSubjectId}
-            onChange={(e) => setClassSubjectId(e.target.value)}
-            disabled={booting}
-          >
-            {classSubjects.length === 0 ? (
-              <option value="">No classes assigned</option>
-            ) : null}
-            {classSubjects.map((c) => (
-              <option key={c.id} value={c.id}>
-                {classLabel(c)}
-              </option>
-            ))}
-          </select>
-        </label>
       </div>
 
-      {viewOnlyHomeroom ? (
-        <div className="res-scores-status res-scores-status--info">
-          <strong>View only</strong>
-          <p>
-            As homeroom teacher you can review scores for your class. Only the assigned
-            subject teacher{selectedCs?.teacher ? ` (${selectedCs.teacher.firstName} ${selectedCs.teacher.lastName})` : ""} can enter or change marks.
-          </p>
+      {isAggregated ? (
+        <div className="res-scores-insights">
+          <div className="res-scores-insight res-scores-insight--info">
+            <span className="res-scores-insight__icon" aria-hidden>
+              ℹ
+            </span>
+            <div>
+              <strong>Overview mode</strong>
+              <p>
+                Showing scores across{" "}
+                {subjectId === ALL ? "all subjects" : subjectsForGrade.find((s) => s.id === subjectId)?.name}
+                {sectionId === ALL
+                  ? " and all sections"
+                  : sectionsForFilter.find((s) => s.id === sectionId)?.name
+                    ? ` in ${sectionsForFilter.find((s) => s.id === sectionId)?.name}`
+                    : ""}
+                . Pick a specific subject and section to enter or edit scores.
+              </p>
+            </div>
+          </div>
         </div>
       ) : null}
 
-      {statusInfo && !viewOnlyHomeroom ? (
-        <div className={`res-scores-status res-scores-status--${statusInfo.tone}`}>
-          <strong>{statusInfo.title}</strong>
-          <p>{statusInfo.body}</p>
+      {viewOnlyHomeroom || (!isAggregated && statusInfo) ? (
+        <div className="res-scores-insights">
+          {viewOnlyHomeroom ? (
+            <div className="res-scores-insight res-scores-insight--info">
+              <span className="res-scores-insight__icon" aria-hidden>
+                👁
+              </span>
+              <div>
+                <strong>View only</strong>
+                <p>
+                  As homeroom teacher you can review scores for your class. Only the assigned
+                  subject teacher
+                  {selectedCs?.teacher
+                    ? ` (${selectedCs.teacher.firstName} ${selectedCs.teacher.lastName})`
+                    : ""}{" "}
+                  can enter or change marks.
+                </p>
+              </div>
+            </div>
+          ) : null}
+          {statusInfo && !viewOnlyHomeroom ? (
+            <div className={`res-scores-insight res-scores-insight--${statusInfo.tone}`}>
+              <span className="res-scores-insight__icon" aria-hidden>
+                {statusInfo.tone === "success" ? "✓" : "ℹ"}
+              </span>
+              <div>
+                <strong>{statusInfo.title}</strong>
+                <p>{statusInfo.body}</p>
+              </div>
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -489,24 +931,92 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
           <p>Loading score sheet…</p>
         </div>
       ) : classSubjects.length === 0 ? (
-        <div className="res-scores-empty">
-          <DashIcon name="results" className="dash-icon--lg" />
+        <div className="res-scores-empty res-scores-empty--action">
+          <div className="res-scores-empty__icon" aria-hidden>
+            <DashIcon name="results" className="dash-icon--lg" />
+          </div>
           <h3>No classes assigned</h3>
-          <p>Ask your admin to assign subject classes.</p>
+          <p>Link grade, section, subject, and teacher before score entry.</p>
+          {role === "admin" || role === "staff" ? (
+            <Link href="/admin/subjects/assign" className="res-scores-btn res-scores-btn--primary">
+              Assign subjects
+            </Link>
+          ) : null}
         </div>
-      ) : matrix && matrix.assessments.length === 0 ? (
-        <div className="res-scores-empty">
-          <DashIcon name="results" className="dash-icon--lg" />
+      ) : !isAggregated && matrix && matrix.assessments.length === 0 ? (
+        <div className="res-scores-empty res-scores-empty--action">
+          <div className="res-scores-empty__icon" aria-hidden>
+            <DashIcon name="results" className="dash-icon--lg" />
+          </div>
           <h3>No grading components</h3>
-          <p>Admin must assign an assessment template to this class.</p>
+          <p>Assign an assessment template to this class to unlock the score grid.</p>
+          {role === "admin" || role === "staff" ? (
+            <Link href="/admin/results/templates" className="res-scores-btn res-scores-btn--primary">
+              Assessment templates
+            </Link>
+          ) : null}
         </div>
-      ) : matrix && matrix.students.length === 0 ? (
-        <div className="res-scores-empty">
-          <DashIcon name="students" className="dash-icon--lg" />
-          <h3>No students enrolled</h3>
-          <p>Add students to {selectedCs?.grade.name ?? "this grade"} first.</p>
+      ) : !isAggregated && matrix && matrix.students.length === 0 ? (
+        <div className="res-scores-empty res-scores-empty--action">
+          <div className="res-scores-empty__icon" aria-hidden>
+            <DashIcon name="students" className="dash-icon--lg" />
+          </div>
+          <h3>No students in this class</h3>
+          <p>
+            Enroll learners in {selectedCs?.grade.name ?? "this grade"}
+            {selectedCs?.section ? ` · ${selectedCs.section.name}` : ""} before entering scores.
+          </p>
+          <Link href="/admin/students" className="res-scores-btn res-scores-btn--primary">
+            Go to students
+          </Link>
         </div>
       ) : hasSheet ? (
+        isAggregated ? (
+          <div className="res-scores-aggregate">
+            <div className="res-scores-sheet__head res-scores-sheet__head--aggregate">
+              <div>
+                <h3 className="res-scores-sheet__title">Score overview</h3>
+                <p className="res-scores-sheet__meta">
+                  {filledScores} of {totalCells} entered across {aggregatedSheets.length} class
+                  {aggregatedSheets.length === 1 ? "" : "es"}
+                </p>
+              </div>
+            </div>
+            <div className="res-scores-progress">
+              <div className="res-scores-progress__bar">
+                <span style={{ width: `${completionPct}%` }} />
+              </div>
+            </div>
+            {aggregatedSheets.map(({ classSubject: cs, matrix: sheet }) => {
+              if (sheet.assessments.length === 0 || sheet.students.length === 0) return null;
+              const sectionLabel = cs.section?.name ? ` · ${cs.section.name}` : "";
+              const sheetFilled = sheet.students.reduce(
+                (sum, st) => sum + st.scores.filter((sc) => sc.score != null).length,
+                0,
+              );
+              const sheetTotal = sheet.students.length * sheet.assessments.length;
+              return (
+                <section key={cs.id} className="res-scores-sheet res-scores-sheet--group">
+                  <div className="res-scores-sheet__head">
+                    <div>
+                      <h3 className="res-scores-sheet__title">
+                        {cs.subject.name}
+                        {sectionLabel}
+                      </h3>
+                      <p className="res-scores-sheet__meta">
+                        {sheetFilled} of {sheetTotal} entered
+                        {sheet.workflow?.status ? (
+                          <> · {WORKFLOW_LABELS[sheet.workflow.status as ResultWorkflowStatus]}</>
+                        ) : null}
+                      </p>
+                    </div>
+                  </div>
+                  {renderScoreSheetTable(sheet, true)}
+                </section>
+              );
+            })}
+          </div>
+        ) : (
         <section
           className={`res-scores-sheet${
             workflowFullyLocked || viewOnlyHomeroom ? " res-scores-sheet--locked" : ""
@@ -521,7 +1031,7 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
                 </p>
               </div>
               <div className="res-scores-components__toggles">
-                {matrix.assessments.map((a) => {
+                {matrix!.assessments.map((a) => {
                   const isOpen = !a.entryLocked;
                   const busy = lockToggleBusy === a.id;
                   return (
@@ -658,99 +1168,9 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
             </div>
           </div>
 
-          {/* Desktop table */}
-          <div className="res-scores-sheet__table">
-            <table className="res-scores-table">
-              <thead>
-                <tr>
-                  <th className="res-scores-table__student-col">Student</th>
-                  {matrix.assessments.map((a) => (
-                    <th
-                      key={a.id}
-                      className={
-                        a.entryLocked && role === "teacher" ? "res-scores-table__col--locked" : ""
-                      }
-                    >
-                      <span className="res-scores-table__col-name">
-                        {a.name}
-                        {a.entryLocked && role === "teacher" ? (
-                          <span
-                            className="res-scores-table__lock"
-                            title="Locked for editing — saved scores still visible"
-                          >
-                            🔒
-                          </span>
-                        ) : null}
-                      </span>
-                      <span className="res-scores-table__col-meta">
-                        /{a.maxScore} · {a.weightPercent}%
-                      </span>
-                    </th>
-                  ))}
-                  <th className="res-scores-table__avg-col">Avg</th>
-                </tr>
-              </thead>
-              <tbody>
-                {matrix.students.map((st) => {
-                  const avg = studentRowAverage(st.studentProfileId);
-                  return (
-                    <tr key={st.studentProfileId}>
-                      <td className="res-scores-table__student">
-                        <span className="res-scores-table__avatar" aria-hidden>
-                          {studentInitials(st.name)}
-                        </span>
-                        <span className="res-scores-table__student-name">{st.name}</span>
-                      </td>
-                      {matrix.assessments.map((a) => (
-                        <td
-                          key={a.id}
-                          className={`res-scores-table__cell${
-                            isComponentEntryLocked(a.id) && role === "teacher"
-                              ? " res-scores-table__cell--locked"
-                              : ""
-                          }`}
-                        >
-                          {renderScoreCell(st.studentProfileId, a.id, a.maxScore)}
-                        </td>
-                      ))}
-                      <td className="res-scores-table__avg">
-                        {avg != null ? `${avg}%` : "—"}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Mobile only */}
-          <div className="res-scores-sheet__mobile">
-            {matrix.students.map((st) => {
-              const avg = studentRowAverage(st.studentProfileId);
-              return (
-                <article key={st.studentProfileId} className="res-scores-row-card">
-                  <header className="res-scores-row-card__head">
-                    <span className="res-scores-table__avatar">{studentInitials(st.name)}</span>
-                    <div>
-                      <h4>{st.name}</h4>
-                      <p>{avg != null ? `Average ${avg}%` : "No scores yet"}</p>
-                    </div>
-                  </header>
-                  <div className="res-scores-row-card__grid">
-                    {matrix.assessments.map((a) => (
-                      <label key={a.id} className="res-scores-row-card__field">
-                        <span>
-                          {a.name} <em>/{a.maxScore}</em>
-                        </span>
-                        {renderScoreCell(st.studentProfileId, a.id, a.maxScore)}
-                      </label>
-                    ))}
-                  </div>
-                </article>
-              );
-            })}
-          </div>
+          {renderScoreSheetTable(matrix!, false)}
         </section>
+        )
       ) : null}
     </div>
   );

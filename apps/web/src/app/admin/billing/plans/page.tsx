@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { DashboardPage } from "@/components/dashboard/dashboard-page";
 import {
@@ -64,6 +64,24 @@ function checkoutAmountEtb(plan: PlanOption, interval: BillingInterval): number 
 }
 
 export default function SchoolPlansPage() {
+  return (
+    <Suspense
+      fallback={
+        <DashboardPage role="admin" title="Plans">
+          <SchoolBillingNav />
+          <div className="upg-loading">
+            <span className="upg-loading__spinner" aria-hidden />
+            <p>Loading plans…</p>
+          </div>
+        </DashboardPage>
+      }
+    >
+      <SchoolPlansPageContent />
+    </Suspense>
+  );
+}
+
+function SchoolPlansPageContent() {
   const [subscription, setSubscription] = useState<SubscriptionStatus | null>(null);
   const [plans, setPlans] = useState<PlanOption[]>([]);
   const [paymentConfig, setPaymentConfig] = useState<BillingPaymentConfig | null>(null);

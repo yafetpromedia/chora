@@ -1175,6 +1175,12 @@
   border: 1px solid #fecaca;
 }
 
+.tch-v2__alert--ok {
+  color: #166534;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+}
+
 .tch-v2__toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -1467,6 +1473,17 @@
   color: #fff;
   border-color: transparent;
   background: var(--brand-teal);
+}
+
+.tch-v2__action--danger {
+  color: #b91c1c;
+  border-color: #fecaca;
+  background: #fef2f2;
+}
+
+.tch-v2__action:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .tch-v2__desktop-only {

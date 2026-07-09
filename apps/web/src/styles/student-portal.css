@@ -1,0 +1,130 @@
+/* Student portal — section banners (Progress, AI, Results) */
+
+.stu-banner {
+  display: grid;
+  gap: 1rem;
+  padding: 1.2rem 1.25rem;
+  border-radius: 1.15rem;
+  color: #fff;
+  box-shadow: 0 14px 40px rgba(30, 74, 74, 0.18);
+  min-width: 0;
+}
+
+@media (min-width: 860px) {
+  .stu-banner {
+    grid-template-columns: 1fr auto;
+    align-items: end;
+    padding: 1.35rem 1.5rem;
+  }
+}
+
+.stu-banner--progress {
+  background: linear-gradient(
+    145deg,
+    var(--brand-ink) 0%,
+    var(--brand-teal-dark) 55%,
+    var(--brand-teal) 100%
+  );
+}
+
+.stu-banner--ai {
+  background: linear-gradient(
+    145deg,
+    #134e4a 0%,
+    var(--brand-teal-dark) 48%,
+    #14b8a6 100%
+  );
+}
+
+.stu-banner--results {
+  background: linear-gradient(
+    145deg,
+    #1e3a5f 0%,
+    var(--brand-teal-dark) 52%,
+    var(--brand-teal) 100%
+  );
+}
+
+.stu-banner__main {
+  min-width: 0;
+}
+
+.stu-banner__brand {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin-bottom: 0.65rem;
+}
+
+.stu-banner__chip {
+  display: inline-flex;
+  padding: 0.28rem 0.65rem;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  border-radius: 999px;
+  color: #ccfbf1;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.stu-banner__icon {
+  width: 2.35rem;
+  height: 2.35rem;
+  display: grid;
+  place-items: center;
+  border-radius: 0.75rem;
+  font-size: 1rem;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.stu-banner__title {
+  margin: 0 0 0.35rem;
+  font-size: clamp(1.1rem, 2.5vw, 1.45rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
+}
+
+.stu-banner__sub {
+  margin: 0;
+  font-size: 0.86rem;
+  opacity: 0.92;
+  line-height: 1.45;
+  max-width: 36rem;
+}
+
+.stu-banner__stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.stu-banner__stat {
+  min-width: 5.25rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(6px);
+}
+
+.stu-banner__stat-value {
+  display: block;
+  font-size: 1.15rem;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.stu-banner__stat-label {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.78;
+}

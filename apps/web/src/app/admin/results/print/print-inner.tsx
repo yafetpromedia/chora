@@ -88,9 +88,9 @@ export function ReportCardPrintInner() {
 
         <p className="rc-print-error">{error}</p>
 
-        <button type="button" className="rc-print-btn" onClick={() => router.replace("/admin/results")}>
+        <button type="button" className="rc-print-btn" onClick={() => router.replace("/admin/report-cards")}>
 
-          Back to results
+          Back to report cards
 
         </button>
 
@@ -125,9 +125,9 @@ export function ReportCardPrintInner() {
       <div className="rc-print-toolbar no-print">
 
         <p>
-
-          <strong>Save as PDF:</strong> click Print, then choose &quot;Save as PDF&quot; (or Microsoft Print to PDF).
-
+          <strong>One student = one sheet.</strong> Choose <strong>Landscape</strong>, enable{" "}
+          <strong>Print on both sides</strong> (duplex), then Print → &quot;Save as PDF&quot;.
+          Page 1 is the front (student info), page 2 is the back (results).
         </p>
 
         <div className="rc-print-toolbar__actions">
@@ -138,11 +138,11 @@ export function ReportCardPrintInner() {
 
           </button>
 
-          <button type="button" className="rc-print-btn" onClick={() => router.replace("/admin/results")}>
+        <button type="button" className="rc-print-btn" onClick={() => router.replace("/admin/report-cards")}>
 
-            Close
+          Close
 
-          </button>
+        </button>
 
         </div>
 

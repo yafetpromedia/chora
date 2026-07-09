@@ -1,4 +1,4 @@
-import { apiFetch, apiPatch, apiPost, getApiBaseUrl } from "@/lib/api";
+import { apiFetch, apiDelete, apiPatch, apiPost, getApiBaseUrl } from "@/lib/api";
 import { AUTH_TOKEN_KEY } from "@/lib/auth";
 
 export type AcademicTerm = {
@@ -11,7 +11,13 @@ export type AcademicTerm = {
   academicYear: { name: string };
 };
 
-export type Subject = { id: string; name: string; code: string };
+export type Subject = {
+  id: string;
+  name: string;
+  code: string;
+  isSystem?: boolean;
+  isCustomized?: boolean;
+};
 
 export type ClassSubject = {
   id: string;
@@ -19,6 +25,7 @@ export type ClassSubject = {
   grade: { id: string; name: string };
   section: { id: string; name: string } | null;
   teacher: { id: string; firstName: string; lastName: string } | null;
+  weeklySessions?: number;
 };
 
 export type Assessment = {
@@ -168,12 +175,33 @@ export async function createTerm(body: {
   return apiPost<AcademicTerm>("/results/terms", body);
 }
 
+export async function updateTerm(
+  termId: string,
+  body: {
+    name?: string;
+    startDate?: string;
+    endDate?: string;
+    sortOrder?: number;
+    isCurrent?: boolean;
+  },
+) {
+  return apiPatch<AcademicTerm>(`/results/terms/${termId}`, body);
+}
+
+export async function deleteTerm(termId: string) {
+  return apiDelete<{ deleted: boolean; id: string }>(`/results/terms/${termId}`);
+}
+
 export async function listSubjects() {
   return apiFetch<Subject[]>("/results/subjects");
 }
 
 export async function createSubject(body: { name: string; code: string }) {
   return apiPost<Subject>("/results/subjects", body);
+}
+
+export async function updateSubject(subjectId: string, body: { name?: string }) {
+  return apiPatch<Subject>(`/results/subjects/${subjectId}`, body);
 }
 
 export async function listClassSubjects(academicYearId?: string) {
@@ -202,7 +230,11 @@ export async function createClassSubject(body: {
 
 export async function updateClassSubject(
   classSubjectId: string,
-  body: { teacherId?: string | null; assessmentTemplateId?: string | null },
+  body: {
+    teacherId?: string | null;
+    assessmentTemplateId?: string | null;
+    weeklySessions?: number;
+  },
 ) {
   return apiPatch<ClassSubjectAssignment>(
     `/results/class-subjects/${classSubjectId}`,
@@ -351,6 +383,41 @@ export type ScoreMatrix = {
   }[];
 };
 
+export type StudentSubjectMatrix = {
+  term: { id: string; name: string };
+  student: {
+    id: string;
+    name: string;
+    grade: string;
+    section: string | null;
+    studentId: string | null;
+  };
+  assessmentCount: number;
+  columns: {
+    key: string;
+    name: string;
+    maxScore: number;
+    weightPercent: number;
+    sortOrder: number;
+  }[];
+  subjects: {
+    classSubjectId: string;
+    subject: string;
+    templateName: string | null;
+    workflowStatus: ResultWorkflowStatus;
+    canEditScores: boolean;
+    cells: {
+      columnKey: string;
+      assessmentId: string | null;
+      score: number | null;
+      maxScore: number | null;
+      weightPercent: number | null;
+      entryLocked: boolean;
+    }[];
+    total: number | null;
+  }[];
+};
+
 export async function listAssessmentTemplates() {
   return apiFetch<AssessmentTemplate[]>("/results/assessment-templates");
 }
@@ -422,6 +489,23 @@ export async function saveScoreMatrix(body: {
   entries: { studentProfileId: string; assessmentId: string; score: number }[];
 }) {
   return apiPost("/results/score-matrix", body);
+}
+
+export async function getStudentSubjectMatrix(
+  termId: string,
+  studentProfileId?: string,
+) {
+  const q = new URLSearchParams({ termId });
+  if (studentProfileId) q.set("studentProfileId", studentProfileId);
+  return apiFetch<StudentSubjectMatrix>(`/results/student-subject-matrix?${q}`);
+}
+
+export async function saveStudentSubjectMatrix(body: {
+  termId: string;
+  studentProfileId: string;
+  entries: { classSubjectId: string; assessmentId: string; score: number }[];
+}) {
+  return apiPost("/results/student-subject-matrix", body);
 }
 
 export async function setAssessmentEntryLock(

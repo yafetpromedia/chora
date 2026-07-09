@@ -48,6 +48,9 @@ export type ClassworkSubmission = {
   fileUrl: string | null;
   fileName: string | null;
   note: string | null;
+  score: number | null;
+  feedback: string | null;
+  gradedAt: string | null;
 };
 
 export function listClassSubjects() {

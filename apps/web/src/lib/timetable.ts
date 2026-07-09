@@ -60,6 +60,24 @@ export async function ensureTimetable(academicYearId: string) {
   );
 }
 
+export async function listTimetablePeriods(academicYearId: string) {
+  const q = new URLSearchParams({ academicYearId });
+  return apiFetch<TimetablePeriod[]>(`/schools/timetable/periods?${q}`);
+}
+
+export async function saveTimetablePeriods(body: {
+  academicYearId: string;
+  periods: {
+    number: number;
+    label: string;
+    startTime?: string | null;
+    endTime?: string | null;
+    sortOrder?: number;
+  }[];
+}) {
+  return apiPatch<TimetablePeriod[]>("/schools/timetable/periods", body);
+}
+
 export async function getTimetableGrid(
   academicYearId: string,
   gradeId: string,
@@ -83,6 +101,27 @@ export async function saveTimetableEntries(body: {
   }[];
 }) {
   return apiPatch<TimetableGrid>("/schools/timetable/entries", body);
+}
+
+export type TimetableGenerateResult = {
+  placed: number;
+  unplaced: Array<{
+    subjectName: string;
+    gradeName: string;
+    sectionName: string | null;
+    reason: string;
+  }>;
+  classesProcessed: number;
+  totalLessons: number;
+};
+
+export async function generateTimetable(body: {
+  academicYearId: string;
+  gradeId?: string;
+  sectionId?: string;
+  replaceExisting?: boolean;
+}) {
+  return apiPost<TimetableGenerateResult>("/schools/timetable/generate", body);
 }
 
 export async function getMyTimetableToday(weekday?: Weekday) {

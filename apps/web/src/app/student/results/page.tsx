@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { DashboardPage } from "@/components/dashboard/dashboard-page";
-import { StudentResultsPanel } from "@/components/results/student-results-panel";
+import { StudentSubjectScoresPanel } from "@/components/results/student-subject-scores-panel";
 import { AUTH_ROLE_KEY, AUTH_TOKEN_KEY } from "@/lib/auth";
 
 export default function StudentResultsPage() {
@@ -20,12 +20,8 @@ export default function StudentResultsPage() {
   }, [router]);
 
   return (
-    <DashboardPage
-      role="student"
-      title="My results"
-      subtitle="Tests, quizzes, and classwork marks as teachers release them"
-    >
-      <StudentResultsPanel />
+    <DashboardPage role="student" title="My results" subtitle="Term scores by subject">
+      <StudentSubjectScoresPanel role="student" readOnly hideStudentPicker />
     </DashboardPage>
   );
 }

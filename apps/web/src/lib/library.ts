@@ -65,6 +65,10 @@ export type LibraryHub = {
     favorites: LibraryResource[];
     continueReading: LibraryResource[];
   } | null;
+  contributions: {
+    pending: LibraryResource[];
+    published: LibraryResource[];
+  } | null;
   studentGrade: { id: string; name: string } | null;
 };
 

@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -98,5 +99,12 @@ export class TeachersController {
     @Body() dto: UpdateTeacherDto,
   ) {
     return this.teachersService.update(user.schoolId, userId, dto);
+  }
+
+  @Delete(':userId')
+  @Roles('admin')
+  @RequirePermissions(SchoolPermission.TEACHERS_MANAGE)
+  remove(@CurrentUser() user: AuthUser, @Param('userId') userId: string) {
+    return this.teachersService.remove(user.schoolId, userId);
   }
 }

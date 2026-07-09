@@ -433,3 +433,121 @@
   color: var(--brand-muted);
   line-height: 1.5;
 }
+
+/* Admin — bell schedule / periods editor */
+
+.tt-periods {
+  padding: 1rem 1.1rem;
+  border-radius: 1rem;
+  border: 1px solid var(--brand-border);
+  background: #fff;
+  box-shadow: 0 2px 12px rgba(42, 111, 111, 0.05);
+}
+
+.tt-periods__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.85rem;
+}
+
+.tt-periods__title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.tt-periods__sub {
+  margin: 0.25rem 0 0;
+  font-size: 0.78rem;
+  color: #64748b;
+  line-height: 1.45;
+  max-width: 36rem;
+}
+
+.tt-periods__head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.tt-periods__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.tt-periods__row {
+  display: grid;
+  grid-template-columns: auto 1fr repeat(2, minmax(7rem, 0.75fr)) auto;
+  gap: 0.55rem;
+  align-items: end;
+  padding: 0.65rem 0.75rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(13, 92, 99, 0.1);
+  background: var(--brand-surface);
+}
+
+@media (max-width: 768px) {
+  .tt-periods__row {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .tt-periods__order {
+    grid-column: 1 / -1;
+  }
+
+  .tt-periods__remove {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+}
+
+.tt-periods__order {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #64748b;
+  padding-bottom: 0.55rem;
+}
+
+.tt-periods__row label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #475569;
+}
+
+.tt-periods__row input {
+  padding: 0.45rem 0.55rem;
+  border-radius: 0.5rem;
+  border: 1px solid #cbd5e1;
+  font-family: inherit;
+  font-size: 0.85rem;
+  background: #fff;
+}
+
+.tt-periods__remove {
+  min-height: 34px;
+  padding: 0.35rem 0.65rem;
+  font-family: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  border-radius: 0.5rem;
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+  color: #b91c1c;
+  cursor: pointer;
+}
+
+.tt-periods__remove:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}

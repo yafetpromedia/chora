@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Header,
   Param,
@@ -30,10 +31,12 @@ import { BulkScoresDto } from './dto/bulk-scores.dto';
 import { CreateAssessmentTemplateDto } from './dto/create-assessment-template.dto';
 import { UpdateAssessmentTemplateDto } from './dto/update-assessment-template.dto';
 import { SaveScoreMatrixDto } from './dto/save-score-matrix.dto';
+import { SaveStudentSubjectMatrixDto } from './dto/save-student-subject-matrix.dto';
 import { CreateAssessmentDto } from './dto/create-assessment.dto';
 import { CreateClassSubjectDto } from './dto/create-class-subject.dto';
 import { CreateSubjectDto } from './dto/create-subject.dto';
 import { CreateTermDto } from './dto/create-term.dto';
+import { UpdateTermDto } from './dto/update-term.dto';
 import { UpdateClassSubjectDto } from './dto/update-class-subject.dto';
 import { UpsertResultDto } from './dto/upsert-result.dto';
 import { UpsertTermReportDto } from './dto/upsert-term-report.dto';
@@ -283,6 +286,44 @@ export class ResultsController {
     );
   }
 
+  @Get('student-subject-matrix')
+  @Roles('admin', 'staff', 'teacher', 'student', 'parent')
+  async studentSubjectMatrix(
+    @CurrentUser() user: AuthUser,
+    @Query('termId') termId: string,
+    @Query('studentProfileId') studentProfileId?: string,
+  ) {
+    const profileId = await this.academicsService.resolveProfileId(
+      user.role,
+      user.id,
+      user.schoolId,
+      studentProfileId,
+    );
+    return this.templatesService.getStudentSubjectMatrix(
+      user.schoolId,
+      termId,
+      profileId,
+      user.id,
+      user.role,
+    );
+  }
+
+  @Post('student-subject-matrix')
+  @Roles('admin', 'staff', 'teacher')
+  saveStudentSubjectMatrix(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: SaveStudentSubjectMatrixDto,
+  ) {
+    return this.templatesService.saveStudentSubjectMatrix(
+      user.schoolId,
+      dto.termId,
+      dto.studentProfileId,
+      dto.entries,
+      user.id,
+      user.role,
+    );
+  }
+
   @Get('academic-years')
   @Roles('admin', 'staff', 'teacher')
   listAcademicYears(@CurrentUser() user: AuthUser) {
@@ -334,6 +375,22 @@ export class ResultsController {
   @Roles('admin')
   createTerm(@CurrentUser() user: AuthUser, @Body() dto: CreateTermDto) {
     return this.academicsService.createTerm(user.schoolId, dto);
+  }
+
+  @Patch('terms/:id')
+  @Roles('admin')
+  updateTerm(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateTermDto,
+  ) {
+    return this.academicsService.updateTerm(user.schoolId, id, dto);
+  }
+
+  @Delete('terms/:id')
+  @Roles('admin')
+  deleteTerm(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.academicsService.deleteTerm(user.schoolId, id);
   }
 
   @Get('subjects')
@@ -605,12 +662,13 @@ export class ResultsController {
       user.schoolId,
       studentProfileId,
     );
-    const report = await this.academicsService.buildReportCard(
-      user.schoolId,
-      profileId,
-      termId,
-      user.role,
+    res.send(
+      await this.academicsService.buildReportCardHtmlDocument(
+        user.schoolId,
+        profileId,
+        termId,
+        user.role,
+      ),
     );
-    res.send(this.academicsService.buildReportCardHtml(report));
   }
 }

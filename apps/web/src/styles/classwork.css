@@ -27,6 +27,18 @@
   color: #065f46;
 }
 
+.cw-alert--row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.cw-alert--row span {
+  flex: 1;
+  min-width: 0;
+}
+
 .cw-loading {
   display: flex;
   flex-direction: column;

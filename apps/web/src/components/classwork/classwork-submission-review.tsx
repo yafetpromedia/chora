@@ -57,7 +57,7 @@ export function ClassworkSubmissionReview({
   const [savedId, setSavedId] = useState<string | null>(null);
   const [error, setError] = useState("");
 
-  const maxScore = assignment.maxScore ?? 100;
+  const maxScore = assignment.maxScore;
 
   useEffect(() => {
     const next: Record<string, DraftGrade> = {};

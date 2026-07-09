@@ -224,6 +224,51 @@ export class TeachersService {
     return this.getByUserId(schoolId, userId);
   }
 
+  async remove(schoolId: string, userId: string) {
+    const user = await this.prisma.user.findFirst({
+      where: { id: userId, schoolId, role: UserRole.teacher },
+    });
+    if (!user) {
+      throw new NotFoundException('Teacher not found');
+    }
+
+    const [classwork, attendance, announcements, behavior, resultsUpdated] =
+      await Promise.all([
+        this.prisma.classworkAssignment.count({
+          where: { schoolId, createdByUserId: userId },
+        }),
+        this.prisma.attendanceRecord.count({
+          where: { schoolId, recordedBy: userId },
+        }),
+        this.prisma.announcement.count({
+          where: { schoolId, createdBy: userId },
+        }),
+        this.prisma.behaviorRecord.count({
+          where: { schoolId, recordedById: userId },
+        }),
+        this.prisma.resultRecord.count({
+          where: { schoolId, updatedBy: userId },
+        }),
+      ]);
+
+    const blockers: string[] = [];
+    if (classwork > 0) blockers.push('classwork they created');
+    if (attendance > 0) blockers.push('attendance records');
+    if (announcements > 0) blockers.push('announcements');
+    if (behavior > 0) blockers.push('behavior records');
+    if (resultsUpdated > 0) blockers.push('score entries');
+
+    if (blockers.length > 0) {
+      throw new BadRequestException(
+        `Cannot remove this teacher yet — they still have ${blockers.join(', ')}. Unassign their classes first if needed.`,
+      );
+    }
+
+    await this.prisma.user.delete({ where: { id: userId } });
+
+    return { removed: true, userId };
+  }
+
   async getByUserId(schoolId: string, userId: string) {
     const user = await this.prisma.user.findFirst({
       where: { id: userId, schoolId },

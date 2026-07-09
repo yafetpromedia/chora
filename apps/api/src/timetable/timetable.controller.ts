@@ -19,6 +19,7 @@ import { SchoolTenantGuard } from '../common/guards/school-tenant.guard';
 import { SchoolPermission } from '../common/permissions/school-permissions';
 import { CreateTimetableRoomDto } from './dto/create-timetable-room.dto';
 import { SaveTimetableEntriesDto } from './dto/save-timetable-entries.dto';
+import { GenerateTimetableDto } from './dto/generate-timetable.dto';
 import { UpsertTimetablePeriodsDto } from './dto/upsert-timetable-periods.dto';
 import { TimetableService } from './timetable.service';
 
@@ -99,6 +100,13 @@ export class TimetableController {
     @Body() dto: SaveTimetableEntriesDto,
   ) {
     return this.timetableService.saveClassEntries(user.schoolId, dto);
+  }
+
+  @Post('generate')
+  @Roles('admin', 'staff')
+  @RequirePermissions(SchoolPermission.TIMETABLE_MANAGE)
+  generate(@CurrentUser() user: AuthUser, @Body() dto: GenerateTimetableDto) {
+    return this.timetableService.autoGenerate(user.schoolId, dto);
   }
 
   @Get('me/today')

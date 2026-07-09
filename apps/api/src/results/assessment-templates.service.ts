@@ -4,10 +4,16 @@ import {
   NotFoundException,
   OnModuleInit,
 } from '@nestjs/common';
+import { ClassworkType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { TeacherScopeService } from '../teachers/teacher-scope.service';
 import { ResultWorkflowService } from './result-workflow.service';
 import { CreateAssessmentTemplateDto } from './dto/create-assessment-template.dto';
+import { weightedTermAverage } from './grading.util';
+
+function columnKey(name: string) {
+  return name.trim().toLowerCase();
+}
 
 function assertWeightsSumTo100(
   components: { weightPercent: number }[],
@@ -355,6 +361,26 @@ export class AssessmentTemplatesService implements OnModuleInit {
     return null;
   }
 
+  /** Match classwork type to the assessment template component max (e.g. Assignment /10). */
+  async resolveClassworkMaxScore(
+    schoolId: string,
+    classSubjectId: string,
+    type: ClassworkType,
+  ): Promise<number> {
+    const template = await this.resolveTemplateForClassSubject(
+      schoolId,
+      classSubjectId,
+    );
+    if (!template) return 10;
+
+    const target =
+      type === ClassworkType.ASSIGNMENT ? 'assignment' : 'worksheet';
+    const component = template.components.find(
+      (c) => c.name.trim().toLowerCase() === target,
+    );
+    return component?.maxScore ?? 10;
+  }
+
   async syncTermAssessments(
     schoolId: string,
     termId: string,
@@ -589,6 +615,284 @@ export class AssessmentTemplatesService implements OnModuleInit {
     );
 
     return { saved: entries.length };
+  }
+
+  async getStudentSubjectMatrix(
+    schoolId: string,
+    termId: string,
+    studentProfileId: string,
+    userId?: string,
+    role?: string,
+  ) {
+    const profile = await this.prisma.studentProfile.findFirst({
+      where: { id: studentProfileId, schoolId },
+      include: {
+        user: { select: { firstName: true, lastName: true, externalRef: true } },
+        grade: { select: { name: true } },
+        section: { select: { name: true } },
+      },
+    });
+    if (!profile) {
+      throw new NotFoundException('Student not found');
+    }
+
+    const term = await this.prisma.academicTerm.findFirst({
+      where: { id: termId, schoolId },
+      select: {
+        id: true,
+        name: true,
+        academicYearId: true,
+      },
+    });
+    if (!term) {
+      throw new NotFoundException('Term not found');
+    }
+
+    if (userId && role === 'teacher') {
+      const scopes = await this.teacherScope.getClassScopes(
+        schoolId,
+        userId,
+        role,
+      );
+      this.teacherScope.assertCanAccessClass(
+        scopes,
+        profile.gradeId,
+        profile.sectionId,
+      );
+    }
+
+    if (userId && role === 'parent') {
+      const link = await this.prisma.parentStudent.findUnique({
+        where: {
+          parentId_studentId: { parentId: userId, studentId: studentProfileId },
+        },
+      });
+      if (!link) {
+        throw new NotFoundException('Not allowed');
+      }
+    }
+
+    const classSubjects = await this.prisma.classSubject.findMany({
+      where: {
+        schoolId,
+        gradeId: profile.gradeId,
+        academicYearId: term.academicYearId,
+        ...(profile.sectionId ? { sectionId: profile.sectionId } : {}),
+      },
+      include: { subject: true },
+      orderBy: { subject: { name: 'asc' } },
+    });
+
+    type ColumnMeta = {
+      key: string;
+      name: string;
+      maxScore: number;
+      weightPercent: number;
+      sortOrder: number;
+    };
+    const columnMap = new Map<string, ColumnMeta>();
+
+    type SubjectRow = {
+      classSubjectId: string;
+      subject: string;
+      templateName: string | null;
+      workflowStatus: string;
+      canEditScores: boolean;
+      cells: {
+        columnKey: string;
+        assessmentId: string | null;
+        score: number | null;
+        maxScore: number | null;
+        weightPercent: number | null;
+        entryLocked: boolean;
+      }[];
+      total: number | null;
+    };
+
+    const subjects: SubjectRow[] = [];
+    type AssessmentWithScores = {
+      id: string;
+      name: string;
+      maxScore: number;
+      weightPercent: number;
+      sortOrder: number;
+      entryLocked: boolean;
+      scores: { score: number }[];
+    };
+    const assessmentsByClass = new Map<string, AssessmentWithScores[]>();
+
+    for (const cs of classSubjects) {
+      await this.syncTermAssessments(schoolId, termId, cs.id);
+      const workflowSheet = await this.workflow.getOrCreateSheet(
+        schoolId,
+        termId,
+        cs.id,
+      );
+      const template = await this.resolveTemplateForClassSubject(
+        schoolId,
+        cs.id,
+      );
+
+      const assessments = await this.prisma.assessment.findMany({
+        where: { termId, classSubjectId: cs.id, schoolId },
+        orderBy: { sortOrder: 'asc' },
+        include: {
+          scores: { where: { studentProfileId } },
+        },
+      });
+
+      assessmentsByClass.set(cs.id, assessments);
+
+      for (const a of assessments) {
+        const key = columnKey(a.name);
+        const existing = columnMap.get(key);
+        if (!existing) {
+          columnMap.set(key, {
+            key,
+            name: a.name,
+            maxScore: a.maxScore,
+            weightPercent: a.weightPercent,
+            sortOrder: a.sortOrder,
+          });
+        } else {
+          existing.maxScore = Math.max(existing.maxScore, a.maxScore);
+          existing.sortOrder = Math.min(existing.sortOrder, a.sortOrder);
+        }
+      }
+
+      const canEditScores =
+        !userId || !role
+          ? true
+          : await this.teacherScope.canEditClassSubjectScores(
+              schoolId,
+              userId,
+              role,
+              cs.id,
+            );
+
+      const averageItems = assessments
+        .filter((a) => a.scores.length > 0)
+        .filter(
+          (a) =>
+            (role !== 'student' && role !== 'parent') || a.entryLocked,
+        )
+        .map((a) => ({
+          score: a.scores[0].score,
+          maxScore: a.maxScore,
+          weightPercent: a.weightPercent,
+        }));
+
+      subjects.push({
+        classSubjectId: cs.id,
+        subject: cs.subject.name,
+        templateName: template?.name ?? null,
+        workflowStatus: workflowSheet.status,
+        canEditScores,
+        cells: [],
+        total: weightedTermAverage(averageItems),
+      });
+    }
+
+    const columns = [...columnMap.values()].sort(
+      (a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name),
+    );
+
+    for (let i = 0; i < subjects.length; i++) {
+      const assessments = assessmentsByClass.get(subjects[i].classSubjectId) ?? [];
+      const byKey = new Map(
+        assessments.map((a) => [columnKey(a.name), a] as const),
+      );
+
+      subjects[i].cells = columns.map((col) => {
+        const a = byKey.get(col.key);
+        if (!a) {
+          return {
+            columnKey: col.key,
+            assessmentId: null,
+            score: null,
+            maxScore: null,
+            weightPercent: null,
+            entryLocked: true,
+          };
+        }
+        return {
+          columnKey: col.key,
+          assessmentId: a.id,
+          score:
+            role === 'student' || role === 'parent'
+              ? a.entryLocked
+                ? (a.scores[0]?.score ?? null)
+                : null
+              : (a.scores[0]?.score ?? null),
+          maxScore: a.maxScore,
+          weightPercent: a.weightPercent,
+          entryLocked: a.entryLocked,
+        };
+      });
+    }
+
+    return {
+      term: { id: term.id, name: term.name },
+      student: {
+        id: profile.id,
+        name: `${profile.user.firstName} ${profile.user.lastName}`.trim(),
+        grade: profile.grade.name,
+        section: profile.section?.name ?? null,
+        studentId: profile.user.externalRef,
+      },
+      assessmentCount: columns.length,
+      columns: columns.map(({ key, name, maxScore, weightPercent, sortOrder }) => ({
+        key,
+        name,
+        maxScore,
+        weightPercent,
+        sortOrder,
+      })),
+      subjects,
+    };
+  }
+
+  async saveStudentSubjectMatrix(
+    schoolId: string,
+    termId: string,
+    studentProfileId: string,
+    entries: {
+      classSubjectId: string;
+      assessmentId: string;
+      score: number;
+    }[],
+    userId?: string,
+    role?: string,
+  ) {
+    const byClass = new Map<
+      string,
+      { studentProfileId: string; assessmentId: string; score: number }[]
+    >();
+
+    for (const entry of entries) {
+      const list = byClass.get(entry.classSubjectId) ?? [];
+      list.push({
+        studentProfileId,
+        assessmentId: entry.assessmentId,
+        score: entry.score,
+      });
+      byClass.set(entry.classSubjectId, list);
+    }
+
+    let saved = 0;
+    for (const [classSubjectId, classEntries] of byClass) {
+      const result = await this.saveScoreMatrix(
+        schoolId,
+        termId,
+        classSubjectId,
+        classEntries,
+        userId,
+        role,
+      );
+      saved += result.saved;
+    }
+
+    return { saved };
   }
 
   async setAssessmentEntryLock(

@@ -20,6 +20,17 @@ import { CreateAssessmentDto } from './dto/create-assessment.dto';
 import { CreateClassSubjectDto } from './dto/create-class-subject.dto';
 import { CreateSubjectDto } from './dto/create-subject.dto';
 import { CreateTermDto } from './dto/create-term.dto';
+import { UpdateTermDto } from './dto/update-term.dto';
+import {
+  ageFromDateOfBirth,
+  buildEthiopianReportCardHtml,
+  buildGradeSectionLabel,
+  buildSubjectGridRows,
+  buildSummaryFromGrid,
+  ethiopianCalendarYear,
+  formatGenderLabel,
+  type ReportCardPrintPayload,
+} from './report-card-html.util';
 
 const DEFAULT_SUBJECTS = [
   { code: 'MATH', name: 'Mathematics' },
@@ -208,6 +219,64 @@ export class AcademicsService implements OnModuleInit {
     });
   }
 
+  async updateTerm(schoolId: string, termId: string, dto: UpdateTermDto) {
+    const existing = await this.prisma.academicTerm.findFirst({
+      where: { id: termId, schoolId },
+    });
+    if (!existing) {
+      throw new NotFoundException('Term not found');
+    }
+
+    const startDate = dto.startDate ? new Date(dto.startDate) : existing.startDate;
+    const endDate = dto.endDate ? new Date(dto.endDate) : existing.endDate;
+    if (startDate > endDate) {
+      throw new BadRequestException('Start date must be before end date');
+    }
+
+    if (dto.isCurrent) {
+      await this.prisma.academicTerm.updateMany({
+        where: { schoolId, id: { not: termId } },
+        data: { isCurrent: false },
+      });
+    }
+
+    return this.prisma.academicTerm.update({
+      where: { id: termId },
+      data: {
+        ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
+        ...(dto.startDate !== undefined ? { startDate } : {}),
+        ...(dto.endDate !== undefined ? { endDate } : {}),
+        ...(dto.sortOrder !== undefined ? { sortOrder: dto.sortOrder } : {}),
+        ...(dto.isCurrent !== undefined ? { isCurrent: dto.isCurrent } : {}),
+      },
+      include: { academicYear: { select: { name: true } } },
+    });
+  }
+
+  async deleteTerm(schoolId: string, termId: string) {
+    const existing = await this.prisma.academicTerm.findFirst({
+      where: { id: termId, schoolId },
+    });
+    if (!existing) {
+      throw new NotFoundException('Term not found');
+    }
+
+    const [assessments, sheets, reports] = await Promise.all([
+      this.prisma.assessment.count({ where: { termId } }),
+      this.prisma.classSubjectTermSheet.count({ where: { termId } }),
+      this.prisma.studentTermReport.count({ where: { termId } }),
+    ]);
+
+    if (assessments > 0 || sheets > 0 || reports > 0) {
+      throw new BadRequestException(
+        'This term has results or report data. Remove scores and unlink data before deleting.',
+      );
+    }
+
+    await this.prisma.academicTerm.delete({ where: { id: termId } });
+    return { deleted: true, id: termId };
+  }
+
   listSubjects(schoolId: string) {
     return this.prisma.subject.findMany({
       where: { schoolId },
@@ -323,7 +392,11 @@ export class AcademicsService implements OnModuleInit {
   async updateClassSubject(
     schoolId: string,
     classSubjectId: string,
-    data: { teacherId?: string | null; assessmentTemplateId?: string | null },
+    data: {
+      teacherId?: string | null;
+      assessmentTemplateId?: string | null;
+      weeklySessions?: number;
+    },
   ) {
     const cs = await this.prisma.classSubject.findFirst({
       where: { id: classSubjectId, schoolId },
@@ -337,12 +410,21 @@ export class AcademicsService implements OnModuleInit {
       if (!teacher) throw new BadRequestException('Teacher not found');
     }
 
+    if (data.weeklySessions !== undefined) {
+      if (data.weeklySessions < 1 || data.weeklySessions > 2) {
+        throw new BadRequestException('Weekly sessions must be 1 or 2');
+      }
+    }
+
     return this.prisma.classSubject.update({
       where: { id: classSubjectId },
       data: {
         ...(data.teacherId !== undefined ? { teacherId: data.teacherId } : {}),
         ...(data.assessmentTemplateId !== undefined
           ? { assessmentTemplateId: data.assessmentTemplateId }
+          : {}),
+        ...(data.weeklySessions !== undefined
+          ? { weeklySessions: data.weeklySessions }
           : {}),
       },
       include: {
@@ -804,87 +886,193 @@ export class AcademicsService implements OnModuleInit {
 
   buildReportCardHtml(
     report: Awaited<ReturnType<AcademicsService['buildReportCard']>>,
+    printPayload: ReportCardPrintPayload,
   ) {
-    const rows = report.subjects
-      .map(
-        (s) => `
-      <tr>
-        <td>${s.subject}</td>
-        <td>${s.assessments.map((a) => `${a.name}: ${a.score}/${a.maxScore}`).join('<br/>')}</td>
-        <td><strong>${s.average}%</strong></td>
-        <td><strong>${s.letter}</strong></td>
-      </tr>`,
-      )
-      .join('');
+    return buildEthiopianReportCardHtml(printPayload);
+  }
 
-    const logo = report.school.logoUrl
-      ? `<img src="${report.school.logoUrl}" alt="" style="max-height:56px;margin-bottom:0.5rem"/>`
-      : '';
+  async buildReportCardHtmlDocument(
+    schoolId: string,
+    studentProfileId: string,
+    termId: string,
+    viewerRole?: string,
+  ) {
+    const report = await this.buildReportCard(
+      schoolId,
+      studentProfileId,
+      termId,
+      viewerRole,
+    );
+    const printPayload = await this.buildReportCardPrintPayload(
+      schoolId,
+      studentProfileId,
+      termId,
+      report,
+    );
+    return this.buildReportCardHtml(report, printPayload);
+  }
 
-    return `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8"/>
-  <title>Report Card — ${report.student.name}</title>
-  <style>
-    * { box-sizing: border-box; }
-    body { font-family: "Segoe UI", system-ui, sans-serif; max-width: 210mm; margin: 0 auto; padding: 16mm; color: #0f172a; background: #fff; }
-    .rc-header { display: flex; gap: 1rem; align-items: flex-start; border-bottom: 3px solid #0d5c63; padding-bottom: 1rem; margin-bottom: 1rem; }
-    .rc-header h1 { color: #0d5c63; margin: 0; font-size: 1.35rem; font-weight: 800; }
-    .meta { color: #64748b; margin: 0.35rem 0 0; font-size: 0.85rem; }
-    .rc-student { background: #f0f9fa; border-radius: 10px; padding: 0.85rem 1rem; margin-bottom: 1rem; font-size: 0.92rem; }
-    .rc-student strong { font-size: 1.05rem; color: #0a3d42; }
-    table { width: 100%; border-collapse: collapse; margin: 0.5rem 0 1rem; font-size: 0.88rem; }
-    th, td { border: 1px solid #cbd5e1; padding: 0.45rem 0.65rem; text-align: left; vertical-align: top; }
-    th { background: #0d5c63; color: #fff; font-weight: 700; }
-    tr:nth-child(even) td { background: #f8fafc; }
-    .summary { background: #f0f9fa; padding: 1rem 1.1rem; border-radius: 10px; border: 1px solid rgba(13, 92, 99, 0.15); }
-    .summary p { margin: 0.35rem 0; }
-    .comment { margin-top: 0.85rem; font-size: 0.9rem; line-height: 1.5; }
-    .sig { margin-top: 2rem; display: flex; justify-content: space-between; gap: 2rem; }
-    .sig div { border-top: 1px solid #334155; flex: 1; padding-top: 0.35rem; font-size: 0.8rem; color: #475569; }
-    .rc-footer { font-size: 0.75rem; color: #94a3b8; margin-top: 1rem; }
-    @page { size: A4; margin: 12mm; }
-    @media print {
-      body { padding: 0; margin: 0; }
-      .summary { break-inside: avoid; }
-      table { break-inside: auto; }
-      tr { break-inside: avoid; }
+  async buildReportCardPrintPayload(
+    schoolId: string,
+    studentProfileId: string,
+    termId: string,
+    report: Awaited<ReturnType<AcademicsService['buildReportCard']>>,
+  ): Promise<ReportCardPrintPayload> {
+    const profile = await this.prisma.studentProfile.findFirst({
+      where: { id: studentProfileId, schoolId },
+      include: {
+        user: { select: { firstName: true, lastName: true, externalRef: true } },
+        grade: { select: { name: true } },
+        section: { select: { name: true } },
+      },
+    });
+    if (!profile) throw new NotFoundException('Student not found');
+
+    const school = await this.prisma.school.findUnique({
+      where: { id: schoolId },
+      select: { name: true, logoUrl: true, address: true, email: true, phone: true },
+    });
+
+    const term = await this.prisma.academicTerm.findFirst({
+      where: { id: termId, schoolId },
+      include: { academicYear: true },
+    });
+    if (!term) throw new NotFoundException('Term not found');
+
+    const bands = await this.getBands(schoolId);
+    const yearTerms = await this.prisma.academicTerm.findMany({
+      where: { schoolId, academicYearId: term.academicYearId },
+      orderBy: { sortOrder: 'asc' },
+    });
+
+    const classSubjects = await this.prisma.classSubject.findMany({
+      where: {
+        schoolId,
+        gradeId: profile.gradeId,
+        academicYearId: term.academicYearId,
+        ...(profile.sectionId ? { sectionId: profile.sectionId } : {}),
+      },
+      include: { subject: true },
+      orderBy: { subject: { name: 'asc' } },
+    });
+    const subjects = classSubjects.map((cs) => cs.subject.name);
+
+    const termAverages: Array<Array<number | null>> = [];
+    for (const yt of yearTerms) {
+      const results = await this.computeSubjectResults(
+        schoolId,
+        studentProfileId,
+        yt.id,
+        profile.gradeId,
+        profile.sectionId,
+        term.academicYearId,
+        bands,
+      );
+      const bySubject = new Map(results.map((r) => [r.subject, r.average]));
+      termAverages.push(subjects.map((name) => bySubject.get(name) ?? null));
     }
-  </style>
-</head>
-<body>
-  <header class="rc-header">
-    <div>${logo}</div>
-    <div>
-      <h1>${report.school.name}</h1>
-      <p class="meta">Official report card · ${report.term.academicYear} · ${report.term.name}</p>
-    </div>
-  </header>
-  <div class="rc-student">
-    <strong>${report.student.name}</strong><br/>
-    ${report.student.grade}${report.student.section ? ` · Section ${report.student.section}` : ''}
-    ${report.student.studentId ? `<br/>Student ID: ${report.student.studentId}` : ''}
-  </div>
-  <table>
-    <thead><tr><th>Subject</th><th>Assessments</th><th>Average</th><th>Grade</th></tr></thead>
-    <tbody>${rows || '<tr><td colspan="4">No scores recorded yet.</td></tr>'}</tbody>
-  </table>
-  <div class="summary">
-    <p><strong>Overall average:</strong> ${report.overallAverage ?? '—'}% 
-    ${report.overallLetter ? `(${report.overallLetter})` : ''}</p>
-    ${report.rank ? `<p><strong>Class rank:</strong> ${report.rank} of ${report.classSize}</p>` : ''}
-    ${report.attendance.rate != null ? `<p><strong>Attendance:</strong> ${report.attendance.rate}% (${report.attendance.present}/${report.attendance.total} days)</p>` : ''}
-    ${report.teacherComment ? `<div class="comment"><strong>Teacher comment:</strong><br/>${report.teacherComment}</div>` : ''}
-    ${report.principalComment ? `<div class="comment"><strong>Principal comment:</strong><br/>${report.principalComment}</div>` : ''}
-    <div class="sig">
-      <div>Homeroom teacher signature</div>
-      <div>Principal signature</div>
-    </div>
-    <p class="rc-footer">Generated ${new Date(report.generatedAt).toLocaleString()} · CampusOne</p>
-  </div>
-</body>
-</html>`;
+
+    while (termAverages.length < 4) {
+      termAverages.push(subjects.map(() => null));
+    }
+
+    const subjectGrid = buildSubjectGridRows(subjects, termAverages);
+
+    const yearStart = yearTerms[0]?.startDate ?? term.startDate;
+    const yearEnd = yearTerms[yearTerms.length - 1]?.endDate ?? term.endDate;
+    const absentDays = await this.prisma.attendanceRecord.count({
+      where: {
+        schoolId,
+        studentProfileId,
+        periodNumber: 0,
+        status: AttendanceStatus.absent,
+        date: { gte: yearStart, lte: yearEnd },
+      },
+    });
+
+    const termReports = await this.prisma.studentTermReport.findMany({
+      where: {
+        schoolId,
+        studentProfileId,
+        termId: { in: yearTerms.map((t) => t.id) },
+      },
+    });
+    const commentByTerm = new Map(termReports.map((r) => [r.termId, r]));
+
+    const enrollment = await this.prisma.studentEnrollment.findUnique({
+      where: {
+        studentProfileId_academicYearId: {
+          studentProfileId,
+          academicYearId: term.academicYearId,
+        },
+      },
+      include: { grade: { select: { name: true } } },
+    });
+
+    let promotionText: string | null = null;
+    if (enrollment?.promotionOutcome === 'PROMOTED') {
+      promotionText = enrollment.promotionNote?.trim() || 'Promoted to next grade';
+    } else if (enrollment?.promotionOutcome === 'GRADUATED') {
+      promotionText = 'Graduated';
+    } else if (enrollment?.promotionOutcome === 'RETAINED') {
+      promotionText = `Retained in ${profile.grade.name}`;
+    } else if (enrollment?.promotionOutcome === 'PASSED') {
+      promotionText = 'Passed';
+    }
+
+    const semester1Comment =
+      commentByTerm.get(yearTerms[1]?.id ?? '')?.teacherComment ??
+      commentByTerm.get(yearTerms[0]?.id ?? '')?.teacherComment ??
+      null;
+    const semester2Comment =
+      commentByTerm.get(yearTerms[3]?.id ?? '')?.teacherComment ??
+      commentByTerm.get(yearTerms[2]?.id ?? '')?.teacherComment ??
+      null;
+    const cumulativeComment =
+      report.principalComment ??
+      commentByTerm.get(yearTerms[yearTerms.length - 1]?.id ?? '')?.principalComment ??
+      report.teacherComment ??
+      null;
+
+    return {
+      school: {
+        name: school?.name ?? report.school.name,
+        logoUrl: school?.logoUrl ?? report.school.logoUrl ?? null,
+        address: school?.address ?? null,
+        email: school?.email ?? null,
+        phone: school?.phone ?? null,
+      },
+      student: {
+        name: report.student.name,
+        number:
+          profile.user.externalRef ??
+          profile.fan ??
+          profile.fcn ??
+          profile.cardCode ??
+          null,
+        sex: formatGenderLabel(profile.gender),
+        age: ageFromDateOfBirth(profile.dateOfBirth),
+        gradeLabel: buildGradeSectionLabel(profile.grade.name, profile.section?.name ?? null),
+        academicYearEc: String(ethiopianCalendarYear(new Date(term.endDate))),
+        academicYear: term.academicYear.name,
+        cardCode: profile.cardCode,
+      },
+      promotionText,
+      subjectGrid,
+      summary: buildSummaryFromGrid(
+        subjectGrid,
+        absentDays,
+        report.overallLetter,
+        report.rank,
+        report.classSize,
+      ),
+      remarks: {
+        semester1: semester1Comment,
+        semester2: semester2Comment,
+        cumulative: cumulativeComment,
+      },
+      generatedAt: report.generatedAt,
+    };
   }
 
   async listStudentReleasedScores(

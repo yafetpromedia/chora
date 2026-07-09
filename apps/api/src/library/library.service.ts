@@ -195,6 +195,28 @@ export class LibraryService {
       continueReading: ReturnType<LibraryService['formatResource']>[];
     } | null = null;
 
+    let contributions: {
+      pending: ReturnType<LibraryService['formatResource']>[];
+      published: ReturnType<LibraryService['formatResource']>[];
+    } | null = null;
+
+    if (role === 'teacher') {
+      const uploads = await this.prisma.libraryResource.findMany({
+        where: { schoolId, uploadedById: userId },
+        orderBy: { createdAt: 'desc' },
+        take: 48,
+        include: this.resourceInclude(),
+      });
+      contributions = {
+        pending: uploads
+          .filter((r) => r.status === LibraryResourceStatus.PENDING)
+          .map((r) => this.formatResource(r)),
+        published: uploads
+          .filter((r) => r.status === LibraryResourceStatus.PUBLISHED)
+          .map((r) => this.formatResource(r)),
+      };
+    }
+
     if (student) {
       const [favorites, progress] = await Promise.all([
         this.prisma.libraryFavorite.findMany({
@@ -246,6 +268,7 @@ export class LibraryService {
       recent: recent.map((r) => this.formatResource(r)),
       stats,
       shelf,
+      contributions,
       studentGrade: student
         ? { id: student.gradeId, name: student.grade.name }
         : null,

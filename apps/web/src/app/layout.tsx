@@ -4,6 +4,7 @@ import { PlatformAdminShortcut } from "@/components/platform-admin-shortcut";
 import "./globals.css";
 import "../styles/landing.css";
 import "../styles/auth.css";
+import "../styles/register.css";
 import "../styles/dashboard.css";
 import "../styles/setup.css";
 import "../styles/students.css";
@@ -26,6 +27,7 @@ import "../styles/ai.css";
 import "../styles/academics.css";
 import "../styles/student-fees.css";
 import "../styles/student-dashboard.css";
+import "../styles/student-portal.css";
 import "../styles/parents.css";
 
 const figtree = Figtree({

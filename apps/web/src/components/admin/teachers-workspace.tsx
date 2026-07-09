@@ -9,6 +9,7 @@ import { TEACHER_ROLE_SLUGS } from "@/lib/people";
 import { ROLE_TEMPLATE_LABELS } from "@/lib/permissions";
 import {
   createTeacher,
+  deleteTeacher,
   listRoleTemplates,
   listTeachers,
   updateTeacher,
@@ -75,6 +76,7 @@ export function TeachersWorkspace() {
   const [grades, setGrades] = useState<GradeWithSections[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [toast, setToast] = useState("");
   const [search, setSearch] = useState("");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<TeacherRecord | null>(null);
@@ -197,6 +199,33 @@ export function TeachersWorkspace() {
     }
   }
 
+  async function onRemove(t: TeacherRecord) {
+    const name = displayName(t);
+    if (
+      !window.confirm(
+        `Remove ${name} from the school? Their login will be deleted. This cannot be undone.`,
+      )
+    ) {
+      return;
+    }
+    setBusy(true);
+    setError("");
+    setToast("");
+    try {
+      await deleteTeacher(t.userId);
+      setToast(`${name} removed.`);
+      if (editTarget?.userId === t.userId) {
+        setDrawerOpen(false);
+        resetForm();
+      }
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not remove teacher");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   function renderActions(t: TeacherRecord, compact?: boolean) {
     return (
       <div className={`tch-v2__actions${compact ? " tch-v2__actions--compact" : ""}`}>
@@ -216,6 +245,14 @@ export function TeachersWorkspace() {
             ID card
           </a>
         ) : null}
+        <button
+          type="button"
+          className="tch-v2__action tch-v2__action--danger"
+          disabled={busy}
+          onClick={() => void onRemove(t)}
+        >
+          Remove
+        </button>
       </div>
     );
   }
@@ -225,6 +262,11 @@ export function TeachersWorkspace() {
       {error ? (
         <div className="tch-v2__alert tch-v2__alert--err" role="alert">
           {error}
+        </div>
+      ) : null}
+      {toast ? (
+        <div className="tch-v2__alert tch-v2__alert--ok" role="status">
+          {toast}
         </div>
       ) : null}
 

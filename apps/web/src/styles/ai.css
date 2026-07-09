@@ -78,9 +78,16 @@
 /* Floating chat */
 .ai-chat {
   position: fixed;
-  right: 1rem;
-  bottom: 1rem;
+  right: 1.25rem;
+  bottom: 1.25rem;
   z-index: 1200;
+}
+
+@media (max-width: 640px) {
+  .ai-chat {
+    right: 1rem;
+    bottom: 1rem;
+  }
 }
 
 .ai-chat__fab {

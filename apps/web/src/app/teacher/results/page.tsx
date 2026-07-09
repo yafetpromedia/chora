@@ -1,9 +1,9 @@
 "use client";
 
 import { Suspense } from "react";
-import { TeacherResultsInner } from "./results-inner";
+import { TeacherResultsPage } from "./teacher-results-page";
 
-export default function TeacherResultsPage() {
+export default function TeacherResultsClassSheetPage() {
   return (
     <Suspense
       fallback={
@@ -13,7 +13,7 @@ export default function TeacherResultsPage() {
         </div>
       }
     >
-      <TeacherResultsInner />
+      <TeacherResultsPage section="class-sheet" />
     </Suspense>
   );
 }

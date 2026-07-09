@@ -1,4 +1,4 @@
-import { apiFetch, apiPatch, apiPost } from "@/lib/api";
+import { apiDelete, apiFetch, apiPatch, apiPost } from "@/lib/api";
 
 export type TeacherAssignment = {
   id: string;
@@ -258,4 +258,8 @@ export async function updateTeacher(
   },
 ) {
   return apiPatch<TeacherRecord>(`/schools/teachers/${userId}`, body);
+}
+
+export async function deleteTeacher(userId: string) {
+  return apiDelete<{ removed: true; userId: string }>(`/schools/teachers/${userId}`);
 }

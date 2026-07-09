@@ -1,5 +1,7 @@
 import {
   BadRequestException,
+  ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
   UnauthorizedException,
@@ -19,9 +21,12 @@ import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { JoinInviteDto } from './dto/join-invite.dto';
 import { RegisterSchoolDto } from './dto/register-school.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import { VerifyStudentEnrollmentDto } from './dto/verify-student-enrollment.dto';
 import { InvitesService } from '../schools/invites.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { normalizeUsername } from '../users/username.util';
+import { UserRole as PrismaUserRole } from '@prisma/client';
 
 @Injectable()
 export class AuthService {
@@ -253,38 +258,86 @@ export class AuthService {
   }
 
   async joinSchool(dto: JoinSchoolDto) {
-    const school = await this.schoolsService.findByJoinCode(dto.schoolCode);
+    if (dto.role !== 'student') {
+      throw new ForbiddenException(
+        'Teachers and parents must join using an invite link from your school admin.',
+      );
+    }
 
+    const school = await this.schoolsService.findByJoinCode(dto.schoolCode);
     const studentId = dto.externalRef?.trim();
-    if (dto.role === 'student' && !studentId) {
+    if (!studentId) {
       throw new BadRequestException('Student ID is required for student accounts');
     }
 
-    await this.subscriptionsService.assertCanAddUser(school.id, dto.role);
+    await this.verifyEnrolledStudent(
+      school.id,
+      studentId,
+      dto.firstName,
+      dto.lastName,
+    );
 
-    const user = await this.usersService.createUser({
-      username: dto.role === 'student' && studentId ? studentId : dto.username,
-      email: dto.email,
-      password: dto.password,
-      firstName: dto.firstName,
-      lastName: dto.lastName,
-      role: dto.role,
-      schoolId: school.id,
-      schoolJoinCode: school.joinCode,
-      externalRef: studentId || undefined,
+    throw new ConflictException(
+      'Your portal account is ready. Sign in with your school code, student ID, and password from your school admin.',
+    );
+  }
+
+  async verifyStudentEnrollment(dto: VerifyStudentEnrollmentDto) {
+    const school = await this.schoolsService.findByJoinCode(dto.schoolCode);
+    const student = await this.verifyEnrolledStudent(
+      school.id,
+      dto.studentId,
+      dto.firstName,
+      dto.lastName,
+    );
+
+    return {
+      schoolName: school.name,
+      joinCode: school.joinCode,
+      studentId: student.externalRef ?? student.username,
+      studentName: `${student.firstName} ${student.lastName}`.trim(),
+      message:
+        'You are enrolled. Sign in with your school code, student ID, and password from your admin.',
+    };
+  }
+
+  private async verifyEnrolledStudent(
+    schoolId: string,
+    studentId: string,
+    firstName: string,
+    lastName: string,
+  ) {
+    const normalizedId = studentId.trim().toUpperCase();
+    const student = await this.prisma.user.findFirst({
+      where: {
+        schoolId,
+        role: PrismaUserRole.student,
+        studentProfile: { isNot: null },
+        OR: [
+          { externalRef: normalizedId },
+          { username: normalizeUsername(normalizedId) },
+        ],
+      },
     });
 
-    const payload = await this.toSchoolPayload(user);
+    if (!student) {
+      throw new BadRequestException(
+        'Student ID not recognized. Ask your school admin to enroll you first.',
+      );
+    }
 
-    const tokens = await this.issueSchoolTokens(payload);
-    return {
-      ...tokens,
-      school: {
-        id: school.id,
-        name: school.name,
-        joinCode: school.joinCode,
-      },
-    };
+    const fn = firstName.trim().toLowerCase();
+    const ln = lastName.trim().toLowerCase();
+    if (
+      student.firstName.trim().toLowerCase() !== fn ||
+      student.lastName.trim().toLowerCase() !== ln
+    ) {
+      throw new BadRequestException(
+        'Your name does not match school records for this Student ID.',
+      );
+    }
+
+    return student;
   }
 
   async googleLogin(dto: GoogleAuthDto) {
@@ -320,17 +373,17 @@ export class AuthService {
   }
 
   async login(dto: LoginDto) {
-    let schoolId: string | undefined;
-    if (dto.schoolCode?.trim()) {
-      const school = await this.schoolsService.findByJoinCode(dto.schoolCode);
-      schoolId = school.id;
-    }
+    const school = await this.schoolsService.findByJoinCode(dto.schoolCode);
 
     const user = await this.usersService.findByLoginIdentifier(
       dto.username,
-      schoolId,
+      school.id,
     );
     if (!user) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    if (user.schoolId !== school.id) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
@@ -340,6 +393,14 @@ export class AuthService {
     }
 
     return this.issueSchoolTokens(await this.toSchoolPayload(user));
+  }
+
+  async validateSchoolCode(code: string) {
+    const school = await this.schoolsService.findByJoinCode(code);
+    return {
+      name: school.name,
+      joinCode: school.joinCode,
+    };
   }
 
   async validateUserById(id: string): Promise<AuthUser | null> {

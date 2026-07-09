@@ -2,6 +2,14 @@ import type { UserRole } from "@/lib/auth";
 import { hasPermission, Permission } from "@/lib/permissions";
 import type { DashIconName } from "./dash-icons";
 
+export type NavChild = {
+  href: string;
+  label: string;
+  description?: string;
+  /** Visual accent for special items (e.g. AI). */
+  tone?: "ai";
+};
+
 export type NavItem = {
   href: string;
   label: string;
@@ -11,6 +19,8 @@ export type NavItem = {
   permission?: string;
   /** Teacher-only: show only when homeroom is assigned. */
   homeroomOnly?: boolean;
+  /** Optional sub-sections shown in the sidebar when this item is active. */
+  children?: NavChild[];
 };
 
 export const DASHBOARD_NAV: NavItem[] = [
@@ -99,6 +109,13 @@ export const DASHBOARD_NAV: NavItem[] = [
     permission: Permission.RESULTS_READ,
   },
   {
+    href: "/admin/report-cards",
+    label: "Report cards",
+    icon: "chart",
+    roles: ["admin", "staff"],
+    permission: Permission.RESULTS_READ,
+  },
+  {
     href: "/admin/results/templates",
     label: "Assessment templates",
     icon: "results",
@@ -146,11 +163,38 @@ export const DASHBOARD_NAV: NavItem[] = [
     roles: ["teacher"],
     homeroomOnly: true,
   },
-  { href: "/teacher/results", label: "Results", icon: "results", roles: ["teacher"] },
+  {
+    href: "/teacher/results",
+    label: "Results",
+    icon: "results",
+    roles: ["teacher"],
+    children: [
+      {
+        href: "/teacher/results",
+        label: "Class score sheet",
+        description: "All students, one subject",
+      },
+      {
+        href: "/teacher/results/by-student",
+        label: "By student",
+        description: "Subject rows per learner",
+      },
+    ],
+  },
   { href: "/teacher/classwork", label: "Assignments", icon: "library", roles: ["teacher"] },
   { href: "/teacher/worksheets", label: "Worksheets", icon: "results", roles: ["teacher"] },
   { href: "/teacher/timetable", label: "Timetable", icon: "calendar", roles: ["teacher"] },
-  { href: "/teacher/library", label: "eLibrary", icon: "library", roles: ["teacher"] },
+  {
+    href: "/teacher/library",
+    label: "eLibrary",
+    icon: "library",
+    roles: ["teacher"],
+    children: [
+      { href: "/teacher/library", label: "Browse", description: "Search & discover" },
+      { href: "/teacher/library/progress", label: "Progress", description: "My uploads" },
+      { href: "/teacher/library/ai", label: "AI Assistant", description: "Summarize & quiz", tone: "ai" },
+    ],
+  },
   { href: "/teacher/id-card", label: "Staff ID", icon: "students", roles: ["teacher"] },
   { href: "/teacher/profile", label: "Profile", icon: "profile", roles: ["teacher"] },
   { href: "/parent", label: "Overview", icon: "overview", roles: ["parent"] },
@@ -166,7 +210,17 @@ export const DASHBOARD_NAV: NavItem[] = [
   { href: "/student/worksheets", label: "Worksheets", icon: "results", roles: ["student"] },
   { href: "/student/fees", label: "Fees", icon: "fees", roles: ["student"] },
   { href: "/student/timetable", label: "Timetable", icon: "calendar", roles: ["student"] },
-  { href: "/student/library", label: "eLibrary", icon: "library", roles: ["student"] },
+  {
+    href: "/student/library",
+    label: "eLibrary",
+    icon: "library",
+    roles: ["student"],
+    children: [
+      { href: "/student/library", label: "Browse", description: "Search & discover" },
+      { href: "/student/library/progress", label: "Progress", description: "Reading & saves" },
+      { href: "/student/library/ai", label: "AI Assistant", description: "Summarize & quiz", tone: "ai" },
+    ],
+  },
   { href: "/student/profile", label: "Profile", icon: "profile", roles: ["student"] },
 ];
 
@@ -207,7 +261,15 @@ export function isNavActive(pathname: string, href: string) {
       (pathname === href || pathname.startsWith(`${href}/`)) &&
       !pathname.startsWith("/admin/results/templates") &&
       !pathname.startsWith("/admin/results/academic-years") &&
-      !pathname.startsWith("/admin/results/terms")
+      !pathname.startsWith("/admin/results/terms") &&
+      !pathname.startsWith("/admin/results/print")
+    );
+  }
+  if (href === "/admin/report-cards") {
+    return (
+      pathname === href ||
+      pathname.startsWith(`${href}/`) ||
+      pathname.startsWith("/admin/results/print")
     );
   }
   if (href === "/student/results") {
@@ -215,6 +277,20 @@ export function isNavActive(pathname: string, href: string) {
       (pathname === href || pathname.startsWith(`${href}/`)) &&
       !pathname.startsWith("/student/report-card")
     );
+  }
+  if (href === "/student/library" || href === "/teacher/library" || href === "/teacher/results") {
+    return pathname === href || pathname.startsWith(`${href}/`);
+  }
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+export function isNavChildActive(pathname: string, href: string) {
+  if (
+    href === "/student/library" ||
+    href === "/teacher/library" ||
+    href === "/teacher/results"
+  ) {
+    return pathname === href;
   }
   return pathname === href || pathname.startsWith(`${href}/`);
 }

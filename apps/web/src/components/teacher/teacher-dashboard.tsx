@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Announcement, apiFetch } from "@/lib/api";
@@ -11,25 +11,20 @@ import {
   type TeacherDashboardOverview,
 } from "@/lib/teachers";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
-import { DashIcon, type DashIconName } from "@/components/dashboard/dash-icons";
+import { DashIcon } from "@/components/dashboard/dash-icons";
 import { TimetableDayList } from "@/components/timetable/timetable-day-list";
-import { TeacherAnalyticsSection } from "@/components/teacher/teacher-analytics-section";
 
-function todayLabel() {
+function todayShort() {
   return new Date().toLocaleDateString(undefined, {
-    weekday: "long",
-    month: "long",
+    weekday: "short",
+    month: "short",
     day: "numeric",
   });
 }
 
 function formatDate(iso: string) {
   try {
-    return new Date(iso).toLocaleDateString(undefined, {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
+    return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
   } catch {
     return iso;
   }
@@ -44,71 +39,155 @@ function subjectInitial(name: string) {
   return word.charAt(0).toUpperCase();
 }
 
-const SUBJECT_TONES = ["teal", "blue", "amber", "violet", "rose", "emerald"] as const;
+const AVATAR_TONES = ["teal", "blue", "amber", "violet", "rose", "emerald"] as const;
 
-function subjectTone(name: string) {
-  let hash = 0;
-  for (const ch of name) hash = (hash + ch.charCodeAt(0)) % SUBJECT_TONES.length;
-  return SUBJECT_TONES[hash];
+function avatarTone(index: number) {
+  return AVATAR_TONES[index % AVATAR_TONES.length];
 }
 
-const QUICK_ACTIONS = [
-  { href: "/teacher/results", label: "Enter scores", icon: "results" as DashIconName },
-  { href: "/teacher/classwork", label: "New assignment", icon: "library" as DashIconName },
-  { href: "/teacher/timetable", label: "View timetable", icon: "calendar" as DashIconName },
-];
-
-function ClassPerformanceBars({
-  items,
+function AnalyticsStrip({
+  analytics,
+  showAttendance,
 }: {
-  items: TeacherDashboardAnalytics["classPerformance"];
+  analytics: TeacherDashboardAnalytics;
+  showAttendance: boolean;
 }) {
-  if (items.length === 0) return null;
+  const grade = analytics.grading;
+  const cw = analytics.classwork;
+  const att = analytics.attendanceToday;
+  const gradingPct = grade.progressPct ?? (grade.termName ? 0 : null);
+  const topClasses = analytics.classPerformance.slice(0, 4);
+  const maxAvg = Math.max(100, ...topClasses.map((c) => c.averageScore ?? 0));
 
   return (
-    <article className="tch-panel tch-panel--perf">
-      <header className="tch-panel__head">
-        <h3 className="tch-panel__title">Class averages</h3>
-        <span className="tch-panel__meta">Current term</span>
-      </header>
-      <ul className="tch-perf-list">
-        {items.slice(0, 6).map((item) => {
-          const hasScore = item.averageScore != null;
-          return (
-            <li key={item.classSubjectId} className="tch-perf-list__item">
-              <div className="tch-perf-list__head">
-                <span className="tch-perf-list__label">{item.label}</span>
-                <strong
-                  className={`tch-perf-list__value${hasScore ? "" : " tch-perf-list__value--muted"}`}
-                >
-                  {hasScore ? `${item.averageScore}%` : "—"}
-                </strong>
-              </div>
-              <div className="tch-perf-list__track">
-                <div
-                  className={`tch-perf-list__fill${hasScore ? "" : " tch-perf-list__fill--empty"}`}
-                  style={{
-                    width: hasScore ? `${Math.min(100, item.averageScore ?? 0)}%` : "0%",
-                  }}
+    <section className="tch-ov__analytics" aria-label="Analytics">
+      <article className="tch-ov__metric">
+        <header className="tch-ov__metric-head">
+          <span className="tch-ov__metric-icon tch-ov__metric-icon--grade">
+            <DashIcon name="results" className="dash-icon--xs" />
+          </span>
+          <div>
+            <h3>Grading</h3>
+            <Link href="/teacher/results">Open results</Link>
+          </div>
+          {gradingPct != null ? (
+            <span className="tch-ov__metric-ring" aria-hidden>
+              <svg viewBox="0 0 36 36">
+                <circle className="tch-ov__metric-ring-bg" cx="18" cy="18" r="15.5" />
+                <circle
+                  className="tch-ov__metric-ring-fg"
+                  cx="18"
+                  cy="18"
+                  r="15.5"
+                  style={{ "--pct": gradingPct } as React.CSSProperties}
                 />
-              </div>
-            </li>
-          );
-        })}
-      </ul>
-    </article>
+              </svg>
+            </span>
+          ) : null}
+        </header>
+        <p className="tch-ov__metric-value">
+          {gradingPct != null ? `${gradingPct}%` : "—"}
+        </p>
+        <p className="tch-ov__metric-meta">
+          {grade.missingScores > 0
+            ? `${grade.missingScores} scores missing`
+            : grade.termName ?? "No active term"}
+        </p>
+        <div className="tch-ov__track">
+          <span className="tch-ov__track-fill" style={{ width: `${gradingPct ?? 0}%` }} />
+        </div>
+      </article>
+
+      {showAttendance ? (
+        <article className="tch-ov__metric">
+          <header className="tch-ov__metric-head">
+            <span className="tch-ov__metric-icon tch-ov__metric-icon--att">
+              <DashIcon name="attendance" className="dash-icon--xs" />
+            </span>
+            <div>
+              <h3>Attendance</h3>
+              <Link href="/teacher/attendance">Mark today</Link>
+            </div>
+          </header>
+          <p className="tch-ov__metric-value">
+            {att.rate != null ? `${att.rate}%` : "—"}
+          </p>
+          <p className="tch-ov__metric-meta">
+            {att.marked}/{att.total} classes marked
+          </p>
+          <div className="tch-ov__spark" role="img" aria-label="Last 7 days">
+            {analytics.attendanceTrend.map((day) => (
+              <span
+                key={day.date}
+                className={`tch-ov__spark-bar${day.rate == null ? " is-empty" : ""}`}
+                style={{
+                  height: day.rate != null ? `${Math.max(14, day.rate)}%` : "14%",
+                }}
+                title={day.rate != null ? `${day.weekday}: ${day.rate}%` : day.weekday}
+              />
+            ))}
+          </div>
+        </article>
+      ) : (
+        <article className="tch-ov__metric">
+          <header className="tch-ov__metric-head">
+            <span className="tch-ov__metric-icon tch-ov__metric-icon--cw">
+              <DashIcon name="library" className="dash-icon--xs" />
+            </span>
+            <div>
+              <h3>Classwork</h3>
+              <Link href="/teacher/classwork">Open inbox</Link>
+            </div>
+          </header>
+          <p className="tch-ov__metric-value">{cw.submissionsToGrade}</p>
+          <p className="tch-ov__metric-meta">
+            {cw.submissionsToGrade > 0 ? "papers to review" : "All caught up"}
+          </p>
+          <div className="tch-ov__chips">
+            <span>{cw.published} live</span>
+            <span>{cw.draft} drafts</span>
+          </div>
+        </article>
+      )}
+
+      <article className="tch-ov__metric">
+        <header className="tch-ov__metric-head">
+          <span className="tch-ov__metric-icon tch-ov__metric-icon--avg">
+            <DashIcon name="students" className="dash-icon--xs" />
+          </span>
+          <div>
+            <h3>Class averages</h3>
+            <span className="tch-ov__metric-tag">{grade.termName ?? "Term"}</span>
+          </div>
+        </header>
+        {topClasses.length > 0 ? (
+          <ul className="tch-ov__avg-list">
+            {topClasses.map((item) => (
+              <li key={item.classSubjectId}>
+                <span className="tch-ov__avg-name">
+                  {item.label.split(" — ").pop()}
+                </span>
+                <div className="tch-ov__track tch-ov__track--sm">
+                  <span
+                    className="tch-ov__track-fill"
+                    style={{
+                      width: item.averageScore
+                        ? `${(item.averageScore / maxAvg) * 100}%`
+                        : "0%",
+                    }}
+                  />
+                </div>
+                <strong>{item.averageScore != null ? `${item.averageScore}%` : "—"}</strong>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="tch-ov__metric-empty">No scores entered yet.</p>
+        )}
+      </article>
+    </section>
   );
 }
-
-type MetricCard = {
-  key: string;
-  label: string;
-  value: string;
-  hint: string;
-  icon: DashIconName;
-  tone: "teal" | "blue" | "amber" | "violet";
-  href?: string;
-};
 
 export function TeacherDashboard() {
   const router = useRouter();
@@ -144,293 +223,203 @@ export function TeacherDashboard() {
     })();
   }, [router]);
 
+  const attentionItems = useMemo(() => {
+    if (!overview) return [];
+    const items: Array<{
+      key: string;
+      type: "attendance" | "grading" | "classwork";
+      title: string;
+      meta: string;
+      href: string;
+      action: string;
+    }> = [];
+    const canTakeAttendance = overview.canTakeAttendance ?? false;
+
+    if (canTakeAttendance && (overview.attendancePendingCount ?? 0) > 0) {
+      for (const p of overview.attendancePending ?? []) {
+        items.push({
+          key: `att-${p.gradeId}-${p.sectionId ?? "all"}`,
+          type: "attendance",
+          title: p.label,
+          meta: `${p.pendingCount} not marked today`,
+          href: `/teacher/attendance?gradeId=${p.gradeId}${p.sectionId ? `&sectionId=${p.sectionId}` : ""}`,
+          action: "Mark",
+        });
+      }
+    }
+
+    const byClass = new Map<string, { missing: number; parts: string[] }>();
+    for (const r of overview.resultsPending ?? []) {
+      const row = byClass.get(r.classLabel) ?? { missing: 0, parts: [] };
+      row.missing += r.missingCount;
+      row.parts.push(r.name);
+      byClass.set(r.classLabel, row);
+    }
+    for (const [classLabel, row] of byClass) {
+      items.push({
+        key: `grade-${classLabel}`,
+        type: "grading",
+        title: classLabel,
+        meta: `${row.missing} missing · ${row.parts.slice(0, 3).join(", ")}`,
+        href: "/teacher/results",
+        action: "Grade",
+      });
+    }
+
+    const inbox = overview.analytics?.classwork.submissionsToGrade ?? 0;
+    if (inbox > 0) {
+      items.push({
+        key: "cw",
+        type: "classwork",
+        title: "Assignment submissions",
+        meta: pluralCount(inbox, "paper") + " waiting",
+        href: "/teacher/classwork",
+        action: "Review",
+      });
+    }
+
+    return items.slice(0, 5);
+  }, [overview]);
+
   if (loading) {
     return (
       <div className="dash-loading dash-loading--pro">
         <span className="dash-loading-spinner" aria-hidden />
-        <p>Loading your dashboard…</p>
+        <p>Loading…</p>
       </div>
     );
   }
 
-  const homeroomLabel = overview?.homeroom
-    ? `${overview.homeroom.gradeName}${overview.homeroom.sectionName ? ` ${overview.homeroom.sectionName}` : ""}`
-    : null;
   const analytics = overview?.analytics;
   const canTakeAttendance = overview?.canTakeAttendance ?? false;
-  const attPending = canTakeAttendance ? (overview?.attendancePendingCount ?? 0) : 0;
-  const classworkInbox = analytics?.classwork.submissionsToGrade ?? 0;
   const subjectCount = analytics?.subjectsTeaching ?? overview?.teachingSlots.length ?? 0;
   const studentCount = analytics?.totalStudents ?? 0;
   const grading = analytics?.grading;
-  const att = analytics?.attendanceToday;
-  const gradingPct =
-    grading?.progressPct ?? (grading?.termName ? 0 : null);
-  const gradingLabel = gradingPct != null ? `${gradingPct}%` : "—";
+  const gradingPct = grading?.progressPct ?? (grading?.termName ? 0 : null);
+  const classworkInbox = analytics?.classwork.submissionsToGrade ?? 0;
+  const firstName = overview?.teacherName?.split(" ")[0];
+  const homeroomLabel = overview?.homeroom
+    ? `${overview.homeroom.gradeName}${overview.homeroom.sectionName ? ` ${overview.homeroom.sectionName}` : ""}`
+    : null;
   const hasSchedule = (overview?.todaySchedule?.slots.length ?? 0) > 0;
 
-  const attentionItems: Array<{
-    key: string;
-    type: string;
-    title: string;
-    meta: string;
-    href: string;
-    action: string;
-  }> = [];
-
-  if (canTakeAttendance && attPending > 0) {
-    for (const p of overview?.attendancePending ?? []) {
-      attentionItems.push({
-        key: `${p.gradeId}-${p.sectionId ?? "all"}`,
-        type: "Attendance",
-        title: p.label,
-        meta: `${p.pendingCount} of ${p.studentCount} not marked`,
-        href: `/teacher/attendance?gradeId=${p.gradeId}${p.sectionId ? `&sectionId=${p.sectionId}` : ""}`,
-        action: "Mark",
-      });
-    }
-  }
-
-  for (const r of (overview?.resultsPending ?? []).slice(0, 4)) {
-    attentionItems.push({
-      key: r.assessmentId,
-      type: "Grading",
-      title: r.name,
-      meta: `${r.classLabel} · ${pluralCount(r.missingCount, "score")} missing`,
-      href: `/teacher/results?assessmentId=${r.assessmentId}`,
-      action: "Grade",
-    });
-  }
-
-  if (classworkInbox > 0) {
-    attentionItems.push({
-      key: "classwork",
-      type: "Assignments",
-      title: `${pluralCount(classworkInbox, "submission")} to review`,
-      meta: "Waiting in your inbox",
-      href: "/teacher/classwork",
-      action: "Open",
-    });
-  }
-
-  const firstName = overview?.teacherName?.split(" ")[0];
-
-  const metrics: MetricCard[] = [
-    {
-      key: "students",
-      label: "Students",
-      value: String(studentCount),
-      hint: pluralCount(subjectCount, "class", "classes"),
-      icon: "students",
-      tone: "teal",
-    },
-    {
-      key: "grading",
-      label: "Grading",
-      value: gradingLabel,
-      hint:
-        grading && grading.missingScores > 0
-          ? `${pluralCount(grading.missingScores, "score")} missing`
-          : grading?.termName ?? "Set up term",
-      icon: "results",
-      tone: "amber",
-      href: "/teacher/results",
-    },
-    ...(canTakeAttendance
-      ? [
-          {
-            key: "attendance",
-            label: "Homeroom today",
-            value: att?.rate != null ? `${att.rate}%` : "—",
-            hint:
-              attPending > 0
-                ? `${attPending} class${attPending === 1 ? "" : "es"} pending`
-                : `${att?.marked ?? 0}/${att?.total ?? 0} marked`,
-            icon: "attendance" as DashIconName,
-            tone: "blue" as const,
-            href: "/teacher/attendance",
-          },
-        ]
-      : []),
-    {
-      key: "inbox",
-      label: "To review",
-      value: String(classworkInbox),
-      hint:
-        classworkInbox > 0
-          ? "Submissions waiting"
-          : analytics?.classwork.published
-            ? `${analytics.classwork.published} published`
-            : "All caught up",
-      icon: "library",
-      tone: "violet",
-      href: "/teacher/classwork",
-    },
-  ];
-
-  const navLinks = [
-    { href: "/teacher/results", label: "Scores", icon: "results" as DashIconName },
-    { href: "/teacher/classwork", label: "Assignments", icon: "library" as DashIconName },
-    { href: "/teacher/worksheets", label: "Worksheets", icon: "library" as DashIconName },
-    { href: "/teacher/timetable", label: "Timetable", icon: "calendar" as DashIconName },
-    { href: "/teacher/library", label: "eLibrary", icon: "library" as DashIconName },
+  const statPills = [
+    { label: "Classes", value: String(subjectCount) },
+    { label: "Students", value: String(studentCount) },
+    { label: "Grading", value: gradingPct != null ? `${gradingPct}%` : "—", href: "/teacher/results" },
+    { label: "Inbox", value: String(classworkInbox), href: "/teacher/classwork" },
   ];
 
   return (
     <DashboardShell role="teacher">
-      <div className="tch-dash tch-dash--v4">
-        <header className="tch-hero-v4">
-          <div className="tch-hero-v4__glow" aria-hidden />
-          <div className="tch-hero-v4__inner">
-            <div className="tch-hero-v4__main">
-              <p className="tch-hero-v4__date">{todayLabel()}</p>
-              <h1 className="tch-hero-v4__title">
-                {firstName ? `Good day, ${firstName}` : "Teacher workspace"}
+      <div className="tch-ov">
+        <header className="tch-ov__hero">
+          <div className="tch-ov__hero-glow" aria-hidden />
+          <div className="tch-ov__hero-inner">
+            <div className="tch-ov__hero-text">
+              <p className="tch-ov__hero-date">{todayShort()}</p>
+              <h1 className="tch-ov__hero-title">
+                {firstName ? `Hi, ${firstName}` : "Overview"}
               </h1>
-              <p className="tch-hero-v4__sub">
-                {subjectCount > 0
-                  ? `Teaching ${pluralCount(subjectCount, "class", "classes")} · ${pluralCount(studentCount, "student")}`
-                  : "No classes assigned yet"}
-                {overview?.currentTerm ? ` · ${overview.currentTerm.name}` : ""}
+              <p className="tch-ov__hero-sub">
+                {overview?.currentTerm?.name ?? "Current term"}
+                {subjectCount > 0 ? ` · ${subjectCount} classes` : ""}
+                {homeroomLabel ? ` · Homeroom ${homeroomLabel}` : ""}
               </p>
-              <div className="tch-hero-v4__tags">
-                <span
-                  className={`tch-hero-v4__tag${canTakeAttendance ? " tch-hero-v4__tag--homeroom" : ""}`}
-                >
-                  {canTakeAttendance ? "Homeroom teacher" : "Subject teacher"}
-                </span>
-                {homeroomLabel ? (
-                  <span className="tch-hero-v4__tag">{homeroomLabel}</span>
-                ) : null}
-                {overview?.academicYear ? (
-                  <span className="tch-hero-v4__tag">{overview.academicYear.name}</span>
-                ) : null}
-              </div>
             </div>
-            <div className="tch-hero-v4__nav-wrap">
-              <nav className="tch-hero-v4__nav" aria-label="Workspace shortcuts">
-                {navLinks.map((link) => (
-                  <Link key={link.href} href={link.href} className="tch-hero-v4__nav-link">
-                    <span className="tch-hero-v4__nav-icon">
-                      <DashIcon name={link.icon} className="dash-icon--xs" />
-                    </span>
-                    <span>{link.label}</span>
+            <div className="tch-ov__hero-stats">
+              {statPills.map((pill) =>
+                pill.href ? (
+                  <Link key={pill.label} href={pill.href} className="tch-ov__stat">
+                    <span>{pill.label}</span>
+                    <strong>{pill.value}</strong>
                   </Link>
-                ))}
-              </nav>
+                ) : (
+                  <div key={pill.label} className="tch-ov__stat">
+                    <span>{pill.label}</span>
+                    <strong>{pill.value}</strong>
+                  </div>
+                ),
+              )}
             </div>
           </div>
         </header>
 
         {error ? <p className="tch-alert tch-alert--error">{error}</p> : null}
 
-        <div className="tch-metrics-v4" role="list" aria-label="Workspace metrics">
-          {metrics.map((m) => {
-            const inner = (
-              <>
-                <div className={`tch-metrics-v4__icon tch-metrics-v4__icon--${m.tone}`}>
-                  <DashIcon name={m.icon} className="dash-icon--sm" />
-                </div>
-                <div className="tch-metrics-v4__body">
-                  <p className="tch-metrics-v4__label">{m.label}</p>
-                  <p className="tch-metrics-v4__value">{m.value}</p>
-                  <p className="tch-metrics-v4__hint">{m.hint}</p>
-                </div>
-                {m.key === "grading" && gradingPct != null ? (
-                  <div
-                    className="tch-metrics-v4__ring"
-                    style={{ "--pct": gradingPct } as CSSProperties}
-                    aria-hidden
-                  >
-                    <svg viewBox="0 0 36 36">
-                      <circle className="tch-metrics-v4__ring-bg" cx="18" cy="18" r="15.5" />
-                      <circle className="tch-metrics-v4__ring-fg" cx="18" cy="18" r="15.5" />
-                    </svg>
-                  </div>
-                ) : null}
-              </>
-            );
-            return m.href ? (
-              <Link
-                key={m.key}
-                href={m.href}
-                className={`tch-metrics-v4__card tch-metrics-v4__card--${m.tone} tch-metrics-v4__card--link`}
-                role="listitem"
-              >
-                {inner}
-              </Link>
-            ) : (
-              <article
-                key={m.key}
-                className={`tch-metrics-v4__card tch-metrics-v4__card--${m.tone}`}
-                role="listitem"
-              >
-                {inner}
-              </article>
-            );
-          })}
-        </div>
+        <div className="tch-ov__layout">
+          <div className="tch-ov__main">
+            {analytics ? (
+              <AnalyticsStrip analytics={analytics} showAttendance={canTakeAttendance} />
+            ) : null}
 
-        <div className="tch-layout-v4">
-          <div className="tch-layout-v4__main">
-            {overview && overview.teachingSlots.length > 0 ? (
-              <section className="tch-panel-v4 tch-panel-v4--classes">
-                <header className="tch-panel-v4__head">
+            {attentionItems.length > 0 ? (
+              <section className="tch-ov__card tch-ov__card--todo">
+                <header className="tch-ov__card-head">
                   <div>
-                    <h2 className="tch-panel-v4__title">My classes</h2>
-                    <p className="tch-panel-v4__meta">Jump into scores or classwork</p>
+                    <h2>Needs attention</h2>
+                    <p>{attentionItems.length} item{attentionItems.length === 1 ? "" : "s"} today</p>
                   </div>
-                  <span className="tch-panel-v4__badge">{overview.teachingSlots.length}</span>
+                  <span className="tch-ov__count">{attentionItems.length}</span>
                 </header>
-                <ul className="tch-class-rows-v4">
-                  {overview.teachingSlots.map((slot) => {
+                <ul className="tch-ov__tasks">
+                  {attentionItems.map((item) => (
+                    <li key={item.key} className={`tch-ov__task tch-ov__task--${item.type}`}>
+                      <div className="tch-ov__task-body">
+                        <span className="tch-ov__task-type">{item.type}</span>
+                        <p>{item.title}</p>
+                        <small>{item.meta}</small>
+                      </div>
+                      <Link href={item.href} className="tch-ov__task-btn">
+                        {item.action}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+
+            {overview && overview.teachingSlots.length > 0 ? (
+              <section className="tch-ov__card">
+                <header className="tch-ov__card-head">
+                  <div>
+                    <h2>My classes</h2>
+                    <p>Jump to scores or create classwork</p>
+                  </div>
+                </header>
+                <ul className="tch-ov__classes">
+                  {overview.teachingSlots.map((slot, index) => {
                     const perf = analytics?.classPerformance.find(
                       (p) => p.classSubjectId === slot.classSubjectId,
                     );
-                    const avg = perf?.averageScore;
-                    const tone = subjectTone(slot.subjectName);
+                    const tone = avatarTone(index);
                     return (
-                      <li key={slot.classSubjectId} className="tch-class-row-v4">
-                        <div className="tch-class-row-v4__identity">
-                          <span
-                            className={`tch-class-row-v4__avatar tch-class-row-v4__avatar--${tone}`}
-                            aria-hidden
-                          >
-                            {subjectInitial(slot.subjectName)}
-                          </span>
-                          <div className="tch-class-row-v4__info">
-                            <p className="tch-class-row-v4__name">{slot.label}</p>
-                            <p className="tch-class-row-v4__sub">{slot.subjectName}</p>
-                          </div>
+                      <li key={slot.classSubjectId} className="tch-ov__class-row">
+                        <span className={`tch-ov__class-avatar tch-ov__class-avatar--${tone}`}>
+                          {subjectInitial(slot.subjectName)}
+                        </span>
+                        <div className="tch-ov__class-info">
+                          <strong>{slot.label}</strong>
+                          <span>{slot.subjectName}</span>
                         </div>
-                        <div className="tch-class-row-v4__stat">
-                          {avg != null ? (
-                            <>
-                              <span className="tch-class-row-v4__stat-label">Avg</span>
-                              <strong className="tch-class-row-v4__stat-value">{avg}%</strong>
-                            </>
-                          ) : (
-                            <span className="tch-class-row-v4__stat-empty">No scores yet</span>
-                          )}
+                        <div className="tch-ov__class-score">
+                          <small>Avg</small>
+                          <strong>
+                            {perf?.averageScore != null ? `${perf.averageScore}%` : "—"}
+                          </strong>
                         </div>
-                        <div className="tch-class-row-v4__actions">
+                        <div className="tch-ov__class-actions">
                           <Link
                             href={`/teacher/results?classSubjectId=${slot.classSubjectId}`}
-                            className="tch-class-row-v4__btn tch-class-row-v4__btn--primary"
+                            className="tch-ov__class-btn tch-ov__class-btn--primary"
                           >
                             Scores
                           </Link>
                           <Link
                             href={`/teacher/classwork?classSubjectId=${slot.classSubjectId}`}
-                            className="tch-class-row-v4__btn"
+                            className="tch-ov__class-btn"
                           >
                             Assign
-                          </Link>
-                          <Link
-                            href={`/teacher/worksheets?classSubjectId=${slot.classSubjectId}`}
-                            className="tch-class-row-v4__btn"
-                          >
-                            Sheets
                           </Link>
                         </div>
                       </li>
@@ -438,97 +427,23 @@ export function TeacherDashboard() {
                   })}
                 </ul>
               </section>
-            ) : overview && overview.classes.length === 0 ? (
-              <section className="tch-empty">
-                <div className="tch-empty__icon" aria-hidden>
-                  <DashIcon name="students" className="dash-icon--lg" />
-                </div>
-                <h2 className="tch-empty__title">No classes yet</h2>
-                <p className="tch-empty__text">
-                  Ask your school admin to assign your homeroom or subject classes.
-                </p>
+            ) : (
+              <section className="tch-ov__empty">
+                <DashIcon name="students" className="dash-icon--sm" />
+                <p>No classes assigned yet.</p>
               </section>
-            ) : null}
-
-            {analytics ? (
-              <section className="tch-insights" aria-label="Analytics">
-                <header className="tch-insights__head">
-                  <h2 className="tch-insights__title">Insights</h2>
-                  <p className="tch-insights__sub">Grading, classwork, and performance this term</p>
-                </header>
-                <TeacherAnalyticsSection
-                  analytics={analytics}
-                  showAttendance={canTakeAttendance}
-                  chartsOnly
-                />
-                <ClassPerformanceBars items={analytics.classPerformance} />
-              </section>
-            ) : null}
+            )}
           </div>
 
-          <aside className="tch-layout-v4__aside">
-            <section className="tch-panel-v4 tch-panel-v4--attention">
-              <header className="tch-panel-v4__head">
-                <h3 className="tch-panel-v4__title">Action queue</h3>
-                {attentionItems.length > 0 ? (
-                  <span className="tch-panel-v4__badge tch-panel-v4__badge--alert">
-                    {attentionItems.length}
-                  </span>
-                ) : null}
-              </header>
-              {attentionItems.length === 0 ? (
-                <div className="tch-aside-v4__ok">
-                  <div className="tch-aside-v4__ok-top">
-                    <div className="tch-aside-v4__ok-icon" aria-hidden>
-                      <DashIcon name="attendance" className="dash-icon--sm" />
-                    </div>
-                    <div>
-                      <p className="tch-aside-v4__ok-title">All caught up</p>
-                      <p className="tch-aside-v4__ok-text">
-                        No pending attendance, grading, or reviews.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="tch-quick-v4">
-                    {QUICK_ACTIONS.map((action) => (
-                      <Link key={action.href} href={action.href} className="tch-quick-v4__link">
-                        <DashIcon name={action.icon} className="dash-icon--xs" />
-                        {action.label}
-                      </Link>
-                    ))}
-                  </div>
+          <aside className="tch-ov__aside">
+            <section className="tch-ov__card tch-ov__card--schedule">
+              <header className="tch-ov__card-head">
+                <div>
+                  <h2>Today</h2>
+                  <p>Your timetable</p>
                 </div>
-              ) : (
-                <ul className="tch-queue">
-                  {attentionItems.map((item) => (
-                    <li key={item.key} className="tch-queue__item">
-                      <div className="tch-queue__content">
-                        <span
-                          className={`tch-queue__type tch-queue__type--${item.type.toLowerCase()}`}
-                        >
-                          {item.type}
-                        </span>
-                        <p className="tch-queue__title">{item.title}</p>
-                        <p className="tch-queue__meta">{item.meta}</p>
-                      </div>
-                      <Link href={item.href} className="tch-queue__action">
-                        {item.action}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
-
-            <section className="tch-panel-v4 tch-panel-v4--schedule">
-              <header className="tch-panel-v4__head">
-                <h3 className="tch-panel-v4__title">
-                  {overview?.todaySchedule
-                    ? `Today — ${overview.todaySchedule.weekdayLabel}`
-                    : "Today's schedule"}
-                </h3>
-                <Link href="/teacher/timetable" className="tch-panel-v4__link">
-                  Week view
+                <Link href="/teacher/timetable" className="tch-ov__link">
+                  Week
                 </Link>
               </header>
               {hasSchedule && overview?.todaySchedule ? (
@@ -538,42 +453,52 @@ export function TeacherDashboard() {
                   layout="timeline"
                 />
               ) : (
-                <div className="tch-schedule-empty">
+                <div className="tch-ov__schedule-empty">
                   <DashIcon name="calendar" className="dash-icon--sm" />
-                  <p>No lessons scheduled for today.</p>
-                  <Link href="/teacher/timetable" className="tch-schedule-empty__link">
-                    Open timetable
-                  </Link>
+                  <p>No lessons scheduled today.</p>
                 </div>
               )}
             </section>
 
-            <section className="tch-panel-v4">
-              <header className="tch-panel-v4__head">
-                <h3 className="tch-panel-v4__title">Announcements</h3>
-                {announcements.length > 0 ? (
-                  <span className="tch-panel-v4__badge">{announcements.length}</span>
-                ) : null}
-              </header>
-              {announcements.length === 0 ? (
-                <div className="tch-announce-empty">
-                  <DashIcon name="announcements" className="dash-icon--sm" />
-                  <p>No announcements from your school yet.</p>
-                </div>
-              ) : (
-                <ul className="tch-announce-list">
-                  {announcements.slice(0, 4).map((item) => (
-                    <li key={item.id} className="tch-announce-list__item">
-                      <p className="tch-announce-list__title">{item.title}</p>
-                      <p className="tch-announce-list__date">{formatDate(item.createdAt)}</p>
-                      {item.body ? (
-                        <p className="tch-announce-list__body">{item.body}</p>
-                      ) : null}
+            <nav className="tch-ov__nav" aria-label="Quick links">
+              <Link href="/teacher/results" className="tch-ov__nav-item">
+                <span className="tch-ov__nav-icon">
+                  <DashIcon name="results" className="dash-icon--xs" />
+                </span>
+                Results
+              </Link>
+              <Link href="/teacher/classwork" className="tch-ov__nav-item">
+                <span className="tch-ov__nav-icon">
+                  <DashIcon name="library" className="dash-icon--xs" />
+                </span>
+                Assignments
+              </Link>
+              <Link href="/teacher/library" className="tch-ov__nav-item">
+                <span className="tch-ov__nav-icon">
+                  <DashIcon name="library" className="dash-icon--xs" />
+                </span>
+                eLibrary
+              </Link>
+            </nav>
+
+            {announcements.length > 0 ? (
+              <section className="tch-ov__card">
+                <header className="tch-ov__card-head">
+                  <div>
+                    <h2>School news</h2>
+                    <p>Latest announcements</p>
+                  </div>
+                </header>
+                <ul className="tch-ov__news">
+                  {announcements.slice(0, 3).map((item) => (
+                    <li key={item.id}>
+                      <strong>{item.title}</strong>
+                      <span>{formatDate(item.createdAt)}</span>
                     </li>
                   ))}
                 </ul>
-              )}
-            </section>
+              </section>
+            ) : null}
           </aside>
         </div>
       </div>

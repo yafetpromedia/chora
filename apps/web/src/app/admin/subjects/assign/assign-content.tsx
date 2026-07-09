@@ -5,6 +5,12 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { DashboardPage } from "@/components/dashboard/dashboard-page";
 import { DashIcon } from "@/components/dashboard/dash-icons";
+import {
+  AcademicsAlert,
+  AcademicsBadge,
+  AcademicsBreadcrumb,
+  AcademicsEmpty,
+} from "@/components/academics/academics-ui";
 import { listGrades } from "@/lib/school-setup";
 import type { GradeWithSections } from "@/lib/api";
 import { listTeachers, type TeacherRecord } from "@/lib/teachers";
@@ -46,10 +52,6 @@ export function SubjectAssignmentContent() {
   const hasSections = (selectedGrade?.sections.length ?? 0) > 0;
   const assignedSubjectIds = new Set(assignments.map((a) => a.subject.id));
   const unassignedSubjects = subjects.filter((s) => !assignedSubjectIds.has(s.id));
-
-  const classLabel = selectedGrade
-    ? `${selectedGrade.name}${sectionId && hasSections ? ` · ${selectedGrade.sections.find((s) => s.id === sectionId)?.name ?? ""}` : ""}`
-    : "";
 
   const highlightTeacher = teachers.find((t) => t.userId === highlightTeacherId);
   const assignedCount = assignments.filter((a) => a.teacher?.id).length;
@@ -130,7 +132,19 @@ export function SubjectAssignmentContent() {
       await updateClassSubject(classSubjectId, {
         teacherId: teacherId || null,
       });
-      setSaved("Teacher updated.");
+      setSaved("Saved.");
+      await loadAssignments();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Save failed");
+    }
+  }
+
+  async function onWeeklySessionsChange(classSubjectId: string, weeklySessions: number) {
+    setError("");
+    setSaved("");
+    try {
+      await updateClassSubject(classSubjectId, { weeklySessions });
+      setSaved("Saved.");
       await loadAssignments();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Save failed");
@@ -166,7 +180,7 @@ export function SubjectAssignmentContent() {
         gradeId,
         sectionId: sectionId || undefined,
       });
-      setSaved("Subject added to class.");
+      setSaved("Subject added.");
       await loadAssignments();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Add failed");
@@ -178,65 +192,27 @@ export function SubjectAssignmentContent() {
     [teachers],
   );
 
+  const readyToView = !hasSections || Boolean(sectionId);
+
   return (
     <DashboardPage role="admin" title="Subject assignment">
-      <div className="sub-v2">
-        {error ? (
-          <div className="sub-v2__alert sub-v2__alert--err" role="alert">
-            {error}
-          </div>
-        ) : null}
-        {saved ? (
-          <div className="sub-v2__alert sub-v2__alert--ok" role="status">
-            {saved}
-          </div>
-        ) : null}
-
-        <header className="sub-v2__hero">
-          <div className="sub-v2__hero-glow" aria-hidden />
-          <div className="sub-v2__hero-inner">
-            <div className="sub-v2__hero-main">
-              <span className="sub-v2__chip">Academics</span>
-              <h2 className="sub-v2__hero-title">Subject assignment</h2>
-              <p className="sub-v2__hero-sub">
-                Match each subject to a teacher for every grade and section.
-              </p>
-            </div>
-            <div className="sub-v2__hero-stats">
-              <div className="sub-v2__stat">
-                <strong>{grades.length}</strong>
-                <span>Grades</span>
-              </div>
-              <div className="sub-v2__stat">
-                <strong>{assignments.length}</strong>
-                <span>In class</span>
-              </div>
-              <div className="sub-v2__stat">
-                <strong>{assignedCount}</strong>
-                <span>Assigned</span>
-              </div>
-              <div className="sub-v2__stat sub-v2__stat--accent">
-                <strong>{teachers.length}</strong>
-                <span>Teachers</span>
-              </div>
-            </div>
-          </div>
-        </header>
+      <div className="acad-page acad-page--assign sub-assign">
+        {error ? <AcademicsAlert tone="error">{error}</AcademicsAlert> : null}
+        {saved ? <AcademicsAlert tone="success">{saved}</AcademicsAlert> : null}
 
         {subjects.length === 0 ? (
-          <div className="sub-v2__alert sub-v2__alert--warn">
-            No subjects in catalog.{" "}
-            <Link href="/admin/subjects">Add subjects first</Link>.
+          <div className="sub-assign__notice">
+            No subjects in catalog. <Link href="/admin/subjects">Add subjects first</Link>.
           </div>
         ) : null}
 
         {highlightTeacher ? (
-          <div className="sub-v2__focus">
+          <div className="sub-assign__focus">
             <div>
-              <span className="sub-v2__focus-label">Assigning for</span>
+              <span className="sub-assign__focus-label">Assigning for</span>
               <strong>{displayName(highlightTeacher)}</strong>
               {highlightTeacher.homeroom ? (
-                <span className="sub-v2__focus-meta">
+                <span className="sub-assign__focus-meta">
                   Homeroom · {highlightTeacher.homeroom.gradeName}
                   {highlightTeacher.homeroom.sectionName
                     ? ` · ${highlightTeacher.homeroom.sectionName}`
@@ -244,155 +220,131 @@ export function SubjectAssignmentContent() {
                 </span>
               ) : null}
             </div>
-            <Link href="/admin/teachers" className="sub-v2__btn sub-v2__btn--ghost">
+            <Link href="/admin/teachers" className="sub-assign__link">
               Back to teachers
             </Link>
           </div>
         ) : null}
 
-        <div className="sub-v2__picker">
-          <div className="sub-v2__picker-head">
-            <h3>Choose class</h3>
-            <Link href="/admin/teachers" className="sub-v2__btn sub-v2__btn--ghost">
-              Teachers
-            </Link>
-          </div>
-          <div className="sub-v2__pills" role="tablist" aria-label="Grades">
-            {grades.map((g) => (
-              <button
-                key={g.id}
-                type="button"
-                role="tab"
-                aria-selected={gradeId === g.id}
-                className={`sub-v2__pill${gradeId === g.id ? " sub-v2__pill--active" : ""}`}
-                onClick={() => selectGrade(g.id)}
-              >
-                {g.name}
-              </button>
-            ))}
-          </div>
-          {hasSections ? (
-            <div className="sub-v2__sections">
-              <span className="sub-v2__sections-label">Section</span>
-              <div className="sub-v2__pills">
-                {selectedGrade?.sections.map((s) => (
-                  <button
-                    key={s.id}
-                    type="button"
-                    className={`sub-v2__pill sub-v2__pill--sm${sectionId === s.id ? " sub-v2__pill--active" : ""}`}
-                    onClick={() => selectSection(s.id)}
-                  >
-                    {s.name}
-                  </button>
-                ))}
+        <section className="sub-assign__workspace">
+          <header className="sub-assign__toolbar">
+            <AcademicsBreadcrumb
+              items={[
+                { label: "Academics", href: "/admin/academics" },
+                { label: "Subjects", href: "/admin/subjects" },
+                { label: "Assign" },
+              ]}
+            />
+
+            <div className="sub-assign__toolbar-row">
+              <div className="sub-assign__picker">
+                <label className="sub-assign__picker-field">
+                  <span className="sub-assign__picker-label">Class</span>
+                  <div className="sub-assign__picker-input">
+                    <DashIcon name="calendar" className="dash-icon--sm" />
+                    <select
+                      className="sub-assign__grade-select"
+                      value={gradeId}
+                      onChange={(e) => selectGrade(e.target.value)}
+                      aria-label="Select grade"
+                    >
+                      {grades.map((g) => (
+                        <option key={g.id} value={g.id}>
+                          {g.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </label>
+
+                {hasSections ? (
+                  <div className="sub-assign__picker-field sub-assign__picker-field--section">
+                    <span className="sub-assign__picker-label">Section</span>
+                    <div className="sub-assign__segment" role="tablist" aria-label="Sections">
+                      {selectedGrade?.sections.map((s) => (
+                        <button
+                          key={s.id}
+                          type="button"
+                          role="tab"
+                          aria-selected={sectionId === s.id}
+                          className={`sub-assign__segment-btn${sectionId === s.id ? " sub-assign__segment-btn--active" : ""}`}
+                          onClick={() => selectSection(s.id)}
+                        >
+                          {s.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="sub-assign__toolbar-actions">
+                {readyToView && !loading ? (
+                  <div className="sub-assign__meta">
+                    <AcademicsBadge variant="live">
+                      {assignments.length} subject{assignments.length === 1 ? "" : "s"}
+                    </AcademicsBadge>
+                    <AcademicsBadge
+                      variant={assignedCount < assignments.length ? "default" : "muted"}
+                    >
+                      {assignedCount} assigned
+                    </AcademicsBadge>
+                  </div>
+                ) : null}
+                <Link href="/admin/teachers" className="sub-assign__teachers-link">
+                  <DashIcon name="teachers" className="dash-icon--sm" />
+                  Teachers
+                </Link>
               </div>
             </div>
-          ) : null}
-        </div>
+          </header>
 
-        {loading ? (
-          <div className="sub-v2__loading">
-            <span className="sub-v2__spinner" aria-hidden />
-            <p>Loading class subjects…</p>
-          </div>
-        ) : hasSections && !sectionId ? (
-          <div className="sub-v2__empty">
-            <p>Select a section to view and assign subjects.</p>
-          </div>
-        ) : (
-          <>
-            <div className="sub-v2__class-head">
-              <div>
-                <span className="sub-v2__class-label">Current class</span>
-                <h3>{classLabel || "Class"}</h3>
+          <div className="sub-assign__body">
+            {loading ? (
+              <div className="sub-assign__loading">
+                <span className="sub-assign__spinner" aria-hidden />
+                <p>Loading subjects…</p>
               </div>
-              <span className="sub-v2__class-count">
-                {assignments.length} subject{assignments.length === 1 ? "" : "s"}
-              </span>
-            </div>
-
-            {assignments.length === 0 ? (
-              <div className="sub-v2__empty">
+            ) : !readyToView ? (
+              <AcademicsEmpty message="Select a section to view and assign subjects." />
+            ) : assignments.length === 0 ? (
+              <div className="sub-assign__empty">
                 <DashIcon name="results" className="dash-icon--lg" />
-                <h3>No subjects for this class</h3>
                 <p>
                   {unassignedSubjects.length > 0
-                    ? "Add a subject below to get started."
+                    ? "No subjects linked to this class yet. Add one below."
                     : "All catalog subjects are already linked or the catalog is empty."}
                 </p>
               </div>
             ) : (
-              <>
-                <div className="sub-v2__table-wrap sub-v2__desktop-only">
-                  <table className="sub-v2__table">
-                    <thead>
-                      <tr>
-                        <th>Subject</th>
-                        <th>Teacher</th>
-                        <th>Template</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {assignments.map((row) => {
-                        const isHighlight =
-                          highlightTeacherId && row.teacher?.id === highlightTeacherId;
-                        return (
-                          <tr key={row.id} className={isHighlight ? "sub-v2__row--focus" : ""}>
-                            <td>
-                              <strong className="sub-v2__subject-name">{row.subject.name}</strong>
-                              <span className="sub-v2__subject-code">{row.subject.code}</span>
-                            </td>
-                            <td>
-                              <select
-                                className="sub-v2__select"
-                                value={row.teacher?.id ?? ""}
-                                onChange={(e) => void onTeacherChange(row.id, e.target.value)}
-                                aria-label={`Teacher for ${row.subject.name}`}
-                              >
-                                <option value="">Unassigned</option>
-                                {teacherOptions.map((t) => (
-                                  <option key={t.userId} value={t.userId}>
-                                    {displayName(t)}
-                                  </option>
-                                ))}
-                              </select>
-                            </td>
-                            <td>
-                              <span className="sub-v2__template">
-                                {row.assessmentTemplate?.name ?? "—"}
-                              </span>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+              <div className="sub-assign__table">
+                <div className="sub-assign__table-head" aria-hidden>
+                  <span>Subject</span>
+                  <span>Teacher</span>
+                  <span>Per week</span>
+                  <span>Template</span>
                 </div>
-
-                <div className="sub-v2__cards sub-v2__mobile-only">
+                <ul className="sub-assign__list">
                   {assignments.map((row) => {
                     const isHighlight =
                       highlightTeacherId && row.teacher?.id === highlightTeacherId;
                     return (
-                      <article
+                      <li
                         key={row.id}
-                        className={`sub-v2__card${isHighlight ? " sub-v2__card--focus" : ""}`}
+                        className={`sub-assign__row${isHighlight ? " sub-assign__row--focus" : ""}`}
                       >
-                        <header className="sub-v2__card-head">
-                          <div>
-                            <strong>{row.subject.name}</strong>
-                            <span className="sub-v2__subject-code">{row.subject.code}</span>
-                          </div>
-                          <span className="sub-v2__template">
-                            {row.assessmentTemplate?.name ?? "No template"}
-                          </span>
-                        </header>
-                        <label className="sub-v2__field">
-                          <span>Teacher</span>
+                        <div className="sub-assign__subject">
+                          <strong>{row.subject.name}</strong>
+                          <span>{row.subject.code}</span>
+                        </div>
+
+                        <label className="sub-assign__field">
+                          <span className="sub-assign__field-label">Teacher</span>
                           <select
-                            className="sub-v2__select"
+                            className="sub-assign__select"
                             value={row.teacher?.id ?? ""}
                             onChange={(e) => void onTeacherChange(row.id, e.target.value)}
+                            aria-label={`Teacher for ${row.subject.name}`}
                           >
                             <option value="">Unassigned</option>
                             {teacherOptions.map((t) => (
@@ -402,40 +354,65 @@ export function SubjectAssignmentContent() {
                             ))}
                           </select>
                         </label>
-                      </article>
+
+                        <label className="sub-assign__field">
+                          <span className="sub-assign__field-label">Per week</span>
+                          <select
+                            className="sub-assign__select"
+                            value={String(row.weeklySessions ?? 1)}
+                            onChange={(e) =>
+                              void onWeeklySessionsChange(
+                                row.id,
+                                Number.parseInt(e.target.value, 10),
+                              )
+                            }
+                            aria-label={`Sessions per week for ${row.subject.name}`}
+                          >
+                            <option value="1">1 period</option>
+                            <option value="2">2 periods (double)</option>
+                          </select>
+                        </label>
+
+                        <div className="sub-assign__template">
+                          <span className="sub-assign__field-label">Template</span>
+                          <span className="sub-assign__template-value">
+                            {row.assessmentTemplate?.name ?? "—"}
+                          </span>
+                        </div>
+                      </li>
                     );
                   })}
-                </div>
-              </>
+                </ul>
+              </div>
             )}
+          </div>
 
-            {unassignedSubjects.length > 0 ? (
-              <section className="sub-v2__add">
-                <h3>Add subject to this class</h3>
-                <div className="sub-v2__add-row">
-                  <select
-                    className="sub-v2__select"
-                    value={addSubjectId}
-                    onChange={(e) => setAddSubjectId(e.target.value)}
-                  >
-                    {unassignedSubjects.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name} ({s.code})
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    className="sub-v2__btn sub-v2__btn--primary"
-                    onClick={() => void onAddSubject()}
-                  >
-                    Add to class
-                  </button>
-                </div>
-              </section>
-            ) : null}
-          </>
-        )}
+          {readyToView && !loading && unassignedSubjects.length > 0 ? (
+            <footer className="sub-assign__add">
+              <label className="sub-assign__field sub-assign__field--grow">
+                <span className="sub-assign__field-label">Add subject</span>
+                <select
+                  className="sub-assign__select"
+                  value={addSubjectId}
+                  onChange={(e) => setAddSubjectId(e.target.value)}
+                >
+                  {unassignedSubjects.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} ({s.code})
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button
+                type="button"
+                className="sub-assign__add-btn"
+                onClick={() => void onAddSubject()}
+              >
+                Add to class
+              </button>
+            </footer>
+          ) : null}
+        </section>
       </div>
     </DashboardPage>
   );

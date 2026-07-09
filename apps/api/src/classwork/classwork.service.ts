@@ -15,6 +15,7 @@ import { mkdir, writeFile } from 'fs/promises';
 import { join, extname } from 'path';
 import { randomBytes } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
+import { AssessmentTemplatesService } from '../results/assessment-templates.service';
 import { TeacherScopeService } from '../teachers/teacher-scope.service';
 import {
   CreateClassworkDto,
@@ -29,6 +30,7 @@ export class ClassworkService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly teacherScope: TeacherScopeService,
+    private readonly templates: AssessmentTemplatesService,
   ) {}
 
   async listTeacherClassSubjects(schoolId: string, userId: string, role: string) {
@@ -188,6 +190,7 @@ export class ClassworkService {
       role,
       assignmentId,
     );
+    await this.syncMaxScoreFromTemplate(schoolId, row);
     const withCount = await this.prisma.classworkAssignment.findFirst({
       where: { id: row.id },
       include: {
@@ -238,6 +241,11 @@ export class ClassworkService {
       role,
       dto.classSubjectId,
     );
+    const maxScore = await this.templates.resolveClassworkMaxScore(
+      schoolId,
+      dto.classSubjectId,
+      dto.type,
+    );
     const row = await this.prisma.classworkAssignment.create({
       data: {
         schoolId,
@@ -247,6 +255,7 @@ export class ClassworkService {
         description: dto.description?.trim() || null,
         type: dto.type,
         dueAt: dto.dueAt ? new Date(dto.dueAt) : null,
+        maxScore,
         status: ClassworkStatus.DRAFT,
       },
       include: {
@@ -302,11 +311,17 @@ export class ClassworkService {
 
   async publish(schoolId: string, userId: string, role: string, id: string) {
     const existing = await this.getOwnedAssignment(schoolId, userId, role, id);
+    const maxScore = await this.templates.resolveClassworkMaxScore(
+      schoolId,
+      existing.classSubjectId,
+      existing.type,
+    );
     const row = await this.prisma.classworkAssignment.update({
       where: { id: existing.id },
       data: {
         status: ClassworkStatus.PUBLISHED,
         publishedAt: new Date(),
+        maxScore,
       },
       include: {
         classSubject: {
@@ -354,6 +369,7 @@ export class ClassworkService {
       role,
       assignmentId,
     );
+    await this.syncMaxScoreFromTemplate(schoolId, assignment);
     const rows = await this.prisma.classworkSubmission.findMany({
       where: { assignmentId },
       include: {
@@ -400,6 +416,7 @@ export class ClassworkService {
       role,
       assignmentId,
     );
+    await this.syncMaxScoreFromTemplate(schoolId, assignment);
     const submission = await this.prisma.classworkSubmission.findFirst({
       where: { id: submissionId, assignmentId },
     });
@@ -625,6 +642,35 @@ export class ClassworkService {
     throw new ForbiddenException('Access denied');
   }
 
+  /** Align legacy default (100) with the class assessment template when nothing is graded yet. */
+  private async syncMaxScoreFromTemplate(
+    schoolId: string,
+    assignment: {
+      id: string;
+      classSubjectId: string;
+      type: ClassworkType;
+      maxScore: number;
+    },
+  ) {
+    const resolved = await this.templates.resolveClassworkMaxScore(
+      schoolId,
+      assignment.classSubjectId,
+      assignment.type,
+    );
+    if (resolved === assignment.maxScore) return;
+
+    const gradedCount = await this.prisma.classworkSubmission.count({
+      where: { assignmentId: assignment.id, score: { not: null } },
+    });
+    if (gradedCount > 0) return;
+
+    await this.prisma.classworkAssignment.update({
+      where: { id: assignment.id },
+      data: { maxScore: resolved },
+    });
+    assignment.maxScore = resolved;
+  }
+
   private formatAssignment(row: {
     id: string;
     title: string;
@@ -652,7 +698,7 @@ export class ClassworkService {
       dueAt: row.dueAt,
       fileUrl: row.fileUrl,
       fileName: row.fileName,
-      maxScore: row.maxScore ?? 100,
+      maxScore: row.maxScore,
       status: row.status,
       publishedAt: row.publishedAt,
       createdAt: row.createdAt,

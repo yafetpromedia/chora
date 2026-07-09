@@ -4,7 +4,7 @@ import { UserRole } from '../../common/auth.types';
 
 
 
-const joinRoles = ['teacher', 'student', 'parent'] as const;
+const joinRoles = ['student'] as const;
 
 export type JoinRole = (typeof joinRoles)[number];
 

@@ -10,6 +10,10 @@ import {
 
 type Props = {
   resources: LibraryResource[];
+  /** Full-width student workspace without duplicate page chrome. */
+  focus?: boolean;
+  /** Hide panel header when a section banner is shown above. */
+  hideHead?: boolean;
 };
 
 const ACTIONS: { id: StudyAssistAction; label: string; hint: string }[] = [
@@ -37,7 +41,7 @@ function resourceText(resource: LibraryResource): string {
   return parts.join("\n\n");
 }
 
-export function LibraryAiAssistant({ resources }: Props) {
+export function LibraryAiAssistant({ resources, focus, hideHead }: Props) {
   const [configured, setConfigured] = useState<boolean | null>(null);
   const [model, setModel] = useState<string | null>(null);
   const [resourceId, setResourceId] = useState("");
@@ -99,19 +103,33 @@ export function LibraryAiAssistant({ resources }: Props) {
   }
 
   return (
-    <section className="lib-ai-panel" aria-labelledby="lib-ai-title">
+    <section
+      className={`lib-ai-panel${focus ? " lib-ai-panel--focus" : ""}`}
+      aria-labelledby="lib-ai-title"
+    >
+      {!hideHead ? (
       <div className="lib-ai-panel__head">
-        <div>
-          <h2 id="lib-ai-title" className="lib-section-title">
-            AI study assistant
-          </h2>
-          <p className="lib-ai-panel__sub">
-            Summarize chapters, generate quizzes, and translate lessons — powered
-            by AI from your school library.
-          </p>
+        <div className="lib-ai-panel__intro">
+          <span className="lib-ai-panel__icon" aria-hidden>
+            ✦
+          </span>
+          <div>
+            <h2 id="lib-ai-title" className="lib-ai-panel__title">
+              AI study assistant
+            </h2>
+            <p className="lib-ai-panel__sub">
+              Summarize chapters, generate quizzes, and translate lessons from your
+              library materials.
+            </p>
+          </div>
         </div>
         <span className="lib-ai-badge">Powered by AI</span>
       </div>
+      ) : (
+        <div className="lib-ai-panel__head lib-ai-panel__head--compact">
+          <span className="lib-ai-badge">Powered by AI</span>
+        </div>
+      )}
 
       {configured === false ? (
         <p className="lib-ai-panel__notice">
@@ -181,7 +199,7 @@ export function LibraryAiAssistant({ resources }: Props) {
           {result ? (
             <div className="lib-ai-result">
               <h3>Result</h3>
-              <pre>{result}</pre>
+              <div className="lib-ai-result__body">{result}</div>
             </div>
           ) : null}
         </form>

@@ -15,6 +15,7 @@ type Props = {
   students: StudentRecord[];
   defaultTermId?: string;
   defaultStudentId?: string;
+  onError?: (message: string) => void;
 };
 
 function reportContext(report: ReportCard): string {
@@ -47,6 +48,7 @@ export function ReportCardCommentsPanel({
   students,
   defaultTermId,
   defaultStudentId,
+  onError,
 }: Props) {
   const [termId, setTermId] = useState(defaultTermId ?? "");
   const [studentId, setStudentId] = useState(defaultStudentId ?? "");
@@ -78,12 +80,14 @@ export function ReportCardCommentsPanel({
       setTeacherComment(card.teacherComment ?? "");
       setPrincipalComment(card.principalComment ?? "");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load report");
+      const message = err instanceof Error ? err.message : "Could not load report";
+      setError(message);
+      onError?.(message);
       setReport(null);
     } finally {
       setLoading(false);
     }
-  }, [studentId, termId]);
+  }, [studentId, termId, onError]);
 
   useEffect(() => {
     if (studentId && termId) void loadReport();
@@ -131,25 +135,22 @@ export function ReportCardCommentsPanel({
   }
 
   return (
-    <section className="ai-report-comments att-admin-section">
-      <div className="ai-report-comments__head">
+    <section className="res-v2__block res-v2__comments">
+      <header className="res-v2__block-head res-v2__block-head--row">
         <div>
-          <h2 className="setup-panel-label">Report card comments</h2>
-          <p className="tch-meta">
-            Teacher and principal remarks appear on printed report cards when published.
+          <p className="res-v2__block-eyebrow">Report cards</p>
+          <h3 className="res-v2__block-title">Teacher & principal comments</h3>
+          <p className="res-v2__block-sub">
+            Remarks appear on printed report cards when scores are published.
           </p>
         </div>
         <span className="lib-ai-badge">Powered by AI</span>
-      </div>
+      </header>
 
-      <div className="att-filters">
-        <label className="att-field att-field--wide">
+      <div className="res-v2__toolbar">
+        <label className="res-scores-field res-scores-field--wide">
           <span>Student</span>
-          <select
-            className="auth-input auth-input--login auth-input--login-plain"
-            value={studentId}
-            onChange={(e) => setStudentId(e.target.value)}
-          >
+          <select value={studentId} onChange={(e) => setStudentId(e.target.value)}>
             <option value="">Select student</option>
             {students.map((s) => (
               <option key={s.id} value={s.id}>
@@ -158,13 +159,9 @@ export function ReportCardCommentsPanel({
             ))}
           </select>
         </label>
-        <label className="att-field">
+        <label className="res-scores-field">
           <span>Term</span>
-          <select
-            className="auth-input auth-input--login auth-input--login-plain"
-            value={termId}
-            onChange={(e) => setTermId(e.target.value)}
-          >
+          <select value={termId} onChange={(e) => setTermId(e.target.value)}>
             <option value="">Select term</option>
             {terms.map((t) => (
               <option key={t.id} value={t.id}>
@@ -175,7 +172,9 @@ export function ReportCardCommentsPanel({
         </label>
       </div>
 
-      {loading ? <p className="setup-hint">Loading report…</p> : null}
+      {loading ? (
+        <p className="res-v2__muted">Loading report card…</p>
+      ) : null}
 
       {report ? (
         <div className="ai-report-comments__grid">
@@ -192,7 +191,7 @@ export function ReportCardCommentsPanel({
               </button>
             </span>
             <textarea
-              className="auth-input auth-input--login auth-input--login-plain dash-textarea"
+              className="res-v2__textarea"
               rows={4}
               value={teacherComment}
               onChange={(e) => setTeacherComment(e.target.value)}
@@ -212,7 +211,7 @@ export function ReportCardCommentsPanel({
               </button>
             </span>
             <textarea
-              className="auth-input auth-input--login auth-input--login-plain dash-textarea"
+              className="res-v2__textarea"
               rows={4}
               value={principalComment}
               onChange={(e) => setPrincipalComment(e.target.value)}
@@ -220,16 +219,20 @@ export function ReportCardCommentsPanel({
             />
           </label>
         </div>
+      ) : !loading && studentId && termId ? (
+        <div className="res-v2__empty res-v2__empty--inline">
+          <p>Select a student and term above — comments load automatically.</p>
+        </div>
       ) : null}
 
-      {error ? <p className="auth-alert auth-alert--error">{error}</p> : null}
-      {saved ? <p className="setup-hint">{saved}</p> : null}
+      {error ? <p className="res-scores-alert res-scores-alert--error">{error}</p> : null}
+      {saved ? <p className="res-scores-alert res-scores-alert--success">{saved}</p> : null}
 
       {report ? (
-        <div className="setup-actions-row">
+        <div className="res-v2__toolbar-actions">
           <button
             type="button"
-            className="auth-page-submit"
+            className="res-scores-btn res-scores-btn--primary"
             disabled={saving}
             onClick={() => void onSave()}
           >

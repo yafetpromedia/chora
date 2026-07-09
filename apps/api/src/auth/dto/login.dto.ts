@@ -1,10 +1,10 @@
-import { IsOptional, IsString, MinLength } from 'class-validator';
+import { IsString, MinLength } from 'class-validator';
 
 export class LoginDto {
-  /** School join code (e.g. BRIGHT1). Omit only if your username is unique on the server. */
+  /** School join code (required for all school portal sign-ins). */
   @IsString()
-  @IsOptional()
-  schoolCode?: string;
+  @MinLength(4)
+  schoolCode!: string;
 
   /** Sign-in username (not email). Legacy: email or STU-/TCH- ID still accepted. */
   @IsString()

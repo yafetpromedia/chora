@@ -8,6 +8,11 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateTimetableRoomDto } from './dto/create-timetable-room.dto';
 import { SaveTimetableEntriesDto } from './dto/save-timetable-entries.dto';
 import { UpsertTimetablePeriodsDto } from './dto/upsert-timetable-periods.dto';
+import { GenerateTimetableDto } from './dto/generate-timetable.dto';
+import {
+  generateTimetableSchedule,
+  type GeneratorLesson,
+} from './timetable-generator.util';
 import {
   currentWeekday,
   DEFAULT_PERIOD_COUNT,
@@ -239,6 +244,7 @@ export class TimetableService {
     });
 
     const roomCache = new Map<string, string>();
+    const classSlotKeys = new Set<string>();
 
     for (const item of dto.entries) {
       if (!item.subjectId) continue;
@@ -248,6 +254,14 @@ export class TimetableService {
           `Unknown period number ${item.periodNumber}`,
         );
       }
+
+      const slotKey = `${item.weekday}:${item.periodNumber}`;
+      if (classSlotKeys.has(slotKey)) {
+        throw new BadRequestException(
+          'Each period holds one subject only — remove duplicate slots in the same class.',
+        );
+      }
+      classSlotKeys.add(slotKey);
 
       let roomId: string | null = null;
       if (item.roomName?.trim()) {
@@ -298,6 +312,134 @@ export class TimetableService {
       dto.gradeId,
       dto.sectionId,
     );
+  }
+
+  async autoGenerate(schoolId: string, dto: GenerateTimetableDto) {
+    const tt = await this.ensureTimetable(schoolId, dto.academicYearId);
+    const weekdays = WEEKDAYS_ORDER.filter((d) => d !== Weekday.SUNDAY);
+    const periods = await this.prisma.timetablePeriod.findMany({
+      where: { timetableId: tt.id },
+      orderBy: { sortOrder: 'asc' },
+    });
+    if (periods.length === 0) {
+      throw new BadRequestException('Add at least one period before generating.');
+    }
+
+    const classSubjects = await this.prisma.classSubject.findMany({
+      where: {
+        schoolId,
+        academicYearId: dto.academicYearId,
+        ...(dto.gradeId ? { gradeId: dto.gradeId } : {}),
+        ...(dto.sectionId !== undefined ? { sectionId: dto.sectionId } : {}),
+      },
+      include: {
+        subject: { select: { id: true, name: true } },
+        grade: { select: { id: true, name: true } },
+        section: { select: { id: true, name: true } },
+      },
+    });
+
+    if (classSubjects.length === 0) {
+      throw new BadRequestException(
+        'No subject assignments found. Assign subjects to classes first.',
+      );
+    }
+
+    const lessons: GeneratorLesson[] = [];
+    for (const cs of classSubjects) {
+      const weeklySessions = Math.min(Math.max(cs.weeklySessions ?? 1, 1), 2);
+      for (let sessionIndex = 0; sessionIndex < weeklySessions; sessionIndex++) {
+        lessons.push({
+          id: `${cs.id}:${sessionIndex}`,
+          classSubjectId: cs.id,
+          gradeId: cs.gradeId,
+          sectionId: cs.sectionId,
+          subjectId: cs.subjectId,
+          subjectName: cs.subject.name,
+          gradeName: cs.grade.name,
+          sectionName: cs.section?.name ?? null,
+          teacherUserId: cs.teacherId,
+          sessionIndex,
+          weeklySessions,
+        });
+      }
+    }
+
+    const { placed, unplaced } = generateTimetableSchedule({
+      weekdays,
+      periodNumbers: periods.map((p) => p.number),
+      lessons,
+    });
+
+    const periodByNumber = new Map(periods.map((p) => [p.number, p]));
+    const replaceExisting = dto.replaceExisting !== false;
+
+    await this.prisma.$transaction(async (tx) => {
+      if (replaceExisting) {
+        await tx.timetableEntry.deleteMany({
+          where: {
+            timetableId: tt.id,
+            ...(dto.gradeId ? { gradeId: dto.gradeId } : {}),
+            ...(dto.sectionId !== undefined ? { sectionId: dto.sectionId } : {}),
+          },
+        });
+      }
+
+      for (const slot of placed) {
+        const period = periodByNumber.get(slot.periodNumber);
+        if (!period) continue;
+
+        if (slot.teacherUserId) {
+          const clash = await tx.timetableEntry.findFirst({
+            where: {
+              timetableId: tt.id,
+              weekday: slot.weekday,
+              periodId: period.id,
+              teacherUserId: slot.teacherUserId,
+            },
+          });
+          if (clash) {
+            throw new BadRequestException(
+              `Scheduling conflict for ${slot.subjectName} — teacher already booked.`,
+            );
+          }
+        }
+
+        await tx.timetableEntry.create({
+          data: {
+            timetableId: tt.id,
+            schoolId,
+            weekday: slot.weekday,
+            periodId: period.id,
+            gradeId: slot.gradeId,
+            sectionId: slot.sectionId,
+            subjectId: slot.subjectId,
+            teacherUserId: slot.teacherUserId,
+          },
+        });
+      }
+    });
+
+    const classKeys = new Set(
+      classSubjects.map(
+        (cs) => `${cs.gradeId}:${cs.sectionId ?? ''}`,
+      ),
+    );
+
+    return {
+      placed: placed.length,
+      unplaced: unplaced.map((u) => ({
+        subjectName: u.subjectName,
+        gradeName: u.gradeName,
+        sectionName: u.sectionName,
+        reason:
+          u.weeklySessions >= 2
+            ? 'Could not fit double lesson on the same day without clashing.'
+            : 'No free slot without clashing with another class or teacher.',
+      })),
+      classesProcessed: classKeys.size,
+      totalLessons: lessons.length,
+    };
   }
 
   async getScheduleForUser(

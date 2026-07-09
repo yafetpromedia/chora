@@ -17,6 +17,7 @@ type Props = {
   terms: AcademicTerm[];
   defaultTermId?: string;
   onError?: (message: string) => void;
+  onCountChange?: (count: number) => void;
 };
 
 function sheetLabel(p: PendingWorkflowItem) {
@@ -24,7 +25,12 @@ function sheetLabel(p: PendingWorkflowItem) {
   return `${cs.grade.name}${cs.section ? ` ${cs.section.name}` : ""} — ${cs.subject.name}`;
 }
 
-export function PendingApprovalsPanel({ terms, defaultTermId, onError }: Props) {
+export function PendingApprovalsPanel({
+  terms,
+  defaultTermId,
+  onError,
+  onCountChange,
+}: Props) {
   const [termId, setTermId] = useState(defaultTermId ?? "");
   const [pending, setPending] = useState<PendingWorkflowItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -42,6 +48,7 @@ export function PendingApprovalsPanel({ terms, defaultTermId, onError }: Props) 
         termId ? { termId, status: "SUBMITTED" } : { status: "SUBMITTED" },
       );
       setPending(rows);
+      onCountChange?.(rows.length);
       setSelected(new Set());
       setPage(0);
     } catch (err) {
@@ -49,7 +56,7 @@ export function PendingApprovalsPanel({ terms, defaultTermId, onError }: Props) 
     } finally {
       setLoading(false);
     }
-  }, [termId, onError]);
+  }, [termId, onError, onCountChange]);
 
   useEffect(() => {
     if (defaultTermId && !termId) setTermId(defaultTermId);
@@ -166,14 +173,17 @@ export function PendingApprovalsPanel({ terms, defaultTermId, onError }: Props) 
   }
 
   return (
-    <section className="res-approvals">
-      <div className="res-approvals__head">
-        <div>
+    <section className="res-approvals res-approvals--queue">
+      <div className="res-approvals__banner">
+        <div className="res-approvals__banner-icon" aria-hidden>
+          ✓
+        </div>
+        <div className="res-approvals__banner-copy">
           <h2 className="res-approvals__title">Pending approvals</h2>
           <p className="res-approvals__sub">
             {loading
-              ? "Loading…"
-              : `${pending.length} submitted score sheet${pending.length === 1 ? "" : "s"} waiting`}
+              ? "Loading submitted sheets…"
+              : `${pending.length} score sheet${pending.length === 1 ? "" : "s"} waiting for academic office review`}
           </p>
         </div>
         <span className="res-approvals__count">{loading ? "…" : pending.length}</span>

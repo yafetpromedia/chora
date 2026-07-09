@@ -269,6 +269,7 @@
 }
 
 .att-btn--primary:hover:not(:disabled) {
+  color: #fff;
   transform: translateY(-1px);
 }
 

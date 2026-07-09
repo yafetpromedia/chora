@@ -370,9 +370,11 @@ describe('CampusOne critical paths (e2e)', () => {
 
 
 
-    expect(String(html.text)).toContain('Report Card');
+    expect(String(html.text)).toContain('Student Report Card');
 
-    expect(String(html.text)).toContain('@media print');
+    expect(String(html.text)).toContain("Student's Information");
+
+    expect(String(html.text)).toContain('A4 landscape');
 
   });
 

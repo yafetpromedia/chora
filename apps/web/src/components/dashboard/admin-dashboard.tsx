@@ -7,22 +7,7 @@ import { formatEtb } from "@/lib/finance";
 import type { AdminAnalyticsOverview } from "@/lib/dashboard-analytics";
 import type { AdminDayOverview } from "@/lib/dashboard-day";
 import { AdminAnalyticsSection } from "@/components/dashboard/admin-analytics";
-import { DashIcon, type DashIconName } from "@/components/dashboard/dash-icons";
-
-const QUICK_ACTIONS: {
-  href: string;
-  label: string;
-  icon: DashIconName;
-}[] = [
-  { href: "/admin/students", label: "Students", icon: "students" },
-  { href: "/admin/parents", label: "Parents", icon: "profile" },
-  { href: "/admin/teachers", label: "Teachers", icon: "teachers" },
-  { href: "/admin/subjects", label: "Subjects", icon: "results" },
-  { href: "/admin/staff", label: "Staff", icon: "users" },
-  { href: "/admin/attendance", label: "Attendance", icon: "attendance" },
-  { href: "/admin/results", label: "Results", icon: "results" },
-  { href: "/admin/finance", label: "Finance", icon: "finance" },
-];
+import { DashIcon } from "@/components/dashboard/dash-icons";
 
 type Props = {
   schoolName: string;
@@ -181,45 +166,6 @@ export function AdminDashboard({
 
       {analytics ? (
         <AdminAnalyticsSection analytics={analytics} canViewFinance={canViewFinance} />
-      ) : null}
-
-      {adminDay && adminDay.alerts.items.length > 0 ? (
-        <section className="da-alerts-strip" aria-label="Action needed">
-          <h2 className="da-alerts-strip__title">Action needed</h2>
-          <ul className="da-alerts-strip__list">
-            {adminDay.alerts.items.map((a) => (
-              <li key={a.type}>
-                <Link href={a.href} className="da-alerts-strip__item">
-                  <span className="da-alerts-strip__count">{a.count}</span>
-                  <span>{a.label}</span>
-                  <DashIcon name="chevron" className="dash-icon--xs" />
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
-
-      {!isPrincipalView ? (
-        <section className="dash-admin-quick dash-admin-quick--modern" aria-label="Quick navigation">
-          <h2 className="dash-admin-quick__heading">Quick access</h2>
-          <div className="dash-admin-quick__track">
-            {QUICK_ACTIONS.map((action) => (
-              <Link key={action.href} href={action.href} className="dash-admin-quick__pill">
-                <DashIcon name={action.icon} className="dash-icon--sm" />
-                {action.label}
-              </Link>
-            ))}
-            <Link href="/admin/announcements" className="dash-admin-quick__pill">
-              <DashIcon name="announcements" className="dash-icon--sm" />
-              Announce
-            </Link>
-            <Link href="/admin/settings" className="dash-admin-quick__pill">
-              <DashIcon name="settings" className="dash-icon--sm" />
-              Settings
-            </Link>
-          </div>
-        </section>
       ) : null}
 
       <article className="da-card da-card--feed">

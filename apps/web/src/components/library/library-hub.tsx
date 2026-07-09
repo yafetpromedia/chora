@@ -1,11 +1,13 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import type { UserRole } from "@/lib/auth";
 import { listGrades } from "@/lib/school-setup";
 import type { GradeWithSections } from "@/lib/api";
 import { LibCategoryIcon, LibHubIcon } from "@/components/library/library-icons";
 import { LibraryAiAssistant } from "@/components/library/library-ai-assistant";
+import { StudentSectionBanner } from "@/components/student/student-section-banner";
 import {
   createLibraryResource,
   deleteLibraryResource,
@@ -31,18 +33,27 @@ type Props = {
   role: UserRole;
   canManage?: boolean;
   canUpload?: boolean;
+  /** Portal section — driven by sidebar navigation routes. */
+  librarySection?: LibrarySection;
+  /** @deprecated Use librarySection */
+  studentSection?: LibrarySection;
 };
+
+export type LibrarySection = "main" | "progress" | "ai";
+export type StudentLibrarySection = LibrarySection;
 
 function ResourceCard({
   resource,
   role,
   onOpen,
   onSave,
+  isNew,
 }: {
   resource: LibraryResource;
   role: UserRole;
   onOpen: (r: LibraryResource) => void;
   onSave: (r: LibraryResource) => void;
+  isNew?: boolean;
 }) {
   const [coverSrc, setCoverSrc] = useState<string | null>(null);
 
@@ -72,6 +83,9 @@ function ResourceCard({
   return (
     <article className="lib-resource">
       <div className="lib-resource__cover" aria-hidden>
+        {isNew ? (
+          <span className="lib-resource__badge lib-badge lib-badge--new">New</span>
+        ) : null}
         {coverSrc ? (
           <img src={coverSrc} alt="" />
         ) : (
@@ -129,7 +143,14 @@ function ResourceCard({
   );
 }
 
-export function LibraryHubView({ role, canManage, canUpload }: Props) {
+export function LibraryHubView({
+  role,
+  canManage,
+  canUpload,
+  librarySection,
+  studentSection = "main",
+}: Props) {
+  const section = librarySection ?? studentSection;
   const [hub, setHub] = useState<LibraryHub | null>(null);
   const [results, setResults] = useState<LibraryResource[] | null>(null);
   const [search, setSearch] = useState("");
@@ -152,6 +173,14 @@ export function LibraryHubView({ role, canManage, canUpload }: Props) {
   const [externalUrl, setExternalUrl] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [coverFile, setCoverFile] = useState<File | null>(null);
+
+  const isStudent = role === "student";
+  const isTeacher = role === "teacher";
+  const useSectionNav = isStudent || isTeacher;
+  const browsePath = isTeacher ? "/teacher/library" : "/student/library";
+  const showMain = !useSectionNav || section === "main";
+  const showProgress = useSectionNav && section === "progress";
+  const showAi = useSectionNav && section === "ai";
 
   const aiResources = useMemo(() => {
     const map = new Map<string, LibraryResource>();
@@ -306,7 +335,34 @@ export function LibraryHubView({ role, canManage, canUpload }: Props) {
     }
   }
 
-  const display = results ?? hub?.recent ?? [];
+  const newResourceIds = useMemo(
+    () => new Set(hub?.recent.map((r) => r.id) ?? []),
+    [hub?.recent],
+  );
+  const featuredIds = useMemo(
+    () => new Set(hub?.featured.map((r) => r.id) ?? []),
+    [hub?.featured],
+  );
+  const recentWithoutFeatured = useMemo(
+    () => (hub?.recent ?? []).filter((r) => !featuredIds.has(r.id)),
+    [hub?.recent, featuredIds],
+  );
+  const isAdminLibrary = !useSectionNav;
+  const display =
+    results ?? (isAdminLibrary ? recentWithoutFeatured : hub?.recent) ?? [];
+  const sectionBrowseItems = useMemo(() => {
+    if (!hub || results || !useSectionNav || section !== "main") return [];
+    const map = new Map<string, LibraryResource>();
+    for (const r of hub.recent) map.set(r.id, r);
+    for (const r of hub.featured) {
+      if (!map.has(r.id)) map.set(r.id, r);
+    }
+    return [...map.values()];
+  }, [hub, results, useSectionNav, section]);
+  const showBrowseList = showMain && useSectionNav && !results;
+  const showResourceList =
+    showMain && (useSectionNav ? !!results : !!results || display.length > 0);
+  const showHero = canManage || !useSectionNav || section === "main";
   const totalResources =
     hub?.stats?.totalResources ??
     hub?.categories.reduce((sum, c) => sum + c.resourceCount, 0) ??
@@ -324,7 +380,10 @@ export function LibraryHubView({ role, canManage, canUpload }: Props) {
   }
 
   return (
-    <div className="lib-page">
+    <div
+      className={`lib-page${useSectionNav && section === "ai" ? " lib-page--ai" : ""}${useSectionNav && section === "progress" ? " lib-page--progress" : ""}`}
+    >
+      {showHero ? (
       <header className="lib-hero">
         <div className="lib-hero__main">
           <div className="lib-hero__brand">
@@ -379,10 +438,80 @@ export function LibraryHubView({ role, canManage, canUpload }: Props) {
           )}
         </div>
       </header>
+      ) : null}
+
+      {showProgress && isStudent ? (
+        <StudentSectionBanner
+          tone="progress"
+          eyebrow="Your shelf"
+          title="Reading progress"
+          subtitle="Pick up unfinished books and manage saved materials."
+          icon="📚"
+          stats={[
+            {
+              value: hub?.shelf?.continueReading.length ?? 0,
+              label: "In progress",
+            },
+            {
+              value: hub?.shelf?.favorites.length ?? 0,
+              label: "Saved",
+            },
+          ]}
+        />
+      ) : null}
+
+      {showProgress && isTeacher ? (
+        <StudentSectionBanner
+          tone="progress"
+          eyebrow="My uploads"
+          title="Upload progress"
+          subtitle="Materials you added — pending admin approval and live in the library."
+          icon="📤"
+          stats={[
+            {
+              value: hub?.contributions?.pending.length ?? 0,
+              label: "Pending",
+            },
+            {
+              value: hub?.contributions?.published.length ?? 0,
+              label: "Published",
+            },
+          ]}
+        />
+      ) : null}
+
+      {showAi && isStudent ? (
+        <StudentSectionBanner
+          tone="ai"
+          eyebrow="Study tools"
+          title="AI Assistant"
+          subtitle="Summarize chapters, generate quizzes, and translate lessons from your library."
+          icon="✦"
+          stats={[
+            { value: aiResources.length, label: "Resources" },
+            { value: 3, label: "Tools" },
+          ]}
+        />
+      ) : null}
+
+      {showAi && isTeacher ? (
+        <StudentSectionBanner
+          tone="ai"
+          eyebrow="Teaching tools"
+          title="AI Assistant"
+          subtitle="Summarize chapters, build quizzes, and translate materials for your classes."
+          icon="✦"
+          stats={[
+            { value: aiResources.length, label: "Resources" },
+            { value: 3, label: "Tools" },
+          ]}
+        />
+      ) : null}
 
       {error ? <p className="lib-alert lib-alert--error">{error}</p> : null}
       {saved ? <p className="lib-alert lib-alert--ok">{saved}</p> : null}
 
+      {showMain ? (
       <section className="lib-card lib-card--search">
         <div className="lib-card__head">
           <div>
@@ -414,8 +543,9 @@ export function LibraryHubView({ role, canManage, canUpload }: Props) {
           </button>
         </form>
       </section>
+      ) : null}
 
-      {hub?.categories.length ? (
+      {showMain && hub?.categories.length ? (
         <section className="lib-card">
           <div className="lib-card__head">
             <div>
@@ -448,11 +578,16 @@ export function LibraryHubView({ role, canManage, canUpload }: Props) {
         </section>
       ) : null}
 
-      {role === "student" && hub?.shelf ? (
+      {showProgress && isStudent && hub?.shelf ? (
         <>
-          {hub.shelf.continueReading.length > 0 ? (
-            <section className="lib-card">
-              <h2 className="lib-section-title">Continue reading</h2>
+          <section className="lib-card">
+            <div className="lib-card__head">
+              <div>
+                <h3 className="lib-card__title">Continue reading</h3>
+                <p className="lib-card__sub">Pick up where you left off</p>
+              </div>
+            </div>
+            {hub.shelf.continueReading.length > 0 ? (
               <div className="lib-grid">
                 {hub.shelf.continueReading.map((r) => (
                   <ResourceCard
@@ -464,11 +599,27 @@ export function LibraryHubView({ role, canManage, canUpload }: Props) {
                   />
                 ))}
               </div>
-            </section>
-          ) : null}
-          {hub.shelf.favorites.length > 0 ? (
-            <section className="lib-card">
-              <h2 className="lib-section-title">Saved books</h2>
+            ) : (
+              <div className="lib-empty lib-empty--compact">
+                <p className="lib-empty__title">Nothing in progress yet</p>
+                <p className="lib-empty__sub">
+                  Open a book from the Main section to start reading.
+                </p>
+                <Link href={browsePath} className="lib-btn lib-btn--primary">
+                  Browse library
+                </Link>
+              </div>
+            )}
+          </section>
+
+          <section className="lib-card">
+            <div className="lib-card__head">
+              <div>
+                <h3 className="lib-card__title">Saved books</h3>
+                <p className="lib-card__sub">Materials you bookmarked for later</p>
+              </div>
+            </div>
+            {hub.shelf.favorites.length > 0 ? (
               <div className="lib-grid">
                 {hub.shelf.favorites.map((r) => (
                   <ResourceCard
@@ -480,12 +631,90 @@ export function LibraryHubView({ role, canManage, canUpload }: Props) {
                   />
                 ))}
               </div>
-            </section>
-          ) : null}
+            ) : (
+              <div className="lib-empty lib-empty--compact">
+                <p className="lib-empty__title">No saved books</p>
+                <p className="lib-empty__sub">
+                  Tap Save on any resource in Main to keep it here.
+                </p>
+              </div>
+            )}
+          </section>
         </>
       ) : null}
 
-      {hub?.featured.length && !results ? (
+      {showProgress && isTeacher ? (
+        <>
+          <section className="lib-card">
+            <div className="lib-card__head">
+              <div>
+                <h3 className="lib-card__title">Awaiting approval</h3>
+                <p className="lib-card__sub">Uploaded resources pending admin review</p>
+              </div>
+            </div>
+            {(hub?.contributions?.pending.length ?? 0) > 0 ? (
+              <div className="lib-grid">
+                {hub!.contributions!.pending.map((r) => (
+                  <div key={r.id} className="lib-card-wrap">
+                    <ResourceCard
+                      resource={r}
+                      role={role}
+                      onOpen={handleOpen}
+                      onSave={handleSave}
+                    />
+                    <div className="lib-resource__admin">
+                      <span className="lib-badge lib-badge--pending">Pending</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="lib-empty lib-empty--compact">
+                <p className="lib-empty__title">Nothing waiting</p>
+                <p className="lib-empty__sub">
+                  New uploads appear here until the academic office publishes them.
+                </p>
+                {canUpload ? (
+                  <Link href={browsePath} className="lib-btn lib-btn--primary">
+                    Add a resource
+                  </Link>
+                ) : null}
+              </div>
+            )}
+          </section>
+
+          <section className="lib-card">
+            <div className="lib-card__head">
+              <div>
+                <h3 className="lib-card__title">Published by you</h3>
+                <p className="lib-card__sub">Live materials students and staff can open</p>
+              </div>
+            </div>
+            {(hub?.contributions?.published.length ?? 0) > 0 ? (
+              <div className="lib-grid">
+                {hub!.contributions!.published.map((r) => (
+                  <ResourceCard
+                    key={r.id}
+                    resource={r}
+                    role={role}
+                    onOpen={handleOpen}
+                    onSave={handleSave}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="lib-empty lib-empty--compact">
+                <p className="lib-empty__title">No published uploads yet</p>
+                <p className="lib-empty__sub">
+                  Once approved, your resources will show up here and in Browse.
+                </p>
+              </div>
+            )}
+          </section>
+        </>
+      ) : null}
+
+      {showMain && !useSectionNav && hub?.featured.length && !results ? (
         <section className="lib-section">
           <h2 className="lib-section-title">Featured</h2>
           <div className="lib-grid">
@@ -502,6 +731,49 @@ export function LibraryHubView({ role, canManage, canUpload }: Props) {
         </section>
       ) : null}
 
+      {showBrowseList ? (
+        sectionBrowseItems.length > 0 ? (
+          <section className="lib-section">
+            <div className="lib-grid">
+              {sectionBrowseItems.map((r) => (
+                <ResourceCard
+                  key={r.id}
+                  resource={r}
+                  role={role}
+                  onOpen={handleOpen}
+                  onSave={handleSave}
+                  isNew={newResourceIds.has(r.id)}
+                />
+              ))}
+            </div>
+          </section>
+        ) : (
+          <div className="lib-empty">
+            <div className="lib-empty__icon" aria-hidden>
+              <LibHubIcon />
+            </div>
+            <p className="lib-empty__title">No resources yet</p>
+            <p className="lib-empty__sub">
+              {isTeacher && canUpload
+                ? "Upload the first book, note, or video for your school."
+                : isTeacher
+                  ? "Check back when your school adds materials."
+                  : "Check back when your teachers add materials."}
+            </p>
+            {isTeacher && canUpload ? (
+              <button
+                type="button"
+                className="lib-btn lib-btn--primary"
+                onClick={() => setUploadOpen(true)}
+              >
+                Upload the first one
+              </button>
+            ) : null}
+          </div>
+        )
+      ) : null}
+
+      {showResourceList ? (
       <section className="lib-card">
         <div className="lib-card__head">
           <div>
@@ -579,8 +851,11 @@ export function LibraryHubView({ role, canManage, canUpload }: Props) {
           </div>
         )}
       </section>
+      ) : null}
 
-      <LibraryAiAssistant resources={aiResources} />
+      {showAi ? (
+        <LibraryAiAssistant resources={aiResources} focus={useSectionNav} hideHead={useSectionNav} />
+      ) : null}
 
       {uploadOpen ? (
         <div

@@ -203,7 +203,8 @@ export default function AcademicsSetupPage() {
             </section>
 
             <nav className="acad-v2__quick" aria-label="Related workspaces">
-              <a href="/admin/results">Results &amp; report cards</a>
+              <a href="/admin/results">Results</a>
+              <a href="/admin/report-cards">Report cards</a>
               <a href="/admin/results/templates">Assessment templates</a>
               <a href="/admin/students">Students</a>
               <a href="/admin/timetable">Timetable</a>

@@ -27,6 +27,34 @@ export function getApiBaseUrl(): string {
     : `http://localhost:${API_PORT}`;
 }
 
+const NETWORK_RETRIES = 2;
+const NETWORK_RETRY_MS = 700;
+
+function networkErrorMessage(base: string): string {
+  return `Could not reach the server. Check that the API is running, then try again.`;
+}
+
+async function fetchWithRetry(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+  retries = NETWORK_RETRIES,
+): Promise<Response> {
+  let lastErr: unknown;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await fetch(input, init);
+    } catch (err) {
+      lastErr = err;
+      if (attempt < retries && err instanceof TypeError) {
+        await new Promise((resolve) => setTimeout(resolve, NETWORK_RETRY_MS * (attempt + 1)));
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw lastErr;
+}
+
 export type SchoolType =
   | "KINDERGARTEN"
   | "PRIMARY"
@@ -334,17 +362,15 @@ export type PlanOption = {
 async function authPost(path: string, body: unknown): Promise<LoginResponse> {
   let response: Response;
   try {
-    response = await fetch(`${getApiBaseUrl()}${path}`, {
+    response = await fetchWithRetry(`${getApiBaseUrl()}${path}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
   } catch (err) {
-    const hint =
-      typeof window !== "undefined" && err instanceof TypeError
-        ? "Cannot reach API. Is it running on port 3001? Restart with: npm run dev"
-        : "API is unavailable. Start backend server and try again.";
-    throw new Error(hint);
+    throw new Error(
+      err instanceof TypeError ? networkErrorMessage(getApiBaseUrl()) : "API is unavailable",
+    );
   }
 
   if (!response.ok) {
@@ -361,15 +387,59 @@ async function authPost(path: string, body: unknown): Promise<LoginResponse> {
   return response.json();
 }
 
+export async function validateSchoolCode(
+  schoolCode: string,
+): Promise<{ name: string; joinCode: string }> {
+  const code = schoolCode.trim().toUpperCase();
+  const response = await fetch(
+    `${getApiBaseUrl()}/auth/school-code/${encodeURIComponent(code)}`,
+  );
+  if (!response.ok) {
+    const data = (await response.json().catch(() => null)) as {
+      message?: string | string[];
+    } | null;
+    const msg = Array.isArray(data?.message) ? data.message[0] : data?.message;
+    if (response.status === 404) throw new Error("Invalid school code");
+    throw new Error(msg ?? "Could not verify school code");
+  }
+  return response.json();
+}
+
+export async function verifyStudentEnrollment(payload: {
+  schoolCode: string;
+  studentId: string;
+  firstName: string;
+  lastName: string;
+}): Promise<{
+  schoolName: string;
+  joinCode: string;
+  studentId: string;
+  studentName: string;
+  message: string;
+}> {
+  return authPost("/auth/verify-student", {
+    schoolCode: payload.schoolCode.trim().toUpperCase(),
+    studentId: payload.studentId.trim(),
+    firstName: payload.firstName.trim(),
+    lastName: payload.lastName.trim(),
+  }) as Promise<{
+    schoolName: string;
+    joinCode: string;
+    studentId: string;
+    studentName: string;
+    message: string;
+  }>;
+}
+
 export async function login(
   username: string,
   password: string,
-  schoolCode?: string,
+  schoolCode: string,
 ): Promise<LoginResponse> {
   return authPost("/auth/login", {
     username,
     password,
-    ...(schoolCode?.trim() ? { schoolCode: schoolCode.trim().toUpperCase() } : {}),
+    schoolCode: schoolCode.trim().toUpperCase(),
   });
 }
 
@@ -511,13 +581,9 @@ async function authedFetch<T>(
   const base = getApiBaseUrl();
   let response: Response;
   try {
-    response = await fetch(`${base}${path}`, { ...init, headers });
+    response = await fetchWithRetry(`${base}${path}`, { ...init, headers });
   } catch (err) {
-    const hint =
-      err instanceof TypeError
-        ? `Cannot reach API at ${base}. Start it: cd apps/api && npm run dev`
-        : "API is unavailable";
-    throw new Error(hint);
+    throw new Error(err instanceof TypeError ? networkErrorMessage(base) : "API is unavailable");
   }
 
   if (response.status === 401) {
@@ -528,13 +594,9 @@ async function authedFetch<T>(
     headers.set("Authorization", `Bearer ${newAccessToken}`);
     let retryResponse: Response;
     try {
-      retryResponse = await fetch(`${base}${path}`, { ...init, headers });
+      retryResponse = await fetchWithRetry(`${base}${path}`, { ...init, headers });
     } catch (err) {
-      const hint =
-        err instanceof TypeError
-          ? `Cannot reach API at ${base}. Start it: cd apps/api && npm run dev`
-          : "API is unavailable";
-      throw new Error(hint);
+      throw new Error(err instanceof TypeError ? networkErrorMessage(base) : "API is unavailable");
     }
     if (!retryResponse.ok) {
       throw new Error(`Request failed: ${retryResponse.status}`);
@@ -584,16 +646,14 @@ export async function apiUpload<T>(path: string, file: File): Promise<T> {
   const base = getApiBaseUrl();
   let response: Response;
   try {
-    response = await fetch(`${base}${path}`, {
+    response = await fetchWithRetry(`${base}${path}`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}` },
       body: form,
     });
   } catch (err) {
     throw new Error(
-      err instanceof TypeError
-        ? `Cannot reach API at ${base}. Start it: cd apps/api && npm run dev`
-        : "Upload failed — API unavailable",
+      err instanceof TypeError ? networkErrorMessage(base) : "Upload failed — API unavailable",
     );
   }
 
@@ -604,16 +664,14 @@ export async function apiUpload<T>(path: string, file: File): Promise<T> {
     }
     token = refreshed;
     try {
-      response = await fetch(`${base}${path}`, {
+      response = await fetchWithRetry(`${base}${path}`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
         body: form,
       });
     } catch (err) {
       throw new Error(
-        err instanceof TypeError
-          ? `Cannot reach API at ${base}. Start it: cd apps/api && npm run dev`
-          : "Upload failed — API unavailable",
+        err instanceof TypeError ? networkErrorMessage(base) : "Upload failed — API unavailable",
       );
     }
   }

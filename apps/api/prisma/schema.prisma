@@ -675,6 +675,7 @@ model ClassSubject {
   section        Section?     @relation(fields: [sectionId], references: [id], onDelete: SetNull)
   teacherId      String?
   teacher              User?                @relation("ClassSubjectTeacher", fields: [teacherId], references: [id], onDelete: SetNull)
+  weeklySessions       Int                  @default(1)
   assessments          Assessment[]
   assessmentTemplateId String?
   assessmentTemplate   AssessmentTemplate?  @relation(fields: [assessmentTemplateId], references: [id], onDelete: SetNull)

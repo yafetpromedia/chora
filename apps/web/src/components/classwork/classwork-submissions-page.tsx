@@ -80,6 +80,16 @@ export function ClassworkSubmissionsPage({ mode, assignmentId }: Props) {
       .finally(() => setLoading(false));
   }, [load]);
 
+  function retryLoad() {
+    setError("");
+    setLoading(true);
+    void load()
+      .catch((err) =>
+        setError(err instanceof Error ? err.message : "Load failed"),
+      )
+      .finally(() => setLoading(false));
+  }
+
   async function onPublish() {
     if (!assignment) return;
     setBusy(true);
@@ -141,7 +151,14 @@ export function ClassworkSubmissionsPage({ mode, assignmentId }: Props) {
         ← Back to {mode === "WORKSHEET" ? "worksheets" : "assignments"}
       </Link>
 
-      {error ? <p className="cw-alert cw-alert--error">{error}</p> : null}
+      {error ? (
+        <div className="cw-alert cw-alert--error cw-alert--row">
+          <span>{error}</span>
+          <button type="button" className="cw-btn cw-btn--ghost cw-btn--sm" onClick={retryLoad}>
+            Retry
+          </button>
+        </div>
+      ) : null}
       {saved ? <p className="cw-alert cw-alert--ok">{saved}</p> : null}
 
       <section className="cw-card cw-detail cw-detail--modern">
@@ -163,7 +180,7 @@ export function ClassworkSubmissionsPage({ mode, assignmentId }: Props) {
                 </span>
               )}
               <span className="cw-detail__points">
-                Graded out of {assignment.maxScore ?? 100}
+                Graded out of {assignment.maxScore}
               </span>
             </div>
           </div>

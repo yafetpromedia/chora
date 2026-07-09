@@ -21,20 +21,30 @@ import {
 } from "@/components/academics/academics-ui";
 import {
   createTerm,
+  deleteTerm,
   listAcademicYears,
   listTerms,
+  updateTerm,
   type AcademicTerm,
   type AcademicYear,
 } from "@/lib/results";
 import { AUTH_ROLE_KEY, AUTH_TOKEN_KEY, isSchoolWorkspaceRole } from "@/lib/auth";
 
+function toDateInput(iso: string) {
+  return iso.slice(0, 10);
+}
+
 function suggestNextTerm(terms: AcademicTerm[]) {
-  const nextIndex = terms.length + 1;
-  const maxOrder = terms.reduce((max, t) => Math.max(max, t.sortOrder), -1);
+  const termNumber = terms.length + 1;
   return {
-    name: `Term ${nextIndex}`,
-    sortOrder: String(maxOrder + 1),
+    name: `Term ${termNumber}`,
+    termNumber: String(termNumber),
   };
+}
+
+function termNumberToSortOrder(termNumber: string) {
+  const n = Number.parseInt(termNumber, 10);
+  return Number.isFinite(n) && n > 0 ? n - 1 : 0;
 }
 
 export default function AcademicTermsPage() {
@@ -49,16 +59,34 @@ export default function AcademicTermsPage() {
   const [name, setName] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [sortOrder, setSortOrder] = useState("0");
+  const [termNumber, setTermNumber] = useState("1");
   const [isCurrent, setIsCurrent] = useState(false);
+  const [editingTermId, setEditingTermId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   function applyFormDefaults(termList: AcademicTerm[]) {
     const suggestion = suggestNextTerm(termList);
     setName(suggestion.name);
-    setSortOrder(suggestion.sortOrder);
+    setTermNumber(suggestion.termNumber);
     setStartDate("");
     setEndDate("");
     setIsCurrent(!termList.some((t) => t.isCurrent));
+    setEditingTermId(null);
+  }
+
+  function startEdit(term: AcademicTerm) {
+    setEditingTermId(term.id);
+    setName(term.name);
+    setStartDate(toDateInput(term.startDate));
+    setEndDate(toDateInput(term.endDate));
+    setTermNumber(String(term.sortOrder + 1));
+    setIsCurrent(term.isCurrent);
+    setError("");
+    setSuccess("");
+  }
+
+  function cancelEdit() {
+    applyFormDefaults(terms);
   }
 
   async function load(yearFilter?: string) {
@@ -100,7 +128,7 @@ export default function AcademicTermsPage() {
     }
   }
 
-  async function onCreate(e: FormEvent) {
+  async function onSave(e: FormEvent) {
     e.preventDefault();
     if (!academicYearId) {
       setError("Create an academic year first.");
@@ -110,21 +138,52 @@ export default function AcademicTermsPage() {
     setError("");
     setSuccess("");
     try {
-      await createTerm({
-        academicYearId,
-        name: name.trim(),
-        startDate,
-        endDate,
-        sortOrder: Number.parseInt(sortOrder, 10) || 0,
-        isCurrent,
-      });
-      setSuccess(`${name.trim()} is ready — teachers can enter scores for this term.`);
+      if (editingTermId) {
+        await updateTerm(editingTermId, {
+          name: name.trim(),
+          startDate,
+          endDate,
+          sortOrder: termNumberToSortOrder(termNumber),
+          isCurrent,
+        });
+        setSuccess(`${name.trim()} updated.`);
+      } else {
+        await createTerm({
+          academicYearId,
+          name: name.trim(),
+          startDate,
+          endDate,
+          sortOrder: termNumberToSortOrder(termNumber),
+          isCurrent,
+        });
+        setSuccess(`${name.trim()} is ready — teachers can enter scores for this term.`);
+      }
       const loadedTerms = await load(academicYearId);
       applyFormDefaults(loadedTerms);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Create failed");
+      setError(err instanceof Error ? err.message : "Save failed");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function onDelete(term: AcademicTerm) {
+    const ok = window.confirm(
+      `Delete "${term.name}"? This only works if the term has no scores or report data yet.`,
+    );
+    if (!ok) return;
+    setDeletingId(term.id);
+    setError("");
+    setSuccess("");
+    try {
+      await deleteTerm(term.id);
+      setSuccess(`${term.name} deleted.`);
+      const loadedTerms = await load(academicYearId);
+      applyFormDefaults(loadedTerms);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Delete failed");
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -301,6 +360,23 @@ export default function AcademicTermsPage() {
                               ? "Starts soon"
                               : "Term ended"}
                         </p>
+                        <div className="acad-term-item__actions">
+                          <button
+                            type="button"
+                            className="acad-btn acad-btn--ghost acad-btn--sm"
+                            onClick={() => startEdit(t)}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            className="acad-btn acad-btn--danger acad-btn--sm"
+                            disabled={deletingId === t.id}
+                            onClick={() => void onDelete(t)}
+                          >
+                            {deletingId === t.id ? "Deleting…" : "Delete"}
+                          </button>
+                        </div>
                       </div>
                     </li>
                   );
@@ -310,17 +386,21 @@ export default function AcademicTermsPage() {
           </section>
 
           <aside className="acad-terms-form-panel">
-            <form className="acad-terms-form" onSubmit={(e) => void onCreate(e)}>
+            <form className="acad-terms-form" onSubmit={(e) => void onSave(e)}>
               <header className="acad-terms-form__head">
                 <div className="acad-terms-form__icon" aria-hidden>
                   <DashIcon name="calendar" className="dash-icon--sm" />
                 </div>
                 <div>
-                  <h3 className="acad-terms-form__title">Add term</h3>
+                  <h3 className="acad-terms-form__title">
+                    {editingTermId ? "Edit term" : "Add term"}
+                  </h3>
                   <p className="acad-terms-form__sub">
-                    {terms.length === 0
-                      ? "Start with Term 1"
-                      : `Next up: ${suggestNextTerm(terms).name}`}
+                    {editingTermId
+                      ? "Update dates, name, or current term flag."
+                      : terms.length === 0
+                        ? "Start with Term 1"
+                        : `Next up: ${suggestNextTerm(terms).name}`}
                   </p>
                 </div>
               </header>
@@ -356,12 +436,13 @@ export default function AcademicTermsPage() {
                   </label>
                 </div>
                 <label>
-                  Sort order
+                  Term number
                   <input
                     type="number"
-                    min={0}
-                    value={sortOrder}
-                    onChange={(e) => setSortOrder(e.target.value)}
+                    min={1}
+                    value={termNumber}
+                    onChange={(e) => setTermNumber(e.target.value)}
+                    placeholder="1"
                   />
                 </label>
                 <label className="acad-form__check acad-terms-form__check">
@@ -380,10 +461,25 @@ export default function AcademicTermsPage() {
                   className="acad-btn acad-btn--primary acad-btn--block"
                   disabled={saving || years.length === 0}
                 >
-                  {saving ? "Creating…" : "Create term"}
+                  {saving
+                    ? "Saving…"
+                    : editingTermId
+                      ? "Save changes"
+                      : "Create term"}
                 </button>
+                {editingTermId ? (
+                  <button
+                    type="button"
+                    className="acad-btn acad-btn--ghost acad-btn--block"
+                    disabled={saving}
+                    onClick={cancelEdit}
+                  >
+                    Cancel edit
+                  </button>
+                ) : null}
                 <p className="acad-terms-form__hint">
-                  Teachers see the current term on their dashboard.
+                  Click <strong>Edit</strong> on a term in the list, or use the form to add a new one.
+                  Delete is only allowed before any scores exist.
                 </p>
               </div>
             </form>
