@@ -2,12 +2,13 @@
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { AcademicsBadge } from "@/components/academics/academics-ui";
 import { DashboardPage } from "@/components/dashboard/dashboard-page";
 import {
   BillingControlsBar,
   PlanPriceDisplay,
 } from "@/components/billing/plan-billing-ui";
-import { SchoolBillingNav } from "@/components/school-billing/school-billing-nav";
+import { SchoolBillingShell } from "@/components/school-billing/school-billing-shell";
 import {
   getPlanPricing,
   PLAN_CATALOG,
@@ -68,11 +69,14 @@ export default function SchoolPlansPage() {
     <Suspense
       fallback={
         <DashboardPage role="admin" title="Plans">
-          <SchoolBillingNav />
-          <div className="upg-loading">
-            <span className="upg-loading__spinner" aria-hidden />
-            <p>Loading plans…</p>
-          </div>
+          <SchoolBillingShell
+            title="Plans & upgrades"
+            subtitle="Loading subscription options…"
+            loading
+            loadingLabel="Loading plans…"
+          >
+            <span />
+          </SchoolBillingShell>
         </DashboardPage>
       }
     >
@@ -168,54 +172,63 @@ function SchoolPlansPageContent() {
     }
   }
 
-  if (loading) {
-    return (
-      <DashboardPage role="admin" title="Plans">
-        <SchoolBillingNav />
-        <div className="upg-loading">
-          <span className="upg-loading__spinner" aria-hidden />
-          <p>Loading plans…</p>
+  const heroExtra = (
+    <>
+      <BillingControlsBar
+        interval={billingInterval}
+        onIntervalChange={setBillingInterval}
+        currency={displayCurrency}
+        onCurrencyChange={setDisplayCurrency}
+      />
+      {chapaEnabled ? (
+        <div className="sb-v2__pay-badge" aria-label="Payment via Chapa">
+          <span className="sb-v2__pay-badge__dot" />
+          Secure checkout · Chapa · ETB
         </div>
-      </DashboardPage>
-    );
-  }
+      ) : null}
+    </>
+  );
 
   return (
     <DashboardPage role="admin" title="Plans">
-      <SchoolBillingNav />
-
-      <div className="upg" data-upgrade-page>
-        <header className="upg-hero">
-          <p className="upg-hero__eyebrow">CampusOne subscription</p>
-          <h1 className="upg-hero__title">Choose your plan</h1>
-          <p className="upg-hero__sub">
-            You are on <strong>{currentPlanLabel}</strong>.
-            {chapaEnabled
-              ? " Pay securely with Chapa to activate or change your plan."
-              : " Online checkout is being configured."}
-          </p>
-          <BillingControlsBar
-            interval={billingInterval}
-            onIntervalChange={setBillingInterval}
-            currency={displayCurrency}
-            onCurrencyChange={setDisplayCurrency}
-          />
-          {chapaEnabled ? (
-            <div className="upg-pay-badge" aria-label="Payment via Chapa">
-              <span className="upg-pay-badge__dot" />
-              Secure checkout · Chapa · ETB
-            </div>
-          ) : null}
-        </header>
-
-        {error ? (
-          <p className="auth-alert auth-alert--error upg-alert" role="alert">
-            {error}
-          </p>
-        ) : null}
-        {success ? <p className="upg-success">{success}</p> : null}
-
-        <div className="upg-grid">
+      <SchoolBillingShell
+        title="Plans & upgrades"
+        subtitle={
+          chapaEnabled
+            ? `You are on ${currentPlanLabel}. Pay securely with Chapa to activate or change your plan.`
+            : `You are on ${currentPlanLabel}. Online checkout is being configured.`
+        }
+        stats={
+          subscription
+            ? [
+                { label: "Current plan", value: currentPlanLabel },
+                {
+                  label: "Students",
+                  value: `${subscription.usage.students}${subscription.limits.students != null ? ` / ${subscription.limits.students}` : ""}`,
+                },
+                {
+                  label: "Teachers",
+                  value: `${subscription.usage.teachers}${subscription.limits.teachers != null ? ` / ${subscription.limits.teachers}` : ""}`,
+                },
+                {
+                  label: "Status",
+                  value: subscription.isActive && !subscription.expired ? "Active" : "Inactive",
+                },
+              ]
+            : undefined
+        }
+        badges={
+          subscription ? (
+            <AcademicsBadge variant="live">{currentPlanLabel}</AcademicsBadge>
+          ) : undefined
+        }
+        heroExtra={heroExtra}
+        error={error}
+        success={success}
+        loading={loading}
+        loadingLabel="Loading plans…"
+      >
+        <div className="sb-v2__plans">
           {plans.map((plan) => {
             const key = plan.plan as PaidPlan;
             const features = plan.features?.length ? plan.features : [];
@@ -233,27 +246,29 @@ function SchoolPlansPageContent() {
             return (
               <article
                 key={plan.plan}
-                className={`upg-card${isFeatured ? " upg-card--featured" : ""}${isCurrent ? " upg-card--current" : ""}`}
+                className={`sb-v2__plan-card${isFeatured ? " sb-v2__plan-card--featured" : ""}${isCurrent ? " sb-v2__plan-card--current" : ""}`}
               >
                 {isCurrent ? (
-                  <span className="upg-card__badge upg-card__badge--current">Current plan</span>
+                  <span className="sb-v2__plan-card__badge sb-v2__plan-card__badge--current">
+                    Current plan
+                  </span>
                 ) : isFeatured ? (
-                  <span className="upg-card__badge">Popular</span>
+                  <span className="sb-v2__plan-card__badge">Popular</span>
                 ) : null}
 
-                <h2 className="upg-card__name">{plan.label}</h2>
-                <p className="upg-card__desc">{plan.description}</p>
+                <h2 className="sb-v2__plan-card__name">{plan.label}</h2>
+                <p className="sb-v2__plan-card__desc">{plan.description}</p>
 
                 <PlanPriceDisplay pricing={pricing} currency={displayCurrency} />
 
                 {!isEnterprise && chapaEnabled && !isCurrent ? (
-                  <p className="upg-card__checkout-hint">
+                  <p className="sb-v2__plan-card__hint">
                     Charged {payAmount.toLocaleString("en-ET")} ETB
                     {billingInterval === "year" ? " / year" : " / month"}
                   </p>
                 ) : null}
 
-                <ul className="upg-card__features">
+                <ul className="sb-v2__plan-card__features">
                   {features.slice(0, 5).map((f) => (
                     <li key={f}>{f}</li>
                   ))}
@@ -261,7 +276,7 @@ function SchoolPlansPageContent() {
 
                 <button
                   type="button"
-                  className={`upg-card__btn${isCurrent ? " upg-card__btn--current" : ""}${isFeatured && !isCurrent ? " upg-card__btn--primary" : ""}`}
+                  className={`sb-v2__plan-card__btn${isCurrent ? " sb-v2__plan-card__btn--current" : ""}${isFeatured && !isCurrent ? " sb-v2__plan-card__btn--primary" : ""}`}
                   disabled={
                     isCurrent ||
                     isCheckingOut ||
@@ -288,12 +303,12 @@ function SchoolPlansPageContent() {
           })}
         </div>
 
-        <p className="upg-footnote">
+        <p className="sb-v2__footnote">
           {chapaEnabled
             ? "Payments are processed by Chapa. Your plan activates immediately after successful payment."
             : "Configure CHAPA_SECRET_KEY on the API server to enable checkout."}
         </p>
-      </div>
+      </SchoolBillingShell>
     </DashboardPage>
   );
 }

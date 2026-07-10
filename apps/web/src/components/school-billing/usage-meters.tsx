@@ -9,10 +9,9 @@ function pct(used: number, limit: number | null) {
 
 type Props = {
   subscription: SubscriptionStatus;
-  compact?: boolean;
 };
 
-export function UsageMeters({ subscription, compact }: Props) {
+export function UsageMeters({ subscription }: Props) {
   const items = [
     { key: "students", label: "Students", used: subscription.usage.students, limit: subscription.limits.students },
     { key: "teachers", label: "Teachers", used: subscription.usage.teachers, limit: subscription.limits.teachers },
@@ -20,7 +19,7 @@ export function UsageMeters({ subscription, compact }: Props) {
   ] as const;
 
   return (
-    <div className={compact ? "sbill-usage-grid" : "sbill-usage-grid"}>
+    <div className="sb-v2__usage-grid">
       {items.map((item) => {
         const ratio = pct(item.used, item.limit);
         const over = item.limit != null && item.limit > 0 && item.used > item.limit;
@@ -28,23 +27,23 @@ export function UsageMeters({ subscription, compact }: Props) {
         return (
           <article
             key={item.key}
-            className={`sbill-usage-card${over ? " sbill-usage-card--over" : ""}`}
+            className={`sb-v2__usage-card${over ? " sb-v2__usage-card--over" : ""}`}
           >
-            <div className="sbill-usage-card__head">
-              <span className="sbill-usage-card__label">{item.label}</span>
-              <span className={`sbill-usage-card__count${over ? " sbill-usage-card__count--over" : ""}`}>
+            <div className="sb-v2__usage-card__head">
+              <span className="sb-v2__usage-card__label">{item.label}</span>
+              <span className={`sb-v2__usage-card__count${over ? " sb-v2__usage-card__count--over" : ""}`}>
                 {item.used} / {item.limit == null ? "∞" : item.limit}
               </span>
             </div>
             {ratio != null ? (
-              <div className="sbill-usage-bar">
+              <div className="sb-v2__usage-bar">
                 <div
-                  className={`sbill-usage-bar__fill${over ? " sbill-usage-bar__fill--over" : warn ? " sbill-usage-bar__fill--warn" : ""}`}
+                  className={`sb-v2__usage-bar__fill${over ? " sb-v2__usage-bar__fill--over" : warn ? " sb-v2__usage-bar__fill--warn" : ""}`}
                   style={{ width: `${Math.round(ratio * 100)}%` }}
                 />
               </div>
             ) : (
-              <p className="sbill-muted">Unlimited on your plan</p>
+              <p className="sb-v2__muted">Unlimited on your plan</p>
             )}
           </article>
         );

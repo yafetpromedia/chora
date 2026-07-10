@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { AcademicsBadge } from "@/components/academics/academics-ui";
 import { DashboardPage } from "@/components/dashboard/dashboard-page";
-import { SchoolBillingNav } from "@/components/school-billing/school-billing-nav";
+import { SchoolBillingShell } from "@/components/school-billing/school-billing-shell";
 import { UsageMeters } from "@/components/school-billing/usage-meters";
 import { AUTH_ROLE_KEY, AUTH_TOKEN_KEY } from "@/lib/auth";
 import { getSchoolBillingOverview, type SchoolBillingOverview } from "@/lib/school-billing";
@@ -20,6 +21,24 @@ function formatDate(iso: string | null) {
   } catch {
     return iso;
   }
+}
+
+function planStatusClass(sub: SchoolBillingOverview["subscription"]) {
+  if (sub.expired || !sub.isActive) return "sb-v2__status--off";
+  if (sub.plan === "TRIAL") return "sb-v2__status--trial";
+  return "sb-v2__status--active";
+}
+
+function planStatusLabel(sub: SchoolBillingOverview["subscription"]) {
+  if (sub.expired || !sub.isActive) return "Inactive";
+  if (sub.plan === "TRIAL") return "Trial";
+  return "Active";
+}
+
+function heroBadgeClass(sub: SchoolBillingOverview["subscription"]) {
+  if (sub.expired || !sub.isActive) return "sb-v2__hero-badge--off";
+  if (sub.plan === "TRIAL") return "sb-v2__hero-badge--trial";
+  return "";
 }
 
 export default function SchoolBillingPage() {
@@ -45,100 +64,110 @@ export default function SchoolBillingPage() {
 
   return (
     <DashboardPage role="admin" title="Billing">
-      <SchoolBillingNav />
-
-      {loading ? <p className="sbill-muted">Loading billing…</p> : null}
-      {error ? <p className="auth-alert auth-alert--error">{error}</p> : null}
-
-      {sub ? (
-        <>
-          <div className="sbill-plan-card">
-            <div>
-              <p className="sbill-hero__eyebrow">Current plan</p>
-              <h2 className="sbill-plan-card__plan">{sub.planLabel}</h2>
-              <p className="sbill-plan-card__meta">{sub.planDescription}</p>
-              {sub.plan === "TRIAL" && sub.trialEndsAt ? (
-                <p className="sbill-plan-card__meta">
-                  Trial ends {formatDate(sub.trialEndsAt)}
-                  {sub.daysRemaining != null ? ` · ${sub.daysRemaining} days left` : ""}
-                </p>
-              ) : null}
-              {data?.planPrice && sub.plan !== "TRIAL" && sub.plan !== "ENTERPRISE" ? (
-                <p className="sbill-plan-card__meta">
-                  ${data.planPrice.usdMonthly}/mo · {data.planPrice.etbMonthly.toLocaleString()} ETB/mo
-                </p>
-              ) : null}
-            </div>
-            <span
-              className={`sbill-status ${
-                sub.expired || !sub.isActive
-                  ? "sbill-status--off"
-                  : sub.plan === "TRIAL"
-                    ? "sbill-status--trial"
-                    : "sbill-status--active"
-              }`}
-            >
-              {sub.expired || !sub.isActive
-                ? "Inactive"
-                : sub.plan === "TRIAL"
-                  ? "Trial"
-                  : "Active"}
-            </span>
-          </div>
-
-          <div className="sbill-kpis">
-            <article className="sbill-kpi">
-              <p className="sbill-kpi__label">Open invoices</p>
-              <p className="sbill-kpi__value">{data?.invoices.openCount ?? 0}</p>
-              <p className="sbill-kpi__hint">
-                {data?.invoices.total ?? 0} total on file
-              </p>
+      <SchoolBillingShell
+        title="CampusOne billing"
+        subtitle={
+          sub
+            ? `${sub.planLabel} plan · ${planStatusLabel(sub).toLowerCase()} subscription for your school workspace`
+            : "Manage your CampusOne subscription, invoices, and seat usage."
+        }
+        stats={
+          sub
+            ? [
+                {
+                  label: "Open invoices",
+                  value: data?.invoices.openCount ?? 0,
+                  hint: `${data?.invoices.total ?? 0} total`,
+                },
+                {
+                  label: "Amount due",
+                  value: `$${(data?.invoices.outstandingUsd ?? 0).toLocaleString()}`,
+                  hint: `${(data?.invoices.outstandingEtb ?? 0).toLocaleString()} ETB`,
+                  accent: (data?.invoices.outstandingUsd ?? 0) > 0,
+                },
+                {
+                  label: "Next due",
+                  value: formatDate(data?.invoices.nextDueAt ?? null),
+                },
+                {
+                  label: "Students",
+                  value: `${sub.usage.students}${sub.limits.students != null ? ` / ${sub.limits.students}` : ""}`,
+                },
+              ]
+            : undefined
+        }
+        badges={
+          sub ? (
+            <>
+              <AcademicsBadge variant="live">{sub.planLabel}</AcademicsBadge>
+              <span className={`sb-v2__hero-badge ${heroBadgeClass(sub)}`.trim()}>
+                {planStatusLabel(sub)}
+              </span>
+            </>
+          ) : undefined
+        }
+        error={error}
+        loading={loading}
+        loadingLabel="Loading billing overview…"
+      >
+        {sub ? (
+          <div className="sb-v2__grid sb-v2__grid--2">
+            <article className="sb-v2__card">
+              <div className="sb-v2__card-head">
+                <div>
+                  <h3 className="sb-v2__plan-name">{sub.planLabel}</h3>
+                  <p className="sb-v2__card-sub">{sub.planDescription}</p>
+                  {sub.plan === "TRIAL" && sub.trialEndsAt ? (
+                    <p className="sb-v2__card-sub">
+                      Trial ends {formatDate(sub.trialEndsAt)}
+                      {sub.daysRemaining != null ? ` · ${sub.daysRemaining} days left` : ""}
+                    </p>
+                  ) : null}
+                  {data?.planPrice && sub.plan !== "TRIAL" && sub.plan !== "ENTERPRISE" ? (
+                    <p className="sb-v2__plan-price">
+                      ${data.planPrice.usdMonthly}/mo · {data.planPrice.etbMonthly.toLocaleString()} ETB/mo
+                    </p>
+                  ) : null}
+                </div>
+                <span className={`sb-v2__status ${planStatusClass(sub)}`}>
+                  {planStatusLabel(sub)}
+                </span>
+              </div>
+              <div className="sb-v2__actions">
+                {sub.plan === "TRIAL" || sub.expired ? (
+                  <Link href="/admin/billing/plans" className="sb-v2__btn sb-v2__btn--primary">
+                    Upgrade plan
+                  </Link>
+                ) : (
+                  <Link href="/admin/billing/plans" className="sb-v2__btn">
+                    Change plan
+                  </Link>
+                )}
+                <Link href="/admin/billing/invoices" className="sb-v2__btn">
+                  View invoices
+                </Link>
+              </div>
             </article>
-            <article className="sbill-kpi">
-              <p className="sbill-kpi__label">Amount due (USD)</p>
-              <p className="sbill-kpi__value">
-                ${(data?.invoices.outstandingUsd ?? 0).toLocaleString()}
-              </p>
-              <p className="sbill-kpi__hint">
-                {(data?.invoices.outstandingEtb ?? 0).toLocaleString()} ETB equivalent
-              </p>
-            </article>
-            <article className="sbill-kpi">
-              <p className="sbill-kpi__label">Next due</p>
-              <p className="sbill-kpi__value" style={{ fontSize: "1rem" }}>
-                {formatDate(data?.invoices.nextDueAt ?? null)}
-              </p>
-              <p className="sbill-kpi__hint">From CampusOne billing</p>
+
+            <article className="sb-v2__card">
+              <div className="sb-v2__card-head">
+                <div>
+                  <h3 className="sb-v2__card-title">Seat usage</h3>
+                  <p className="sb-v2__card-sub">
+                    Students, teachers, and admins on your {sub.planLabel} plan.
+                  </p>
+                </div>
+              </div>
+              <UsageMeters subscription={sub} />
+              <div className="sb-v2__actions" style={{ marginTop: "0.85rem" }}>
+                <Link href="/admin/billing/usage" className="sb-v2__btn">
+                  Usage details
+                </Link>
+              </div>
             </article>
           </div>
-
-          <header className="sbill-hero">
-            <h3 className="sbill-hero__title">Seat usage</h3>
-            <p className="sbill-hero__sub">
-              How your school uses seats on the {sub.planLabel} plan.
-            </p>
-          </header>
-          <UsageMeters subscription={sub} />
-
-          <div className="sbill-actions">
-            <Link href="/admin/billing/usage" className="sbill-link-btn">
-              View usage details
-            </Link>
-            <Link href="/admin/billing/invoices" className="sbill-link-btn">
-              View invoices
-            </Link>
-            {(sub.plan === "TRIAL" || sub.expired) ? (
-              <Link href="/admin/billing/plans" className="sbill-link-btn sbill-link-btn--primary">
-                Upgrade plan
-              </Link>
-            ) : (
-              <Link href="/admin/billing/plans" className="sbill-link-btn">
-                Change plan
-              </Link>
-            )}
-          </div>
-        </>
-      ) : null}
+        ) : null}
+      </SchoolBillingShell>
     </DashboardPage>
   );
 }

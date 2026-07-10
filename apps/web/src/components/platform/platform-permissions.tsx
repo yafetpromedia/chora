@@ -21,7 +21,8 @@ const PERMISSIONS = [
   },
   {
     key: "platform.schools.delete",
-    label: "Delete schools",
+    label: "Delete tenants",
+    desc: "Permanently remove tenant workspaces and data",
     desc: "Reserved for future lifecycle (not exposed in UI)",
   },
 ] as const;

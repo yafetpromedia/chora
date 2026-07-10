@@ -18,6 +18,17 @@ export function buildContactEmail(joinCode: string, username: string): string {
   return `${user}.${school}@users.campusone.app`;
 }
 
+/** Parent portal contact email — short, tied to username + school code. */
+export function buildParentContactEmail(joinCode: string, username: string): string {
+  const school = joinCode.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const user = normalizeUsername(username).replace(/[^a-z0-9-]/g, '');
+  return `${user}.${school}@parent.campusone.app`;
+}
+
+export function isLegacyParentContactEmail(email: string): boolean {
+  return /^\d+\.[a-z]+@parent\.campusone\.app$/i.test(email.trim());
+}
+
 export function isValidUsername(raw: string): boolean {
   const n = normalizeUsername(raw);
   if (n.length < 3 || n.length > 40) return false;

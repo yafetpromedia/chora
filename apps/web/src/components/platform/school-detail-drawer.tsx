@@ -18,7 +18,9 @@ type Props = {
   school: PlatformSchoolRow | null;
   onClose: () => void;
   onStatusChange: (schoolId: string, status: "ACTIVE" | "SUSPENDED" | "TRIAL") => Promise<void>;
+  onDelete: (schoolId: string) => Promise<void>;
   canSuspend: boolean;
+  canDelete: boolean;
 };
 
 type Tab = "overview" | "contact" | "billing" | "access";
@@ -56,7 +58,9 @@ export function SchoolDetailDrawer({
   school,
   onClose,
   onStatusChange,
+  onDelete,
   canSuspend,
+  canDelete,
 }: Props) {
   const [detail, setDetail] = useState<PlatformSchoolDetail | null>(null);
   const [loading, setLoading] = useState(false);
@@ -68,11 +72,14 @@ export function SchoolDetailDrawer({
   const [planActive, setPlanActive] = useState(true);
   const [planSaving, setPlanSaving] = useState(false);
   const [planMessage, setPlanMessage] = useState("");
+  const [deleteConfirm, setDeleteConfirm] = useState("");
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (!school) {
       setDetail(null);
       setTab("overview");
+      setDeleteConfirm("");
       return;
     }
     setLoading(true);
@@ -80,7 +87,7 @@ export function SchoolDetailDrawer({
     void platformFetch<PlatformSchoolDetail>(`/platform/schools/${school.id}`)
       .then(setDetail)
       .catch((err) =>
-        setError(err instanceof Error ? err.message : "Could not load school"),
+        setError(err instanceof Error ? err.message : "Could not load tenant"),
       )
       .finally(() => setLoading(false));
   }, [school]);
@@ -128,7 +135,7 @@ export function SchoolDetailDrawer({
         `/platform/schools/${school.id}`,
       );
       setDetail(refreshed);
-      setPlanMessage("Plan updated for this school.");
+      setPlanMessage("Plan updated for this tenant.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not update plan");
     } finally {
@@ -150,6 +157,20 @@ export function SchoolDetailDrawer({
       setError(err instanceof Error ? err.message : "Update failed");
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function removeTenant() {
+    if (!school || deleteConfirm !== school.name) return;
+    setDeleting(true);
+    setError("");
+    try {
+      await onDelete(school.id);
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not remove tenant");
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -198,7 +219,7 @@ export function SchoolDetailDrawer({
                 )}
               </span>
               <div className="plat-manage-hero__titles">
-                <p className="plat-manage-hero__eyebrow">Tenant school</p>
+                <p className="plat-manage-hero__eyebrow">Tenant</p>
                 <h2 id="plat-school-drawer-title" className="plat-manage-hero__title">
                   {school.name}
                 </h2>
@@ -243,7 +264,7 @@ export function SchoolDetailDrawer({
             </div>
           </div>
 
-          <nav className="plat-manage-tabs" role="tablist" aria-label="School sections">
+          <nav className="plat-manage-tabs" role="tablist" aria-label="Tenant sections">
             {tabs.map((t) => (
               <button
                 key={t.id}
@@ -318,8 +339,8 @@ export function SchoolDetailDrawer({
                     </div>
                     <p className="plat-manage-card__hint">
                       {setupDone
-                        ? "School completed onboarding — admins can use all modules."
-                        : "School is still configuring grades and staff."}
+                        ? "Tenant completed onboarding — admins can use all modules."
+                        : "Tenant is still configuring grades and staff."}
                     </p>
                   </section>
                 </>
@@ -391,7 +412,7 @@ export function SchoolDetailDrawer({
                       <dd>{formatDate(sub?.trialEndsAt)}</dd>
                     </div>
                     <div>
-                      <dt>School status</dt>
+                      <dt>Access status</dt>
                       <dd>{detail?.school.status ?? school.status}</dd>
                     </div>
                     <div>
@@ -402,7 +423,7 @@ export function SchoolDetailDrawer({
                   <div className="plat-school-plan-form">
                     <h3 className="plat-manage-card__title">Assign plan</h3>
                     <p className="plat-manage-card__hint">
-                      Override what this school is on. Edit catalog prices under Platform → Plans.
+                      Override what this tenant is on. Edit catalog prices under Platform → Plans.
                     </p>
                     <label className="plat-field">
                       <span>Plan</span>
@@ -432,7 +453,7 @@ export function SchoolDetailDrawer({
                       disabled={planSaving || loading}
                       onClick={() => void savePlan()}
                     >
-                      {planSaving ? "Saving…" : "Save plan for school"}
+                      {planSaving ? "Saving…" : "Save plan for tenant"}
                     </button>
                     {planMessage ? <p className="plat-plans__ok">{planMessage}</p> : null}
                   </div>
@@ -443,12 +464,12 @@ export function SchoolDetailDrawer({
                 <section className="plat-manage-card">
                   <h3 className="plat-manage-card__title">Tenant access</h3>
                   <p className="plat-manage-card__hint">
-                    Suspending blocks all school logins immediately. Activate to restore access.
+                    Suspending blocks all tenant logins immediately. Activate to restore access.
                   </p>
                   <div className={`plat-access-state${isSuspended ? " plat-access-state--off" : ""}`}>
                     <DashIcon name={isSuspended ? "alert" : "attendance"} className="dash-icon--sm" />
                     <div>
-                      <strong>{isSuspended ? "School is suspended" : "School is operational"}</strong>
+                      <strong>{isSuspended ? "Tenant is suspended" : "Tenant is operational"}</strong>
                       <span>
                         {isSuspended
                           ? "Users cannot sign in until you activate."
@@ -465,7 +486,7 @@ export function SchoolDetailDrawer({
                           disabled={busy}
                           onClick={() => void patchStatus("ACTIVE")}
                         >
-                          Activate school
+                          Activate tenant
                         </button>
                       ) : (
                         <button
@@ -474,15 +495,41 @@ export function SchoolDetailDrawer({
                           disabled={busy}
                           onClick={() => void patchStatus("SUSPENDED")}
                         >
-                          Suspend school
+                          Suspend tenant
                         </button>
                       )}
                     </div>
                   ) : (
                     <p className="plat-manage-card__hint">
-                      Your role cannot change school access. Contact a platform owner.
+                      Your role cannot change tenant access. Contact a platform owner.
                     </p>
                   )}
+                  {canDelete ? (
+                    <div className="plat-tenant-remove">
+                      <h4>Remove tenant permanently</h4>
+                      <p>
+                        Deletes this workspace, all users, and tenant data. This cannot be undone.
+                        Type <strong>{school.name}</strong> to confirm.
+                      </p>
+                      <label className="plat-field">
+                        <span>Confirm tenant name</span>
+                        <input
+                          value={deleteConfirm}
+                          onChange={(e) => setDeleteConfirm(e.target.value)}
+                          placeholder={school.name}
+                          autoComplete="off"
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        className="plat-btn plat-btn--danger plat-btn--block"
+                        disabled={deleting || deleteConfirm !== school.name}
+                        onClick={() => void removeTenant()}
+                      >
+                        {deleting ? "Removing…" : "Remove tenant permanently"}
+                      </button>
+                    </div>
+                  ) : null}
                 </section>
               ) : null}
             </>

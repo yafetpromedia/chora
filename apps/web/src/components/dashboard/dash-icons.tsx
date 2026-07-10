@@ -17,6 +17,10 @@ export type DashIconName =
   | "teachers"
   | "attendance"
   | "results"
+  | "subjects"
+  | "assign"
+  | "report-card"
+  | "templates"
   | "finance"
   | "announcements"
   | "settings"
@@ -71,6 +75,44 @@ export function DashIcon({ name, className }: { name: DashIconName; className?: 
       return (
         <svg {...p}>
           <path d="M18 20V10M12 20V4M6 20v-6" />
+        </svg>
+      );
+    case "subjects":
+      return (
+        <svg {...p}>
+          <path d="M12 3 2 8l10 5 10-5-10-5z" />
+          <path d="M2 13l10 5 10-5" />
+          <path d="M2 18l10 5 10-5" />
+        </svg>
+      );
+    case "assign":
+      return (
+        <svg {...p}>
+          <circle cx="7" cy="7" r="3" />
+          <circle cx="17" cy="17" r="3" />
+          <line x1="9.5" y1="9.5" x2="14.5" y2="14.5" />
+        </svg>
+      );
+    case "report-card":
+      return (
+        <svg {...p}>
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+          <polyline points="14 2 14 8 20 8" />
+          <line x1="8" y1="12" x2="16" y2="12" />
+          <line x1="8" y1="16" x2="14" y2="16" />
+          <path d="M8 8h3" />
+        </svg>
+      );
+    case "templates":
+      return (
+        <svg {...p}>
+          <rect x="4" y="3" width="16" height="18" rx="2" />
+          <path d="M7 8l1.5 1.5L11 7" />
+          <line x1="12" y1="8.5" x2="17" y2="8.5" />
+          <path d="M7 12l1.5 1.5L11 11" />
+          <line x1="12" y1="12.5" x2="17" y2="12.5" />
+          <path d="M7 16l1.5 1.5L11 15" />
+          <line x1="12" y1="16.5" x2="15" y2="16.5" />
         </svg>
       );
     case "finance":
@@ -149,7 +191,12 @@ export function DashIcon({ name, className }: { name: DashIconName; className?: 
         </svg>
       );
     case "chart":
-      return <DashIcon name="results" className={className} />;
+      return (
+        <svg {...p}>
+          <polyline points="3 17 9 11 13 15 21 7" />
+          <line x1="3" y1="21" x2="21" y2="21" />
+        </svg>
+      );
     case "plus":
       return (
         <svg {...p}>

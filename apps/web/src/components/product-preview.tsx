@@ -1,10 +1,22 @@
 "use client";
 
 import { motion, useInView, useReducedMotion } from "framer-motion";
-import { useRef } from "react";
+import { useRef, type CSSProperties } from "react";
+import { DashIcon, type DashIconName } from "@/components/dashboard/dash-icons";
 
-const BARS = [38, 52, 48, 61, 68, 74, 82];
-const NAV = ["Overview", "Students", "Parents", "Attendance", "Results"];
+const NAV: { label: string; icon: DashIconName; active?: boolean }[] = [
+  { label: "Overview", icon: "overview", active: true },
+  { label: "Students", icon: "students" },
+  { label: "Attendance", icon: "attendance" },
+  { label: "Results", icon: "results" },
+  { label: "Finance", icon: "finance" },
+];
+
+const COMMUNITY = [
+  { label: "Students", value: 486, tone: "teal" },
+  { label: "Parents", value: 412, tone: "blue" },
+  { label: "Teachers", value: 38, tone: "amber" },
+];
 
 export function ProductPreview() {
   const ref = useRef<HTMLDivElement>(null);
@@ -14,10 +26,10 @@ export function ProductPreview() {
   return (
     <motion.div
       ref={ref}
-      className="lp3-preview"
-      initial={reduce ? false : { opacity: 0, y: 24 }}
+      className="lp3-preview lp3-preview--real"
+      initial={reduce ? false : { opacity: 0, y: 20 }}
       animate={inView || reduce ? { opacity: 1, y: 0 } : {}}
-      transition={{ duration: 0.55, ease: "easeOut" }}
+      transition={{ duration: 0.5, ease: "easeOut" }}
     >
       <div className="lp3-preview__chrome">
         <div className="lp3-preview__dots" aria-hidden>
@@ -25,7 +37,10 @@ export function ProductPreview() {
           <span />
           <span />
         </div>
-        <span className="lp3-preview__url">admin.campusone.app</span>
+        <span className="lp3-preview__url">everest-youth.campusone.app/admin</span>
+        <span className="lp3-preview__notify" aria-hidden>
+          2
+        </span>
       </div>
 
       <div className="lp3-preview__body">
@@ -34,61 +49,108 @@ export function ProductPreview() {
             <span>C1</span>
             <div>
               <strong>Everest Youth</strong>
-              <em>Admin</em>
+              <em>Admin workspace</em>
             </div>
           </div>
           <ul>
-            {NAV.map((item, i) => (
-              <li key={item} className={i === 1 ? "is-active" : ""}>
-                {item}
+            {NAV.map((item) => (
+              <li key={item.label} className={item.active ? "is-active" : ""}>
+                <DashIcon name={item.icon} className="lp3-preview__nav-icon" />
+                {item.label}
               </li>
             ))}
           </ul>
         </aside>
 
         <div className="lp3-preview__main">
-          <header className="lp3-preview__head">
+          <div className="lp3-preview__dash-hero">
             <div>
-              <p>Students</p>
-              <h3>Admission roster</h3>
+              <p>Thursday, July 10</p>
+              <h3>Everest Youth Academy</h3>
             </div>
-            <span className="lp3-preview__pill">486 enrolled</span>
-          </header>
+            <div className="lp3-preview__hero-chips">
+              <span>2025/26 · Term 2</span>
+              <span className="lp3-preview__live">Live</span>
+            </div>
+          </div>
 
-          <div className="lp3-preview__metrics">
+          <div className="lp3-preview__kpis">
             <article>
-              <span>Present today</span>
-              <strong>94%</strong>
-              <div className="lp3-preview__bar">
-                <motion.div
-                  className="lp3-preview__bar-fill"
-                  initial={{ width: 0 }}
-                  animate={inView ? { width: "94%" } : { width: 0 }}
-                  transition={{ duration: 0.9, delay: 0.15 }}
-                />
+              <span className="lp3-preview__kpi-icon lp3-preview__kpi-icon--att">
+                <DashIcon name="attendance" className="lp3-preview__kpi-svg" />
+              </span>
+              <div>
+                <span>Attendance today</span>
+                <strong>94%</strong>
+                <em>412 marked · 28 absent</em>
               </div>
             </article>
             <article>
-              <span>Fees collected</span>
-              <strong>78%</strong>
+              <span className="lp3-preview__kpi-icon lp3-preview__kpi-icon--fin">
+                <DashIcon name="finance" className="lp3-preview__kpi-svg" />
+              </span>
+              <div>
+                <span>Collected</span>
+                <strong>1.2M ETB</strong>
+                <em>78% of expected</em>
+              </div>
             </article>
             <article>
-              <span>Report cards</span>
-              <strong>Term 2</strong>
+              <span className="lp3-preview__kpi-icon lp3-preview__kpi-icon--stu">
+                <DashIcon name="students" className="lp3-preview__kpi-svg" />
+              </span>
+              <div>
+                <span>Enrolled</span>
+                <strong>486</strong>
+                <em>Across 24 sections</em>
+              </div>
             </article>
           </div>
 
-          <div className="lp3-preview__chart" aria-hidden>
-            {BARS.map((h, i) => (
-              <motion.div
-                key={i}
-                className="lp3-preview__chart-bar"
-                style={{ height: `${h}%` }}
-                initial={reduce ? false : { scaleY: 0 }}
-                animate={inView ? { scaleY: 1 } : {}}
-                transition={{ delay: 0.1 + i * 0.04, duration: 0.35 }}
-              />
-            ))}
+          <div className="lp3-preview__widgets">
+            <article className="lp3-preview__widget">
+              <div className="lp3-preview__widget-head">
+                <strong>Fee collection</strong>
+                <span>Finance →</span>
+              </div>
+              <div className="lp3-preview__ring-wrap">
+                <div className="lp3-preview__ring" style={{ "--pct": "78" } as CSSProperties}>
+                  <span>78%</span>
+                </div>
+                <ul>
+                  <li>
+                    <span>Collected</span>
+                    <strong>940K ETB</strong>
+                  </li>
+                  <li>
+                    <span>Outstanding</span>
+                    <strong>260K ETB</strong>
+                  </li>
+                </ul>
+              </div>
+            </article>
+
+            <article className="lp3-preview__widget">
+              <div className="lp3-preview__widget-head">
+                <strong>Community</strong>
+                <span>Parents →</span>
+              </div>
+              <ul className="lp3-preview__community">
+                {COMMUNITY.map((row) => (
+                  <li key={row.label} className={`lp3-preview__community-row--${row.tone}`}>
+                    <span>{row.label}</span>
+                    <div className="lp3-preview__community-bar">
+                      <motion.i
+                        initial={{ width: 0 }}
+                        animate={inView ? { width: `${Math.min(100, (row.value / 486) * 100)}%` } : { width: 0 }}
+                        transition={{ duration: 0.7, delay: 0.2 }}
+                      />
+                    </div>
+                    <strong>{row.value}</strong>
+                  </li>
+                ))}
+              </ul>
+            </article>
           </div>
         </div>
       </div>

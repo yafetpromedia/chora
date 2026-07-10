@@ -1,5 +1,5 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { Plan, SchoolStatus, UserRole } from '@prisma/client';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Plan, PlatformRole, SchoolStatus, UserRole } from '@prisma/client';
 import { CurriculumCatalogService } from '../provisioning/curriculum-catalog.service';
 import { SchoolProvisioningService } from '../provisioning/school-provisioning.service';
 import { DEFAULT_CURRICULUM_PACKAGE_KEY } from '../provisioning/curriculum-packages.data';
@@ -223,6 +223,28 @@ export class PlatformService {
       select: { id: true, name: true, status: true },
     });
     return school;
+  }
+
+  async deleteTenantSchool(schoolId: string, role: PlatformRole) {
+    if (role !== PlatformRole.OWNER) {
+      throw new ForbiddenException('Only platform owners can remove tenants');
+    }
+
+    const school = await this.prisma.school.findUnique({
+      where: { id: schoolId },
+      select: { id: true, name: true },
+    });
+    if (!school) {
+      throw new NotFoundException('Tenant not found');
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.announcement.deleteMany({ where: { schoolId } });
+      await tx.user.deleteMany({ where: { schoolId } });
+      await tx.school.delete({ where: { id: schoolId } });
+    });
+
+    return { removed: true, id: schoolId, name: school.name };
   }
 
   async createTenantSchool(dto: CreateTenantSchoolDto) {

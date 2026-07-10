@@ -245,7 +245,6 @@ export function ParentsWorkspace() {
                     ) : (
                       <span className="par-v2__meta">No portal username</span>
                     )}
-                    <span className="par-v2__meta">{p.email}</span>
                   </td>
                   <td>
                     <code className="par-v2__username">{p.username || "—"}</code>
@@ -367,12 +366,13 @@ export function ParentsWorkspace() {
 
               <div className="par-v2__readonly">
                 <div>
-                  <span>Email on file</span>
-                  <strong>{manageTarget.email}</strong>
-                </div>
-                <div>
                   <span>Phone</span>
                   <strong>{manageTarget.phone ?? "—"}</strong>
+                </div>
+                <div>
+                  <span>Portal email</span>
+                  <strong>{manageTarget.email}</strong>
+                  <em>Not used for sign-in — parents use school code + username.</em>
                 </div>
               </div>
 

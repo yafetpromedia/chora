@@ -21,6 +21,10 @@ import { FayedaService } from '../fayeda/fayeda.service';
 import { AcademicEnrollmentService } from '../results/academic-enrollment.service';
 import { UsersService } from '../users/users.service';
 import { UpdateParentAccountDto } from './dto/update-parent-account.dto';
+import {
+  buildParentContactEmail,
+  isLegacyParentContactEmail,
+} from '../users/username.util';
 
 export type StudentRow = {
   firstName: string;
@@ -86,6 +90,14 @@ export class StudentsService {
   }
 
   async listParents(schoolId: string) {
+    const school = await this.prisma.school.findUnique({
+      where: { id: schoolId },
+      select: { joinCode: true },
+    });
+    if (!school) {
+      throw new NotFoundException('School not found');
+    }
+
     const parents = await this.prisma.user.findMany({
       where: { schoolId, role: UserRole.parent },
       include: {
@@ -111,6 +123,17 @@ export class StudentsService {
       },
       orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
     });
+
+    for (const p of parents) {
+      const expected = buildParentContactEmail(school.joinCode, p.username);
+      if (p.email !== expected && isLegacyParentContactEmail(p.email)) {
+        await this.prisma.user.update({
+          where: { id: p.id },
+          data: { email: expected },
+        });
+        p.email = expected;
+      }
+    }
 
     return parents.map((p) => ({
       userId: p.id,
@@ -170,14 +193,28 @@ export class StudentsService {
     dto: UpdateParentAccountDto,
   ) {
     const user = await this.getParentUser(schoolId, userId);
-    const data: { username?: string; passwordHash?: string } = {};
+    const school = await this.prisma.school.findUnique({
+      where: { id: schoolId },
+      select: { joinCode: true },
+    });
+    if (!school) {
+      throw new NotFoundException('School not found');
+    }
 
-    if (dto.username?.trim()) {
-      data.username = await this.usersService.assertUsernameAvailable(
-        schoolId,
-        dto.username,
-        userId,
-      );
+    const data: { username?: string; passwordHash?: string; email?: string } = {};
+    const nextUsername = dto.username?.trim()
+      ? await this.usersService.assertUsernameAvailable(
+          schoolId,
+          dto.username,
+          userId,
+        )
+      : undefined;
+
+    if (nextUsername) {
+      data.username = nextUsername;
+      data.email = buildParentContactEmail(school.joinCode, nextUsername);
+    } else if (isLegacyParentContactEmail(user.email)) {
+      data.email = buildParentContactEmail(school.joinCode, user.username);
     }
 
     if (dto.password?.trim()) {
@@ -1106,7 +1143,7 @@ export class StudentsService {
   }
 
   private async updateParentLink(
-    tx: Pick<PrismaService, 'user' | 'parentStudent'>,
+    tx: Pick<PrismaService, 'user' | 'parentStudent' | 'school'>,
     profile: Awaited<ReturnType<StudentsService['getOne']>>,
     index: number,
     fullName: string | undefined,
@@ -1165,19 +1202,24 @@ export class StudentsService {
   }
 
   private async linkParent(
-    tx: Pick<PrismaService, 'user' | 'parentStudent'>,
+    tx: Pick<PrismaService, 'user' | 'parentStudent' | 'school'>,
     schoolId: string,
     fullName: string,
     phone: string,
     studentProfileId: string,
     emailOverride?: string,
   ) {
+    const school = await tx.school.findUnique({
+      where: { id: schoolId },
+      select: { joinCode: true },
+    });
+    if (!school) {
+      throw new NotFoundException('School not found');
+    }
+
     const normalizedPhone = this.normalizePhone(phone);
     const [first, ...rest] = fullName.trim().split(/\s+/);
     const lastName = rest.join(' ') || 'Parent';
-    const email =
-      emailOverride?.toLowerCase().trim() ||
-      `${normalizedPhone.replace(/\D/g, '')}.${first.toLowerCase()}@parent.campusone.app`;
 
     let user = await tx.user.findFirst({
       where: { schoolId, phone: normalizedPhone, role: UserRole.parent },
@@ -1192,6 +1234,9 @@ export class StudentsService {
       );
       tempPassword = this.generateTempPassword();
       const parentUsername = `p${normalizedPhone.replace(/\D/g, '').slice(-12) || randomBytes(4).toString('hex')}`;
+      const email =
+        emailOverride?.toLowerCase().trim() ||
+        buildParentContactEmail(school.joinCode, parentUsername);
       user = await tx.user.create({
         data: {
           id: `u_${randomBytes(8).toString('hex')}`,
@@ -1206,9 +1251,17 @@ export class StudentsService {
         },
       });
     } else {
+      const email =
+        isLegacyParentContactEmail(user.email)
+          ? buildParentContactEmail(school.joinCode, user.username)
+          : undefined;
       await tx.user.update({
         where: { id: user.id },
-        data: { firstName: first, lastName },
+        data: {
+          firstName: first,
+          lastName,
+          ...(email ? { email } : {}),
+        },
       });
     }
 

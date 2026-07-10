@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -8,7 +9,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { PlatformInvoiceStatus } from '@prisma/client';
+import { PlatformInvoiceStatus, PlatformRole } from '@prisma/client';
 import { UpdatePlatformProfileDto } from './dto/update-platform-profile.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentPlatformUser } from '../common/decorators/current-platform-user.decorator';
@@ -269,6 +270,15 @@ export class PlatformController {
   @UseGuards(JwtAuthGuard, PlatformGuard)
   updateStatus(@Param('id') id: string, @Body() dto: UpdateSchoolStatusDto) {
     return this.platformService.updateSchoolStatus(id, dto.status);
+  }
+
+  @Delete('schools/:id')
+  @UseGuards(JwtAuthGuard, PlatformGuard)
+  deleteSchool(
+    @CurrentPlatformUser() user: PlatformAuthUser,
+    @Param('id') id: string,
+  ) {
+    return this.platformService.deleteTenantSchool(id, user.role);
   }
 
   @Get('plans')

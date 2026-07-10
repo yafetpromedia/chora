@@ -1,16 +1,28 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { DashboardPage } from "@/components/dashboard/dashboard-page";
+import {
+  AcademicsAlert,
+  AcademicsBadge,
+  AcademicsHero,
+} from "@/components/academics/academics-ui";
 import { AdminInvitePanel } from "@/components/auth/admin-invite-panel";
 import { PilotHandoutPanel } from "@/components/admin/pilot-handout-panel";
 import { TrialBanner } from "@/components/trial-banner";
+import { DashIcon } from "@/components/dashboard/dash-icons";
+import { DashboardPage } from "@/components/dashboard/dashboard-page";
 import {
   downloadAttendanceExport,
   type AttendanceMode,
 } from "@/lib/attendance";
+import { downloadFinanceExport } from "@/lib/finance";
+import {
+  downloadParentsReport,
+  downloadStudentsReport,
+  downloadTeachersReport,
+} from "@/lib/school-reports";
 import type { SchoolType } from "@/lib/api";
 import { getSchoolSubscription, type SubscriptionStatus } from "@/lib/api";
 import { SchoolLogoUpload } from "@/components/school/school-logo-upload";
@@ -40,12 +52,90 @@ const ATTENDANCE_MODES: {
   value: AttendanceMode;
   label: string;
   desc: string;
-  icon: string;
+  mark: string;
 }[] = [
-  { value: "DAILY", label: "Daily", desc: "Once per day — primary schools", icon: "☀️" },
-  { value: "PERIOD", label: "Period", desc: "Each class period", icon: "🕐" },
-  { value: "BOTH", label: "Both", desc: "Daily + period tracking", icon: "⚡" },
+  { value: "DAILY", label: "Daily", desc: "Once per day — primary schools", mark: "D" },
+  { value: "PERIOD", label: "Period", desc: "Each class period", mark: "P" },
+  { value: "BOTH", label: "Both", desc: "Daily + period tracking", mark: "B" },
 ];
+
+type ReportKind =
+  | "attendance"
+  | "finance"
+  | "students"
+  | "teachers"
+  | "parents";
+
+const REPORTS: {
+  id: ReportKind;
+  title: string;
+  desc: string;
+  tag: string;
+  tagClass?: string;
+  icon: "attendance" | "finance" | "students" | "teachers" | "users";
+  iconClass?: string;
+  usesRange?: boolean;
+}[] = [
+  {
+    id: "attendance",
+    title: "Attendance records",
+    desc: "Daily and period marks for the selected date range.",
+    tag: "Date range",
+    tagClass: "set-v2__report-tag--range",
+    icon: "attendance",
+    iconClass: "set-v2__report-icon--attendance",
+    usesRange: true,
+  },
+  {
+    id: "finance",
+    title: "Fee payments",
+    desc: "Collections, allocations, and payment activity.",
+    tag: "Date range",
+    tagClass: "set-v2__report-tag--range",
+    icon: "finance",
+    iconClass: "set-v2__report-icon--finance",
+    usesRange: true,
+  },
+  {
+    id: "students",
+    title: "Student roster",
+    desc: "All enrolled students with grade, contact, and parent info.",
+    tag: "Snapshot",
+    icon: "students",
+    iconClass: "set-v2__report-icon--people",
+  },
+  {
+    id: "teachers",
+    title: "Teachers & staff",
+    desc: "Staff directory with homeroom and teaching assignments.",
+    tag: "Snapshot",
+    icon: "teachers",
+    iconClass: "set-v2__report-icon--people",
+  },
+  {
+    id: "parents",
+    title: "Parent accounts",
+    desc: "Linked parent logins and their children.",
+    tag: "Snapshot",
+    icon: "users",
+    iconClass: "set-v2__report-icon--people",
+  },
+];
+
+const TABS: { id: Tab; label: string; icon: "settings" | "attendance" | "users" | "finance" }[] = [
+  { id: "school", label: "School profile", icon: "settings" },
+  { id: "attendance", label: "Attendance", icon: "attendance" },
+  { id: "access", label: "Access & invites", icon: "users" },
+  { id: "plan", label: "Plan & reports", icon: "finance" },
+];
+
+function schoolTypeLabel(value: SchoolType | null) {
+  return SCHOOL_TYPES.find((t) => t.value === value)?.label ?? "Mixed";
+}
+
+function attendanceLabel(mode: AttendanceMode) {
+  return ATTENDANCE_MODES.find((m) => m.value === mode)?.label ?? mode;
+}
 
 export default function AdminSettingsPage() {
   const router = useRouter();
@@ -77,6 +167,7 @@ export default function AdminSettingsPage() {
     return d.toISOString().slice(0, 10);
   });
   const [exportTo, setExportTo] = useState(() => new Date().toISOString().slice(0, 10));
+  const [exportingReport, setExportingReport] = useState<ReportKind | null>(null);
 
   function applySchool(s: SchoolSettings) {
     setSchool(s);
@@ -111,10 +202,18 @@ export default function AdminSettingsPage() {
       .finally(() => setLoading(false));
   }, [router]);
 
+  const heroSubtitle = useMemo(() => {
+    if (!school) {
+      return "Configure your school profile, attendance rules, access, and subscription.";
+    }
+    return `${schoolTypeLabel(school.schoolType)} · ${attendanceLabel(school.attendanceMode)} attendance · Join code ${school.joinCode}`;
+  }, [school]);
+
   async function onSaveSchool(e: FormEvent) {
     e.preventDefault();
     setSaving(true);
     setError("");
+    setToast(null);
     try {
       const updated = await updateSchoolSettings({
         name: name.trim(),
@@ -145,6 +244,7 @@ export default function AdminSettingsPage() {
   async function onSaveAttendanceMode(mode: AttendanceMode) {
     setAttendanceMode(mode);
     setError("");
+    setToast(null);
     try {
       const updated = await updateSchoolSettings({ attendanceMode: mode });
       applySchool(updated);
@@ -161,28 +261,79 @@ export default function AdminSettingsPage() {
     window.setTimeout(() => setCodeCopied(false), 2000);
   }
 
-  if (loading) {
-    return (
-      <DashboardPage role="admin" title="Settings" subtitle="Loading school configuration…">
-        <p className="setup-hint">Loading…</p>
-      </DashboardPage>
-    );
+  async function runReport(kind: ReportKind) {
+    setExportingReport(kind);
+    setError("");
+    setToast(null);
+    try {
+      if (kind === "attendance") {
+        await downloadAttendanceExport(exportFrom, exportTo);
+        setToast("Attendance report downloaded.");
+      } else if (kind === "finance") {
+        await downloadFinanceExport(exportFrom, exportTo);
+        setToast("Fee payments report downloaded.");
+      } else if (kind === "students") {
+        await downloadStudentsReport();
+        setToast("Student roster downloaded.");
+      } else if (kind === "teachers") {
+        await downloadTeachersReport();
+        setToast("Teachers & staff report downloaded.");
+      } else if (kind === "parents") {
+        await downloadParentsReport();
+        setToast("Parent accounts report downloaded.");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Export failed");
+    } finally {
+      setExportingReport(null);
+    }
   }
 
+  const planShortLabel = subscription?.planLabel?.split(" ")[0] ?? "Plan";
+
   return (
-    <DashboardPage
-      role="admin"
-      title="Settings"
-      eyebrow="Configuration"
-    >
-      <div className="cfg-page">
-        {error ? <p className="cfg-toast cfg-toast--error">{error}</p> : null}
+    <DashboardPage role="admin" title="Settings">
+      <div className="set-v2">
+        <AcademicsHero
+          title={loading ? "School settings" : school?.name ?? "School settings"}
+          subtitle={heroSubtitle}
+          stats={[
+            {
+              label: "Plan",
+              value: loading ? "—" : subscription?.planLabel ?? "—",
+            },
+            {
+              label: "Attendance",
+              value: loading ? "—" : attendanceLabel(attendanceMode),
+            },
+            {
+              label: "Join code",
+              value: loading ? "—" : school?.joinCode ?? "—",
+            },
+            {
+              label: "Setup",
+              value: loading ? "—" : school?.setupComplete ? "Complete" : "In progress",
+            },
+          ]}
+          badges={
+            school ? (
+              <>
+                <AcademicsBadge variant="live">{schoolTypeLabel(school.schoolType)}</AcademicsBadge>
+                {subscription?.plan === "TRIAL" ? (
+                  <span className="set-v2__hero-badge">Trial active</span>
+                ) : null}
+              </>
+            ) : undefined
+          }
+        />
+
+        {error ? <AcademicsAlert tone="error">{error}</AcademicsAlert> : null}
         {toast ? (
-          <p className="cfg-toast" role="status">
+          <p className="set-v2__alert set-v2__alert--ok" role="status">
             {toast}
             <button
               type="button"
-              style={{ marginLeft: "0.75rem", fontWeight: 700, background: "none", border: "none", cursor: "pointer" }}
+              className="set-v2__alert-dismiss"
               onClick={() => setToast(null)}
             >
               Dismiss
@@ -190,32 +341,43 @@ export default function AdminSettingsPage() {
           </p>
         ) : null}
 
-        <nav className="cfg-tabs" aria-label="Settings sections">
-          {(
-            [
-              ["school", "School profile"],
-              ["attendance", "Attendance"],
-              ["access", "Access & invites"],
-              ["plan", "Plan & reports"],
-            ] as const
-          ).map(([id, label]) => (
-            <button
-              key={id}
-              type="button"
-              className={`cfg-tab${tab === id ? " cfg-tab--active" : ""}`}
-              onClick={() => setTab(id)}
-            >
-              {label}
-            </button>
-          ))}
-        </nav>
+        <div className="set-v2__toolbar">
+          <nav className="set-v2__tabs" aria-label="Settings sections">
+            {TABS.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className={`set-v2__tab${tab === item.id ? " set-v2__tab--active" : ""}`}
+                onClick={() => setTab(item.id)}
+              >
+                <DashIcon name={item.icon} className="dash-icon--sm" />
+                {item.label}
+              </button>
+            ))}
+          </nav>
+        </div>
 
-        {tab === "school" && (
-          <section className="cfg-section">
-            <h2 className="cfg-section__title">School profile</h2>
-            <p className="cfg-section__lead">
-              This name appears on your admin dashboard, reports, and parent communications.
-            </p>
+        {loading ? (
+          <div className="set-v2__loading" aria-busy="true">
+            <span className="set-v2__loading-spinner" aria-hidden />
+            <p>Loading school configuration…</p>
+          </div>
+        ) : null}
+
+        {!loading && tab === "school" ? (
+          <section className="set-v2__panel">
+            <div className="set-v2__panel-head">
+              <span className="set-v2__panel-icon" aria-hidden>
+                <DashIcon name="settings" className="dash-icon--sm" />
+              </span>
+              <div>
+                <h2 className="set-v2__panel-title">School profile</h2>
+                <p className="set-v2__panel-sub">
+                  This name appears on your admin dashboard, reports, and parent communications.
+                </p>
+              </div>
+            </div>
+
             <form className="cfg-form" onSubmit={onSaveSchool}>
               <div className="cfg-field">
                 <label htmlFor="cfg-name">School name</label>
@@ -281,10 +443,9 @@ export default function AdminSettingsPage() {
                   />
                 </div>
               </div>
-              <h3 className="setup-panel-label" style={{ marginTop: "1.25rem" }}>
-                Bank account (parent fee payments)
-              </h3>
-              <p className="cfg-section__lead">
+
+              <h3 className="set-v2__subhead">Bank account (parent fee payments)</h3>
+              <p className="set-v2__panel-sub" style={{ marginBottom: "0.85rem" }}>
                 Shown to parents when they pay by bank transfer. Telebirr / Chapa can be added later.
               </p>
               <div className="cfg-field">
@@ -338,27 +499,35 @@ export default function AdminSettingsPage() {
               </div>
             </form>
           </section>
-        )}
+        ) : null}
 
-        {tab === "attendance" && (
-          <section className="cfg-section">
-            <h2 className="cfg-section__title">Attendance mode</h2>
-            <p className="cfg-section__lead">
-              Controls how teachers mark attendance. Changes apply to all classes immediately.
-            </p>
-            <div className="att-mode-grid">
+        {!loading && tab === "attendance" ? (
+          <section className="set-v2__panel">
+            <div className="set-v2__panel-head">
+              <span className="set-v2__panel-icon set-v2__panel-icon--attendance" aria-hidden>
+                <DashIcon name="attendance" className="dash-icon--sm" />
+              </span>
+              <div>
+                <h2 className="set-v2__panel-title">Attendance mode</h2>
+                <p className="set-v2__panel-sub">
+                  Controls how teachers mark attendance. Changes apply to all classes immediately.
+                </p>
+              </div>
+            </div>
+
+            <div className="set-v2__mode-grid">
               {ATTENDANCE_MODES.map((m) => (
                 <button
                   key={m.value}
                   type="button"
-                  className={`att-mode-card${attendanceMode === m.value ? " att-mode-card--active" : ""}`}
+                  className={`set-v2__mode-card${attendanceMode === m.value ? " set-v2__mode-card--active" : ""}`}
                   onClick={() => void onSaveAttendanceMode(m.value)}
                 >
-                  <span className="att-mode-card__icon" aria-hidden>
-                    {m.icon}
+                  <span className="set-v2__mode-mark" aria-hidden>
+                    {m.mark}
                   </span>
-                  <span className="att-mode-card__title">{m.label}</span>
-                  <span className="att-mode-card__desc">{m.desc}</span>
+                  <span className="set-v2__mode-title">{m.label}</span>
+                  <span className="set-v2__mode-desc">{m.desc}</span>
                 </button>
               ))}
             </div>
@@ -367,82 +536,157 @@ export default function AdminSettingsPage() {
               <Link href="/admin/attendance">Attendance → Mark</Link>.
             </p>
           </section>
-        )}
+        ) : null}
 
-        {tab === "access" && school && (
-          <>
-            <section className="cfg-section">
-              <h2 className="cfg-section__title">School join code</h2>
-              <p className="cfg-section__lead">
-                Teachers, students, and parents enter this at{" "}
-                <Link href="/join">/join</Link> to connect to your school.
-              </p>
-              <div className="cfg-code-box">
-                <code className="cfg-code">{school.joinCode}</code>
+        {!loading && tab === "access" && school ? (
+          <div className="set-v2__stack">
+            <section className="set-v2__panel">
+              <div className="set-v2__panel-head">
+                <span className="set-v2__panel-icon set-v2__panel-icon--access" aria-hidden>
+                  <DashIcon name="users" className="dash-icon--sm" />
+                </span>
+                <div>
+                  <h2 className="set-v2__panel-title">School join code</h2>
+                  <p className="set-v2__panel-sub">
+                    Teachers, students, and parents enter this at{" "}
+                    <Link href="/join">/join</Link> to connect to your school.
+                  </p>
+                </div>
+              </div>
+              <div className="set-v2__code-box">
+                <code className="set-v2__code">{school.joinCode}</code>
                 <button type="button" className="cfg-btn cfg-btn--ghost" onClick={copyJoinCode}>
                   {codeCopied ? "Copied!" : "Copy code"}
                 </button>
               </div>
-              <p className="cfg-hint">Join code cannot be changed — share invitation links below for more control.</p>
-            </section>
-            <section className="cfg-section">
-              <h2 className="cfg-section__title">Invitation links</h2>
-              <p className="cfg-section__lead">
-                Create role-specific links for teachers, students, or parents.
+              <p className="cfg-hint" style={{ marginTop: "0.75rem" }}>
+                Join code cannot be changed — share invitation links below for more control.
               </p>
+            </section>
+
+            <section className="set-v2__panel">
+              <div className="set-v2__panel-head">
+                <span className="set-v2__panel-icon set-v2__panel-icon--access" aria-hidden>
+                  <DashIcon name="users" className="dash-icon--sm" />
+                </span>
+                <div>
+                  <h2 className="set-v2__panel-title">Invitation links</h2>
+                  <p className="set-v2__panel-sub">
+                    Create role-specific links for teachers, students, or parents.
+                  </p>
+                </div>
+              </div>
               <AdminInvitePanel />
             </section>
-            <PilotHandoutPanel
-              schoolName={school.name}
-              joinCode={school.joinCode}
-            />
-          </>
-        )}
 
-        {tab === "plan" && (
-          <>
+            <PilotHandoutPanel schoolName={school.name} joinCode={school.joinCode} />
+          </div>
+        ) : null}
+
+        {!loading && tab === "plan" ? (
+          <div className="set-v2__stack">
             {subscription ? <TrialBanner subscription={subscription} /> : null}
-            <section className="cfg-section">
-              <h2 className="cfg-section__title">Subscription</h2>
-              <p className="cfg-section__lead">
-                Current plan: <strong>{subscription?.plan ?? "—"}</strong>
-                {subscription?.daysRemaining != null
-                  ? ` · ${subscription.daysRemaining} days remaining on trial`
-                  : ""}
-              </p>
-              <div className="cfg-link-row">
+
+            <section className="set-v2__panel">
+              <div className="set-v2__panel-head">
+                <span className="set-v2__panel-icon set-v2__panel-icon--plan" aria-hidden>
+                  <DashIcon name="finance" className="dash-icon--sm" />
+                </span>
+                <div>
+                  <h2 className="set-v2__panel-title">CampusOne subscription</h2>
+                  <p className="set-v2__panel-sub">
+                    Your school plan, billing, and seat limits.
+                  </p>
+                </div>
+              </div>
+              <div className="set-v2__plan-row">
+                <div className="set-v2__plan-main">
+                  <span className="set-v2__plan-badge">{planShortLabel}</span>
+                  <div>
+                    <p className="set-v2__plan-label">{subscription?.planLabel ?? "—"}</p>
+                    <p className="set-v2__plan-meta">
+                      {subscription?.daysRemaining != null
+                        ? `${subscription.daysRemaining} days remaining on trial`
+                        : "Active school subscription"}
+                      {subscription
+                        ? ` · ${subscription.usage.students} students · ${subscription.usage.teachers} teachers`
+                        : ""}
+                    </p>
+                  </div>
+                </div>
                 <Link href="/admin/billing" className="cfg-btn cfg-btn--primary">
-                  Upgrade plan
+                  Manage billing
                 </Link>
               </div>
             </section>
-            <section className="cfg-section">
-              <h2 className="cfg-section__title">Attendance export</h2>
-              <p className="cfg-section__lead">Download attendance records as CSV for Excel.</p>
-              <div className="att-export-row">
-                <label className="att-field">
-                  <span>From</span>
-                  <input type="date" value={exportFrom} onChange={(e) => setExportFrom(e.target.value)} />
-                </label>
-                <label className="att-field">
-                  <span>To</span>
-                  <input type="date" value={exportTo} onChange={(e) => setExportTo(e.target.value)} />
-                </label>
-                <button
-                  type="button"
-                  className="cfg-btn cfg-btn--primary"
-                  onClick={() =>
-                    void downloadAttendanceExport(exportFrom, exportTo).catch((err) =>
-                      setError(err instanceof Error ? err.message : "Export failed"),
-                    )
-                  }
-                >
-                  Download CSV
-                </button>
+
+            <section className="set-v2__panel">
+              <div className="set-v2__panel-head">
+                <span className="set-v2__panel-icon set-v2__panel-icon--access" aria-hidden>
+                  <DashIcon name="chart" className="dash-icon--sm" />
+                </span>
+                <div>
+                  <h2 className="set-v2__panel-title">School reports & exports</h2>
+                  <p className="set-v2__panel-sub">
+                    Download CSV files for attendance, finance, students, teachers, and parents.
+                  </p>
+                </div>
+              </div>
+
+              <div className="set-v2__report-range">
+                <div>
+                  <p className="set-v2__report-range-label">Report period</p>
+                  <div className="set-v2__export-row">
+                    <label className="att-field">
+                      <span>From</span>
+                      <input
+                        type="date"
+                        value={exportFrom}
+                        onChange={(e) => setExportFrom(e.target.value)}
+                      />
+                    </label>
+                    <label className="att-field">
+                      <span>To</span>
+                      <input
+                        type="date"
+                        value={exportTo}
+                        onChange={(e) => setExportTo(e.target.value)}
+                      />
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <div className="set-v2__report-grid">
+                {REPORTS.map((report) => (
+                  <button
+                    key={report.id}
+                    type="button"
+                    className="set-v2__report-card"
+                    disabled={exportingReport != null}
+                    onClick={() => void runReport(report.id)}
+                  >
+                    <span
+                      className={`set-v2__report-icon ${report.iconClass ?? ""}`.trim()}
+                      aria-hidden
+                    >
+                      <DashIcon name={report.icon} className="dash-icon--sm" />
+                    </span>
+                    <span className="set-v2__report-body">
+                      <strong className="set-v2__report-title">
+                        {exportingReport === report.id ? "Preparing…" : report.title}
+                      </strong>
+                      <span className="set-v2__report-desc">{report.desc}</span>
+                    </span>
+                    <span className={`set-v2__report-tag ${report.tagClass ?? ""}`.trim()}>
+                      {report.tag}
+                    </span>
+                  </button>
+                ))}
               </div>
             </section>
-          </>
-        )}
+          </div>
+        ) : null}
       </div>
     </DashboardPage>
   );

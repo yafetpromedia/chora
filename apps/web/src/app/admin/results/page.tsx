@@ -26,7 +26,7 @@ export default function AdminResultsPage() {
   }, [router]);
 
   return (
-    <DashboardPage role="admin" title="Results" eyebrow="Academics">
+    <DashboardPage role="admin" title="Results">
       <Suspense
         fallback={
           <div className="res-scores-loading" style={{ padding: "2rem" }}>

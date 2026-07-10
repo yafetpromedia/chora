@@ -38,11 +38,47 @@ function homeroomLine(h: TeacherRecord["homeroom"]) {
   return `${h.gradeName}${h.sectionName ? ` · ${h.sectionName}` : ""}`;
 }
 
-function assignSubjectsHref(teacher: TeacherRecord) {
+function teachingSlotClass(slot: TeacherRecord["teachingSlots"][0]) {
+  return slot.sectionName ? `${slot.gradeName} · ${slot.sectionName}` : slot.gradeName;
+}
+
+function assignSlotHref(
+  teacher: TeacherRecord,
+  slot: TeacherRecord["teachingSlots"][0],
+  grades: GradeWithSections[],
+) {
   const q = new URLSearchParams();
+  q.set("teacherId", teacher.userId);
+  const grade = grades.find((g) => g.name === slot.gradeName);
+  if (grade) {
+    q.set("gradeId", grade.id);
+    if (slot.sectionName) {
+      const section = grade.sections.find((s) => s.name === slot.sectionName);
+      if (section) q.set("sectionId", section.id);
+    }
+  } else if (teacher.homeroom?.gradeId) {
+    q.set("gradeId", teacher.homeroom.gradeId);
+    if (teacher.homeroom.sectionId) q.set("sectionId", teacher.homeroom.sectionId);
+  }
+  return `/admin/subjects/assign?${q}`;
+}
+
+function assignSubjectsHref(teacher: TeacherRecord, grades: GradeWithSections[]) {
+  const q = new URLSearchParams();
+  q.set("teacherId", teacher.userId);
   if (teacher.homeroom?.gradeId) q.set("gradeId", teacher.homeroom.gradeId);
   if (teacher.homeroom?.sectionId) q.set("sectionId", teacher.homeroom.sectionId);
-  q.set("teacherId", teacher.userId);
+  if (!teacher.homeroom?.gradeId && teacher.teachingSlots[0]) {
+    const first = teacher.teachingSlots[0];
+    const grade = grades.find((g) => g.name === first.gradeName);
+    if (grade) {
+      q.set("gradeId", grade.id);
+      if (first.sectionName) {
+        const section = grade.sections.find((s) => s.name === first.sectionName);
+        if (section) q.set("sectionId", section.id);
+      }
+    }
+  }
   return `/admin/subjects/assign?${q}`;
 }
 
@@ -50,23 +86,6 @@ function roleLabel(t: TeacherRecord) {
   return (
     t.roleTemplateName ??
     (t.roleTemplateSlug ? ROLE_TEMPLATE_LABELS[t.roleTemplateSlug] : "Teacher")
-  );
-}
-
-function SubjectSlots({ slots }: { slots: TeacherRecord["teachingSlots"] }) {
-  if (!slots?.length) return <span className="tch-v2__muted">No subjects yet</span>;
-  return (
-    <ul className="tch-v2__slots">
-      {slots.map((slot, i) => (
-        <li key={`${slot.gradeName}-${slot.subjectName}-${i}`}>
-          <span className="tch-v2__badge tch-v2__badge--subject">{slot.subjectName}</span>
-          <span className="tch-v2__muted">
-            {slot.gradeName}
-            {slot.sectionName ? ` · ${slot.sectionName}` : ""}
-          </span>
-        </li>
-      ))}
-    </ul>
   );
 }
 
@@ -78,6 +97,9 @@ export function TeachersWorkspace() {
   const [error, setError] = useState("");
   const [toast, setToast] = useState("");
   const [search, setSearch] = useState("");
+  const [roleFilter, setRoleFilter] = useState("");
+  const [gradeFilter, setGradeFilter] = useState("");
+  const [sectionFilter, setSectionFilter] = useState("");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<TeacherRecord | null>(null);
   const [busy, setBusy] = useState(false);
@@ -95,22 +117,62 @@ export function TeachersWorkspace() {
   const homeroomNeedsSection = hasHomeroom && (homeroomGrade?.sections.length ?? 0) > 0;
 
   const homeroomCount = people.filter((t) => t.homeroom).length;
-  const subjectsCount = people.filter((t) => (t.teachingSlots?.length ?? 0) > 0).length;
+  const subjectTeacherCount = people.filter((t) => t.roleTemplateSlug === "subject_teacher").length;
+
+  const filterGrade = grades.find((g) => g.id === gradeFilter);
+  const hasFilterSections = (filterGrade?.sections.length ?? 0) > 0;
+
+  const teacherRoles = useMemo(
+    () =>
+      templates
+        .filter((tpl) => (TEACHER_ROLE_SLUGS as readonly string[]).includes(tpl.slug))
+        .map((tpl) => ({ slug: tpl.slug, name: tpl.name })),
+    [templates],
+  );
+
+  const hasActiveFilters =
+    Boolean(search.trim()) ||
+    Boolean(roleFilter) ||
+    Boolean(gradeFilter) ||
+    Boolean(sectionFilter);
 
   const filtered = useMemo(() => {
+    let rows = people;
     const q = search.trim().toLowerCase();
-    if (!q) return people;
-    return people.filter(
-      (t) =>
-        displayName(t).toLowerCase().includes(q) ||
-        t.email.toLowerCase().includes(q) ||
-        (t.teacherId ?? "").toLowerCase().includes(q) ||
-        (t.homeroom?.gradeName ?? "").toLowerCase().includes(q) ||
-        (t.teachingSlots ?? []).some((s) =>
-          `${s.gradeName} ${s.subjectName}`.toLowerCase().includes(q),
-        ),
-    );
-  }, [people, search]);
+
+    if (q) {
+      rows = rows.filter(
+        (t) =>
+          displayName(t).toLowerCase().includes(q) ||
+          t.email.toLowerCase().includes(q) ||
+          (t.teacherId ?? "").toLowerCase().includes(q) ||
+          (t.homeroom?.gradeName ?? "").toLowerCase().includes(q) ||
+          (t.homeroom?.sectionName ?? "").toLowerCase().includes(q) ||
+          roleLabel(t).toLowerCase().includes(q),
+      );
+    }
+
+    if (roleFilter) {
+      rows = rows.filter((t) => t.roleTemplateSlug === roleFilter);
+    }
+
+    if (gradeFilter) {
+      rows = rows.filter((t) => t.homeroom?.gradeId === gradeFilter);
+    }
+
+    if (sectionFilter && gradeFilter) {
+      rows = rows.filter((t) => t.homeroom?.sectionId === sectionFilter);
+    }
+
+    return rows;
+  }, [people, search, roleFilter, gradeFilter, sectionFilter]);
+
+  function clearFilters() {
+    setSearch("");
+    setRoleFilter("");
+    setGradeFilter("");
+    setSectionFilter("");
+  }
 
   async function load() {
     setLoading(true);
@@ -132,6 +194,12 @@ export function TeachersWorkspace() {
   useEffect(() => {
     void Promise.all([load(), listGrades().then(setGrades)]).catch(() => undefined);
   }, []);
+
+  useEffect(() => {
+    if (!editTarget) return;
+    const fresh = people.find((p) => p.userId === editTarget.userId);
+    if (fresh) setEditTarget(fresh);
+  }, [people, editTarget?.userId]);
 
   function resetForm() {
     setEmail("");
@@ -229,20 +297,18 @@ export function TeachersWorkspace() {
   function renderActions(t: TeacherRecord, compact?: boolean) {
     return (
       <div className={`tch-v2__actions${compact ? " tch-v2__actions--compact" : ""}`}>
-        <button type="button" className="tch-v2__action" onClick={() => openEdit(t)}>
-          Homeroom
+        <button type="button" className="tch-v2__action" onClick={() => openEdit(t)} title="Edit homeroom">
+          Edit
         </button>
-        <Link href={assignSubjectsHref(t)} className="tch-v2__action tch-v2__action--primary">
-          Subjects
-        </Link>
         {t.teacherId ? (
           <a
             href={`/print/teacher-id-card?userId=${t.userId}&duplex=1`}
             className="tch-v2__action"
             target="_blank"
             rel="noreferrer"
+            title="Print ID card"
           >
-            ID card
+            ID
           </a>
         ) : null}
         <button
@@ -250,8 +316,9 @@ export function TeachersWorkspace() {
           className="tch-v2__action tch-v2__action--danger"
           disabled={busy}
           onClick={() => void onRemove(t)}
+          title="Remove teacher"
         >
-          Remove
+          ×
         </button>
       </div>
     );
@@ -275,9 +342,13 @@ export function TeachersWorkspace() {
         <div className="tch-v2__hero-inner">
           <div className="tch-v2__hero-main">
             <span className="tch-v2__chip">Faculty</span>
-            <h2 className="tch-v2__hero-title">Teachers &amp; homeroom</h2>
+            <h2 className="tch-v2__hero-title">Teachers</h2>
             <p className="tch-v2__hero-sub">
-              Add staff, assign homeroom classes, then link subject teaching per grade.
+              Add staff and homeroom classes. Subject teaching lives on{" "}
+              <Link href="/admin/subjects/assign" className="tch-v2__hero-link">
+                Assign subjects
+              </Link>
+              .
             </p>
           </div>
           <div className="tch-v2__hero-stats">
@@ -290,8 +361,8 @@ export function TeachersWorkspace() {
               <span>Homeroom</span>
             </div>
             <div className="tch-v2__stat">
-              <strong>{subjectsCount}</strong>
-              <span>Teaching</span>
+              <strong>{subjectTeacherCount}</strong>
+              <span>Subject</span>
             </div>
             <div className="tch-v2__stat tch-v2__stat--accent">
               <strong>{filtered.length}</strong>
@@ -308,12 +379,61 @@ export function TeachersWorkspace() {
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search name, email, class, subject…"
+            placeholder="Search name, email, ID, homeroom…"
           />
         </label>
+        <select
+          className="tch-v2__filter"
+          value={roleFilter}
+          onChange={(e) => setRoleFilter(e.target.value)}
+          aria-label="Filter by role"
+        >
+          <option value="">All roles</option>
+          {teacherRoles.map((r) => (
+            <option key={r.slug} value={r.slug}>
+              {r.name}
+            </option>
+          ))}
+        </select>
+        <select
+          className="tch-v2__filter"
+          value={gradeFilter}
+          onChange={(e) => {
+            setGradeFilter(e.target.value);
+            setSectionFilter("");
+          }}
+          aria-label="Filter by grade"
+        >
+          <option value="">All grades</option>
+          {grades.map((g) => (
+            <option key={g.id} value={g.id}>
+              {g.name}
+            </option>
+          ))}
+        </select>
+        {hasFilterSections ? (
+          <select
+            className="tch-v2__filter"
+            value={sectionFilter}
+            onChange={(e) => setSectionFilter(e.target.value)}
+            aria-label="Filter by section"
+          >
+            <option value="">All sections</option>
+            {filterGrade?.sections.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        ) : null}
         <div className="tch-v2__toolbar-actions">
+          {hasActiveFilters ? (
+            <button type="button" className="tch-v2__btn tch-v2__btn--ghost" onClick={clearFilters}>
+              Clear filters
+            </button>
+          ) : null}
           <Link href="/admin/subjects/assign" className="tch-v2__btn tch-v2__btn--ghost">
-            Subject assignment
+            Assign subjects
           </Link>
           <Link href="/admin/teachers/cards" className="tch-v2__btn tch-v2__btn--ghost">
             ID cards
@@ -322,6 +442,9 @@ export function TeachersWorkspace() {
             + Add teacher
           </button>
         </div>
+        <p className="tch-v2__toolbar-meta">
+          {filtered.length} of {people.length} shown
+        </p>
       </div>
 
       {loading ? (
@@ -335,8 +458,8 @@ export function TeachersWorkspace() {
           <h3>{people.length === 0 ? "No teachers yet" : "No matches"}</h3>
           <p>
             {people.length === 0
-              ? "Add your first teacher, then assign homeroom and subjects."
-              : "Try a different search term."}
+              ? "Add your first teacher, then set homeroom."
+              : "Try different search or filter settings."}
           </p>
           {people.length === 0 ? (
             <button type="button" className="tch-v2__btn tch-v2__btn--primary" onClick={openCreate}>
@@ -352,41 +475,38 @@ export function TeachersWorkspace() {
                 <tr>
                   <th>Teacher</th>
                   <th>Homeroom</th>
-                  <th>Subject classes</th>
                   <th aria-label="Actions" />
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((t) => (
-                  <tr key={t.userId}>
-                    <td>
+                  <tr key={t.userId} className="tch-v2__row">
+                    <td className="tch-v2__cell tch-v2__cell--teacher">
                       <div className="tch-v2__teacher">
                         <span className="tch-v2__avatar" aria-hidden>
                           {initials(displayName(t))}
                         </span>
-                        <div>
+                        <div className="tch-v2__teacher-line">
                           <strong className="tch-v2__name">{displayName(t)}</strong>
-                          <span className="tch-v2__meta">
-                            {t.teacherId ? `${t.teacherId} · ` : ""}
-                            {t.email}
-                          </span>
                           <span className="tch-v2__badge tch-v2__badge--role">{roleLabel(t)}</span>
+                          {t.teacherId ? (
+                            <code className="tch-v2__id" title={t.email}>
+                              {t.teacherId}
+                            </code>
+                          ) : null}
                         </div>
                       </div>
                     </td>
-                    <td>
+                    <td className="tch-v2__cell tch-v2__cell--homeroom">
                       {t.homeroom ? (
-                        <span className="tch-v2__badge tch-v2__badge--homeroom">
+                        <span className="tch-v2__chip tch-v2__chip--homeroom">
                           {homeroomLine(t.homeroom)}
                         </span>
                       ) : (
-                        <span className="tch-v2__muted">Not assigned</span>
+                        <span className="tch-v2__dash">—</span>
                       )}
                     </td>
-                    <td>
-                      <SubjectSlots slots={t.teachingSlots} />
-                    </td>
-                    <td>{renderActions(t)}</td>
+                    <td className="tch-v2__cell tch-v2__cell--actions">{renderActions(t)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -419,10 +539,6 @@ export function TeachersWorkspace() {
                     <span className="tch-v2__muted">Not assigned</span>
                   )}
                 </div>
-                <div className="tch-v2__card-block">
-                  <span className="tch-v2__card-label">Subject classes</span>
-                  <SubjectSlots slots={t.teachingSlots} />
-                </div>
                 {renderActions(t, true)}
               </article>
             ))}
@@ -452,8 +568,8 @@ export function TeachersWorkspace() {
                 </h2>
                 <p className="stu-drawer__sub">
                   {editTarget
-                    ? "Update homeroom. Subject classes are set per grade on Subject assignment."
-                    : "Create the account, then set homeroom and subject classes."}
+                    ? "Update role and homeroom. Subject classes are listed below."
+                    : "Create the account, then set homeroom."}
                 </p>
               </div>
               <button
@@ -612,18 +728,33 @@ export function TeachersWorkspace() {
               </section>
 
               {editTarget ? (
-                <section className="tch-drawer-section tch-drawer-section--link">
-                  <h3 className="tch-drawer-section__title">Subject teaching</h3>
-                  <p className="tch-meta">
-                    Assign Math, Science, etc. for each grade on the subject assignment board.
-                  </p>
-                  <Link
-                    href={assignSubjectsHref(editTarget)}
-                    className="att-btn att-btn--primary"
-                    onClick={() => setDrawerOpen(false)}
-                  >
-                    Open subject assignment
-                  </Link>
+                <section className="tch-drawer-section tch-drawer-section--slots">
+                  <div className="tch-drawer-section__head">
+                    <h3 className="tch-drawer-section__title">Subjects teaching</h3>
+                    <Link
+                      href={assignSubjectsHref(editTarget, grades)}
+                      className="tch-drawer-section__link"
+                    >
+                      Assign subjects
+                    </Link>
+                  </div>
+                  {editTarget.teachingSlots.length === 0 ? (
+                    <p className="tch-meta">No subjects assigned yet.</p>
+                  ) : (
+                    <ul className="tch-drawer-slots">
+                      {editTarget.teachingSlots.map((slot, i) => (
+                        <li key={`${slot.subjectName}-${slot.gradeName}-${slot.sectionName ?? ""}-${i}`}>
+                          <Link
+                            href={assignSlotHref(editTarget, slot, grades)}
+                            className="tch-drawer-slot"
+                          >
+                            <strong>{slot.subjectName}</strong>
+                            <span>{teachingSlotClass(slot)}</span>
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </section>
               ) : null}
 

@@ -19,7 +19,7 @@ export default function AdminSubjectsPage() {
   }, [router]);
 
   return (
-    <DashboardPage role="admin" title="Subjects" eyebrow="Academics">
+    <DashboardPage role="admin" title="Subjects">
       <SubjectsWorkspace />
     </DashboardPage>
   );

@@ -7,7 +7,6 @@ const turbopackRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), ".
 
 /** LAN IP for phone testing — update if your Wi‑Fi IP changes (ipconfig). */
 const LAN_DEV_ORIGIN = process.env.NEXT_PUBLIC_LAN_ORIGIN?.trim() || "192.168.1.9";
-
 const nextConfig: NextConfig = {
   turbopack: {
     root: turbopackRoot,

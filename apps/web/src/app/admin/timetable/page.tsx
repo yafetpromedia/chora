@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { DashIcon } from "@/components/dashboard/dash-icons";
 import { DashboardPage } from "@/components/dashboard/dashboard-page";
 import { listGrades } from "@/lib/school-setup";
 import type { GradeWithSections } from "@/lib/api";
@@ -142,6 +143,23 @@ export default function AdminTimetablePage() {
     const sec = selectedGrade.sections.find((s) => s.id === sectionId);
     return `${selectedGrade.name}${sec ? ` · ${sec.name}` : ""}`;
   }, [selectedGrade, sectionId]);
+
+  const filledSlots = useMemo(
+    () => Object.values(cells).filter((c) => c.subjectId).length,
+    [cells],
+  );
+
+  const totalSlots = useMemo(() => {
+    if (!grid) return 0;
+    return grid.periods.length * weekdays.length;
+  }, [grid, weekdays.length]);
+
+  const periodCount = grid?.periods.length ?? periods.length;
+
+  const timedPeriodCount = useMemo(
+    () => periods.filter((p) => p.startTime && p.endTime).length,
+    [periods],
+  );
 
   function setCell(weekday: Weekday, periodNumber: number, patch: Partial<CellDraft>) {
     const key = cellKey(weekday, periodNumber);
@@ -322,171 +340,289 @@ export default function AdminTimetablePage() {
   }
 
   return (
-    <DashboardPage
-      role="admin"
-      title="Timetable"
-      eyebrow="Academics"
-    >
-      <div className="att-page tt-page">
-        {error ? <p className="att-toast att-toast--error">{error}</p> : null}
-        {saved ? <p className="att-toast">{saved}</p> : null}
+    <DashboardPage role="admin" title="Timetable">
+      <div className="tt-admin">
+        {error ? <p className="tt-admin__alert tt-admin__alert--err">{error}</p> : null}
+        {saved ? <p className="tt-admin__alert tt-admin__alert--ok">{saved}</p> : null}
 
-        <p className="tt-rule-hint">
-          Each <strong>period</strong> is one fixed time slot — <strong>one subject only</strong> per
-          class. Doubles use <strong>two periods</strong> (e.g. Period 3 &amp; 5 same day), never
-          two subjects in the same period. Set bell times under <strong>Manage periods</strong>.
-        </p>
+        <header className="tt-admin__hero">
+          <div className="tt-admin__hero-glow" aria-hidden />
+          <div className="tt-admin__hero-inner">
+            <div className="tt-admin__hero-main">
+              <h2 className="tt-admin__hero-title">Class timetable</h2>
+              <p className="tt-admin__hero-sub">
+                One <strong>subject per period</strong> per class. Doubles use two separate periods
+                (e.g. Period 3 &amp; 5). Set bell times under{" "}
+                <button
+                  type="button"
+                  className="tt-admin__hero-link"
+                  onClick={() => canEdit && setPeriodsOpen(true)}
+                  disabled={!canEdit}
+                >
+                  Manage periods
+                </button>
+                .
+              </p>
+              {classLabel ? (
+                <div className="tt-admin__hero-badges">
+                  <span className="tt-admin__badge">{classLabel}</span>
+                  {canEdit ? (
+                    <span className="tt-admin__badge tt-admin__badge--muted">
+                      {generateScope === "school" ? "Whole school generate" : "This class only"}
+                    </span>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+            <div className="tt-admin__hero-stats">
+              <div className="tt-admin__stat">
+                <strong>{loading ? "—" : periodCount}</strong>
+                <span>Periods</span>
+              </div>
+              <div className="tt-admin__stat">
+                <strong>{loading ? "—" : weekdays.length}</strong>
+                <span>Days</span>
+              </div>
+              <div className="tt-admin__stat">
+                <strong>{loading || !grid ? "—" : filledSlots}</strong>
+                <span>Scheduled</span>
+              </div>
+              <div className="tt-admin__stat tt-admin__stat--accent">
+                <strong>{loading || !grid ? "—" : Math.max(totalSlots - filledSlots, 0)}</strong>
+                <span>Open slots</span>
+              </div>
+            </div>
+          </div>
+        </header>
 
-        <div className="tt-toolbar">
-          <label>
-            Grade
+        <div className="tt-admin__toolbar">
+          <select
+            className="tt-admin__filter"
+            value={gradeId}
+            onChange={(e) => {
+              setGradeId(e.target.value);
+              const g = grades.find((x) => x.id === e.target.value);
+              setSectionId(g?.sections[0]?.id ?? "");
+            }}
+            aria-label="Grade"
+          >
+            {grades.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.name}
+              </option>
+            ))}
+          </select>
+          {selectedGrade && selectedGrade.sections.length > 0 ? (
             <select
-              value={gradeId}
-              onChange={(e) => {
-                setGradeId(e.target.value);
-                const g = grades.find((x) => x.id === e.target.value);
-                setSectionId(g?.sections[0]?.id ?? "");
-              }}
+              className="tt-admin__filter"
+              value={sectionId}
+              onChange={(e) => setSectionId(e.target.value)}
+              aria-label="Section"
             >
-              {grades.map((g) => (
-                <option key={g.id} value={g.id}>
-                  {g.name}
+              {selectedGrade.sections.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
                 </option>
               ))}
             </select>
-          </label>
-          {selectedGrade && selectedGrade.sections.length > 0 ? (
-            <label>
-              Section
-              <select value={sectionId} onChange={(e) => setSectionId(e.target.value)}>
-                {selectedGrade.sections.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
-            </label>
           ) : null}
           {canEdit ? (
-            <label>
-              Auto-generate
-              <select
-                value={generateScope}
-                onChange={(e) => setGenerateScope(e.target.value as "school" | "class")}
+            <select
+              className="tt-admin__filter"
+              value={generateScope}
+              onChange={(e) => setGenerateScope(e.target.value as "school" | "class")}
+              aria-label="Auto-generate scope"
+            >
+              <option value="school">Whole school</option>
+              <option value="class">This class only</option>
+            </select>
+          ) : null}
+          <div className="tt-admin__toolbar-actions">
+            {canEdit ? (
+              <button
+                type="button"
+                className="tt-admin__btn tt-admin__btn--ghost"
+                disabled={busy || !academicYearId}
+                onClick={() => void onAutoGenerate()}
               >
-                <option value="school">Whole school</option>
-                <option value="class">This class only</option>
-              </select>
-            </label>
-          ) : null}
-          {canEdit ? (
-            <button
-              type="button"
-              className="att-btn att-btn--ghost"
-              disabled={busy || !academicYearId}
-              onClick={() => void onAutoGenerate()}
-            >
-              {busy ? "Working…" : "Auto-generate"}
-            </button>
-          ) : null}
-          {canEdit ? (
-            <button
-              type="button"
-              className="att-btn att-btn--ghost"
-              onClick={() => setPeriodsOpen((v) => !v)}
-            >
-              {periodsOpen ? "Hide periods" : "Manage periods"}
-            </button>
-          ) : null}
-          {canEdit ? (
-            <button
-              type="button"
-              className="att-btn att-btn--primary"
-              disabled={busy || !gradeId}
-              onClick={() => void onSave()}
-            >
-              {busy ? "Saving…" : "Save timetable"}
-            </button>
-          ) : null}
+                <DashIcon name="calendar" className="dash-icon--sm" />
+                {busy ? "Working…" : "Auto-generate"}
+              </button>
+            ) : null}
+            {canEdit ? (
+              <button
+                type="button"
+                className="tt-admin__btn tt-admin__btn--ghost"
+                onClick={() => setPeriodsOpen(true)}
+              >
+                Manage periods
+              </button>
+            ) : null}
+            {canEdit ? (
+              <button
+                type="button"
+                className="tt-admin__btn tt-admin__btn--primary"
+                disabled={busy || !gradeId}
+                onClick={() => void onSave()}
+              >
+                {busy ? "Saving…" : "Save timetable"}
+              </button>
+            ) : null}
+          </div>
         </div>
 
         {periodsOpen && canEdit ? (
-          <section className="tt-periods">
-            <header className="tt-periods__head">
-              <div>
-                <h2 className="tt-periods__title">Bell schedule</h2>
-                <p className="tt-periods__sub">
-                  Add or remove periods for the whole school. Set labels and optional start/end times.
-                </p>
+          <>
+            <div
+              className="stu-drawer-backdrop"
+              onClick={() => setPeriodsOpen(false)}
+              aria-hidden
+            />
+            <aside
+              className="stu-drawer stu-drawer--wide tt-periods-drawer"
+              role="dialog"
+              aria-labelledby="tt-periods-title"
+            >
+              <header className="stu-drawer__head tt-periods-drawer__head">
+                <div className="tt-periods-drawer__head-main">
+                  <span className="tt-periods-drawer__icon" aria-hidden>
+                    <DashIcon name="calendar" className="dash-icon--sm" />
+                  </span>
+                  <div>
+                    <h2 id="tt-periods-title" className="stu-drawer__title">
+                      Bell schedule
+                    </h2>
+                    <p className="stu-drawer__sub">
+                      Periods apply to every class. Add labels and optional start/end times.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="stu-drawer__close"
+                  onClick={() => setPeriodsOpen(false)}
+                  aria-label="Close"
+                >
+                  ×
+                </button>
+              </header>
+
+              <div className="tt-periods-drawer__stats">
+                <div className="tt-periods-drawer__stat">
+                  <strong>{periods.length}</strong>
+                  <span>Periods</span>
+                </div>
+                <div className="tt-periods-drawer__stat">
+                  <strong>{timedPeriodCount}</strong>
+                  <span>With times</span>
+                </div>
+                <div className="tt-periods-drawer__stat tt-periods-drawer__stat--accent">
+                  <strong>{Math.max(periods.length - timedPeriodCount, 0)}</strong>
+                  <span>Untimed</span>
+                </div>
               </div>
-              <div className="tt-periods__head-actions">
-                <button type="button" className="att-btn att-btn--ghost" onClick={addPeriod}>
-                  + Add period
+
+              <div className="stu-drawer__body tt-periods-drawer__body">
+                {periods.length === 0 ? (
+                  <div className="tt-periods-drawer__empty">
+                    <p>No periods yet.</p>
+                    <button
+                      type="button"
+                      className="tt-admin__btn tt-admin__btn--primary"
+                      onClick={addPeriod}
+                    >
+                      + Add first period
+                    </button>
+                  </div>
+                ) : (
+                  <ul className="tt-periods-drawer__list">
+                    {periods.map((p, index) => (
+                      <li key={`period-${index}`} className="tt-periods-drawer__item">
+                        <span className="tt-periods-drawer__num">{index + 1}</span>
+                        <div className="tt-periods-drawer__fields">
+                          <input
+                            className="tt-periods-drawer__label"
+                            value={p.label}
+                            onChange={(e) => updatePeriod(p.number, { label: e.target.value })}
+                            placeholder={`Period ${index + 1}`}
+                            aria-label={`Period ${index + 1} label`}
+                          />
+                          <div className="tt-periods-drawer__times">
+                            <input
+                              type="time"
+                              value={p.startTime}
+                              onChange={(e) =>
+                                updatePeriod(p.number, { startTime: e.target.value })
+                              }
+                              aria-label={`Period ${index + 1} start`}
+                            />
+                            <span className="tt-periods-drawer__times-sep">to</span>
+                            <input
+                              type="time"
+                              value={p.endTime}
+                              onChange={(e) =>
+                                updatePeriod(p.number, { endTime: e.target.value })
+                              }
+                              aria-label={`Period ${index + 1} end`}
+                            />
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          className="tt-periods-drawer__remove"
+                          disabled={periods.length <= 1}
+                          onClick={() => removePeriod(p.number)}
+                          aria-label={`Remove period ${index + 1}`}
+                        >
+                          ×
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {periods.length > 0 ? (
+                  <button
+                    type="button"
+                    className="tt-periods-drawer__add"
+                    onClick={addPeriod}
+                  >
+                    + Add period
+                  </button>
+                ) : null}
+              </div>
+
+              <footer className="stu-drawer__foot tt-periods-drawer__foot">
+                <button
+                  type="button"
+                  className="tt-admin__btn tt-admin__btn--ghost"
+                  onClick={() => setPeriodsOpen(false)}
+                >
+                  Cancel
                 </button>
                 <button
                   type="button"
-                  className="att-btn att-btn--primary"
+                  className="tt-admin__btn tt-admin__btn--primary"
                   disabled={busy || periods.length === 0}
                   onClick={() => void onSavePeriods()}
                 >
-                  {busy ? "Saving…" : "Save periods"}
+                  {busy ? "Saving…" : "Save schedule"}
                 </button>
-              </div>
-            </header>
-            {periods.length === 0 ? (
-              <p className="setup-hint">No periods yet. Add your first period above.</p>
-            ) : (
-              <ul className="tt-periods__list">
-                {periods.map((p, index) => (
-                  <li key={`period-${index}`} className="tt-periods__row">
-                    <span className="tt-periods__order">#{p.number}</span>
-                    <label>
-                      Label
-                      <input
-                        value={p.label}
-                        onChange={(e) => updatePeriod(p.number, { label: e.target.value })}
-                        placeholder="Period 1"
-                      />
-                    </label>
-                    <label>
-                      Start
-                      <input
-                        type="time"
-                        value={p.startTime}
-                        onChange={(e) => updatePeriod(p.number, { startTime: e.target.value })}
-                      />
-                    </label>
-                    <label>
-                      End
-                      <input
-                        type="time"
-                        value={p.endTime}
-                        onChange={(e) => updatePeriod(p.number, { endTime: e.target.value })}
-                      />
-                    </label>
-                    <button
-                      type="button"
-                      className="tt-periods__remove"
-                      disabled={periods.length <= 1}
-                      onClick={() => removePeriod(p.number)}
-                    >
-                      Remove
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
+              </footer>
+            </aside>
+          </>
         ) : null}
 
         {loading || (busy && !grid) ? (
-          <p className="setup-hint">Loading timetable…</p>
+          <div className="tt-admin__loading">
+            <span className="tt-admin__loading-spinner" aria-hidden />
+            <p>Loading timetable…</p>
+          </div>
         ) : grid ? (
-          <div className="tt-grid-wrap">
-            <table className="tt-grid">
+          <div className="tt-admin__grid-wrap">
+            <table className="tt-admin__grid">
               <thead>
                 <tr>
-                  <th>Period</th>
+                  <th className="tt-admin__grid-corner">Period</th>
                   {weekdays.map((d) => (
                     <th key={d}>{grid.weekdayLabels[d]}</th>
                   ))}
@@ -495,16 +631,16 @@ export default function AdminTimetablePage() {
               <tbody>
                 {grid.periods.map((period) => (
                   <tr key={period.id}>
-                    <th className="tt-grid__period">
-                      <span className="tt-grid__period-label">{period.label}</span>
+                    <th className="tt-admin__grid-period">
+                      <span className="tt-admin__grid-period-label">{period.label}</span>
                       {period.startTime && period.endTime ? (
-                        <span className="tt-grid__period-time">
+                        <span className="tt-admin__grid-period-time">
                           {period.startTime}–{period.endTime}
                         </span>
                       ) : period.startTime ? (
-                        <span className="tt-grid__period-time">{period.startTime}</span>
+                        <span className="tt-admin__grid-period-time">{period.startTime}</span>
                       ) : (
-                        <span className="tt-grid__period-time tt-grid__period-time--muted">
+                        <span className="tt-admin__grid-period-time tt-admin__grid-period-time--muted">
                           One subject slot
                         </span>
                       )}
@@ -516,18 +652,24 @@ export default function AdminTimetablePage() {
                         teacherUserId: "",
                         roomName: "",
                       };
+                      const filled = Boolean(cell.subjectId);
                       return (
-                        <td key={weekday} className="tt-grid__cell">
+                        <td
+                          key={weekday}
+                          className={`tt-admin__grid-cell${filled ? " tt-admin__grid-cell--filled" : ""}`}
+                        >
                           <select
+                            className="tt-admin__cell-input"
                             value={cell.subjectId}
                             disabled={!canEdit}
+                            aria-label={`${grid.weekdayLabels[weekday]} ${period.label} subject`}
                             onChange={(e) =>
                               setCell(weekday, period.number, {
                                 subjectId: e.target.value,
                               })
                             }
                           >
-                            <option value="">—</option>
+                            <option value="">Subject</option>
                             {grid.subjects.map((s) => (
                               <option key={s.id} value={s.id}>
                                 {s.name}
@@ -535,8 +677,10 @@ export default function AdminTimetablePage() {
                             ))}
                           </select>
                           <select
+                            className="tt-admin__cell-input"
                             value={cell.teacherUserId}
                             disabled={!canEdit || !cell.subjectId}
+                            aria-label={`${grid.weekdayLabels[weekday]} ${period.label} teacher`}
                             onChange={(e) =>
                               setCell(weekday, period.number, {
                                 teacherUserId: e.target.value,
@@ -551,10 +695,12 @@ export default function AdminTimetablePage() {
                             ))}
                           </select>
                           <input
+                            className="tt-admin__cell-input"
                             type="text"
                             placeholder="Room"
                             value={cell.roomName}
                             disabled={!canEdit || !cell.subjectId}
+                            aria-label={`${grid.weekdayLabels[weekday]} ${period.label} room`}
                             onChange={(e) =>
                               setCell(weekday, period.number, {
                                 roomName: e.target.value,

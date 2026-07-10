@@ -9,6 +9,7 @@ const LINKS = [
   { href: "#portals", label: "Portals" },
   { href: "#pricing", label: "Pricing" },
   { href: "#faq", label: "FAQ" },
+  { href: "/join", label: "Join school", external: true },
 ];
 
 export function LandingNav() {
@@ -39,11 +40,17 @@ export function LandingNav() {
           </Link>
 
           <nav className="lp3-nav__links" aria-label="Main">
-            {LINKS.map((l) => (
-              <a key={l.href} href={l.href} className="lp3-nav__link">
-                {l.label}
-              </a>
-            ))}
+            {LINKS.map((l) =>
+              l.external ? (
+                <Link key={l.href} href={l.href} className="lp3-nav__link">
+                  {l.label}
+                </Link>
+              ) : (
+                <a key={l.href} href={l.href} className="lp3-nav__link">
+                  {l.label}
+                </a>
+              ),
+            )}
           </nav>
 
           <div className="lp3-nav__actions">

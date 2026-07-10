@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { DashIcon } from "@/components/dashboard/dash-icons";
 import {
   approveResultWorkflow,
@@ -25,14 +25,6 @@ type Props = {
 };
 
 const ALL = "__all__";
-
-function useHydrated() {
-  return useSyncExternalStore(
-    () => () => {},
-    () => true,
-    () => false,
-  );
-}
 
 const WORKFLOW_LABELS: Record<ResultWorkflowStatus, string> = {
   DRAFT: "Draft",
@@ -149,7 +141,7 @@ function rowAverage(
 }
 
 export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
-  const hydrated = useHydrated();
+  const [toolbarReady, setToolbarReady] = useState(false);
   const [terms, setTerms] = useState<AcademicTerm[]>([]);
   const [classSubjects, setClassSubjects] = useState<ClassSubject[]>([]);
   const [termId, setTermId] = useState("");
@@ -176,6 +168,10 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
   const canEditScores =
     role === "admin" || role === "staff" || (matrix?.canEditScores ?? true);
   const viewOnlyHomeroom = role === "teacher" && matrix != null && !canEditScores;
+
+  useEffect(() => {
+    setToolbarReady(true);
+  }, []);
 
   useEffect(() => {
     void Promise.all([listTerms(), listClassSubjects()])
@@ -295,7 +291,7 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
     syncClassSubject(gradeId, subjectId, id);
   }
 
-  const controlsDisabled = !hydrated || booting;
+  const controlsDisabled = booting;
 
   const loadAggregated = useCallback(async () => {
     if (!termId || activeClassSubjects.length === 0) return;
@@ -725,61 +721,9 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
         </div>
       ) : null}
 
-      <div className="res-scores-head">
-        <header className="res-scores-hero">
-          <div className="res-scores-hero__main">
-            <p className="res-scores-hero__eyebrow">Class score sheet</p>
-            <h2 className="res-scores-hero__title">
-              {heroTitle(
-                selectedCs,
-                selectedGrade?.name ?? "Grade",
-                subjectId,
-                selectedSubjectName,
-                sectionId,
-                selectedSectionName,
-              )}
-              {!canEditScores && selectedCs ? " (view)" : ""}
-            </h2>
-            <p className="res-scores-hero__sub">
-              {selectedTerm?.name ?? "Select term"}
-              {matrix?.template ? ` · ${matrix.template.name}` : ""}
-              {viewOnlyHomeroom ? " · View only (homeroom)" : ""}
-            </p>
-            {workflowStatus && !isAggregated ? (
-              <span
-                className={`res-scores-workflow-pill res-scores-workflow-pill--${workflowStatus.toLowerCase()}`}
-              >
-                {WORKFLOW_LABELS[workflowStatus]}
-              </span>
-            ) : null}
-          </div>
-          <div className="res-scores-stats">
-            <div className="res-scores-stat">
-              <strong className="res-scores-stat__value">
-                {isAggregated
-                  ? aggregatedSheets.reduce((n, s) => n + s.matrix.students.length, 0)
-                  : (displayMatrix?.students.length ?? 0)}
-              </strong>
-              <span className="res-scores-stat__label">Students</span>
-            </div>
-            <div className="res-scores-stat">
-              <strong className="res-scores-stat__value">
-                {isAggregated
-                  ? activeClassSubjects.length
-                  : (displayMatrix?.assessments.length ?? 0)}
-              </strong>
-              <span className="res-scores-stat__label">
-                {isAggregated ? "Classes" : "Components"}
-              </span>
-            </div>
-            <div className="res-scores-stat res-scores-stat--accent">
-              <strong className="res-scores-stat__value">{completionPct}%</strong>
-              <span className="res-scores-stat__label">Complete</span>
-            </div>
-          </div>
-        </header>
-
-        <div className="res-scores-toolbar res-scores-toolbar--quad">
+      <div className="res-scores-head res-scores-head--modern">
+        {toolbarReady ? (
+        <div className="res-scores-filters res-scores-toolbar res-scores-toolbar--quad">
           <label className="res-scores-field">
             <span>Term</span>
             <select
@@ -830,100 +774,165 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
             </select>
           </label>
           {hasSections ? (
-            <div className="res-scores-field res-scores-field--section">
+            <label className="res-scores-field res-scores-field--section">
               <span>Section</span>
-              <div className="res-scores-segment" role="tablist" aria-label="Class section">
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={sectionId === ALL}
-                  className={`res-scores-segment__btn${
-                    sectionId === ALL ? " res-scores-segment__btn--active" : ""
-                  }`}
-                  disabled={controlsDisabled}
-                  onClick={() => selectSection(ALL)}
-                >
-                  All
-                </button>
+              <select
+                value={sectionId}
+                onChange={(e) => selectSection(e.target.value)}
+                disabled={controlsDisabled}
+              >
+                <option value={ALL}>All sections</option>
                 {sectionsForFilter
                   .filter((s) => s.id !== "")
                   .map((s) => (
-                    <button
-                      key={s.id}
-                      type="button"
-                      role="tab"
-                      aria-selected={sectionId === s.id}
-                      className={`res-scores-segment__btn${
-                        sectionId === s.id ? " res-scores-segment__btn--active" : ""
-                      }`}
-                      disabled={controlsDisabled}
-                      onClick={() => selectSection(s.id)}
-                    >
+                    <option key={s.id} value={s.id}>
                       {s.name}
-                    </button>
+                    </option>
                   ))}
-              </div>
-            </div>
+              </select>
+            </label>
           ) : null}
         </div>
-      </div>
+        ) : (
+        <div
+          className="res-scores-toolbar res-scores-toolbar--quad res-scores-toolbar--placeholder"
+          aria-hidden
+        >
+          <label className="res-scores-field">
+            <span>Term</span>
+            <select disabled defaultValue="">
+              <option value="">Loading…</option>
+            </select>
+          </label>
+          <label className="res-scores-field">
+            <span>Grade</span>
+            <select disabled defaultValue="">
+              <option value="">Loading…</option>
+            </select>
+          </label>
+          <label className="res-scores-field res-scores-field--wide">
+            <span>Subject</span>
+            <select disabled defaultValue="">
+              <option value="">Loading…</option>
+            </select>
+          </label>
+          <label className="res-scores-field res-scores-field--section">
+            <span>Section</span>
+            <select disabled defaultValue="">
+              <option value="">Loading…</option>
+            </select>
+          </label>
+        </div>
+        )}
 
-      {isAggregated ? (
-        <div className="res-scores-insights">
-          <div className="res-scores-insight res-scores-insight--info">
-            <span className="res-scores-insight__icon" aria-hidden>
-              ℹ
-            </span>
-            <div>
-              <strong>Overview mode</strong>
-              <p>
-                Showing scores across{" "}
-                {subjectId === ALL ? "all subjects" : subjectsForGrade.find((s) => s.id === subjectId)?.name}
-                {sectionId === ALL
-                  ? " and all sections"
-                  : sectionsForFilter.find((s) => s.id === sectionId)?.name
-                    ? ` in ${sectionsForFilter.find((s) => s.id === sectionId)?.name}`
-                    : ""}
-                . Pick a specific subject and section to enter or edit scores.
-              </p>
+        <div className="res-scores-context">
+          <div className="res-scores-context__main">
+            <div className="res-scores-context__title-row">
+              <h2 className="res-scores-context__title">
+                {heroTitle(
+                  selectedCs,
+                  selectedGrade?.name ?? "Grade",
+                  subjectId,
+                  selectedSubjectName,
+                  sectionId,
+                  selectedSectionName,
+                )}
+                {!canEditScores && selectedCs ? " (view)" : ""}
+              </h2>
+              {workflowStatus && !isAggregated ? (
+                <span
+                  className={`res-scores-workflow-pill res-scores-workflow-pill--${workflowStatus.toLowerCase()}`}
+                >
+                  {WORKFLOW_LABELS[workflowStatus]}
+                </span>
+              ) : null}
+            </div>
+            <p className="res-scores-context__meta">
+              {selectedTerm?.name ?? "Select term"}
+              {matrix?.template ? ` · ${matrix.template.name}` : ""}
+              {viewOnlyHomeroom ? " · View only (homeroom)" : ""}
+            </p>
+          </div>
+          <div className="res-scores-context__metrics">
+            <div className="res-metric-pill">
+              <strong>
+                {isAggregated
+                  ? aggregatedSheets.reduce((n, s) => n + s.matrix.students.length, 0)
+                  : (displayMatrix?.students.length ?? 0)}
+              </strong>
+              <span>Students</span>
+            </div>
+            <div className="res-metric-pill">
+              <strong>
+                {isAggregated
+                  ? activeClassSubjects.length
+                  : (displayMatrix?.assessments.length ?? 0)}
+              </strong>
+              <span>{isAggregated ? "Classes" : "Components"}</span>
+            </div>
+            <div className="res-metric-pill res-metric-pill--accent">
+              <strong>{completionPct}%</strong>
+              <span>Complete</span>
             </div>
           </div>
         </div>
-      ) : null}
 
-      {viewOnlyHomeroom || (!isAggregated && statusInfo) ? (
-        <div className="res-scores-insights">
-          {viewOnlyHomeroom ? (
-            <div className="res-scores-insight res-scores-insight--info">
-              <span className="res-scores-insight__icon" aria-hidden>
-                👁
-              </span>
-              <div>
-                <strong>View only</strong>
-                <p>
-                  As homeroom teacher you can review scores for your class. Only the assigned
-                  subject teacher
-                  {selectedCs?.teacher
-                    ? ` (${selectedCs.teacher.firstName} ${selectedCs.teacher.lastName})`
-                    : ""}{" "}
-                  can enter or change marks.
-                </p>
+        {isAggregated || viewOnlyHomeroom || (!isAggregated && statusInfo) ? (
+          <div className="res-scores-head__insights">
+            {isAggregated ? (
+              <div className="res-scores-insight res-scores-insight--info">
+                <span className="res-scores-insight__icon" aria-hidden>
+                  ℹ
+                </span>
+                <div>
+                  <strong>Overview mode</strong>
+                  <p>
+                    Showing scores across{" "}
+                    {subjectId === ALL
+                      ? "all subjects"
+                      : subjectsForGrade.find((s) => s.id === subjectId)?.name}
+                    {sectionId === ALL
+                      ? " and all sections"
+                      : sectionsForFilter.find((s) => s.id === sectionId)?.name
+                        ? ` in ${sectionsForFilter.find((s) => s.id === sectionId)?.name}`
+                        : ""}
+                    . Pick a specific subject and section to enter or edit scores.
+                  </p>
+                </div>
               </div>
-            </div>
-          ) : null}
-          {statusInfo && !viewOnlyHomeroom ? (
-            <div className={`res-scores-insight res-scores-insight--${statusInfo.tone}`}>
-              <span className="res-scores-insight__icon" aria-hidden>
-                {statusInfo.tone === "success" ? "✓" : "ℹ"}
-              </span>
-              <div>
-                <strong>{statusInfo.title}</strong>
-                <p>{statusInfo.body}</p>
+            ) : null}
+            {viewOnlyHomeroom ? (
+              <div className="res-scores-insight res-scores-insight--info">
+                <span className="res-scores-insight__icon" aria-hidden>
+                  👁
+                </span>
+                <div>
+                  <strong>View only</strong>
+                  <p>
+                    As homeroom teacher you can review scores for your class. Only the assigned
+                    subject teacher
+                    {selectedCs?.teacher
+                      ? ` (${selectedCs.teacher.firstName} ${selectedCs.teacher.lastName})`
+                      : ""}{" "}
+                    can enter or change marks.
+                  </p>
+                </div>
               </div>
-            </div>
-          ) : null}
-        </div>
-      ) : null}
+            ) : null}
+            {statusInfo && !viewOnlyHomeroom && !isAggregated ? (
+              <div className={`res-scores-insight res-scores-insight--${statusInfo.tone}`}>
+                <span className="res-scores-insight__icon" aria-hidden>
+                  {statusInfo.tone === "success" ? "✓" : "ℹ"}
+                </span>
+                <div>
+                  <strong>{statusInfo.title}</strong>
+                  <p>{statusInfo.body}</p>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
 
       {booting || loading ? (
         <div className="res-scores-loading">

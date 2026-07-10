@@ -6,7 +6,6 @@ import { DashIcon } from "@/components/dashboard/dash-icons";
 import {
   AcademicsAlert,
   AcademicsBadge,
-  AcademicsBreadcrumb,
   AcademicsEmpty,
   AcademicsHero,
 } from "@/components/academics/academics-ui";
@@ -135,15 +134,7 @@ export function SubjectsWorkspace() {
 
   return (
     <div className="acad-page sub-v2">
-      <AcademicsBreadcrumb
-        items={[
-          { label: "Academics", href: "/admin/academics" },
-          { label: "Subjects" },
-        ]}
-      />
-
       <AcademicsHero
-        chip="Curriculum"
         title="Subject catalog"
         subtitle="Define what your school teaches — then assign subjects to grades, sections, and teachers for the active year."
         stats={heroStats}
@@ -163,29 +154,6 @@ export function SubjectsWorkspace() {
 
       {error ? <AcademicsAlert tone="error">{error}</AcademicsAlert> : null}
       {success ? <AcademicsAlert tone="success">{success}</AcademicsAlert> : null}
-
-      <div className="sub-v2__links">
-        <Link href="/admin/subjects/assign" className="sub-v2__link-card">
-          <span className="sub-v2__link-icon sub-v2__link-icon--assign" aria-hidden>
-            <DashIcon name="teachers" className="dash-icon--sm" />
-          </span>
-          <span className="sub-v2__link-body">
-            <strong>Assign to classes</strong>
-            <span>Link grade, section, subject, and teacher for this year.</span>
-          </span>
-          <span className="sub-v2__link-cta">Open assignment →</span>
-        </Link>
-        <Link href="/admin/timetable" className="sub-v2__link-card">
-          <span className="sub-v2__link-icon sub-v2__link-icon--time" aria-hidden>
-            <DashIcon name="calendar" className="dash-icon--sm" />
-          </span>
-          <span className="sub-v2__link-body">
-            <strong>Timetable</strong>
-            <span>Schedule periods once subjects are assigned to classes.</span>
-          </span>
-          <span className="sub-v2__link-cta">Open timetable →</span>
-        </Link>
-      </div>
 
       <div className="sub-v2__layout">
         <section className="sub-v2__main">

@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { DashIcon } from "@/components/dashboard/dash-icons";
 import { DashboardPage } from "@/components/dashboard/dashboard-page";
 import { AttendanceMarkPanel } from "@/components/attendance/attendance-mark-panel";
 import { AttendanceScanner } from "@/components/attendance/attendance-scanner";
@@ -12,11 +13,24 @@ import {
 } from "@/lib/attendance";
 import { AUTH_ROLE_KEY, AUTH_TOKEN_KEY, isSchoolWorkspaceRole } from "@/lib/auth";
 
-type Tab = "overview" | "mark" | "scan";
+type Tab = "mark" | "scan";
+
+function formatHeroDate(iso: string) {
+  try {
+    return new Date(`${iso}T12:00:00`).toLocaleDateString(undefined, {
+      weekday: "long",
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+    });
+  } catch {
+    return iso;
+  }
+}
 
 export default function AdminAttendancePage() {
   const router = useRouter();
-  const [tab, setTab] = useState<Tab>("overview");
+  const [tab, setTab] = useState<Tab>("mark");
   const [analytics, setAnalytics] = useState<AttendanceAnalytics | null>(null);
   const [analyticsDate, setAnalyticsDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [loading, setLoading] = useState(true);
@@ -38,137 +52,121 @@ export default function AdminAttendancePage() {
 
   async function onDateChange(date: string) {
     setAnalyticsDate(date);
+    setLoading(true);
     try {
       setAnalytics(await getAttendanceAnalytics(date));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load analytics");
+    } finally {
+      setLoading(false);
     }
   }
 
+  const heroDate = formatHeroDate(analyticsDate);
+  const markedLabel = useMemo(() => {
+    if (!analytics) return "—";
+    return `${analytics.markedToday} / ${analytics.totalStudents}`;
+  }, [analytics]);
+
   return (
-    <DashboardPage
-      role="admin"
-      title="Attendance"
-      eyebrow="Management"
-    >
-      <div className="att-page">
-        {error ? <p className="att-toast att-toast--error">{error}</p> : null}
+    <DashboardPage role="admin" title="Attendance">
+      <div className="att-v2">
+        {error ? <p className="att-v2__alert att-v2__alert--err">{error}</p> : null}
 
-        <nav className="att-tabs" aria-label="Attendance">
-          <button
-            type="button"
-            className={`att-tab${tab === "overview" ? " att-tab--active" : ""}`}
-            onClick={() => setTab("overview")}
-          >
-            Overview
-          </button>
-          <button
-            type="button"
-            className={`att-tab${tab === "mark" ? " att-tab--active" : ""}`}
-            onClick={() => setTab("mark")}
-          >
-            Mark manually
-          </button>
-          <button
-            type="button"
-            className={`att-tab${tab === "scan" ? " att-tab--active" : ""}`}
-            onClick={() => setTab("scan")}
-          >
-            Scan QR
-          </button>
-          <Link href="/admin/settings" className="att-tab" style={{ textDecoration: "none" }}>
-            ⚙️ Settings
-          </Link>
-        </nav>
-
-        {tab === "overview" && (
-          <>
-            <div className="att-field" style={{ maxWidth: "12rem" }}>
-              <span>View date</span>
-              <input
-                type="date"
-                value={analyticsDate}
-                onChange={(e) => void onDateChange(e.target.value)}
-              />
+        <header className="att-v2__hero">
+          <div className="att-v2__hero-glow" aria-hidden />
+          <div className="att-v2__hero-inner">
+            <div className="att-v2__hero-main">
+              <h2 className="att-v2__hero-title">Daily attendance</h2>
+              <p className="att-v2__hero-sub">
+                {tab === "mark"
+                  ? `Roll call for ${heroDate} — mark students by grade and section.`
+                  : `Scan student ID cards for ${heroDate}.`}
+              </p>
+              {analytics ? (
+                <div className="att-v2__hero-badges">
+                  <span className="att-v2__badge">{heroDate}</span>
+                  {analytics.todayRate != null ? (
+                    <span className="att-v2__badge att-v2__badge--live">
+                      {analytics.todayRate}% rate
+                    </span>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
+            <div className="att-v2__hero-stats">
+              <div className="att-v2__stat">
+                <strong>
+                  {loading || !analytics
+                    ? "—"
+                    : analytics.todayRate != null
+                      ? `${analytics.todayRate}%`
+                      : "—"}
+                </strong>
+                <span>Rate</span>
+              </div>
+              <div className="att-v2__stat">
+                <strong>{loading || !analytics ? "—" : analytics.presentToday}</strong>
+                <span>Present</span>
+              </div>
+              <div className="att-v2__stat">
+                <strong>{loading || !analytics ? "—" : analytics.absentToday}</strong>
+                <span>Absent</span>
+              </div>
+              <div className="att-v2__stat att-v2__stat--accent">
+                <strong>{loading || !analytics ? "—" : markedLabel}</strong>
+                <span>Marked</span>
+              </div>
+            </div>
+          </div>
+        </header>
 
-            {loading ? (
-              <p className="setup-hint">Loading analytics…</p>
-            ) : analytics ? (
-              <>
-                <div className="att-stats">
-                  <div className="att-stat-card att-stat-card--rate">
-                    <span className="att-stat-card__label">Attendance rate</span>
-                    <span className="att-stat-card__value">
-                      {analytics.todayRate != null ? `${analytics.todayRate}%` : "—"}
-                    </span>
-                    <span className="att-stat-card__sub">School-wide</span>
-                  </div>
-                  <div className="att-stat-card att-stat-card--present">
-                    <span className="att-stat-card__label">Present</span>
-                    <span className="att-stat-card__value">{analytics.presentToday}</span>
-                  </div>
-                  <div className="att-stat-card att-stat-card--absent">
-                    <span className="att-stat-card__label">Absent</span>
-                    <span className="att-stat-card__value">{analytics.absentToday}</span>
-                  </div>
-                  <div className="att-stat-card att-stat-card--marked">
-                    <span className="att-stat-card__label">Marked</span>
-                    <span className="att-stat-card__value">
-                      {analytics.markedToday}
-                      <span style={{ fontSize: "0.9rem", fontWeight: 600, color: "var(--brand-muted)" }}>
-                        {" "}/ {analytics.totalStudents}
-                      </span>
-                    </span>
-                  </div>
-                </div>
+        <div className="att-v2__toolbar">
+          <nav className="att-v2__tabs" aria-label="Attendance">
+            <button
+              type="button"
+              className={`att-v2__tab${tab === "mark" ? " att-v2__tab--active" : ""}`}
+              onClick={() => setTab("mark")}
+            >
+              <DashIcon name="attendance" className="dash-icon--sm" />
+              Mark manually
+            </button>
+            <button
+              type="button"
+              className={`att-v2__tab${tab === "scan" ? " att-v2__tab--active" : ""}`}
+              onClick={() => setTab("scan")}
+            >
+              <DashIcon name="students" className="dash-icon--sm" />
+              Scan QR
+            </button>
+            <Link href="/admin/settings" className="att-v2__tab att-v2__tab--link">
+              <DashIcon name="settings" className="dash-icon--sm" />
+              Settings
+            </Link>
+          </nav>
 
-                <div className="att-insights">
-                  {analytics.mostAbsentGrade ? (
-                    <div className="att-insight">
-                      <span className="att-insight__label">Needs attention</span>
-                      <p className="att-insight__value">{analytics.mostAbsentGrade.label}</p>
-                      <p className="att-insight__meta">
-                        {analytics.mostAbsentGrade.rate}% present · {analytics.mostAbsentGrade.marked} marked
-                      </p>
-                    </div>
-                  ) : null}
-                  {analytics.mostPunctualGrade ? (
-                    <div className="att-insight">
-                      <span className="att-insight__label">Most punctual</span>
-                      <p className="att-insight__value">{analytics.mostPunctualGrade.label}</p>
-                      <p className="att-insight__meta">
-                        {analytics.mostPunctualGrade.rate}% present
-                      </p>
-                    </div>
-                  ) : null}
-                </div>
+          <label className="att-v2__date">
+            <DashIcon name="calendar" className="dash-icon--sm" />
+            <span className="att-v2__date-label">View date</span>
+            <input
+              type="date"
+              value={analyticsDate}
+              onChange={(e) => void onDateChange(e.target.value)}
+            />
+          </label>
+        </div>
 
-                <div className="att-panel">
-                  <h3 className="att-panel__title">Quick actions</h3>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
-                    <button type="button" className="att-btn att-btn--primary" onClick={() => setTab("scan")}>
-                      Scan student IDs →
-                    </button>
-                    <button type="button" className="att-btn att-btn--ghost" onClick={() => setTab("mark")}>
-                      Mark manually
-                    </button>
-                    <Link href="/admin/students/cards" className="att-btn att-btn--ghost">
-                      Print ID cards
-                    </Link>
-                    <Link href="/admin/settings" className="att-btn att-btn--ghost">
-                      Attendance settings
-                    </Link>
-                  </div>
-                </div>
-              </>
-            ) : null}
-          </>
-        )}
+        {tab === "mark" ? (
+          <div className="att-v2__panel">
+            <AttendanceMarkPanel />
+          </div>
+        ) : null}
 
-        {tab === "mark" && <AttendanceMarkPanel />}
-
-        {tab === "scan" && <AttendanceScanner />}
+        {tab === "scan" ? (
+          <div className="att-v2__panel">
+            <AttendanceScanner />
+          </div>
+        ) : null}
       </div>
     </DashboardPage>
   );

@@ -79,15 +79,15 @@ export const SECTION_META: Record<
 > = {
   overview: {
     title: "Platform overview",
-    subtitle: "Tenant health, growth, and quick actions",
+    subtitle: "Tenant health, growth, and analytics",
   },
   schools: {
-    title: "Schools",
+    title: "Tenants",
     subtitle: "Create, inspect, and control tenant access",
   },
   curriculum: {
     title: "Curriculum packages",
-    subtitle: "Manage starter packs for school provisioning",
+    subtitle: "Starter packs for tenant provisioning",
   },
   subjects: {
     title: "Subject repository",

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { DashIcon } from "@/components/dashboard/dash-icons";
 import type { StudentRecord } from "@/lib/api";
 import { draftReportComment } from "@/lib/ai";
 import {
@@ -15,6 +16,7 @@ type Props = {
   students: StudentRecord[];
   defaultTermId?: string;
   defaultStudentId?: string;
+  hideSelectors?: boolean;
   onError?: (message: string) => void;
 };
 
@@ -48,6 +50,7 @@ export function ReportCardCommentsPanel({
   students,
   defaultTermId,
   defaultStudentId,
+  hideSelectors = false,
   onError,
 }: Props) {
   const [termId, setTermId] = useState(defaultTermId ?? "");
@@ -135,45 +138,52 @@ export function ReportCardCommentsPanel({
   }
 
   return (
-    <section className="res-v2__block res-v2__comments">
-      <header className="res-v2__block-head res-v2__block-head--row">
+    <div className="rc-v2__comments">
+      <header className="rc-v2__card-head rc-v2__card-head--row">
+        <span className="rc-v2__card-icon rc-v2__card-icon--ai" aria-hidden>
+          <DashIcon name="profile" className="dash-icon--sm" />
+        </span>
         <div>
-          <p className="res-v2__block-eyebrow">Report cards</p>
-          <h3 className="res-v2__block-title">Teacher & principal comments</h3>
-          <p className="res-v2__block-sub">
+          <h3 className="rc-v2__card-title">Teacher &amp; principal comments</h3>
+          <p className="rc-v2__card-sub">
             Remarks appear on printed report cards when scores are published.
           </p>
         </div>
-        <span className="lib-ai-badge">Powered by AI</span>
+        <span className="rc-v2__ai-badge">Powered by AI</span>
       </header>
 
-      <div className="res-v2__toolbar">
-        <label className="res-scores-field res-scores-field--wide">
-          <span>Student</span>
-          <select value={studentId} onChange={(e) => setStudentId(e.target.value)}>
-            <option value="">Select student</option>
-            {students.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.user.firstName} {s.user.lastName} — {s.grade.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="res-scores-field">
-          <span>Term</span>
-          <select value={termId} onChange={(e) => setTermId(e.target.value)}>
-            <option value="">Select term</option>
-            {terms.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name} ({t.academicYear.name})
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
+      {!hideSelectors ? (
+        <div className="rc-v2__toolbar rc-v2__toolbar--inline">
+          <label className="rc-v2__field rc-v2__field--wide">
+            <span>Student</span>
+            <select value={studentId} onChange={(e) => setStudentId(e.target.value)}>
+              <option value="">Select student</option>
+              {students.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.user.firstName} {s.user.lastName} — {s.grade.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="rc-v2__field">
+            <span>Term</span>
+            <select value={termId} onChange={(e) => setTermId(e.target.value)}>
+              <option value="">Select term</option>
+              {terms.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name} ({t.academicYear.name})
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      ) : null}
 
       {loading ? (
-        <p className="res-v2__muted">Loading report card…</p>
+        <div className="rc-v2__loading">
+          <span className="rc-v2__loading-spinner" aria-hidden />
+          <p>Loading comments…</p>
+        </div>
       ) : null}
 
       {report ? (
@@ -220,19 +230,19 @@ export function ReportCardCommentsPanel({
           </label>
         </div>
       ) : !loading && studentId && termId ? (
-        <div className="res-v2__empty res-v2__empty--inline">
-          <p>Select a student and term above — comments load automatically.</p>
+        <div className="rc-v2__empty rc-v2__empty--inline">
+          <p>Comments load automatically for the selected student and term.</p>
         </div>
       ) : null}
 
-      {error ? <p className="res-scores-alert res-scores-alert--error">{error}</p> : null}
-      {saved ? <p className="res-scores-alert res-scores-alert--success">{saved}</p> : null}
+      {error ? <p className="rc-v2__alert rc-v2__alert--err">{error}</p> : null}
+      {saved ? <p className="rc-v2__alert rc-v2__alert--ok">{saved}</p> : null}
 
       {report ? (
-        <div className="res-v2__toolbar-actions">
+        <div className="rc-v2__comments-foot">
           <button
             type="button"
-            className="res-scores-btn res-scores-btn--primary"
+            className="rc-v2__btn rc-v2__btn--primary"
             disabled={saving}
             onClick={() => void onSave()}
           >
@@ -240,6 +250,6 @@ export function ReportCardCommentsPanel({
           </button>
         </div>
       ) : null}
-    </section>
+    </div>
   );
 }

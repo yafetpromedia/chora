@@ -362,37 +362,37 @@ export function StudentSubjectScoresPanel({
       ) : null}
 
       {!isPortalView ? (
-        <div className="res-scores-head">
-          <header className="res-scores-hero res-scores-hero--student-view">
-            <div className="res-scores-hero__main">
-              <p className="res-scores-hero__eyebrow">Individual view</p>
-              <h2 className="res-scores-hero__title">
+        <div className="res-scores-head res-scores-head--modern">
+          <div className="res-scores-context">
+            <div className="res-scores-context__main">
+              <p className="res-scores-context__eyebrow">Individual view</p>
+              <h2 className="res-scores-context__title">
                 {selectedStudent?.name ?? matrix?.student.name ?? "Subject scores by student"}
               </h2>
-              <p className="res-scores-hero__sub">
+              <p className="res-scores-context__meta">
                 {selectedTerm?.name ?? "Select term"}
                 {matrix?.student.grade ? ` · ${matrix.student.grade}` : ""}
                 {matrix?.student.section ? ` · ${matrix.student.section}` : ""}
                 {" · One row per subject"}
               </p>
             </div>
-            <div className="res-scores-stats">
-              <div className="res-scores-stat">
-                <strong className="res-scores-stat__value">{matrix?.subjects.length ?? 0}</strong>
-                <span className="res-scores-stat__label">Subjects</span>
+            <div className="res-scores-context__metrics">
+              <div className="res-metric-pill">
+                <strong>{matrix?.subjects.length ?? 0}</strong>
+                <span>Subjects</span>
               </div>
-              <div className="res-scores-stat">
-                <strong className="res-scores-stat__value">{matrix?.columns.length ?? 0}</strong>
-                <span className="res-scores-stat__label">Components</span>
+              <div className="res-metric-pill">
+                <strong>{matrix?.columns.length ?? 0}</strong>
+                <span>Components</span>
               </div>
-              <div className="res-scores-stat res-scores-stat--accent">
-                <strong className="res-scores-stat__value">{completionPct}%</strong>
-                <span className="res-scores-stat__label">Complete</span>
+              <div className="res-metric-pill res-metric-pill--accent">
+                <strong>{completionPct}%</strong>
+                <span>Complete</span>
               </div>
             </div>
-          </header>
+          </div>
 
-          <div className="res-scores-toolbar res-scores-toolbar--triple">
+          <div className="res-scores-filters res-scores-toolbar res-scores-toolbar--triple">
             <label className="res-scores-field">
               <span>Term</span>
               <select value={termId} onChange={(e) => setTermId(e.target.value)}>

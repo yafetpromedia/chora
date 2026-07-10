@@ -530,6 +530,15 @@
   overflow-wrap: anywhere;
 }
 
+.par-v2__readonly em {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 0.72rem;
+  font-style: normal;
+  color: var(--brand-muted);
+  line-height: 1.4;
+}
+
 .par-v2__linked-label {
   display: block;
   margin-bottom: 0.35rem;

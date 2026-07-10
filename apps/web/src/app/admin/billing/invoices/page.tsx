@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DashboardPage } from "@/components/dashboard/dashboard-page";
-import { SchoolBillingNav } from "@/components/school-billing/school-billing-nav";
+import { SchoolBillingShell } from "@/components/school-billing/school-billing-shell";
 import { AUTH_ROLE_KEY, AUTH_TOKEN_KEY } from "@/lib/auth";
 import {
   getSchoolInvoices,
@@ -55,84 +55,104 @@ export default function SchoolInvoicesPage() {
     return invoices.filter((i) => i.status === filter);
   }, [invoices, filter]);
 
+  const stats = useMemo(() => {
+    const open = invoices.filter((i) => i.status === "SENT" || i.status === "OVERDUE").length;
+    const overdue = invoices.filter((i) => i.status === "OVERDUE").length;
+    const outstandingUsd = invoices
+      .filter((i) => i.status === "SENT" || i.status === "OVERDUE")
+      .reduce((sum, i) => sum + i.amountUsd, 0);
+    return { open, overdue, outstandingUsd, total: invoices.length };
+  }, [invoices]);
+
   return (
     <DashboardPage role="admin" title="Invoices">
-      <SchoolBillingNav />
+      <SchoolBillingShell
+        title="Subscription invoices"
+        subtitle="Invoices issued by CampusOne for your school plan. Pay by the due date shown on each invoice."
+        stats={[
+          { label: "Total", value: stats.total },
+          { label: "Open", value: stats.open, accent: stats.open > 0 },
+          {
+            label: "Outstanding",
+            value: `$${stats.outstandingUsd.toLocaleString()}`,
+            accent: stats.outstandingUsd > 0,
+          },
+          { label: "Overdue", value: stats.overdue, accent: stats.overdue > 0 },
+        ]}
+        error={error}
+        loading={loading}
+        loadingLabel="Loading invoices…"
+      >
+        <div className="sb-v2__card">
+          <div className="sb-v2__filters" role="tablist" aria-label="Invoice status">
+            {(["ALL", "SENT", "OVERDUE", "PAID", "DRAFT"] as const).map((f) => (
+              <button
+                key={f}
+                type="button"
+                role="tab"
+                aria-selected={filter === f}
+                className={`sb-v2__filter${filter === f ? " sb-v2__filter--active" : ""}`}
+                onClick={() => setFilter(f)}
+              >
+                {f === "ALL" ? "All" : f.charAt(0) + f.slice(1).toLowerCase()}
+              </button>
+            ))}
+          </div>
 
-      <header className="sbill-hero">
-        <p className="sbill-hero__eyebrow">Accounts payable</p>
-        <h2 className="sbill-hero__title">Your invoices</h2>
-        <p className="sbill-hero__sub">
-          Invoices issued by CampusOne for your school subscription. Pay by the due date shown.
-        </p>
-      </header>
-
-      {error ? <p className="auth-alert auth-alert--error">{error}</p> : null}
-      {loading ? <p className="sbill-muted">Loading invoices…</p> : null}
-
-      <div className="sbill-nav" style={{ marginBottom: "1rem" }}>
-        {(["ALL", "SENT", "OVERDUE", "PAID", "DRAFT"] as const).map((f) => (
-          <button
-            key={f}
-            type="button"
-            className={`sbill-nav__link${filter === f ? " sbill-nav__link--active" : ""}`}
-            onClick={() => setFilter(f)}
-          >
-            {f === "ALL" ? "All" : f.charAt(0) + f.slice(1).toLowerCase()}
-          </button>
-        ))}
-      </div>
-
-      <div className="sbill-table-wrap">
-        <table className="sbill-table">
-          <thead>
-            <tr>
-              <th>Invoice</th>
-              <th>Period</th>
-              <th>Amount</th>
-              <th>Due</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {!loading && filtered.length === 0 ? (
-              <tr>
-                <td colSpan={5} className="sbill-table-empty">
-                  No invoices yet. CampusOne will issue one when you move to a paid plan.
-                </td>
-              </tr>
-            ) : (
-              filtered.map((inv) => (
-                <tr key={inv.id}>
-                  <td>
-                    <strong>{inv.invoiceNumber}</strong>
-                    {inv.plan ? (
-                      <div className="sbill-muted">{inv.plan}</div>
-                    ) : null}
-                  </td>
-                  <td className="sbill-muted">
-                    {formatDate(inv.periodStart)} – {formatDate(inv.periodEnd)}
-                  </td>
-                  <td>{formatAmount(inv.amountUsd, inv.amountEtb, inv.currency)}</td>
-                  <td className="sbill-muted">{formatDate(inv.dueAt)}</td>
-                  <td>
-                    <span className={`sbill-invoice-status sbill-invoice-status--${inv.status.toLowerCase()}`}>
-                      {inv.status}
-                    </span>
-                    {inv.paidAt ? (
-                      <div className="sbill-muted">Paid {formatDate(inv.paidAt)}</div>
-                    ) : null}
-                  </td>
+          <div className="sb-v2__table-wrap" style={{ marginTop: "0.85rem" }}>
+            <table className="sb-v2__table">
+              <thead>
+                <tr>
+                  <th>Invoice</th>
+                  <th>Period</th>
+                  <th>Amount</th>
+                  <th>Due</th>
+                  <th>Status</th>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+              </thead>
+              <tbody>
+                {filtered.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="sb-v2__table-empty">
+                      No invoices yet. CampusOne will issue one when you move to a paid plan.
+                    </td>
+                  </tr>
+                ) : (
+                  filtered.map((inv) => (
+                    <tr key={inv.id}>
+                      <td>
+                        <span className="sb-v2__invoice-num">{inv.invoiceNumber}</span>
+                        {inv.plan ? (
+                          <span className="sb-v2__muted">{inv.plan}</span>
+                        ) : null}
+                      </td>
+                      <td className="sb-v2__muted">
+                        {formatDate(inv.periodStart)} – {formatDate(inv.periodEnd)}
+                      </td>
+                      <td>{formatAmount(inv.amountUsd, inv.amountEtb, inv.currency)}</td>
+                      <td className="sb-v2__muted">{formatDate(inv.dueAt)}</td>
+                      <td>
+                        <span
+                          className={`sb-v2__invoice-status sb-v2__invoice-status--${inv.status.toLowerCase()}`}
+                        >
+                          {inv.status}
+                        </span>
+                        {inv.paidAt ? (
+                          <div className="sb-v2__muted">Paid {formatDate(inv.paidAt)}</div>
+                        ) : null}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
 
-      <p className="sbill-muted" style={{ marginTop: "1rem" }}>
-        Questions about an invoice? Contact CampusOne support with your invoice number.
-      </p>
+          <p className="sb-v2__muted" style={{ marginTop: "0.85rem" }}>
+            Questions about an invoice? Contact CampusOne support with your invoice number.
+          </p>
+        </div>
+      </SchoolBillingShell>
     </DashboardPage>
   );
 }

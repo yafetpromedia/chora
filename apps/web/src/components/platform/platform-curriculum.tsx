@@ -21,8 +21,24 @@ type PackageRow = {
   };
 };
 
+type PackageSubject = {
+  id: string;
+  code: string;
+  name: string;
+  level: string | null;
+  platformSubjectId: string | null;
+};
+
+type PlatformSubjectOption = {
+  id: string;
+  code: string;
+  name: string;
+  level: string | null;
+  isArchived: boolean;
+};
+
 type PackageDetail = PackageRow & {
-  subjects: { code: string; name: string; level: string | null }[];
+  subjects: PackageSubject[];
   departments: { name: string }[];
   libraryItems: {
     title: string;
@@ -37,6 +53,14 @@ type DetailTab = "overview" | "subjects" | "structure" | "library" | "templates"
 
 const DEFAULT_KEY = "ETHIOPIAN_PRIVATE";
 
+function todayLabel() {
+  return new Date().toLocaleDateString(undefined, {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  });
+}
+
 function formatPreset(value: string | null) {
   if (!value) return "—";
   return value
@@ -45,9 +69,41 @@ function formatPreset(value: string | null) {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-function formatSchoolType(value: string | null) {
+function formatOrgType(value: string | null) {
   if (!value) return "—";
   return value.charAt(0) + value.slice(1).toLowerCase();
+}
+
+function ContentMixChart({ detail }: { detail: PackageDetail }) {
+  const items = [
+    { label: "Subjects", value: detail.subjects.length, color: "var(--brand-teal-dark)" },
+    { label: "Departments", value: detail.departments.length, color: "var(--brand-teal)" },
+    { label: "eLibrary", value: detail.libraryItems.length, color: "var(--brand-cyan)" },
+    { label: "Templates", value: detail.templates.length, color: "#5eead4" },
+  ];
+  const max = Math.max(1, ...items.map((i) => i.value));
+
+  return (
+    <ul className="plat-curriculum-v2__mix">
+      {items.map((item) => (
+        <li key={item.label}>
+          <div className="plat-curriculum-v2__mix-head">
+            <span>{item.label}</span>
+            <strong>{item.value}</strong>
+          </div>
+          <div className="plat-curriculum-v2__mix-track">
+            <div
+              className="plat-curriculum-v2__mix-fill"
+              style={{
+                width: `${(item.value / max) * 100}%`,
+                background: item.color,
+              }}
+            />
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 function packageAccent(key: string) {
@@ -84,6 +140,9 @@ export function PlatformCurriculum() {
   const [editLabel, setEditLabel] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [catalogSyncing, setCatalogSyncing] = useState(false);
+  const [platformSubjects, setPlatformSubjects] = useState<PlatformSubjectOption[]>([]);
+  const [addSubjectId, setAddSubjectId] = useState("");
+  const [subjectBusy, setSubjectBusy] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -118,6 +177,69 @@ export function PlatformCurriculum() {
       )
       .finally(() => setDetailLoading(false));
   }, [selectedKey]);
+
+  useEffect(() => {
+    if (tab !== "subjects" || detail?.isBlank) {
+      return;
+    }
+    void platformFetch<PlatformSubjectOption[]>("/platform/subjects")
+      .then(setPlatformSubjects)
+      .catch(() => setPlatformSubjects([]));
+  }, [tab, detail?.isBlank, detail?.key]);
+
+  const availableSubjects = useMemo(() => {
+    if (!detail) return [];
+    const inPackage = new Set(detail.subjects.map((s) => s.code));
+    return platformSubjects.filter(
+      (s) => !s.isArchived && !inPackage.has(s.code),
+    );
+  }, [detail, platformSubjects]);
+
+  async function reloadDetail() {
+    if (!selectedKey) return;
+    const [refreshed, rows] = await Promise.all([
+      platformFetch<PackageDetail>(`/platform/curriculum-packages/${selectedKey}`),
+      platformFetch<PackageRow[]>("/platform/curriculum-packages"),
+    ]);
+    setDetail(refreshed);
+    setPackages(rows);
+  }
+
+  async function addSubjectToPackage() {
+    if (!detail || !addSubjectId) return;
+    setSubjectBusy(true);
+    setError("");
+    try {
+      await platformFetch(`/platform/curriculum-packages/${detail.key}/subjects`, {
+        method: "POST",
+        body: JSON.stringify({ platformSubjectId: addSubjectId }),
+      });
+      setAddSubjectId("");
+      await reloadDetail();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not add subject");
+    } finally {
+      setSubjectBusy(false);
+    }
+  }
+
+  async function removeSubjectFromPackage(subject: PackageSubject) {
+    if (!detail) return;
+    if (!confirm(`Remove ${subject.name} from this package?`)) return;
+    setSubjectBusy(true);
+    setError("");
+    try {
+      await platformFetch(
+        `/platform/curriculum-packages/${detail.key}/subjects/${subject.id}/remove`,
+        { method: "POST" },
+      );
+      await reloadDetail();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not remove subject");
+    } finally {
+      setSubjectBusy(false);
+    }
+  }
 
   const filteredPackages = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -248,7 +370,7 @@ export function PlatformCurriculum() {
 
   if (loading) {
     return (
-      <div className="plat-curriculum plat-curriculum--loading">
+      <div className="plat-curriculum-v2 dash-admin dash-admin--modern plat-curriculum plat-curriculum--loading">
         <div className="plat-curriculum__skeleton plat-curriculum__skeleton--hero" />
         <div className="plat-curriculum__skeleton-row">
           <div className="plat-curriculum__skeleton" />
@@ -260,57 +382,44 @@ export function PlatformCurriculum() {
   }
 
   return (
-    <div className="plat-section plat-curriculum">
+    <div className="plat-curriculum-v2 dash-admin dash-admin--modern">
       {error ? <p className="auth-alert auth-alert--error">{error}</p> : null}
 
-      <header className="plat-section-hero plat-section-hero--curriculum">
-        <div>
-          <p className="plat-section-hero__eyebrow">Content distribution</p>
-          <h2 className="plat-section-hero__title">Curriculum packages</h2>
-          <p className="plat-section-hero__sub">
-            Starter packs provision new schools with subjects, grades, eLibrary
-            items, and templates — each tenant gets an editable copy.
+      <header className="dash-admin-hero dash-admin-hero--modern plat-curriculum-v2__hero">
+        <div className="dash-admin-hero__text">
+          <p className="dash-admin-hero__eyebrow">{todayLabel()}</p>
+          <h2 className="dash-admin-hero__title">Curriculum packages</h2>
+          <p className="dash-admin-hero__sub">
+            Starter packs provision new tenants with subjects, grades, eLibrary
+            items, and templates — each workspace gets an editable copy.
           </p>
         </div>
-        <div className="plat-curriculum-hero-stat">
-          <span className="plat-curriculum-hero-stat__value">{packages.length}</span>
-          <span className="plat-curriculum-hero-stat__label">Active packages</span>
+        <div className="dash-admin-hero__aside">
+          <div className="dash-admin-hero__chip">
+            <DashIcon name="library" className="dash-icon--sm" />
+            <span>{packages.length} active packages</span>
+          </div>
+          <div className="dash-admin-hero__chip dash-admin-hero__chip--muted">
+            <DashIcon name="subjects" className="dash-icon--sm" />
+            <span>
+              {totals.subjects} subjects · {totals.library} library · {totals.templates} templates
+            </span>
+          </div>
+          <button
+            type="button"
+            className="plat-v2__btn plat-v2__btn--primary"
+            disabled={catalogSyncing}
+            onClick={() => void syncCatalog()}
+          >
+            <DashIcon name="settings" className="dash-icon--sm" />
+            {catalogSyncing ? "Syncing…" : "Sync catalog"}
+          </button>
         </div>
       </header>
 
-      <div className="plat-curriculum-kpis">
-        <div className="plat-curriculum-kpi">
-          <span className="plat-curriculum-kpi__icon" aria-hidden>
-            📚
-          </span>
-          <div>
-            <strong>{totals.subjects}</strong>
-            <span>Master subjects</span>
-          </div>
-        </div>
-        <div className="plat-curriculum-kpi">
-          <span className="plat-curriculum-kpi__icon" aria-hidden>
-            🗂️
-          </span>
-          <div>
-            <strong>{totals.library}</strong>
-            <span>eLibrary starters</span>
-          </div>
-        </div>
-        <div className="plat-curriculum-kpi">
-          <span className="plat-curriculum-kpi__icon" aria-hidden>
-            ✉️
-          </span>
-          <div>
-            <strong>{totals.templates}</strong>
-            <span>Templates</span>
-          </div>
-        </div>
-      </div>
-
-      <div className="plat-toolbar plat-curriculum-toolbar">
-        <div className="plat-search">
-          <DashIcon name="results" className="dash-icon--sm" />
+      <div className="plat-tenants-v2__toolbar plat-curriculum-v2__toolbar">
+        <div className="plat-tenants-v2__search">
+          <DashIcon name="library" className="dash-icon--sm" />
           <input
             type="search"
             placeholder="Search packages…"
@@ -321,23 +430,15 @@ export function PlatformCurriculum() {
         </div>
         <button
           type="button"
-          className="plat-btn plat-btn--ghost"
-          disabled={catalogSyncing}
-          onClick={() => void syncCatalog()}
-        >
-          {catalogSyncing ? "Syncing…" : "Sync catalog"}
-        </button>
-        <button
-          type="button"
-          className="plat-btn plat-btn--ghost"
+          className="plat-btn plat-btn--ghost plat-tenants-v2__toolbar-btn"
           onClick={() => void load()}
         >
           Refresh
         </button>
       </div>
 
-      <div className="plat-curriculum-workspace">
-        <aside className="plat-curriculum-sidebar" aria-label="Packages">
+      <div className="plat-curriculum-workspace plat-curriculum-v2__workspace">
+        <aside className="plat-curriculum-sidebar plat-curriculum-v2__sidebar" aria-label="Packages">
           {filteredPackages.length === 0 ? (
             <p className="plat-empty">No packages match your search.</p>
           ) : (
@@ -382,7 +483,7 @@ export function PlatformCurriculum() {
           )}
         </aside>
 
-        <main className="plat-curriculum-main">
+        <main className="plat-curriculum-main plat-curriculum-v2__main">
           {!detail && !detailLoading ? (
             <div className="plat-curriculum-empty">
               <p>Select a package to manage its catalog.</p>
@@ -407,23 +508,31 @@ export function PlatformCurriculum() {
                     {detail.description ? <p>{detail.description}</p> : null}
                   </div>
                 </div>
-                <div className="plat-curriculum-main__actions">
-                  {!detail.isBlank ? (
+                <div className="plat-curriculum-main__actions plat-curriculum-v2__actions">
+                  <div className="plat-curriculum-v2__action-group">
+                    {!detail.isBlank ? (
+                      <button
+                        type="button"
+                        className="plat-btn plat-btn--ghost plat-btn--xs"
+                        onClick={() => setEditingMeta((v) => !v)}
+                      >
+                        {editingMeta ? "Cancel edit" : "Edit package"}
+                      </button>
+                    ) : null}
                     <button
                       type="button"
                       className="plat-btn plat-btn--ghost plat-btn--xs"
-                      onClick={() => setEditingMeta((v) => !v)}
+                      onClick={() => void copyKey()}
                     >
-                      {editingMeta ? "Cancel edit" : "Edit package"}
+                      {copied ? "Copied" : "Copy package key"}
                     </button>
+                  </div>
+                  {!detail.isBlank ? (
+                    <p className="plat-curriculum-v2__action-hint">
+                      <strong>Edit</strong> renames this package · <strong>Subjects</strong> tab
+                      adds or removes items
+                    </p>
                   ) : null}
-                  <button
-                    type="button"
-                    className="plat-btn plat-btn--ghost plat-btn--xs"
-                    onClick={() => void copyKey()}
-                  >
-                    {copied ? "Copied" : "Copy package key"}
-                  </button>
                 </div>
               </header>
 
@@ -454,7 +563,7 @@ export function PlatformCurriculum() {
                 <div className="plat-curriculum-blank">
                   <strong>Blank provisioning</strong>
                   <p>
-                    New schools get no subjects, grades, or library content until
+                    New tenants get no subjects, grades, or library content until
                     the admin completes setup manually.
                   </p>
                 </div>
@@ -485,7 +594,7 @@ export function PlatformCurriculum() {
 
                   <div className="plat-curriculum-panel">
                     {tab === "overview" ? (
-                      <div className="plat-curriculum-overview">
+                      <div className="plat-curriculum-overview plat-curriculum-v2__overview">
                         <div className="plat-curriculum-overview__cards">
                           <div className="plat-curriculum-mini">
                             <span className="plat-curriculum-mini__label">
@@ -495,9 +604,9 @@ export function PlatformCurriculum() {
                           </div>
                           <div className="plat-curriculum-mini">
                             <span className="plat-curriculum-mini__label">
-                              School type
+                              Organization type
                             </span>
-                            <strong>{formatSchoolType(detail.schoolType)}</strong>
+                            <strong>{formatOrgType(detail.schoolType)}</strong>
                           </div>
                           <div className="plat-curriculum-mini">
                             <span className="plat-curriculum-mini__label">
@@ -508,6 +617,11 @@ export function PlatformCurriculum() {
                             </strong>
                           </div>
                         </div>
+                        <section className="plat-curriculum-v2__mix-panel">
+                          <h4>Content included</h4>
+                          <p>What gets copied when this package provisions a tenant.</p>
+                          <ContentMixChart detail={detail} />
+                        </section>
                         <ul className="plat-curriculum-checklist">
                           <li>
                             <span>Subjects copied to tenant</span>
@@ -539,6 +653,33 @@ export function PlatformCurriculum() {
 
                     {tab === "subjects" ? (
                       <div className="plat-curriculum-tab-body">
+                        {!detail.isBlank ? (
+                          <div className="plat-curriculum-v2__subject-actions">
+                            <select
+                              value={addSubjectId}
+                              onChange={(e) => setAddSubjectId(e.target.value)}
+                              aria-label="Subject to add"
+                            >
+                              <option value="">Add from subject repository…</option>
+                              {availableSubjects.map((s) => (
+                                <option key={s.id} value={s.id}>
+                                  {s.code} — {s.name}
+                                </option>
+                              ))}
+                            </select>
+                            <button
+                              type="button"
+                              className="plat-btn plat-btn--primary plat-btn--sm"
+                              disabled={!addSubjectId || subjectBusy}
+                              onClick={() => void addSubjectToPackage()}
+                            >
+                              {subjectBusy ? "Saving…" : "Add subject"}
+                            </button>
+                            <span className="plat-curriculum-v2__subject-hint">
+                              New master subjects: sidebar → <strong>Subjects</strong>
+                            </span>
+                          </div>
+                        ) : null}
                         <div className="plat-search plat-search--compact">
                           <input
                             type="search"
@@ -555,18 +696,22 @@ export function PlatformCurriculum() {
                                 <th>Code</th>
                                 <th>Subject</th>
                                 <th>Level</th>
+                                {!detail.isBlank ? <th aria-label="Actions" /> : null}
                               </tr>
                             </thead>
                             <tbody>
                               {filteredSubjects.length === 0 ? (
                                 <tr>
-                                  <td colSpan={3} className="plat-curriculum-table__empty">
+                                  <td
+                                    colSpan={detail.isBlank ? 3 : 4}
+                                    className="plat-curriculum-table__empty"
+                                  >
                                     No subjects match.
                                   </td>
                                 </tr>
                               ) : (
                                 filteredSubjects.map((s) => (
-                                  <tr key={s.code}>
+                                  <tr key={s.id ?? s.code}>
                                     <td>
                                       <code>{s.code}</code>
                                     </td>
@@ -580,6 +725,18 @@ export function PlatformCurriculum() {
                                         "All"
                                       )}
                                     </td>
+                                    {!detail.isBlank ? (
+                                      <td>
+                                        <button
+                                          type="button"
+                                          className="plat-btn plat-btn--ghost plat-btn--xs plat-btn--danger"
+                                          disabled={subjectBusy}
+                                          onClick={() => void removeSubjectFromPackage(s)}
+                                        >
+                                          Remove
+                                        </button>
+                                      </td>
+                                    ) : null}
                                   </tr>
                                 ))
                               )}
@@ -592,7 +749,7 @@ export function PlatformCurriculum() {
                     {tab === "structure" ? (
                       <div className="plat-curriculum-tab-body">
                         <p className="plat-curriculum-tab-hint">
-                          Departments are created for each provisioned school.
+                          Departments are created for each provisioned tenant.
                         </p>
                         <div className="plat-curriculum-dept-grid">
                           {detail.departments.map((d) => (

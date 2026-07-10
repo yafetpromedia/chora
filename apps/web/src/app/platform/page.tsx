@@ -27,6 +27,7 @@ import type {
 import {
   PLATFORM_TOKEN_KEY,
   PLATFORM_USER_KEY,
+  isPlatformAuthError,
   platformFetch,
   type PlatformUser,
 } from "@/lib/platform-auth";
@@ -58,7 +59,13 @@ export default function PlatformDashboardPage() {
     if (raw) setUser(JSON.parse(raw) as PlatformUser);
 
     void loadData()
-      .catch((err) => setError(err instanceof Error ? err.message : "Load failed"))
+      .catch((err) => {
+        if (isPlatformAuthError(err)) {
+          router.replace("/platform/login");
+          return;
+        }
+        setError(err instanceof Error ? err.message : "Load failed");
+      })
       .finally(() => setLoading(false));
   }, [router, loadData]);
 
@@ -67,12 +74,35 @@ export default function PlatformDashboardPage() {
     status: "ACTIVE" | "SUSPENDED" | "TRIAL",
   ) {
     setError("");
-    await platformFetch(`/platform/schools/${schoolId}/status`, {
-      method: "PATCH",
-      body: JSON.stringify({ status }),
-    });
-    await loadData();
-    setSchools(await platformFetch<PlatformSchoolRow[]>("/platform/schools"));
+    try {
+      await platformFetch(`/platform/schools/${schoolId}/status`, {
+        method: "PATCH",
+        body: JSON.stringify({ status }),
+      });
+      await loadData();
+      setSchools(await platformFetch<PlatformSchoolRow[]>("/platform/schools"));
+    } catch (err) {
+      if (isPlatformAuthError(err)) {
+        router.replace("/platform/login");
+        return;
+      }
+      setError(err instanceof Error ? err.message : "Update failed");
+    }
+  }
+
+  async function deleteTenant(schoolId: string) {
+    setError("");
+    try {
+      await platformFetch(`/platform/schools/${schoolId}`, { method: "DELETE" });
+      await loadData();
+      setSchools(await platformFetch<PlatformSchoolRow[]>("/platform/schools"));
+    } catch (err) {
+      if (isPlatformAuthError(err)) {
+        router.replace("/platform/login");
+        return;
+      }
+      throw err;
+    }
   }
 
   async function refreshSchools() {
@@ -105,6 +135,7 @@ export default function PlatformDashboardPage() {
               user={user}
               onRefresh={refreshSchools}
               onStatusChange={setStatus}
+              onDelete={deleteTenant}
             />
           ) : null}
           {section === "curriculum" ? <PlatformCurriculum /> : null}

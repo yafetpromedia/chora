@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { DashIcon } from "@/components/dashboard/dash-icons";
+import { AcademicsAlert, AcademicsHero, AcademicsBadge } from "@/components/academics/academics-ui";
 import { DashboardPage } from "@/components/dashboard/dashboard-page";
-import { listGrades } from "@/lib/school-setup";
-import type { GradeWithSections } from "@/lib/api";
+import { listGrades, listStudents } from "@/lib/school-setup";
+import type { GradeWithSections, StudentRecord } from "@/lib/api";
 import {
   assignGradeFees,
   createFeeSchedule,
@@ -26,12 +28,13 @@ import {
   type FeeType,
   type FinanceAnalytics,
 } from "@/lib/finance";
-import { listStudents } from "@/lib/school-setup";
-import type { StudentRecord } from "@/lib/api";
 import { AUTH_ROLE_KEY, AUTH_TOKEN_KEY, isSchoolWorkspaceRole } from "@/lib/auth";
+
+type Tab = "pending" | "billing" | "payments" | "tools";
 
 export default function AdminFinancePage() {
   const router = useRouter();
+  const [tab, setTab] = useState<Tab>("pending");
   const [years, setYears] = useState<AcademicYear[]>([]);
   const [feeTypes, setFeeTypes] = useState<FeeType[]>([]);
   const [schedules, setSchedules] = useState<FeeSchedule[]>([]);
@@ -39,7 +42,10 @@ export default function AdminFinancePage() {
   const [students, setStudents] = useState<StudentRecord[]>([]);
   const [analytics, setAnalytics] = useState<FinanceAnalytics | null>(null);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [pendingBusy, setPendingBusy] = useState<string | null>(null);
 
   const [scheduleFeeTypeId, setScheduleFeeTypeId] = useState("");
   const [scheduleGradeId, setScheduleGradeId] = useState("");
@@ -57,9 +63,7 @@ export default function AdminFinancePage() {
   const [payAmount, setPayAmount] = useState("");
   const [payMethod, setPayMethod] = useState("CASH");
   const [payRef, setPayRef] = useState("");
-  const [receiptMsg, setReceiptMsg] = useState("");
   const [pending, setPending] = useState<PendingPaymentReview[]>([]);
-  const [pendingBusy, setPendingBusy] = useState<string | null>(null);
 
   const currentYear = years.find((y) => y.isCurrent) ?? years[0];
 
@@ -100,10 +104,19 @@ export default function AdminFinancePage() {
       .finally(() => setLoading(false));
   }, [router]);
 
-  async function onCreateSchedule(e: React.FormEvent) {
+  const collectionRate = useMemo(() => {
+    if (!analytics || analytics.expectedRevenueCents <= 0) return null;
+    return Math.round((analytics.collectedCents / analytics.expectedRevenueCents) * 100);
+  }, [analytics]);
+
+  const selectedStudent = students.find((s) => s.id === payStudentId);
+
+  async function onCreateSchedule(e: FormEvent) {
     e.preventDefault();
     if (!currentYear) return;
     setError("");
+    setSuccess("");
+    setBusy(true);
     try {
       const amountCents = Math.round(parseFloat(scheduleAmount) * 100);
       await createFeeSchedule({
@@ -114,32 +127,40 @@ export default function AdminFinancePage() {
         frequency: "MONTHLY",
         installmentCount: 1,
       });
-      setSchedules(await listFeeSchedules());
-      setAnalytics(await getFinanceAnalytics());
+      setSuccess("Fee schedule created.");
+      await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed");
+    } finally {
+      setBusy(false);
     }
   }
 
   async function onAssign() {
     setError("");
+    setSuccess("");
+    setBusy(true);
     try {
       const res = await assignGradeFees({
         feeScheduleId: assignScheduleId,
         gradeId: assignGradeId,
         dueDate: assignDueDate,
       });
-      setReceiptMsg(`Assigned fees to ${res.assigned} students.`);
-      setAnalytics(await getFinanceAnalytics());
+      setSuccess(`Assigned fees to ${res.assigned} students.`);
+      await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Assign failed");
+    } finally {
+      setBusy(false);
     }
   }
 
-  async function onRecordPayment(e: React.FormEvent) {
+  async function onRecordPayment(e: FormEvent) {
     e.preventDefault();
     if (!payStudentId || !payFeeId) return;
     setError("");
+    setSuccess("");
+    setBusy(true);
     try {
       const amountCents = Math.round(parseFloat(payAmount) * 100);
       const receipt = await recordPayment({
@@ -149,25 +170,24 @@ export default function AdminFinancePage() {
         reference: payRef || undefined,
         allocations: [{ studentFeeId: payFeeId, amountCents }],
       });
-      setReceiptMsg(
+      setSuccess(
         `Receipt ${(receipt as { receiptNumber: string }).receiptNumber} — balance ${formatEtb((receipt as { balanceRemainingCents: number }).balanceRemainingCents)}`,
       );
-      setAnalytics(await getFinanceAnalytics());
+      await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Payment failed");
+    } finally {
+      setBusy(false);
     }
   }
-
-  const selectedStudent = students.find((s) => s.id === payStudentId);
 
   async function onApprovePending(id: string) {
     setPendingBusy(id);
     setError("");
+    setSuccess("");
     try {
       const receipt = await approvePendingPayment(id);
-      setReceiptMsg(
-        `Approved — receipt ${(receipt as { receiptNumber: string }).receiptNumber}`,
-      );
+      setSuccess(`Approved — receipt ${(receipt as { receiptNumber: string }).receiptNumber}`);
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Approve failed");
@@ -180,9 +200,10 @@ export default function AdminFinancePage() {
     const reason = window.prompt("Reason for rejection (optional):") ?? undefined;
     setPendingBusy(id);
     setError("");
+    setSuccess("");
     try {
       await rejectPendingPayment(id, reason);
-      setReceiptMsg("Payment rejected.");
+      setSuccess("Payment rejected.");
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Reject failed");
@@ -192,287 +213,408 @@ export default function AdminFinancePage() {
   }
 
   return (
-    <DashboardPage
-      role="admin"
-      title="Finance"
-      eyebrow="CampusOne"
-    >
-      {error ? <p className="auth-alert auth-alert--error">{error}</p> : null}
-        {receiptMsg ? (
-          <p className="auth-alert" style={{ background: "var(--brand-surface)" }}>
-            {receiptMsg}
+    <DashboardPage role="admin" title="Finance">
+      <div className="fin-v2">
+        <AcademicsHero
+          title="School finance"
+          subtitle={
+            analytics
+              ? `${formatEtb(analytics.collectedCents)} collected of ${formatEtb(analytics.expectedRevenueCents)} expected · ${analytics.overdueFeesCount} overdue fees`
+              : "Track collections, bill students, verify payments, and export records."
+          }
+          stats={[
+            {
+              label: "This month",
+              value: loading || !analytics ? "—" : formatEtb(analytics.collectedThisMonthCents),
+            },
+            {
+              label: "Outstanding",
+              value: loading || !analytics ? "—" : formatEtb(analytics.outstandingCents),
+              accent: !loading && !!analytics && analytics.outstandingCents > 0,
+            },
+            {
+              label: "Unpaid",
+              value: loading || !analytics ? "—" : analytics.unpaidStudents,
+            },
+            {
+              label: "Collection",
+              value:
+                loading || collectionRate == null ? "—" : `${collectionRate}%`,
+            },
+          ]}
+          badges={
+            <>
+              {currentYear ? (
+                <AcademicsBadge variant="live">{currentYear.name}</AcademicsBadge>
+              ) : null}
+              {!loading && pending.length > 0 ? (
+                <span className="fin-v2__hero-badge fin-v2__hero-badge--warn">
+                  {pending.length} pending verification
+                </span>
+              ) : null}
+            </>
+          }
+        />
+
+        {error ? <AcademicsAlert tone="error">{error}</AcademicsAlert> : null}
+        {success ? (
+          <p className="fin-v2__alert fin-v2__alert--ok" role="status">
+            {success}
           </p>
         ) : null}
 
+        <div className="fin-v2__toolbar">
+          <nav className="fin-v2__tabs" aria-label="Finance">
+            <button
+              type="button"
+              className={`fin-v2__tab${tab === "pending" ? " fin-v2__tab--active" : ""}`}
+              onClick={() => setTab("pending")}
+            >
+              <DashIcon name="alert" className="dash-icon--sm" />
+              Pending
+              {pending.length > 0 ? (
+                <span className="fin-v2__tab-badge">{pending.length}</span>
+              ) : null}
+            </button>
+            <button
+              type="button"
+              className={`fin-v2__tab${tab === "billing" ? " fin-v2__tab--active" : ""}`}
+              onClick={() => setTab("billing")}
+            >
+              <DashIcon name="fees" className="dash-icon--sm" />
+              Billing
+            </button>
+            <button
+              type="button"
+              className={`fin-v2__tab${tab === "payments" ? " fin-v2__tab--active" : ""}`}
+              onClick={() => setTab("payments")}
+            >
+              <DashIcon name="finance" className="dash-icon--sm" />
+              Record payment
+            </button>
+            <button
+              type="button"
+              className={`fin-v2__tab${tab === "tools" ? " fin-v2__tab--active" : ""}`}
+              onClick={() => setTab("tools")}
+            >
+              <DashIcon name="settings" className="dash-icon--sm" />
+              Tools
+            </button>
+          </nav>
+        </div>
+
         {loading ? (
-          <p className="setup-hint">Loading…</p>
-        ) : analytics ? (
-          <section className="att-admin-section" style={{ borderTop: "none", marginTop: 0 }}>
-            <h2 className="setup-panel-label">School finance</h2>
-            <div className="att-stats-grid">
-              <div className="att-stat">
-                <span className="att-stat-value">{formatEtb(analytics.collectedThisMonthCents)}</span>
-                <span className="att-stat-label">Collected this month</span>
-              </div>
-              <div className="att-stat">
-                <span className="att-stat-value">{formatEtb(analytics.outstandingCents)}</span>
-                <span className="att-stat-label">Outstanding</span>
-              </div>
-              <div className="att-stat">
-                <span className="att-stat-value">{formatEtb(analytics.expectedRevenueCents)}</span>
-                <span className="att-stat-label">Expected revenue</span>
-              </div>
-              <div className="att-stat">
-                <span className="att-stat-value">{analytics.unpaidStudents}</span>
-                <span className="att-stat-label">Unpaid students</span>
-              </div>
-            </div>
-            <p className="tch-meta">
-              Forecast: {formatEtb(analytics.collectedCents)} collected of{" "}
-              {formatEtb(analytics.expectedRevenueCents)} expected · {analytics.overdueFeesCount}{" "}
-              overdue fees
-            </p>
-          </section>
-        ) : null}
-
-        <section className="att-admin-section">
-          <h2 className="setup-panel-label">Pending payment verification</h2>
-          {pending.length === 0 ? (
-            <p className="setup-hint">No payments awaiting verification.</p>
-          ) : (
-            <ul className="dash-list">
-              {pending.map((p) => (
-                <li key={p.id} className="dash-list-item dash-list-item--stack">
+          <div className="fin-v2__loading">
+            <span className="fin-v2__loading-spinner" aria-hidden />
+            <p>Loading finance data…</p>
+          </div>
+        ) : (
+          <>
+            {tab === "pending" ? (
+              <section className="fin-v2__card">
+                <header className="fin-v2__card-head">
+                  <span className="fin-v2__card-icon fin-v2__card-icon--warn" aria-hidden>
+                    <DashIcon name="alert" className="dash-icon--sm" />
+                  </span>
                   <div>
-                    <p className="dash-list-title">
-                      {p.student.name} · {formatEtb(p.amountCents)}
+                    <h3 className="fin-v2__card-title">Payment verification</h3>
+                    <p className="fin-v2__card-sub">
+                      Approve or reject bank transfers submitted by parents.
                     </p>
-                    <p className="dash-list-meta">
-                      {p.student.grade}
-                      {p.student.section ? ` · ${p.student.section}` : ""} · Ref:{" "}
-                      {p.reference ?? "—"} · #{p.receiptNumber}
-                    </p>
-                    {p.proofUrl ? (
-                      <a
-                        href={p.proofUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="dash-link-btn"
-                        style={{ display: "inline-block", marginTop: "0.35rem" }}
-                      >
-                        View screenshot
-                      </a>
-                    ) : null}
                   </div>
-                  <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-                    <button
-                      type="button"
-                      className="att-btn att-btn--primary"
-                      disabled={pendingBusy === p.id}
-                      onClick={() => void onApprovePending(p.id)}
-                    >
-                      {pendingBusy === p.id ? "…" : "Approve"}
-                    </button>
-                    <button
-                      type="button"
-                      className="att-btn att-btn--ghost"
-                      disabled={pendingBusy === p.id}
-                      onClick={() => void onRejectPending(p.id)}
-                    >
-                      Reject
-                    </button>
+                </header>
+                {pending.length === 0 ? (
+                  <div className="fin-v2__empty">
+                    <p>No payments awaiting verification.</p>
                   </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-
-        <section className="att-admin-section">
-          <h2 className="setup-panel-label">Create fee schedule</h2>
-          <form onSubmit={(e) => void onCreateSchedule(e)} className="att-filters">
-            <label className="att-field">
-              <span>Fee type</span>
-              <select
-                className="auth-input auth-input--login auth-input--login-plain"
-                value={scheduleFeeTypeId}
-                onChange={(e) => setScheduleFeeTypeId(e.target.value)}
-              >
-                {feeTypes.map((f) => (
-                  <option key={f.id} value={f.id}>
-                    {f.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="att-field">
-              <span>Grade</span>
-              <select
-                className="auth-input auth-input--login auth-input--login-plain"
-                value={scheduleGradeId}
-                onChange={(e) => setScheduleGradeId(e.target.value)}
-              >
-                <option value="">All grades</option>
-                {grades.map((g) => (
-                  <option key={g.id} value={g.id}>
-                    {g.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="att-field">
-              <span>Amount (ETB)</span>
-              <input
-                className="auth-input auth-input--login auth-input--login-plain"
-                value={scheduleAmount}
-                onChange={(e) => setScheduleAmount(e.target.value)}
-                required
-              />
-            </label>
-            <button type="submit" className="auth-page-submit att-field--wide">
-              Add schedule
-            </button>
-          </form>
-        </section>
-
-        <section className="att-admin-section">
-          <h2 className="setup-panel-label">Bill students by grade</h2>
-          <div className="att-filters">
-            <label className="att-field">
-              <span>Schedule</span>
-              <select
-                className="auth-input auth-input--login auth-input--login-plain"
-                value={assignScheduleId}
-                onChange={(e) => setAssignScheduleId(e.target.value)}
-              >
-                {schedules.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.feeType.name} — {s.grade?.name ?? "All"} — {formatEtb(s.amountCents)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="att-field">
-              <span>Grade</span>
-              <select
-                className="auth-input auth-input--login auth-input--login-plain"
-                value={assignGradeId}
-                onChange={(e) => setAssignGradeId(e.target.value)}
-              >
-                {grades.map((g) => (
-                  <option key={g.id} value={g.id}>
-                    {g.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="att-field">
-              <span>Due date</span>
-              <input
-                type="date"
-                className="auth-input auth-input--login auth-input--login-plain"
-                value={assignDueDate}
-                onChange={(e) => setAssignDueDate(e.target.value)}
-              />
-            </label>
-          </div>
-          <button type="button" className="auth-page-submit" onClick={() => void onAssign()}>
-            Assign fees to class
-          </button>
-        </section>
-
-        <section className="att-admin-section">
-          <h2 className="setup-panel-label">Record manual payment</h2>
-          <form onSubmit={(e) => void onRecordPayment(e)} className="setup-form-col">
-            <label className="att-field">
-              <span>Student</span>
-              <select
-                className="auth-input auth-input--login auth-input--login-plain"
-                value={payStudentId}
-                onChange={(e) => {
-                  setPayStudentId(e.target.value);
-                  setPayFeeId("");
-                }}
-              >
-                {students.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.user.firstName} {s.user.lastName} — {s.grade.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            {selectedStudent ? (
-              <StudentFeePicker
-                profileId={selectedStudent.id}
-                onSelect={(feeId, balance) => {
-                  setPayFeeId(feeId);
-                  setPayAmount(String(balance / 100));
-                }}
-              />
+                ) : (
+                  <ul className="fin-v2__pending-list">
+                    {pending.map((p) => (
+                      <li key={p.id} className="fin-v2__pending-item">
+                        <div className="fin-v2__pending-main">
+                          <strong>{p.student.name}</strong>
+                          <span className="fin-v2__pending-amount">{formatEtb(p.amountCents)}</span>
+                          <p>
+                            {p.student.grade}
+                            {p.student.section ? ` · ${p.student.section}` : ""} · Ref:{" "}
+                            {p.reference ?? "—"} · #{p.receiptNumber}
+                          </p>
+                          {p.proofUrl ? (
+                            <a href={p.proofUrl} target="_blank" rel="noreferrer" className="fin-v2__link">
+                              View proof screenshot →
+                            </a>
+                          ) : null}
+                        </div>
+                        <div className="fin-v2__pending-actions">
+                          <button
+                            type="button"
+                            className="fin-v2__btn fin-v2__btn--primary fin-v2__btn--sm"
+                            disabled={pendingBusy === p.id}
+                            onClick={() => void onApprovePending(p.id)}
+                          >
+                            {pendingBusy === p.id ? "…" : "Approve"}
+                          </button>
+                          <button
+                            type="button"
+                            className="fin-v2__btn fin-v2__btn--ghost fin-v2__btn--sm"
+                            disabled={pendingBusy === p.id}
+                            onClick={() => void onRejectPending(p.id)}
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
             ) : null}
-            <label className="att-field">
-              <span>Amount (ETB)</span>
-              <input
-                className="auth-input auth-input--login auth-input--login-plain"
-                value={payAmount}
-                onChange={(e) => setPayAmount(e.target.value)}
-                required
-              />
-            </label>
-            <label className="att-field">
-              <span>Method</span>
-              <select
-                className="auth-input auth-input--login auth-input--login-plain"
-                value={payMethod}
-                onChange={(e) => setPayMethod(e.target.value)}
-              >
-                <option value="CASH">Cash</option>
-                <option value="BANK_TRANSFER">Bank transfer</option>
-                <option value="OTHER">Other</option>
-              </select>
-            </label>
-            <input
-              className="auth-input auth-input--login auth-input--login-plain"
-              placeholder="Reference (optional)"
-              value={payRef}
-              onChange={(e) => setPayRef(e.target.value)}
-            />
-            <button type="submit" className="auth-page-submit" disabled={!payFeeId}>
-              Record payment & receipt
-            </button>
-          </form>
-        </section>
 
-        <section className="att-admin-section">
-          <h2 className="setup-panel-label">Tools</h2>
-          <div className="setup-actions-row">
-            <button
-              type="button"
-              className="dash-copy-btn"
-              onClick={() =>
-                void sendFeeReminders(3).then((r) =>
-                  setReceiptMsg(`Sent ${r.remindersSent} fee reminders.`),
-                )
-              }
-            >
-              Send due reminders (3 days)
-            </button>
-            <button
-              type="button"
-              className="dash-copy-btn"
-              onClick={() => {
-                const to = new Date().toISOString().slice(0, 10);
-                const from = new Date(new Date().getFullYear(), 0, 1)
-                  .toISOString()
-                  .slice(0, 10);
-                void downloadFinanceExport(from, to);
-              }}
-            >
-              Export CSV
-            </button>
-          </div>
-        </section>
+            {tab === "billing" ? (
+              <div className="fin-v2__grid">
+                <section className="fin-v2__card">
+                  <header className="fin-v2__card-head">
+                    <span className="fin-v2__card-icon" aria-hidden>
+                      <DashIcon name="fees" className="dash-icon--sm" />
+                    </span>
+                    <div>
+                      <h3 className="fin-v2__card-title">Create fee schedule</h3>
+                      <p className="fin-v2__card-sub">
+                        Define tuition, transport, or other recurring charges for a grade.
+                      </p>
+                    </div>
+                  </header>
+                  <form className="fin-v2__form" onSubmit={(e) => void onCreateSchedule(e)}>
+                    <label className="fin-v2__field">
+                      <span>Fee type</span>
+                      <select
+                        value={scheduleFeeTypeId}
+                        onChange={(e) => setScheduleFeeTypeId(e.target.value)}
+                      >
+                        {feeTypes.map((f) => (
+                          <option key={f.id} value={f.id}>
+                            {f.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="fin-v2__field">
+                      <span>Grade</span>
+                      <select
+                        value={scheduleGradeId}
+                        onChange={(e) => setScheduleGradeId(e.target.value)}
+                      >
+                        <option value="">All grades</option>
+                        {grades.map((g) => (
+                          <option key={g.id} value={g.id}>
+                            {g.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="fin-v2__field">
+                      <span>Amount (ETB)</span>
+                      <input
+                        value={scheduleAmount}
+                        onChange={(e) => setScheduleAmount(e.target.value)}
+                        required
+                      />
+                    </label>
+                    <button
+                      type="submit"
+                      className="fin-v2__btn fin-v2__btn--primary"
+                      disabled={busy}
+                    >
+                      {busy ? "Saving…" : "Add schedule"}
+                    </button>
+                  </form>
+                </section>
 
+                <section className="fin-v2__card">
+                  <header className="fin-v2__card-head">
+                    <span className="fin-v2__card-icon fin-v2__card-icon--assign" aria-hidden>
+                      <DashIcon name="students" className="dash-icon--sm" />
+                    </span>
+                    <div>
+                      <h3 className="fin-v2__card-title">Bill students by grade</h3>
+                      <p className="fin-v2__card-sub">
+                        Assign a schedule to every student in a grade with a due date.
+                      </p>
+                    </div>
+                  </header>
+                  <div className="fin-v2__form">
+                    <label className="fin-v2__field">
+                      <span>Schedule</span>
+                      <select
+                        value={assignScheduleId}
+                        onChange={(e) => setAssignScheduleId(e.target.value)}
+                      >
+                        {schedules.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.feeType.name} — {s.grade?.name ?? "All"} — {formatEtb(s.amountCents)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="fin-v2__field">
+                      <span>Grade</span>
+                      <select value={assignGradeId} onChange={(e) => setAssignGradeId(e.target.value)}>
+                        {grades.map((g) => (
+                          <option key={g.id} value={g.id}>
+                            {g.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="fin-v2__field">
+                      <span>Due date</span>
+                      <input
+                        type="date"
+                        value={assignDueDate}
+                        onChange={(e) => setAssignDueDate(e.target.value)}
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      className="fin-v2__btn fin-v2__btn--primary"
+                      disabled={busy}
+                      onClick={() => void onAssign()}
+                    >
+                      {busy ? "Working…" : "Assign fees to class"}
+                    </button>
+                  </div>
+                </section>
+              </div>
+            ) : null}
+
+            {tab === "payments" ? (
+              <section className="fin-v2__card">
+                <header className="fin-v2__card-head">
+                  <span className="fin-v2__card-icon fin-v2__card-icon--pay" aria-hidden>
+                    <DashIcon name="finance" className="dash-icon--sm" />
+                  </span>
+                  <div>
+                    <h3 className="fin-v2__card-title">Record manual payment</h3>
+                    <p className="fin-v2__card-sub">
+                      Log cash or in-office payments and generate a receipt instantly.
+                    </p>
+                  </div>
+                </header>
+                <form className="fin-v2__form fin-v2__form--wide" onSubmit={(e) => void onRecordPayment(e)}>
+                  <label className="fin-v2__field">
+                    <span>Student</span>
+                    <select
+                      value={payStudentId}
+                      onChange={(e) => {
+                        setPayStudentId(e.target.value);
+                        setPayFeeId("");
+                      }}
+                    >
+                      {students.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.user.firstName} {s.user.lastName} — {s.grade.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  {selectedStudent ? (
+                    <StudentFeePicker
+                      profileId={selectedStudent.id}
+                      onSelect={(feeId, balance) => {
+                        setPayFeeId(feeId);
+                        setPayAmount(String(balance / 100));
+                      }}
+                    />
+                  ) : null}
+                  <label className="fin-v2__field">
+                    <span>Amount (ETB)</span>
+                    <input
+                      value={payAmount}
+                      onChange={(e) => setPayAmount(e.target.value)}
+                      required
+                    />
+                  </label>
+                  <label className="fin-v2__field">
+                    <span>Method</span>
+                    <select value={payMethod} onChange={(e) => setPayMethod(e.target.value)}>
+                      <option value="CASH">Cash</option>
+                      <option value="BANK_TRANSFER">Bank transfer</option>
+                      <option value="OTHER">Other</option>
+                    </select>
+                  </label>
+                  <label className="fin-v2__field">
+                    <span>Reference (optional)</span>
+                    <input
+                      value={payRef}
+                      onChange={(e) => setPayRef(e.target.value)}
+                      placeholder="Transaction ref or note"
+                    />
+                  </label>
+                  <button
+                    type="submit"
+                    className="fin-v2__btn fin-v2__btn--primary"
+                    disabled={!payFeeId || busy}
+                  >
+                    {busy ? "Recording…" : "Record payment & receipt"}
+                  </button>
+                </form>
+              </section>
+            ) : null}
+
+            {tab === "tools" ? (
+              <section className="fin-v2__card">
+                <header className="fin-v2__card-head">
+                  <span className="fin-v2__card-icon" aria-hidden>
+                    <DashIcon name="settings" className="dash-icon--sm" />
+                  </span>
+                  <div>
+                    <h3 className="fin-v2__card-title">Finance tools</h3>
+                    <p className="fin-v2__card-sub">Remind families and export records for accounting.</p>
+                  </div>
+                </header>
+                <div className="fin-v2__actions">
+                  <button
+                    type="button"
+                    className="fin-v2__action"
+                    onClick={() =>
+                      void sendFeeReminders(3).then((r) =>
+                        setSuccess(`Sent ${r.remindersSent} fee reminders.`),
+                      )
+                    }
+                  >
+                    <span className="fin-v2__action-icon" aria-hidden>
+                      <DashIcon name="announcements" className="dash-icon--sm" />
+                    </span>
+                    <span className="fin-v2__action-body">
+                      <strong>Send due reminders</strong>
+                      <span>Notify parents 3 days before fees are due.</span>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    className="fin-v2__action"
+                    onClick={() => {
+                      const to = new Date().toISOString().slice(0, 10);
+                      const from = new Date(new Date().getFullYear(), 0, 1)
+                        .toISOString()
+                        .slice(0, 10);
+                      void downloadFinanceExport(from, to);
+                    }}
+                  >
+                    <span className="fin-v2__action-icon fin-v2__action-icon--export" aria-hidden>
+                      <DashIcon name="chart" className="dash-icon--sm" />
+                    </span>
+                    <span className="fin-v2__action-body">
+                      <strong>Export CSV</strong>
+                      <span>Download year-to-date payment records.</span>
+                    </span>
+                  </button>
+                </div>
+              </section>
+            ) : null}
+          </>
+        )}
+      </div>
     </DashboardPage>
   );
 }
@@ -501,14 +643,13 @@ function StudentFeePicker({
   }, [profileId]);
 
   if (fees.length === 0) {
-    return <p className="setup-hint">No outstanding fees for this student.</p>;
+    return <p className="fin-v2__hint">No outstanding fees for this student.</p>;
   }
 
   return (
-    <label className="att-field">
+    <label className="fin-v2__field">
       <span>Apply to fee</span>
       <select
-        className="auth-input auth-input--login auth-input--login-plain"
         onChange={(e) => {
           const fee = fees.find((f) => f.id === e.target.value);
           if (fee) onSelect(fee.id, fee.balanceCents);

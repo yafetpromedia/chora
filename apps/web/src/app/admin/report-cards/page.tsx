@@ -26,7 +26,7 @@ export default function AdminReportCardsPage() {
   }, [router]);
 
   return (
-    <DashboardPage role="admin" title="Report cards" eyebrow="Academics">
+    <DashboardPage role="admin" title="Report cards">
       <ReportCardsWorkspace students={students} />
     </DashboardPage>
   );

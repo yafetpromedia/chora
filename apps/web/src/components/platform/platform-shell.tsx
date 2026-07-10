@@ -16,7 +16,7 @@ import {
 
 const NAV: { id: PlatformSection; label: string; icon: DashIconName }[] = [
   { id: "overview", label: "Overview", icon: "overview" },
-  { id: "schools", label: "Schools", icon: "students" },
+  { id: "schools", label: "Tenants", icon: "students" },
   { id: "curriculum", label: "Packages", icon: "results" },
   { id: "subjects", label: "Subjects", icon: "library" },
   { id: "library", label: "eLibrary", icon: "library" },

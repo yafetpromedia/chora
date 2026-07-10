@@ -3,11 +3,9 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { DashIcon } from "@/components/dashboard/dash-icons";
 import {
   AcademicsAlert,
-  AcademicsBadge,
-  AcademicsBreadcrumb,
-  AcademicsHero,
 } from "@/components/academics/academics-ui";
 import { PendingApprovalsPanel } from "@/components/results/pending-approvals-panel";
 import { ScoreMatrixPanel } from "@/components/results/score-matrix-panel";
@@ -161,112 +159,106 @@ export function ResultsWorkspace({ students, onError }: Props) {
     [students],
   );
 
-  const activeSection = SECTIONS.find((s) => s.id === section) ?? SECTIONS[0];
-  const activeScoreMode = SCORE_MODES.find((m) => m.id === scoreMode) ?? SCORE_MODES[0];
-
   return (
     <div className="acad-page acad-page--results res-v2">
-      <AcademicsBreadcrumb
-        items={[
-          { label: "Academics", href: "/admin/academics" },
-          { label: "Results" },
-        ]}
-      />
-
-      <AcademicsHero
-        chip="Grading & score sheets"
-        title="Results"
-        subtitle="Enter scores, review teacher submissions, and publish class sheets."
-        stats={heroStats}
-        badges={
-          <>
-            {currentTerm ? (
-              <AcademicsBadge variant="live">Current: {currentTerm.name}</AcademicsBadge>
-            ) : (
-              <AcademicsBadge variant="muted">No current term</AcademicsBadge>
-            )}
-            {!loading && pendingCount > 0 ? (
-              <AcademicsBadge variant="default">
-                {pendingCount} awaiting approval
-              </AcademicsBadge>
+      <header className="res-v2__hero">
+        <div className="res-v2__hero-glow" aria-hidden />
+        <div className="res-v2__hero-inner">
+          <div className="res-v2__hero-main">
+            <h2 className="res-v2__hero-title">Grading workspace</h2>
+            <p className="res-v2__hero-sub">
+              {section === "scores"
+                ? scoreMode === "matrix"
+                  ? "Enter and review class score sheets by term, grade, and subject."
+                  : "View all subjects for one student in a single read-only sheet."
+                : "Review submitted sheets and publish results to families."}
+            </p>
+            {currentTerm || (!loading && pendingCount > 0) ? (
+              <div className="res-v2__hero-badges">
+                {currentTerm ? <span className="res-v2__badge">{currentTerm.name}</span> : null}
+                {!loading && pendingCount > 0 ? (
+                  <span className="res-v2__badge res-v2__badge--warn">
+                    {pendingCount} pending review
+                  </span>
+                ) : null}
+              </div>
             ) : null}
-          </>
-        }
-      />
-
-      <div className="res-v2__nav">
-        <div className="res-v2__nav-group">
-          <label className="res-v2__nav-field">
-            <span>Workspace</span>
-            <select
-              value={section}
-              onChange={(e) => setSection(e.target.value as ResultsSection)}
-              aria-label="Results workspace section"
-            >
-              {SECTIONS.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.label} — {item.hint}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          {section === "scores" ? (
-            <label className="res-v2__nav-field">
-              <span>Score view</span>
-              <select
-                value={scoreMode}
-                onChange={(e) => setScoreMode(e.target.value as ScoreMode)}
-                aria-label="Score entry view"
+          </div>
+          <div className="res-v2__hero-stats">
+            {heroStats.map((stat) => (
+              <div
+                key={stat.label}
+                className={`res-v2__stat${stat.accent ? " res-v2__stat--accent" : ""}`}
               >
-                {SCORE_MODES.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.label} — {item.hint}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ) : null}
+                <strong>{stat.value}</strong>
+                <span>{stat.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </header>
+
+      <div className="res-v2__toolbar">
+        <div className="res-v2__tabs" role="tablist" aria-label="Results workspace">
+          {SECTIONS.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              role="tab"
+              aria-selected={section === item.id}
+              className={`res-v2__tab${section === item.id ? " res-v2__tab--active" : ""}`}
+              onClick={() => setSection(item.id)}
+            >
+              <DashIcon
+                name={item.id === "scores" ? "results" : "chart"}
+                className="dash-icon--sm"
+              />
+              <span className="res-v2__tab-text">
+                <strong>{item.label}</strong>
+                <em>{item.hint}</em>
+              </span>
+            </button>
+          ))}
         </div>
 
-        <label className="res-v2__nav-field res-v2__nav-field--setup">
-          <span>Setup</span>
-          <select
-            defaultValue=""
-            onChange={(e) => {
-              const href = e.target.value;
-              if (href) window.location.href = href;
-              e.target.value = "";
-            }}
-            aria-label="Results setup pages"
-          >
-            <option value="" disabled>
-              Open setup page…
-            </option>
-            {SETUP_LINKS.map((link) => (
-              <option key={link.href} value={link.href}>
-                {link.label}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
-
-      <p className="res-v2__nav-caption">
-        <strong>{activeSection.label}</strong>
-        <span> — {activeSection.hint}</span>
         {section === "scores" ? (
-          <>
-            <span className="res-v2__nav-dot">·</span>
-            <span>{activeScoreMode.label}</span>
-          </>
+          <div className="res-v2__subtabs" role="tablist" aria-label="Score entry view">
+            {SCORE_MODES.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                role="tab"
+                aria-selected={scoreMode === item.id}
+                className={`res-v2__subtab${scoreMode === item.id ? " res-v2__subtab--active" : ""}`}
+                onClick={() => setScoreMode(item.id)}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
         ) : null}
-      </p>
+
+        <div className="res-v2__setup">
+          <details className="res-v2__setup-menu">
+            <summary>
+              <DashIcon name="settings" className="dash-icon--sm" />
+              Setup
+            </summary>
+            <div className="res-v2__setup-links">
+              {SETUP_LINKS.map((link) => (
+                <Link key={link.href} href={link.href}>
+                  {link.label}
+                </Link>
+              ))}
+            </div>
+          </details>
+        </div>
+      </div>
 
       {error ? <AcademicsAlert tone="error">{error}</AcademicsAlert> : null}
 
       {section === "scores" ? (
-        <section className="res-v2__panel" aria-label={activeScoreMode.label}>
+        <section className="res-v2__panel" aria-label={scoreMode === "matrix" ? "Class sheet" : "By student"}>
           {scoreMode === "matrix" ? (
             <ScoreMatrixPanel role="admin" />
           ) : (

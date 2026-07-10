@@ -49,7 +49,7 @@ export function AcademicsHero({
   subtitle,
   badges,
   stats,
-  chip = "School academics",
+  chip,
 }: {
   title: string;
   subtitle: string;
@@ -62,7 +62,7 @@ export function AcademicsHero({
       <div className="acad-v2__hero-glow" aria-hidden />
       <div className="acad-v2__hero-inner">
         <div className="acad-v2__hero-main">
-          <span className="acad-v2__chip">{chip}</span>
+          {chip ? <span className="acad-v2__chip">{chip}</span> : null}
           <h2 className="acad-v2__hero-title">{title}</h2>
           <p className="acad-v2__hero-sub">{subtitle}</p>
           {badges ? <div className="acad-v2__hero-badges">{badges}</div> : null}

@@ -62,7 +62,7 @@ export function CreateSchoolDrawer({ open, onClose, onCreated }: Props) {
       onCreated();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not create school");
+      setError(err instanceof Error ? err.message : "Could not create tenant");
     } finally {
       setBusy(false);
     }
@@ -84,10 +84,10 @@ export function CreateSchoolDrawer({ open, onClose, onCreated }: Props) {
         <header className="stu-drawer__head">
           <div>
             <h2 id="plat-create-school-title" className="stu-drawer__title">
-              New school (tenant)
+              New tenant
             </h2>
             <p className="stu-drawer__sub">
-              Creates the school, trial status, and the first admin account.
+              Creates the tenant workspace, trial status, and the first admin account.
             </p>
           </div>
           <button type="button" className="stu-drawer__close" onClick={onClose}>
@@ -99,7 +99,7 @@ export function CreateSchoolDrawer({ open, onClose, onCreated }: Props) {
           {error ? <p className="auth-alert auth-alert--error">{error}</p> : null}
 
           <label className="plat-field">
-            <span>School name</span>
+            <span>Organization name</span>
             <input
               value={schoolName}
               onChange={(e) => setSchoolName(e.target.value)}
@@ -185,7 +185,7 @@ export function CreateSchoolDrawer({ open, onClose, onCreated }: Props) {
               Cancel
             </button>
             <button type="submit" className="plat-btn plat-btn--primary" disabled={busy}>
-              {busy ? "Creating…" : "Create school"}
+              {busy ? "Creating…" : "Create tenant"}
             </button>
           </footer>
         </form>
