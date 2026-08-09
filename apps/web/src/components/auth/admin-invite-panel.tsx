@@ -2,6 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { createSchoolInvite, listSchoolInvites, type SchoolInvite } from "@/lib/api";
+import { AppToast } from "@/components/ui/app-toast";
 
 const ROLES = [
   { value: "teacher" as const, label: "Teachers" },
@@ -104,12 +105,12 @@ export function AdminInvitePanel() {
         </button>
       </form>
 
-      {error ? <p className="auth-alert auth-alert--error" style={{ marginTop: "0.75rem" }}>{error}</p> : null}
-      {copied ? (
-        <p style={{ marginTop: "0.75rem", fontSize: "0.875rem", fontWeight: 600, color: "var(--brand-teal-dark)" }}>
-          Link copied to clipboard
-        </p>
-      ) : null}
+      <AppToast message={error} tone="error" onDismiss={() => setError("")} />
+      <AppToast
+        message={copied ? "Link copied to clipboard" : ""}
+        tone="success"
+        onDismiss={() => setCopied(null)}
+      />
 
       {invites.length > 0 ? (
         <div className="dash-invite-list">

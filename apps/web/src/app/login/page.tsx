@@ -96,11 +96,7 @@ export default function LoginPage() {
   }
 
   return (
-    <LoginShell
-      error={error || undefined}
-      schoolCode={schoolCode}
-      schoolName={schoolName}
-    >
+    <LoginShell error={error || undefined}>
       {step === "school" ? (
         <form onSubmit={(e) => void onValidateSchool(e)} className="reg-form login-form">
           <div className="reg-form__step">

@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { SchoolBrandLockup } from "@/components/dashboard/school-brand-lockup";
 import { fileToPhotoDataUrl } from "@/lib/student-photo";
+import { AppToast } from "@/components/ui/app-toast";
 
 type Props = {
   schoolName: string;
@@ -79,7 +80,7 @@ export function SchoolLogoUpload({ schoolName, value, onChange }: Props) {
         />
       </label>
 
-      {error ? <p className="auth-alert auth-alert--error">{error}</p> : null}
+      <AppToast message={error} tone="error" onDismiss={() => setError("")} />
     </div>
   );
 }

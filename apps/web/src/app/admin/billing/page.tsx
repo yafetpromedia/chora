@@ -107,6 +107,7 @@ export default function SchoolBillingPage() {
           ) : undefined
         }
         error={error}
+        onDismissError={() => setError("")}
         loading={loading}
         loadingLabel="Loading billing overview…"
       >

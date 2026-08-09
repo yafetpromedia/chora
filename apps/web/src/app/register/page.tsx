@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { AuthInput } from "@/components/auth/auth-input";
@@ -24,12 +24,6 @@ const SCHOOL_TYPES: { value: SchoolType; label: string }[] = [
   { value: "PREPARATORY", label: "Preparatory" },
   { value: "MIXED", label: "Mixed (K–12)" },
 ];
-
-const WIZARD_STEPS = [
-  { label: "School profile", desc: "Name, type & contact" },
-  { label: "Admin account", desc: "Your login details" },
-  { label: "Ready to launch", desc: "Secure your workspace" },
-] as const;
 
 const COUNTRIES = [
   "Ethiopia",
@@ -68,49 +62,42 @@ export default function RegisterSchoolPage() {
       .catch(() => undefined);
   }, []);
 
-  const packageLabel = useMemo(() => {
-    const match = packages.find((p) => p.key === curriculumPackageKey);
-    return match?.label ?? "Ethiopian private school";
-  }, [packages, curriculumPackageKey]);
-
   function validateStep(index: number): string | null {
     if (index === 0) {
       if (!schoolName.trim()) return "Enter your school name.";
       return null;
     }
-    if (index === 1) {
-      if (!adminFirstName.trim() || !adminLastName.trim()) {
-        return "Enter your first and last name.";
-      }
-      if (!username.trim()) return "Choose a username for sign-in.";
-      if (username.trim().length < 3) return "Username must be at least 3 characters.";
-      return null;
+    if (!adminFirstName.trim() || !adminLastName.trim()) {
+      return "Enter your first and last name.";
     }
-    if (index === 2) {
-      if (password.length < 8) return "Password must be at least 8 characters.";
-      return null;
-    }
+    if (!username.trim()) return "Choose a username for sign-in.";
+    if (username.trim().length < 3) return "Username must be at least 3 characters.";
+    if (password.length < 8) return "Password must be at least 8 characters.";
     return null;
   }
 
   function goNext() {
-    const message = validateStep(step);
+    const message = validateStep(0);
     if (message) {
       setError(message);
       return;
     }
     setError("");
-    setStep((s) => Math.min(s + 1, WIZARD_STEPS.length - 1));
+    setStep(1);
   }
 
   function goBack() {
     setError("");
-    setStep((s) => Math.max(s - 1, 0));
+    setStep(0);
   }
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const message = validateStep(2);
+    if (step === 0) {
+      goNext();
+      return;
+    }
+    const message = validateStep(1);
     if (message) {
       setError(message);
       return;
@@ -144,9 +131,6 @@ export default function RegisterSchoolPage() {
   return (
     <RegisterShell
       activeStep={step}
-      stepCount={WIZARD_STEPS.length}
-      stepLabel={WIZARD_STEPS[step].label}
-      schoolName={schoolName}
       error={error || undefined}
       footer={<RegisterFooterLinks />}
     >
@@ -157,14 +141,19 @@ export default function RegisterSchoolPage() {
               key="school"
               className="reg-form__step"
               aria-labelledby="reg-school"
-              initial={reduce ? false : { opacity: 0, x: 10 }}
+              initial={reduce ? false : { opacity: 0, x: 12 }}
               animate={{ opacity: 1, x: 0 }}
-              exit={reduce ? undefined : { opacity: 0, x: -10 }}
-              transition={{ duration: 0.28 }}
+              exit={reduce ? undefined : { opacity: 0, x: -12 }}
+              transition={{ duration: 0.25 }}
             >
-              <h2 id="reg-school" className="reg-form__title">
-                School details
-              </h2>
+              <header className="reg-form__head">
+                <h2 id="reg-school" className="reg-form__title">
+                  School details
+                </h2>
+                <p className="reg-form__lead">
+                  Tell us about the school. You can edit contact info later.
+                </p>
+              </header>
               <div className="reg-form__grid">
                 <div className="reg-form__full">
                   <AuthInput
@@ -216,15 +205,17 @@ export default function RegisterSchoolPage() {
                     ))}
                   </select>
                 </div>
-                <AuthInput
-                  id="school-address"
-                  label="Address"
-                  icon="none"
-                  variant="login"
-                  placeholder="Bole, Addis Ababa"
-                  value={address}
-                  onChange={setAddress}
-                />
+                <div className="reg-form__full">
+                  <AuthInput
+                    id="school-address"
+                    label="Address"
+                    icon="none"
+                    variant="login"
+                    placeholder="Bole, Addis Ababa"
+                    value={address}
+                    onChange={setAddress}
+                  />
+                </div>
                 <AuthInput
                   id="school-contact-email"
                   label="School email"
@@ -237,7 +228,7 @@ export default function RegisterSchoolPage() {
                 />
                 <AuthInput
                   id="school-phone"
-                  label="School phone"
+                  label="Phone"
                   icon="none"
                   variant="login"
                   autoComplete="tel"
@@ -245,7 +236,7 @@ export default function RegisterSchoolPage() {
                   value={phone}
                   onChange={setPhone}
                 />
-                <div className="reg-field">
+                <div className="reg-field reg-form__full">
                   <label className="auth-input-label" htmlFor="school-country">
                     Country
                   </label>
@@ -264,26 +255,29 @@ export default function RegisterSchoolPage() {
                 </div>
               </div>
             </motion.section>
-          ) : null}
-
-          {step === 1 ? (
+          ) : (
             <motion.section
               key="admin"
               className="reg-form__step"
               aria-labelledby="reg-admin"
-              initial={reduce ? false : { opacity: 0, x: 10 }}
+              initial={reduce ? false : { opacity: 0, x: 12 }}
               animate={{ opacity: 1, x: 0 }}
-              exit={reduce ? undefined : { opacity: 0, x: -10 }}
-              transition={{ duration: 0.28 }}
+              exit={reduce ? undefined : { opacity: 0, x: -12 }}
+              transition={{ duration: 0.25 }}
             >
-              <h2 id="reg-admin" className="reg-form__title">
-                Your admin login
-              </h2>
+              <header className="reg-form__head">
+                <h2 id="reg-admin" className="reg-form__title">
+                  Admin login
+                </h2>
+                <p className="reg-form__lead">
+                  This is how you&apos;ll sign in to manage the school.
+                </p>
+              </header>
               <div className="reg-form__grid">
                 <AuthInput
                   id="admin-first"
                   label="First name"
-                  icon="user"
+                  icon="none"
                   variant="login"
                   autoComplete="given-name"
                   placeholder="Jane"
@@ -294,7 +288,7 @@ export default function RegisterSchoolPage() {
                 <AuthInput
                   id="admin-last"
                   label="Last name"
-                  icon="user"
+                  icon="none"
                   variant="login"
                   autoComplete="family-name"
                   placeholder="Doe"
@@ -302,90 +296,46 @@ export default function RegisterSchoolPage() {
                   onChange={setAdminLastName}
                   required
                 />
+                <AuthInput
+                  id="admin-username"
+                  label="Username"
+                  icon="none"
+                  variant="login"
+                  autoComplete="username"
+                  placeholder="jane.admin"
+                  value={username}
+                  onChange={setUsername}
+                  required
+                />
+                <AuthInput
+                  id="admin-email"
+                  label="Email (optional)"
+                  type="email"
+                  icon="email"
+                  variant="login"
+                  autoComplete="email"
+                  placeholder="jane@brightside.edu.et"
+                  value={email}
+                  onChange={setEmail}
+                />
                 <div className="reg-form__full">
                   <AuthInput
-                    id="admin-username"
-                    label="Username"
-                    icon="user"
+                    id="school-password"
+                    label="Password"
+                    type="password"
+                    icon="password"
                     variant="login"
-                    autoComplete="username"
-                    placeholder="jane.admin"
-                    value={username}
-                    onChange={setUsername}
+                    autoComplete="new-password"
+                    placeholder="At least 8 characters"
+                    value={password}
+                    onChange={setPassword}
                     required
-                  />
-                </div>
-                <div className="reg-form__full">
-                  <AuthInput
-                    id="admin-email"
-                    label="Your email (contact)"
-                    type="email"
-                    icon="email"
-                    variant="login"
-                    autoComplete="email"
-                    placeholder="jane@brightside.edu.et"
-                    value={email}
-                    onChange={setEmail}
+                    minLength={8}
                   />
                 </div>
               </div>
             </motion.section>
-          ) : null}
-
-          {step === 2 ? (
-            <motion.section
-              key="launch"
-              className="reg-form__step"
-              aria-labelledby="reg-launch"
-              initial={reduce ? false : { opacity: 0, x: 10 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={reduce ? undefined : { opacity: 0, x: -10 }}
-              transition={{ duration: 0.28 }}
-            >
-              <h2 id="reg-launch" className="reg-form__title">
-                Review & launch
-              </h2>
-
-              <dl className="reg-review">
-                <div>
-                  <dt>School</dt>
-                  <dd>{schoolName || "—"}</dd>
-                </div>
-                <div>
-                  <dt>Package</dt>
-                  <dd>{packageLabel}</dd>
-                </div>
-                <div>
-                  <dt>Admin</dt>
-                  <dd>
-                    {adminFirstName} {adminLastName} · @{username}
-                  </dd>
-                </div>
-                {(address || phone || country) ? (
-                  <div>
-                    <dt>Contact</dt>
-                    <dd>
-                      {[address, phone, country].filter(Boolean).join(" · ")}
-                    </dd>
-                  </div>
-                ) : null}
-              </dl>
-
-              <AuthInput
-                id="school-password"
-                label="Password"
-                type="password"
-                icon="password"
-                variant="login"
-                autoComplete="new-password"
-                placeholder="Min. 8 characters"
-                value={password}
-                onChange={setPassword}
-                required
-                minLength={8}
-              />
-            </motion.section>
-          ) : null}
+          )}
         </AnimatePresence>
 
         <div className="reg-form__actions">
@@ -399,10 +349,10 @@ export default function RegisterSchoolPage() {
               ← Back
             </button>
           ) : (
-            <span />
+            <span className="reg-form__spacer" aria-hidden />
           )}
-          {step < WIZARD_STEPS.length - 1 ? (
-            <button type="button" className="reg-form__next" onClick={goNext}>
+          {step === 0 ? (
+            <button type="submit" className="reg-form__next">
               Continue →
             </button>
           ) : (
@@ -410,7 +360,7 @@ export default function RegisterSchoolPage() {
               variant="page"
               loading={loading}
               loadingLabel="Creating school…"
-              label="Start your school →"
+              label="Create workspace"
             />
           )}
         </div>

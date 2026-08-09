@@ -17,8 +17,7 @@ import {
   type UserProfile,
 
 } from "@/lib/profile";
-
-
+import { AppToast } from "@/components/ui/app-toast";
 
 function formatDate(iso: string) {
 
@@ -228,9 +227,8 @@ export function UserProfilePanel() {
 
     <div className="profile-page">
 
-      {error ? <p className="profile-alert profile-alert--error">{error}</p> : null}
-
-      {toast ? <p className="profile-alert profile-alert--ok">{toast}</p> : null}
+      <AppToast message={error} tone="error" onDismiss={() => setError("")} />
+      <AppToast message={toast} tone="success" onDismiss={() => setToast(null)} />
 
 
 

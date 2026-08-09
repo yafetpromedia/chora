@@ -38,7 +38,7 @@ const STEP_COPY: Record<StepNum, { title: string; lead: string }> = {
   },
   2: {
     title: "Class sections",
-    lead: "Split grades into A, B, C — or skip if you don't use sections.",
+    lead: "Add A–H for every grade, or Natural / Social streams on Grades 11 & 12. Type any name you use.",
   },
   3: {
     title: "Attendance mode",
@@ -71,9 +71,34 @@ const SECTION_PRESETS = [
   { label: "A·B", names: ["A", "B"] },
   { label: "A·B·C", names: ["A", "B", "C"] },
   { label: "A·B·C·D", names: ["A", "B", "C", "D"] },
+  { label: "A·B·C·G·H", names: ["A", "B", "C", "G", "H"] },
 ] as const;
 
-const QUICK_LETTERS = ["A", "B", "C", "D", "E", "F"] as const;
+const QUICK_LETTERS = ["A", "B", "C", "D", "E", "F", "G", "H"] as const;
+
+const STREAM_PRESETS = [
+  { label: "Natural", names: ["Natural"] },
+  { label: "Social", names: ["Social"] },
+  { label: "Nat A·B", names: ["Natural A", "Natural B"] },
+  { label: "Soc A·B", names: ["Social A", "Social B"] },
+  { label: "All streams", names: ["Natural A", "Natural B", "Social A", "Social B"] },
+] as const;
+
+function parseSectionNames(raw: string): string[] {
+  return raw
+    .split(/[,;]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+function isUpperSecondaryGrade(gradeName: string): boolean {
+  const n = gradeName.trim();
+  return /\b(11|12)\b/.test(n) || /^g\s*(11|12)$/i.test(n);
+}
+
+function upperSecondaryGrades(grades: GradeWithSections[]): GradeWithSections[] {
+  return grades.filter((g) => isUpperSecondaryGrade(g.name));
+}
 
 function StepNav({
   step,
@@ -142,6 +167,7 @@ export default function SchoolSetupPage() {
   const [activePreset, setActivePreset] = useState<GradePresetKey | null>(null);
   const [grades, setGrades] = useState<GradeWithSections[]>([]);
   const [bulkSections, setBulkSections] = useState("A, B, C");
+  const [customByGrade, setCustomByGrade] = useState<Record<string, string>>({});
   const [sectionBusy, setSectionBusy] = useState(false);
   const [attendanceMode, setAttendanceMode] = useState<AttendanceMode>("DAILY");
   const [loading, setLoading] = useState(false);
@@ -293,13 +319,19 @@ export default function SchoolSetupPage() {
   }
 
   async function onApplyBulkAll() {
-    const names = bulkSections
-      .split(/[,;]+/)
-      .map((s) => s.trim())
-      .filter(Boolean);
+    const names = parseSectionNames(bulkSections);
     if (names.length === 0) return;
     await applySections(names);
   }
+
+  async function onApplyGradeCustom(gradeId: string) {
+    const names = parseSectionNames(customByGrade[gradeId] ?? "");
+    if (names.length === 0) return;
+    await applySections(names, [gradeId]);
+    setCustomByGrade((prev) => ({ ...prev, [gradeId]: "" }));
+  }
+
+  const upperGrades = upperSecondaryGrades(grades);
 
   async function onRemoveSection(gradeId: string, sectionId: string, sectionName: string) {
     if (!window.confirm(`Remove section "${sectionName}"?`)) return;
@@ -384,38 +416,63 @@ export default function SchoolSetupPage() {
             ) : null}
 
             {step === 2 ? (
-              <div className="sw__toolbar">
-                <span className="sw__toolbar-label">{grades.length} grades</span>
-                <div className="sw__toolbar-pills">
-                  {SECTION_PRESETS.map((preset) => (
-                    <button
-                      key={preset.label}
-                      type="button"
-                      className="sw__pill"
-                      disabled={sectionBusy}
-                      onClick={() => void applySections([...preset.names])}
-                    >
-                      All {preset.label}
-                    </button>
-                  ))}
+              <div className="sw__toolbar-wrap">
+                <div className="sw__toolbar">
+                  <span className="sw__toolbar-label">{grades.length} grades</span>
+                  <div className="sw__toolbar-pills">
+                    {SECTION_PRESETS.map((preset) => (
+                      <button
+                        key={preset.label}
+                        type="button"
+                        className="sw__pill"
+                        disabled={sectionBusy}
+                        onClick={() => void applySections([...preset.names])}
+                      >
+                        All {preset.label}
+                      </button>
+                    ))}
+                  </div>
+                  <input
+                    className="sw__toolbar-input"
+                    placeholder="A, B, C, G, H"
+                    value={bulkSections}
+                    onChange={(e) => setBulkSections(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") void onApplyBulkAll();
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="sw__btn sw__btn--ghost"
+                    disabled={sectionBusy}
+                    onClick={() => void onApplyBulkAll()}
+                  >
+                    {sectionBusy ? "…" : "Apply all"}
+                  </button>
                 </div>
-                <input
-                  className="sw__toolbar-input"
-                  placeholder="A, B, C"
-                  value={bulkSections}
-                  onChange={(e) => setBulkSections(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") void onApplyBulkAll();
-                  }}
-                />
-                <button
-                  type="button"
-                  className="sw__btn sw__btn--ghost"
-                  disabled={sectionBusy}
-                  onClick={() => void onApplyBulkAll()}
-                >
-                  {sectionBusy ? "…" : "Apply"}
-                </button>
+                {upperGrades.length > 0 ? (
+                  <div className="sw__toolbar sw__toolbar--streams">
+                    <span className="sw__toolbar-label">Gr 11–12</span>
+                    <div className="sw__toolbar-pills">
+                      {STREAM_PRESETS.map((preset) => (
+                        <button
+                          key={preset.label}
+                          type="button"
+                          className="sw__pill sw__pill--stream"
+                          disabled={sectionBusy}
+                          onClick={() =>
+                            void applySections(
+                              [...preset.names],
+                              upperGrades.map((g) => g.id),
+                            )
+                          }
+                        >
+                          {preset.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
               </div>
             ) : null}
 
@@ -494,6 +551,46 @@ export default function SchoolSetupPage() {
                               </button>
                             );
                           })}
+                        </div>
+                        {isUpperSecondaryGrade(g.name) ? (
+                          <div className="sw__grade-streams">
+                            {STREAM_PRESETS.map((preset) => (
+                              <button
+                                key={preset.label}
+                                type="button"
+                                className="sw__stream"
+                                disabled={sectionBusy}
+                                onClick={() => void applySections([...preset.names], [g.id])}
+                              >
+                                {preset.label}
+                              </button>
+                            ))}
+                          </div>
+                        ) : null}
+                        <div className="sw__grade-custom">
+                          <input
+                            className="sw__grade-custom-input"
+                            placeholder="Custom, e.g. Natural A"
+                            value={customByGrade[g.id] ?? ""}
+                            disabled={sectionBusy}
+                            onChange={(e) =>
+                              setCustomByGrade((prev) => ({
+                                ...prev,
+                                [g.id]: e.target.value,
+                              }))
+                            }
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") void onApplyGradeCustom(g.id);
+                            }}
+                          />
+                          <button
+                            type="button"
+                            className="sw__grade-custom-btn"
+                            disabled={sectionBusy || !parseSectionNames(customByGrade[g.id] ?? "").length}
+                            onClick={() => void onApplyGradeCustom(g.id)}
+                          >
+                            Add
+                          </button>
                         </div>
                       </article>
                     ))}

@@ -87,6 +87,7 @@ export default function SchoolUsagePage() {
           ) : undefined
         }
         error={error}
+        onDismissError={() => setError("")}
         loading={loading}
         loadingLabel="Loading usage…"
       >

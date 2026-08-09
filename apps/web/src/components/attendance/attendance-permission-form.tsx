@@ -9,6 +9,7 @@ import {
   type AttendancePermissionType,
   type AttendanceReason,
 } from "@/lib/attendance";
+import { AppToast } from "@/components/ui/app-toast";
 
 const TYPES: {
   value: AttendancePermissionType;
@@ -198,16 +199,8 @@ export function AttendancePermissionForm() {
             </div>
           </div>
 
-          {error ? (
-            <div className="att-perm-v2__alert att-perm-v2__alert--err" role="alert">
-              {error}
-            </div>
-          ) : null}
-          {saved ? (
-            <div className="att-perm-v2__alert att-perm-v2__alert--ok" role="status">
-              {saved}
-            </div>
-          ) : null}
+          <AppToast message={error} tone="error" onDismiss={() => setError("")} />
+          <AppToast message={saved} tone="success" onDismiss={() => setSaved("")} />
 
           <form className="att-perm-v2__form" onSubmit={(e) => void onSubmit(e)}>
             <fieldset className="att-perm-v2__types">

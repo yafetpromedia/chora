@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DashIcon } from "@/components/dashboard/dash-icons";
 import { DashboardPage } from "@/components/dashboard/dashboard-page";
+import { AppToast } from "@/components/ui/app-toast";
 import { listGrades } from "@/lib/school-setup";
 import type { GradeWithSections } from "@/lib/api";
 import { getOrEnsureCurrentAcademicYear } from "@/lib/results";
@@ -342,8 +343,8 @@ export default function AdminTimetablePage() {
   return (
     <DashboardPage role="admin" title="Timetable">
       <div className="tt-admin">
-        {error ? <p className="tt-admin__alert tt-admin__alert--err">{error}</p> : null}
-        {saved ? <p className="tt-admin__alert tt-admin__alert--ok">{saved}</p> : null}
+        <AppToast message={error} tone="error" onDismiss={() => setError("")} />
+        <AppToast message={saved} tone="success" onDismiss={() => setSaved("")} />
 
         <header className="tt-admin__hero">
           <div className="tt-admin__hero-glow" aria-hidden />

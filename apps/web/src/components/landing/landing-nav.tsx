@@ -4,35 +4,76 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 const LINKS = [
+  { href: "#hero", label: "Home" },
   { href: "#features", label: "Product" },
   { href: "#app", label: "Mobile app" },
   { href: "#portals", label: "Portals" },
   { href: "#pricing", label: "Pricing" },
   { href: "#faq", label: "FAQ" },
-  { href: "/join", label: "Join school", external: true },
-];
+] as const;
+
+const SECTION_IDS = ["hero", "features", "app", "portals", "pricing", "faq"];
 
 export function LandingNav() {
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [overHero, setOverHero] = useState(true);
+  const [active, setActive] = useState("hero");
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 12);
-    onScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    const update = () => {
+      const y = window.scrollY;
+      setScrolled(y > 12);
+      const hero = document.getElementById("hero");
+      if (hero) {
+        const heroEnd = hero.offsetTop + hero.offsetHeight - 72;
+        setOverHero(y < heroEnd);
+      } else {
+        setOverHero(y < 400);
+      }
+    };
+
+    update();
+    window.addEventListener("scroll", update, { passive: true });
+    window.addEventListener("resize", update, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", update);
+      window.removeEventListener("resize", update);
+    };
   }, []);
 
   useEffect(() => {
-    document.body.style.overflow = open ? "hidden" : "";
+    const sections = SECTION_IDS.map((id) => document.getElementById(id)).filter(Boolean);
+    const sectionObserver = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((e) => e.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio);
+        if (visible[0]?.target.id) {
+          setActive(visible[0].target.id);
+        }
+      },
+      { rootMargin: "-20% 0px -55% 0px", threshold: [0, 0.2, 0.5] },
+    );
+
+    sections.forEach((section) => sectionObserver.observe(section!));
+
     return () => {
-      document.body.style.overflow = "";
+      sectionObserver.disconnect();
     };
-  }, [open]);
+  }, []);
+
+  const navClass = [
+    "lp3-nav",
+    overHero ? "lp3-nav--over-hero" : "lp3-nav--solid",
+    scrolled ? "lp3-nav--scrolled" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
     <>
-      <header className={`lp3-nav${scrolled ? " lp3-nav--scrolled" : ""}`}>
+      <header className={navClass}>
         <div className="lp3-container lp3-nav__inner">
           <Link href="/" className="lp3-nav__brand" onClick={() => setOpen(false)}>
             <span className="lp3-nav__mark">C1</span>
@@ -40,17 +81,21 @@ export function LandingNav() {
           </Link>
 
           <nav className="lp3-nav__links" aria-label="Main">
-            {LINKS.map((l) =>
-              l.external ? (
-                <Link key={l.href} href={l.href} className="lp3-nav__link">
+            {LINKS.map((l) => {
+              const isActive =
+                !l.external && l.href === `#${active}`;
+              const className = `lp3-nav__link${isActive ? " lp3-nav__link--active" : ""}`;
+
+              return l.external ? (
+                <Link key={l.href} href={l.href} className={className}>
                   {l.label}
                 </Link>
               ) : (
-                <a key={l.href} href={l.href} className="lp3-nav__link">
+                <a key={l.href} href={l.href} className={className} aria-current={isActive ? "page" : undefined}>
                   {l.label}
                 </a>
-              ),
-            )}
+              );
+            })}
           </nav>
 
           <div className="lp3-nav__actions">
@@ -85,16 +130,21 @@ export function LandingNav() {
           />
           <div className="lp3-nav__mobile" role="dialog" aria-label="Menu">
             <div className="lp3-nav__mobile-links">
-              {LINKS.map((l) => (
-                <a key={l.href} href={l.href} className="lp3-nav__mobile-link" onClick={() => setOpen(false)}>
-                  {l.label}
-                </a>
-              ))}
+              {LINKS.map((l) => {
+                const isActive = !l.external && l.href === `#${active}`;
+                return (
+                  <a
+                    key={l.href}
+                    href={l.href}
+                    className={`lp3-nav__mobile-link${isActive ? " lp3-nav__mobile-link--active" : ""}`}
+                    onClick={() => setOpen(false)}
+                  >
+                    {l.label}
+                  </a>
+                );
+              })}
               <Link href="/login" className="lp3-nav__mobile-link" onClick={() => setOpen(false)}>
                 Sign in
-              </Link>
-              <Link href="/join" className="lp3-nav__mobile-link" onClick={() => setOpen(false)}>
-                Join with school code
               </Link>
             </div>
             <Link href="/register" className="lp3-btn lp3-btn--primary lp3-btn--block" onClick={() => setOpen(false)}>

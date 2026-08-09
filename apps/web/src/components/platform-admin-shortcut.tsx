@@ -17,7 +17,8 @@ export function PlatformAdminShortcut() {
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key.toLowerCase() !== "a") return;
+      const key = e.key?.toLowerCase();
+      if (!key || key !== "a") return;
       if (!e.shiftKey) return;
       if (!(e.ctrlKey || e.metaKey)) return;
       if (isTypingTarget(e.target)) return;

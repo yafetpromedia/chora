@@ -1,7 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { DashIcon } from "@/components/dashboard/dash-icons";
+import {
+  ResultsStudentPicker,
+  type ResultsStudentOption,
+} from "@/components/results/results-student-picker";
+import { AppToast } from "@/components/ui/app-toast";
 import type { StudentRecord } from "@/lib/api";
 import { draftReportComment } from "@/lib/ai";
 import {
@@ -71,6 +76,21 @@ export function ReportCardCommentsPanel({
   useEffect(() => {
     if (defaultStudentId) setStudentId(defaultStudentId);
   }, [defaultStudentId]);
+
+  const studentOptions = useMemo<ResultsStudentOption[]>(
+    () =>
+      students.map((s) => ({
+        id: s.id,
+        name: `${s.user.firstName} ${s.user.lastName}`.trim(),
+        grade: s.grade.name,
+        gradeId: s.grade.id,
+        section: s.section?.name ?? null,
+        sectionId: s.section?.id ?? null,
+        studentId: s.user.externalRef,
+        photoUrl: s.photoUrl,
+      })),
+    [students],
+  );
 
   const loadReport = useCallback(async () => {
     if (!studentId || !termId) return;
@@ -154,17 +174,14 @@ export function ReportCardCommentsPanel({
 
       {!hideSelectors ? (
         <div className="rc-v2__toolbar rc-v2__toolbar--inline">
-          <label className="rc-v2__field rc-v2__field--wide">
-            <span>Student</span>
-            <select value={studentId} onChange={(e) => setStudentId(e.target.value)}>
-              <option value="">Select student</option>
-              {students.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.user.firstName} {s.user.lastName} — {s.grade.name}
-                </option>
-              ))}
-            </select>
-          </label>
+          <div className="rc-v2__student-pick">
+            <ResultsStudentPicker
+              students={studentOptions}
+              value={studentId}
+              onChange={setStudentId}
+              disabled={students.length === 0}
+            />
+          </div>
           <label className="rc-v2__field">
             <span>Term</span>
             <select value={termId} onChange={(e) => setTermId(e.target.value)}>
@@ -235,8 +252,8 @@ export function ReportCardCommentsPanel({
         </div>
       ) : null}
 
-      {error ? <p className="rc-v2__alert rc-v2__alert--err">{error}</p> : null}
-      {saved ? <p className="rc-v2__alert rc-v2__alert--ok">{saved}</p> : null}
+      <AppToast message={error} tone="error" onDismiss={() => setError("")} />
+      <AppToast message={saved} tone="success" onDismiss={() => setSaved("")} />
 
       {report ? (
         <div className="rc-v2__comments-foot">

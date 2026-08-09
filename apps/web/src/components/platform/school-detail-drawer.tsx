@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { DashIcon } from "@/components/dashboard/dash-icons";
+import { AppToast } from "@/components/ui/app-toast";
 import type { PlanType } from "@/lib/api";
 import { platformFetch } from "@/lib/platform-auth";
 import { setSchoolPlan } from "@/lib/platform-plans";
@@ -281,7 +282,7 @@ export function SchoolDetailDrawer({
         </header>
 
         <div className="stu-drawer__body plat-manage-body">
-          {error ? <p className="auth-alert auth-alert--error">{error}</p> : null}
+          <AppToast message={error} tone="error" onDismiss={() => setError("")} />
 
           {loading ? (
             <div className="plat-manage-skeleton" aria-busy="true">

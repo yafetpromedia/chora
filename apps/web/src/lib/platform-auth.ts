@@ -50,6 +50,17 @@ export function isPlatformAuthError(err: unknown) {
   );
 }
 
+/** Redirect to platform login on auth failure; returns true if handled. */
+export function handlePlatformAuthFailure(
+  err: unknown,
+  onRedirect: () => void,
+): boolean {
+  if (!isPlatformAuthError(err)) return false;
+  clearPlatformSession();
+  onRedirect();
+  return true;
+}
+
 export async function platformFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const token = localStorage.getItem(PLATFORM_TOKEN_KEY);
   if (!token) throw new Error("Not authenticated");
@@ -79,4 +90,29 @@ export async function platformFetch<T>(path: string, init?: RequestInit): Promis
 export function persistPlatformSession(data: PlatformLoginResponse) {
   localStorage.setItem(PLATFORM_TOKEN_KEY, data.accessToken);
   localStorage.setItem(PLATFORM_USER_KEY, JSON.stringify(data.user));
+}
+
+export async function platformUpload<T>(path: string, file: File): Promise<T> {
+  const token = localStorage.getItem(PLATFORM_TOKEN_KEY);
+  if (!token) throw new Error("Not authenticated");
+
+  const form = new FormData();
+  form.append("file", file);
+
+  const res = await fetch(`${getApiBaseUrl()}${path}`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: form,
+  });
+
+  if (!res.ok) {
+    const data = (await res.json().catch(() => null)) as { message?: string } | null;
+    const message = data?.message ?? `Upload failed: ${res.status}`;
+    if (res.status === 401) {
+      clearPlatformSession();
+      throw new Error(message === "Unauthorized" ? "Session expired — sign in again" : message);
+    }
+    throw new Error(message);
+  }
+  return res.json();
 }

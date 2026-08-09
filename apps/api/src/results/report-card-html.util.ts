@@ -1,4 +1,4 @@
-import { buildCardScanPayload } from '../students/student-card.util';
+﻿import { buildCardScanPayload } from '../students/student-card.util';
 
 export type ReportCardSubjectGridRow = {
   subject: string;
@@ -23,6 +23,10 @@ export type ReportCardPrintPayload = {
     address: string | null;
     email: string | null;
     phone: string | null;
+    /** Per-school document title (defaults in renderer). */
+    headerTitle: string | null;
+    /** Per-school motto / tagline under the school name. */
+    headerTagline: string | null;
   };
   student: {
     name: string;
@@ -33,7 +37,9 @@ export type ReportCardPrintPayload = {
     academicYearEc: string;
     academicYear: string;
     cardCode: string | null;
+    photoUrl: string | null;
   };
+  termName: string;
   promotionText: string | null;
   subjectGrid: ReportCardSubjectGridRow[];
   summary: {
@@ -66,7 +72,7 @@ function escapeHtml(value: string): string {
 }
 
 function fmtScore(value: number | null | undefined): string {
-  if (value == null || Number.isNaN(value)) return '—';
+  if (value == null || Number.isNaN(value)) return 'â€”';
   return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
 
@@ -183,7 +189,7 @@ function scoreTone(score: number | null | undefined): string {
 }
 
 function fmtScoreCell(value: number | null | undefined, emphasize = false): string {
-  if (value == null || Number.isNaN(value)) return '<span class="rc-cell rc-cell--empty">—</span>';
+  if (value == null || Number.isNaN(value)) return '<span class="rc-cell rc-cell--empty">â€”</span>';
   const letter = letterGrade(value);
   const tone = scoreTone(value);
   const display = fmtScore(value);
@@ -211,7 +217,7 @@ function scoreRingSvg(percent: number | null): string {
   const radius = 40;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference - (value / 100) * circumference;
-  const display = percent != null ? fmtScore(percent) : '—';
+  const display = percent != null ? fmtScore(percent) : 'â€”';
   const letter = letterGrade(percent);
   const stroke = ringStroke(percent);
   return `
@@ -280,61 +286,55 @@ export function buildEthiopianReportCardHtml(data: ReportCardPrintPayload): stri
   const schoolName = escapeHtml(data.school.name);
   const studentName = escapeHtml(data.student.name);
   const studentNameUpper = escapeHtml(data.student.name.toUpperCase());
+  const headerTitle = escapeHtml(
+    data.school.headerTitle?.trim() || 'Student Report Card',
+  );
+  const headerTagline = data.school.headerTagline?.trim()
+    ? escapeHtml(data.school.headerTagline.trim())
+    : null;
   const qrPayload = data.student.cardCode
     ? buildCardScanPayload(data.student.cardCode)
     : `CAMPUS1:STUDENT:${data.student.number ?? 'unknown'}`;
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=110x110&margin=6&data=${encodeURIComponent(qrPayload)}`;
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&margin=4&data=${encodeURIComponent(qrPayload)}`;
   const logo = data.school.logoUrl
     ? `<img class="rc-logo" src="${escapeHtml(data.school.logoUrl)}" alt=""/>`
-    : `<div class="rc-logo rc-logo--fallback" aria-hidden>${schoolName.slice(0, 2)}</div>`;
+    : `<div class="rc-logo rc-logo--fallback" aria-hidden="true">${schoolName.slice(0, 2).toUpperCase()}</div>`;
+  const avatar = data.student.photoUrl
+    ? `<img class="rc-avatar rc-avatar--photo" src="${escapeHtml(data.student.photoUrl)}" alt=""/>`
+    : `<div class="rc-avatar" aria-hidden="true">${escapeHtml(
+        data.student.name
+          .trim()
+          .split(/\s+/)
+          .map((p) => p[0])
+          .filter(Boolean)
+          .slice(0, 2)
+          .join('')
+          .toUpperCase() || '?',
+      )}</div>`;
 
   const subjectRows = data.subjectGrid
     .map(
       (row, i) => `
-      <tr class="${i % 2 === 1 ? 'rc-tbl__alt' : ''}">
-        <th scope="row" class="rc-tbl__subject">${escapeHtml(row.subject)}</th>
+      <tr class="${i % 2 === 1 ? 'is-alt' : ''}">
+        <th scope="row">${escapeHtml(row.subject)}</th>
         ${subjectRowCells(row)}
       </tr>`,
     )
     .join('');
 
-  const infoField = (am: string, en: string, value: string) => `
-    <div class="rc-field">
-      <div class="rc-field__label">
-        <span class="rc-field__am">${am}</span>
-        <span class="rc-field__en">${en}</span>
-      </div>
-      <div class="rc-field__value">${value}</div>
-    </div>`;
-
-  const contactLine = [
+  const contactBits = [
+    data.school.address ? escapeHtml(data.school.address) : '',
     data.school.phone ? escapeHtml(data.school.phone) : '',
     data.school.email ? escapeHtml(data.school.email) : '',
-    data.school.address ? escapeHtml(data.school.address) : '',
-  ]
-    .filter(Boolean)
-    .join('  ·  ');
-
+  ].filter(Boolean);
+  const contactLine = contactBits.join(' · ');
   const rankLabel =
     data.summary.rank != null ? `${data.summary.rank} / ${data.summary.classSize}` : '—';
-
-  const studentInitials = escapeHtml(
-    data.student.name
-      .trim()
-      .split(/\s+/)
-      .map((p) => p[0])
-      .filter(Boolean)
-      .slice(0, 2)
-      .join('')
-      .toUpperCase() || '?',
-  );
   const documentRef = escapeHtml(
     data.student.cardCode ?? data.student.number ?? 'DRAFT',
   );
   const avgNumeric = data.summary.cumulative.average;
   const achievement = achievementLabel(avgNumeric);
-  const subjectSnapshot = subjectSnapshotHtml(data.subjectGrid);
-
   const issuedDate = escapeHtml(
     new Date(data.generatedAt).toLocaleDateString('en-GB', {
       day: 'numeric',
@@ -342,1092 +342,529 @@ export function buildEthiopianReportCardHtml(data: ReportCardPrintPayload): stri
       year: 'numeric',
     }),
   );
+  const yearLabel = `${escapeHtml(data.student.academicYear)} · ${escapeHtml(data.student.academicYearEc)} E.C.`;
+  const snap = subjectSnapshotHtml(data.subjectGrid);
+
+  const schoolHeader = `
+    <header class="rc-brand">
+      ${logo}
+      <div class="rc-brand__text">
+        <p class="rc-brand__doc">${headerTitle}</p>
+        <h1>${schoolName}</h1>
+        ${headerTagline ? `<p class="rc-brand__tag">${headerTagline}</p>` : ''}
+        <p class="rc-brand__meta">${yearLabel}${contactLine ? ` · ${contactLine}` : ''}</p>
+      </div>
+      <div class="rc-brand__side">
+        <span class="rc-brand__badge">Official</span>
+        <span class="rc-brand__page">Page <strong>1</strong> · Front</span>
+      </div>
+    </header>`;
+
+  const schoolHeaderBack = `
+    <header class="rc-brand rc-brand--compact">
+      ${logo}
+      <div class="rc-brand__text">
+        <p class="rc-brand__doc">${headerTitle}</p>
+        <h1>${schoolName}</h1>
+        <p class="rc-brand__meta">${studentName} · ${escapeHtml(data.student.gradeLabel)} · ${yearLabel}</p>
+      </div>
+      <div class="rc-brand__side">
+        <span class="rc-brand__page">Page <strong>2</strong> · Back</span>
+      </div>
+    </header>`;
 
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8"/>
-  <title>Report Card — ${studentNameUpper}</title>
+  <title>${headerTitle} — ${studentNameUpper}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+Ethiopic:wght@400;600;700&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&family=Noto+Sans+Ethiopic:wght@400;600;700&display=swap" rel="stylesheet"/>
   <style>
     :root {
-      --rc-paper: #fffdf8;
-      --rc-ink: #1f2d2f;
-      --rc-muted: #657576;
-      --rc-border: #9eb9b2;
-      --rc-accent: #244f7f;
-      --rc-seal: #8c5f2b;
-      --rc-green: #1d8f4f;
-      --rc-gold: #f5bf31;
-      --rc-red: #c8343d;
-      --rc-excellent-bg: #e8f8ee;
-      --rc-excellent-fg: #1c7a4a;
-      --rc-good-bg: #e9f2ff;
-      --rc-good-fg: #245ea9;
-      --rc-fair-bg: #fff6df;
-      --rc-fair-fg: #8a6516;
-      --rc-low-bg: #ffe9e9;
-      --rc-low-fg: #9d2b34;
+      --ink: #122427;
+      --muted: #5b7274;
+      --line: #d5e3df;
+      --paper: #ffffff;
+      --soft: #f3faf7;
+      --teal: #0f766e;
+      --teal-dark: #115e59;
+      --navy: #1e3a5f;
+      --excellent-bg: #e7f8ef; --excellent-fg: #166534;
+      --good-bg: #e8f1ff; --good-fg: #1d4ed8;
+      --fair-bg: #fff7e6; --fair-fg: #b45309;
+      --low-bg: #feecec; --low-fg: #b91c1c;
     }
-
     * { box-sizing: border-box; }
-
     body {
       margin: 0;
-      font-family: Inter, "Segoe UI", system-ui, sans-serif;
-      color: var(--rc-ink);
-      background: #e5ece8;
+      font-family: "DM Sans", "Segoe UI", system-ui, sans-serif;
+      color: var(--ink);
+      background: #e8eef0;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
     }
-
     .rc-page {
       width: 297mm;
       height: 210mm;
-      margin: 0 auto 12px;
-      background: var(--rc-paper);
+      margin: 0 auto 10px;
+      background: var(--paper);
+      position: relative;
       overflow: hidden;
       page-break-after: always;
       page-break-inside: avoid;
-      position: relative;
-      box-shadow: 0 12px 28px rgba(22, 38, 34, 0.14);
+      box-shadow: 0 10px 28px rgba(18, 36, 39, 0.12);
     }
-
-    .rc-page:last-child {
-      margin-bottom: 0;
-      page-break-after: auto;
+    .rc-page:last-child { page-break-after: auto; margin-bottom: 0; }
+    .rc-page__bar {
+      position: absolute; inset: 0 0 auto 0; height: 5mm;
+      background: linear-gradient(90deg, var(--teal-dark), var(--teal) 55%, #0d9488);
     }
-
-    .rc-tricolor {
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 9px;
-      display: grid;
-      grid-template-rows: repeat(3, 3px);
-      z-index: 5;
-      pointer-events: none;
-    }
-    .rc-tricolor span:nth-child(1) { background: var(--rc-green); }
-    .rc-tricolor span:nth-child(2) { background: var(--rc-gold); }
-    .rc-tricolor span:nth-child(3) { background: var(--rc-red); }
-
-    .rc-frame {
-      position: absolute;
-      inset: 6mm;
-      border: 2px solid #6f8f86;
-      z-index: 3;
-      pointer-events: none;
-    }
-    .rc-frame::before {
-      content: "";
-      position: absolute;
-      inset: 3px;
-      border: 1px solid #c9d8d1;
-    }
-    .rc-corner {
-      position: absolute;
-      width: 11mm;
-      height: 11mm;
-      border-color: #6f8f86;
-      border-style: solid;
-      z-index: 4;
-      pointer-events: none;
-    }
-    .rc-corner--tl { top: 7mm; left: 7mm; border-width: 2px 0 0 2px; }
-    .rc-corner--tr { top: 7mm; right: 7mm; border-width: 2px 2px 0 0; }
-    .rc-corner--bl { bottom: 7mm; left: 7mm; border-width: 0 0 2px 2px; }
-    .rc-corner--br { bottom: 7mm; right: 7mm; border-width: 0 2px 2px 0; }
-
-    .rc-watermark {
-      position: absolute;
-      inset: 0;
-      display: grid;
-      place-items: center;
-      opacity: 0.035;
-      z-index: 0;
-      pointer-events: none;
-    }
-    .rc-watermark .rc-logo,
-    .rc-watermark img {
-      width: 250px;
-      height: 250px;
-      border-radius: 50%;
-    }
-
-    .rc-logo {
-      width: 58px;
-      height: 58px;
-      border-radius: 50%;
-      object-fit: cover;
-      border: 2px solid #ffffff;
-      box-shadow: 0 0 0 2px #7f9f95;
-      flex-shrink: 0;
-    }
-    .rc-logo--fallback {
-      display: grid;
-      place-items: center;
-      background: linear-gradient(145deg, #2f6d57, #235f74);
-      color: #fff;
-      font-weight: 800;
-      letter-spacing: 0.05em;
-    }
-
     .rc-sheet {
-      position: relative;
-      z-index: 2;
       height: 100%;
-      padding: 12mm 11mm 9mm;
+      padding: 9mm 10mm 7mm;
       display: flex;
       flex-direction: column;
+      gap: 3.2mm;
     }
-
-    .rc-header {
+    .rc-brand {
       display: grid;
       grid-template-columns: auto 1fr auto;
+      gap: 3.5mm;
       align-items: center;
-      gap: 0.9rem;
-      padding: 0.75rem 0.85rem;
-      margin-bottom: 4mm;
-      border-radius: 10px;
-      border: 1px solid rgba(36, 79, 127, 0.14);
+      padding: 2.8mm 3.2mm;
+      border: 1px solid var(--line);
+      border-radius: 3mm;
       background:
-        radial-gradient(circle at 0% 0%, rgba(29, 143, 79, 0.12), transparent 42%),
-        radial-gradient(circle at 100% 100%, rgba(36, 79, 127, 0.14), transparent 45%),
-        linear-gradient(135deg, #ffffff, #f3f8f5);
-      box-shadow: 0 8px 22px rgba(31, 45, 47, 0.06);
+        radial-gradient(circle at 0% 0%, rgba(15,118,110,.08), transparent 45%),
+        linear-gradient(180deg, #fff, var(--soft));
     }
-    .rc-header__title {
-      min-width: 0;
-      text-align: center;
+    .rc-brand--compact { padding: 2.2mm 3mm; }
+    .rc-logo {
+      width: 16mm; height: 16mm; border-radius: 50%;
+      object-fit: cover; border: 2px solid #fff;
+      box-shadow: 0 0 0 1.5px rgba(15,118,110,.35);
+      flex-shrink: 0;
     }
-    .rc-header h1 {
-      margin: 0;
-      font-size: 1.26rem;
-      font-weight: 800;
-      letter-spacing: 0.08em;
+    .rc-brand--compact .rc-logo { width: 12mm; height: 12mm; }
+    .rc-logo--fallback {
+      display: grid; place-items: center;
+      background: linear-gradient(145deg, var(--teal-dark), var(--navy));
+      color: #fff; font-weight: 800; font-size: 5mm; letter-spacing: .04em;
+    }
+    .rc-brand__doc {
+      margin: 0; font-size: 2.1mm; font-weight: 800;
+      letter-spacing: .14em; text-transform: uppercase; color: var(--teal);
+    }
+    .rc-brand h1 {
+      margin: 0.6mm 0 0; font-size: 5.2mm; font-weight: 800;
+      letter-spacing: .02em; line-height: 1.1; color: var(--navy);
       text-transform: uppercase;
-      color: #244f7f;
-      line-height: 1.08;
     }
-    .rc-header p {
-      margin: 0.18rem 0 0;
-      font-size: 0.62rem;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: #5a6f70;
-      font-weight: 600;
+    .rc-brand--compact h1 { font-size: 4.2mm; }
+    .rc-brand__tag {
+      margin: 0.8mm 0 0; font-size: 2.5mm; font-weight: 600;
+      color: var(--muted); font-style: italic;
     }
-    .rc-badge {
-      align-self: start;
-      justify-self: end;
-      padding: 0.28rem 0.68rem;
-      border: 1px solid #b89663;
-      background: linear-gradient(160deg, #f9ecd4, #f1debb);
-      color: #7c5228;
-      font-size: 0.5rem;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      font-weight: 700;
-      border-radius: 999px;
-      box-shadow: inset 0 1px 0 #fff8ea;
-      white-space: nowrap;
+    .rc-brand__meta {
+      margin: 1mm 0 0; font-size: 2.2mm; color: var(--muted); font-weight: 600;
     }
+    .rc-brand__side { text-align: right; display: grid; gap: 1.4mm; justify-items: end; }
+    .rc-brand__badge {
+      padding: 0.8mm 2.2mm; border-radius: 999px;
+      background: var(--teal); color: #fff;
+      font-size: 2mm; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
+    }
+    .rc-brand__page {
+      font-size: 2.1mm; color: var(--muted); font-weight: 700; text-transform: uppercase;
+    }
+    .rc-brand__page strong { color: var(--teal-dark); }
 
-    .rc-front-main {
-      flex: 1;
+    .rc-front {
+      flex: 1; min-height: 0;
       display: grid;
-      grid-template-columns: 1.35fr 0.9fr;
-      gap: 5mm;
-      min-height: 0;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 3.2mm;
     }
+    .rc-card {
+      border: 1px solid var(--line);
+      border-radius: 2.6mm;
+      background: #fff;
+      display: flex; flex-direction: column; min-height: 0; overflow: hidden;
+    }
+    .rc-card__h {
+      margin: 0; padding: 1.8mm 2.6mm;
+      font-size: 2.2mm; font-weight: 800; letter-spacing: .1em;
+      text-transform: uppercase; color: var(--teal-dark);
+      background: var(--soft); border-bottom: 1px solid var(--line);
+    }
+    .rc-card__b { padding: 2.6mm; flex: 1; min-height: 0; }
 
-    .rc-block {
-      border: 1px solid #bfd0ca;
-      background: rgba(255, 255, 255, 0.55);
-      display: flex;
-      flex-direction: column;
-      min-height: 0;
-    }
-    .rc-block__head {
-      margin: 0;
-      padding: 0.45rem 0.65rem;
-      font-size: 0.57rem;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: #2c5a51;
-      background: linear-gradient(90deg, rgba(36, 79, 127, 0.06), rgba(29, 143, 79, 0.08));
-      border-bottom: 1px solid #d1dfda;
-      font-weight: 700;
-    }
-    .rc-block__body {
-      padding: 0.62rem 0.75rem;
-      flex: 1;
-      min-height: 0;
-    }
-
-    .rc-student-hero {
-      display: grid;
-      grid-template-columns: 85px 1fr;
-      gap: 0.75rem;
-      align-items: center;
-      margin-bottom: 0.55rem;
+    .rc-id {
+      display: grid; grid-template-columns: 18mm 1fr; gap: 2.8mm; align-items: center;
+      margin-bottom: 2.4mm;
     }
     .rc-avatar {
-      width: 82px;
-      height: 82px;
-      border-radius: 50%;
-      border: 2px solid #7d9a90;
-      background: radial-gradient(circle at 30% 30%, #f6fbf7, #dfece5);
-      display: grid;
-      place-items: center;
-      color: #2f6558;
-      font-size: 1.25rem;
-      font-weight: 800;
-      letter-spacing: 0.04em;
+      width: 18mm; height: 18mm; border-radius: 50%;
+      display: grid; place-items: center;
+      background: linear-gradient(145deg, #ccfbf1, #99f6e4);
+      color: var(--teal-dark); font-weight: 800; font-size: 5mm;
+      border: 1.5px solid rgba(15,118,110,.25);
     }
-    .rc-student-name strong {
-      display: block;
-      font-size: 1.02rem;
-      line-height: 1.15;
-      letter-spacing: 0.02em;
-      text-transform: uppercase;
+    .rc-avatar--photo { object-fit: cover; padding: 0; }
+    .rc-id strong {
+      display: block; font-size: 4mm; letter-spacing: .03em;
+      text-transform: uppercase; line-height: 1.15;
     }
-    .rc-student-name span {
-      display: block;
-      margin-top: 0.22rem;
-      color: var(--rc-muted);
-      font-size: 0.58rem;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-      font-weight: 600;
-    }
+    .rc-id span { display: block; margin-top: 0.8mm; font-size: 2.3mm; color: var(--muted); font-weight: 600; }
 
     .rc-fields {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 0.48rem 0.72rem;
+      display: grid; grid-template-columns: 1fr 1fr; gap: 1.6mm;
     }
-    .rc-field__label {
-      display: flex;
-      flex-direction: column;
-      gap: 0.03rem;
-      margin-bottom: 0.12rem;
+    .rc-field {
+      border: 1px solid var(--line); border-radius: 1.8mm;
+      padding: 1.4mm 1.8mm; background: #fbfdfe;
     }
-    .rc-field__am {
-      font-family: "Noto Sans Ethiopic", Inter, sans-serif;
-      font-size: 0.51rem;
-      color: #728b8a;
-      line-height: 1.2;
+    .rc-field em {
+      display: block; font-style: normal; font-size: 1.9mm;
+      color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
     }
-    .rc-field__en {
-      font-size: 0.51rem;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      color: #5d7272;
-      font-weight: 700;
-    }
-    .rc-field__value {
-      padding: 0.1rem 0 0.2rem;
-      border-bottom: 1px dashed #92aaa4;
-      font-size: 0.75rem;
-      font-weight: 700;
-      color: #1f2f2f;
-      min-height: 1.2em;
+    .rc-field strong {
+      display: block; margin-top: 0.6mm; font-size: 2.7mm; font-weight: 700;
     }
 
-    .rc-performance {
-      display: flex;
-      flex-direction: column;
-      gap: 0.56rem;
-      height: 100%;
+    .rc-perf { display: grid; gap: 2.4mm; }
+    .rc-ring-row {
+      display: grid; grid-template-columns: 28mm 1fr; gap: 2.4mm; align-items: center;
     }
-    .rc-ring-wrap {
-      border: 1px solid #d1dfda;
-      background: linear-gradient(160deg, #ffffff, #f7fbf9);
-      display: grid;
-      grid-template-columns: 116px 1fr;
-      gap: 0.5rem;
-      align-items: center;
-      padding: 0.52rem;
-    }
-    .rc-ring-shell {
-      width: 104px;
-      height: 104px;
-      position: relative;
-      margin: 0 auto;
-      display: grid;
-      place-items: center;
-    }
-    .rc-ring {
-      width: 100%;
-      height: 100%;
-      transform: rotate(-90deg);
-    }
-    .rc-ring__track {
-      fill: none;
-      stroke: #dbe7e1;
-      stroke-width: 9;
-    }
-    .rc-ring__fill {
-      fill: none;
-      stroke: #2f7c5e;
-      stroke-width: 9;
-      stroke-linecap: round;
-      transition: stroke-dashoffset .3s ease;
-    }
+    .rc-ring-shell { position: relative; width: 28mm; height: 28mm; }
+    .rc-ring { width: 100%; height: 100%; transform: rotate(-90deg); }
+    .rc-ring__track { fill: none; stroke: #e2e8f0; stroke-width: 8; }
+    .rc-ring__fill { fill: none; stroke-width: 8; stroke-linecap: round; }
     .rc-ring__label {
-      position: absolute;
-      inset: 0;
-      display: grid;
-      place-content: center;
-      text-align: center;
-      line-height: 1.05;
+      position: absolute; inset: 0; display: grid; place-items: center; text-align: center;
     }
-    .rc-ring__label strong {
-      font-size: 1.2rem;
-      color: #2e6657;
-      font-weight: 800;
-    }
-    .rc-ring__label span {
-      font-size: 0.46rem;
-      color: #637f77;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      font-weight: 700;
-    }
-    .rc-ring__label em {
-      margin-top: 0.07rem;
-      font-size: 0.67rem;
-      font-style: normal;
-      color: #356486;
-      font-weight: 800;
-      letter-spacing: 0.06em;
-    }
-    .rc-ring-meta h4 {
-      margin: 0;
-      font-size: 0.57rem;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: #4f6967;
-    }
-    .rc-ring-meta p {
-      margin: 0.35rem 0 0;
-      font-size: 0.53rem;
-      line-height: 1.5;
-      color: #607776;
-    }
+    .rc-ring__label strong { font-size: 5mm; font-weight: 800; line-height: 1; }
+    .rc-ring__label span { font-size: 2mm; color: var(--muted); font-weight: 700; }
+    .rc-ring__label em { font-style: normal; font-size: 2.4mm; font-weight: 800; color: var(--teal); }
+    .rc-ring-meta h4 { margin: 0; font-size: 2.8mm; color: var(--navy); }
+    .rc-ring-meta p { margin: 1mm 0 0; font-size: 2.2mm; color: var(--muted); line-height: 1.35; }
 
-    .rc-stat-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      border: 1px solid #d1dfda;
-      background: #fff;
+    .rc-stats {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 1.6mm;
     }
-    .rc-stat-card {
-      padding: 0.45rem 0.5rem;
-      border-right: 1px solid #d9e5e0;
-      border-bottom: 1px solid #d9e5e0;
-      text-align: center;
+    .rc-stat {
+      border: 1px solid var(--line); border-radius: 1.8mm;
+      padding: 1.6mm 1.8mm; background: var(--soft);
     }
-    .rc-stat-card:nth-child(2n) { border-right: 0; }
-    .rc-stat-card:nth-last-child(-n + 2) { border-bottom: 0; }
-    .rc-stat-card em {
-      display: block;
-      font-size: 0.47rem;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-      color: #607675;
-      font-style: normal;
-      font-weight: 700;
+    .rc-stat em {
+      display: block; font-style: normal; font-size: 1.9mm;
+      text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 700;
     }
-    .rc-stat-card i {
-      display: block;
-      margin-top: 0.05rem;
-      font-family: "Noto Sans Ethiopic", Inter, sans-serif;
-      font-size: 0.45rem;
-      color: #809190;
-      font-style: normal;
-    }
-    .rc-stat-card strong {
-      display: block;
-      margin-top: 0.16rem;
-      font-size: 0.85rem;
-      color: #244f7f;
-      font-weight: 800;
-    }
+    .rc-stat strong { display: block; margin-top: 0.6mm; font-size: 3.2mm; font-weight: 800; }
 
-    .rc-security {
-      border: 1px dashed #b89c73;
-      background: linear-gradient(160deg, #fffaf0, #fff6e8);
-      padding: 0.48rem 0.56rem;
-      display: grid;
-      grid-template-columns: auto 1fr;
-      gap: 0.52rem;
-      align-items: center;
+    .rc-verify {
+      display: grid; grid-template-columns: 22mm 1fr; gap: 2.2mm; align-items: center;
+      padding: 2mm; border: 1px dashed rgba(15,118,110,.35); border-radius: 2mm; background: #f0fdfa;
     }
-    .rc-security__qr {
-      position: relative;
-      border: 2px solid #d1b487;
-      border-radius: 50%;
-      width: 83px;
-      height: 83px;
-      padding: 7px;
-      background: #fff;
-      display: grid;
-      place-items: center;
-    }
-    .rc-security__qr::before {
-      content: "Verified";
-      position: absolute;
-      top: -8px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: #fff8eb;
-      border: 1px solid #d2b58a;
-      border-radius: 999px;
-      padding: 0.03rem 0.35rem;
-      font-size: 0.41rem;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: #8f6132;
-      font-weight: 700;
-    }
-    .rc-security__qr img {
-      width: 60px;
-      height: 60px;
-    }
-    .rc-security__meta strong {
-      display: block;
-      font-size: 0.52rem;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: #7f5a2e;
-      font-weight: 800;
-    }
-    .rc-security__meta p {
-      margin: 0.18rem 0 0;
-      font-size: 0.5rem;
-      line-height: 1.45;
-      color: #6f6a5f;
-    }
-
-    .rc-promo {
-      margin-top: 3.5mm;
-      padding: 0.55rem 0.8rem;
-      border-radius: 8px;
-      border: 1px solid #c8d9d2;
-      background: linear-gradient(90deg, rgba(29, 143, 79, 0.1), rgba(36, 79, 127, 0.08));
-      text-align: center;
-      font-size: 0.72rem;
-      font-weight: 800;
-      color: #24507f;
-      letter-spacing: 0.03em;
-    }
+    .rc-verify img { width: 22mm; height: 22mm; border-radius: 1.5mm; background: #fff; }
+    .rc-verify strong { display: block; font-size: 2.3mm; color: var(--teal-dark); text-transform: uppercase; letter-spacing: .06em; }
+    .rc-verify p { margin: 0.8mm 0 0; font-size: 2.1mm; color: var(--muted); line-height: 1.35; }
 
     .rc-ribbon {
-      margin-top: 3.5mm;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 0.75rem;
-      padding: 0.5rem 0.75rem;
-      border-radius: 999px;
-      background: linear-gradient(90deg, #1d4f91, #1d8f4f);
+      display: flex; justify-content: space-between; align-items: center; gap: 3mm;
+      padding: 1.8mm 3mm; border-radius: 2mm;
+      background: linear-gradient(90deg, var(--navy), var(--teal-dark));
       color: #fff;
-      font-size: 0.56rem;
-      font-weight: 800;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      box-shadow: 0 6px 16px rgba(29, 79, 145, 0.22);
     }
-    .rc-ribbon span {
-      opacity: 0.9;
-      font-weight: 600;
-      letter-spacing: 0.04em;
-    }
+    .rc-ribbon strong { font-size: 2.5mm; letter-spacing: .04em; }
+    .rc-ribbon span { font-size: 2.1mm; opacity: .9; font-weight: 600; }
 
-    .rc-snapshot {
-      margin-top: 3.5mm;
-      padding: 0.55rem 0.65rem;
-      border: 1px solid #c5d8d0;
-      border-radius: 10px;
-      background: linear-gradient(180deg, #ffffff, #f7fbf8);
-    }
-    .rc-snapshot__head {
-      display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-      margin-bottom: 0.45rem;
-      font-size: 0.52rem;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      font-weight: 800;
-      color: #4d6663;
-    }
-    .rc-snapshot__grid {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 0.45rem;
+    .rc-snap-grid {
+      display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1.5mm;
     }
     .rc-snap {
-      padding: 0.38rem 0.45rem;
-      border-radius: 8px;
-      border: 1px solid #d5e4dc;
-      background: #fff;
+      border: 1px solid var(--line); border-radius: 1.6mm; padding: 1.4mm 1.6mm; background: #fff;
     }
     .rc-snap__top {
-      display: flex;
-      justify-content: space-between;
-      gap: 0.35rem;
-      font-size: 0.52rem;
-      margin-bottom: 0.28rem;
+      display: flex; justify-content: space-between; gap: 1mm; font-size: 2mm; font-weight: 700;
     }
-    .rc-snap__top strong {
-      font-weight: 800;
-      color: #1f2f2f;
-    }
-    .rc-snap__top span {
-      font-weight: 700;
-      color: #4f6967;
-      white-space: nowrap;
-    }
+    .rc-snap__top strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .rc-snap__bar {
-      height: 6px;
-      border-radius: 999px;
-      background: #e4ece8;
-      overflow: hidden;
+      margin-top: 1mm; height: 1.4mm; border-radius: 999px; background: #e2e8f0; overflow: hidden;
     }
-    .rc-snap__bar i {
-      display: block;
-      height: 100%;
-      border-radius: inherit;
-      background: linear-gradient(90deg, #3b82f6, #1d4ed8);
-    }
-    .rc-snap.rc-score--excellent .rc-snap__bar i {
-      background: linear-gradient(90deg, #22c55e, #15803d);
-    }
-    .rc-snap.rc-score--good .rc-snap__bar i {
-      background: linear-gradient(90deg, #60a5fa, #2563eb);
-    }
-    .rc-snap.rc-score--fair .rc-snap__bar i {
-      background: linear-gradient(90deg, #fbbf24, #d97706);
-    }
-    .rc-snap.rc-score--low .rc-snap__bar i {
-      background: linear-gradient(90deg, #f87171, #dc2626);
+    .rc-snap__bar i { display: block; height: 100%; background: linear-gradient(90deg, #14b8a6, var(--teal-dark)); }
+    .rc-score--excellent .rc-snap__bar i { background: linear-gradient(90deg, #22c55e, #15803d); }
+    .rc-score--good .rc-snap__bar i { background: linear-gradient(90deg, #60a5fa, #2563eb); }
+    .rc-score--fair .rc-snap__bar i { background: linear-gradient(90deg, #fbbf24, #d97706); }
+    .rc-score--low .rc-snap__bar i { background: linear-gradient(90deg, #f87171, #dc2626); }
+
+    .rc-promo {
+      padding: 1.6mm 2.4mm; border-radius: 1.8mm;
+      background: #ecfdf5; border: 1px solid #a7f3d0;
+      color: #065f46; font-size: 2.3mm; font-weight: 700;
     }
 
-    .rc-signatures {
-      margin-top: 3.5mm;
-      padding-top: 2.5mm;
-      border-top: 1px solid #cddbd5;
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 6mm;
+    .rc-signs {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 4mm;
+      padding-top: 1.5mm; border-top: 1px solid var(--line);
     }
-    .rc-sign {
-      text-align: center;
-      color: #546a69;
-    }
-    .rc-sign__line {
-      height: 17px;
-      border-bottom: 1px solid #9fb4ae;
-      margin-bottom: 0.26rem;
-    }
+    .rc-sign { text-align: center; }
+    .rc-sign__line { height: 5mm; border-bottom: 1px solid #94a3b8; margin-bottom: 1mm; }
     .rc-sign strong {
-      display: block;
-      font-size: 0.53rem;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      font-weight: 700;
-      color: #476060;
+      display: block; font-size: 2mm; text-transform: uppercase; letter-spacing: .05em; color: var(--muted);
     }
     .rc-sign span {
-      display: block;
-      margin-top: 0.08rem;
-      font-family: "Noto Sans Ethiopic", Inter, sans-serif;
-      font-size: 0.47rem;
-      color: #748c89;
+      display: block; margin-top: 0.4mm;
+      font-family: "Noto Sans Ethiopic", "DM Sans", sans-serif;
+      font-size: 1.9mm; color: #7c9193;
     }
 
-    .rc-footer-meta {
-      margin-top: 2.6mm;
-      border-top: 1px solid #d3dfda;
-      padding-top: 2mm;
-      display: grid;
-      grid-template-columns: 1.4fr 1fr;
-      gap: 0.7rem;
-      align-items: start;
-      font-size: 0.47rem;
-      color: #6b7f7f;
-      line-height: 1.4;
+    .rc-foot {
+      display: grid; grid-template-columns: 1.4fr 1fr; gap: 3mm;
+      font-size: 1.95mm; color: var(--muted); line-height: 1.4;
+      border-top: 1px solid var(--line); padding-top: 1.5mm;
     }
-    .rc-footer-meta strong {
-      color: #3d5758;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      font-size: 0.46rem;
-      font-weight: 700;
+    .rc-foot strong {
+      color: var(--ink); text-transform: uppercase; letter-spacing: .05em; font-size: 1.9mm;
     }
-    .rc-footer-meta__right {
-      text-align: right;
-    }
-
-    .rc-back {
-      display: grid;
-      grid-template-columns: 1fr 11mm;
-      height: 100%;
-      position: relative;
-      z-index: 2;
-    }
-    .rc-back__body {
-      padding: 12mm 8mm 8mm 11mm;
-      display: flex;
-      flex-direction: column;
-      min-height: 0;
-    }
-    .rc-back-head {
-      display: flex;
-      justify-content: space-between;
-      align-items: end;
-      gap: 0.85rem;
-      margin-bottom: 3mm;
-      padding-bottom: 2.6mm;
-      border-bottom: 1px solid #c9dad3;
-    }
-    .rc-back-head h2 {
-      margin: 0;
-      font-size: 0.8rem;
-      color: #244f7f;
-      text-transform: uppercase;
-      letter-spacing: 0.09em;
-      font-weight: 800;
-    }
-    .rc-back-head p {
-      margin: 0.18rem 0 0;
-      font-size: 0.56rem;
-      color: #5f7777;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-      font-weight: 600;
-    }
-    .rc-back-head span {
-      font-size: 0.52rem;
-      color: #66817d;
-      font-weight: 700;
-      text-transform: uppercase;
-      white-space: nowrap;
-      letter-spacing: 0.04em;
-    }
+    .rc-foot__right { text-align: right; }
 
     .rc-table-wrap {
-      border: 1px solid #b4cac3;
-      background: #fff;
-      overflow: hidden;
+      flex: 1; min-height: 0; overflow: hidden;
+      border: 1px solid var(--line); border-radius: 2mm;
     }
-    .rc-tbl {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 0.51rem;
+    table.rc-tbl {
+      width: 100%; border-collapse: collapse; font-size: 2.15mm;
     }
     .rc-tbl thead th {
-      padding: 0.36rem 0.2rem;
-      background: #244f7f;
-      color: #fff;
-      border: 1px solid rgba(255, 255, 255, 0.15);
-      font-size: 0.45rem;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      line-height: 1.2;
-      font-weight: 700;
+      padding: 1.5mm 1mm; background: var(--navy); color: #fff;
+      border: 1px solid rgba(255,255,255,.12);
+      font-size: 1.9mm; text-transform: uppercase; letter-spacing: .04em; font-weight: 700;
     }
-    .rc-tbl thead th.rc-sem {
-      background: #1f6e5f;
+    .rc-tbl thead th.rc-sem { background: var(--teal-dark); }
+    .rc-tbl td, .rc-tbl tbody th {
+      border: 1px solid var(--line); padding: 1mm 0.8mm; text-align: center; background: #fff;
     }
-    .rc-tbl td,
+    .rc-tbl tr.is-alt td, .rc-tbl tr.is-alt th { background: #f8fbfa; }
     .rc-tbl tbody th {
-      border: 1px solid #d4e3de;
-      padding: 0.22rem 0.16rem;
-      text-align: center;
-      vertical-align: middle;
-      background: #fff;
-    }
-    .rc-tbl__alt td,
-    .rc-tbl__alt th {
-      background: #f9fcfb;
-    }
-    .rc-tbl__subject {
-      text-align: left !important;
-      padding-left: 0.42rem !important;
-      min-width: 72px;
-      font-weight: 700;
-      color: #2d4647;
-      background: #fcfefc !important;
-      white-space: nowrap;
+      text-align: left; padding-left: 2mm; font-weight: 700; white-space: nowrap; color: #243b3d;
     }
     .rc-cell {
-      display: inline-flex;
-      align-items: baseline;
-      justify-content: center;
-      gap: 0.17rem;
-      min-width: 34px;
-      padding: 0.1rem 0.24rem;
-      border-radius: 999px;
-      font-size: 0.49rem;
-      font-weight: 700;
-      line-height: 1.1;
+      display: inline-flex; align-items: baseline; justify-content: center; gap: 0.6mm;
+      min-width: 9mm; padding: 0.4mm 1mm; border-radius: 999px; font-weight: 700; font-size: 2.05mm;
     }
-    .rc-cell em {
-      font-style: normal;
-      font-size: 0.42rem;
-      opacity: 0.86;
-      letter-spacing: 0.02em;
-      font-weight: 700;
-    }
+    .rc-cell em { font-style: normal; font-size: 1.7mm; opacity: .85; }
     .rc-cell--empty {
-      color: #8ba29b;
-      background: #f3f7f5;
-      border: 1px dashed #c7d8d1;
-      min-width: 30px;
-      padding: 0.06rem 0.22rem;
+      color: #94a3b8; background: #f1f5f9; border: 1px dashed #cbd5e1; min-width: 8mm;
     }
-    .rc-score--excellent {
-      background: var(--rc-excellent-bg);
-      color: var(--rc-excellent-fg);
+    .rc-score--excellent { background: var(--excellent-bg); color: var(--excellent-fg); }
+    .rc-score--good { background: var(--good-bg); color: var(--good-fg); }
+    .rc-score--fair { background: var(--fair-bg); color: var(--fair-fg); }
+    .rc-score--low { background: var(--low-bg); color: var(--low-fg); }
+    .rc-tbl__sum th {
+      text-align: left !important; padding-left: 2mm !important;
+      background: #eef7f4 !important; color: var(--teal-dark);
+      text-transform: uppercase; font-size: 1.95mm; letter-spacing: .04em;
     }
-    .rc-score--good {
-      background: var(--rc-good-bg);
-      color: var(--rc-good-fg);
-    }
-    .rc-score--fair {
-      background: var(--rc-fair-bg);
-      color: var(--rc-fair-fg);
-    }
-    .rc-score--low {
-      background: var(--rc-low-bg);
-      color: var(--rc-low-fg);
-    }
-    .rc-tbl__summary th {
-      text-align: left !important;
-      padding-left: 0.42rem !important;
-      font-size: 0.47rem;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      color: #2d5c53;
-      background: #f2f7f4 !important;
-      font-weight: 800;
-    }
-    .rc-tbl__summary td {
-      background: #f7fbf9;
-    }
-    .rc-tbl__summary--average th {
-      background: #eef4fb !important;
-      color: #2d5278;
-    }
-    .rc-tbl__summary--average td {
-      background: #f5f9ff;
-    }
+    .rc-tbl__sum td { background: #f4faf8; }
+    .rc-tbl__sum--avg th { background: #eef2ff !important; color: var(--navy); }
+    .rc-tbl__sum--avg td { background: #f5f7ff; }
 
     .rc-remarks {
-      margin-top: 3mm;
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 2.8mm;
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 2.2mm;
     }
     .rc-remark {
-      border: 1px solid #c8d9d3;
-      background:
-        repeating-linear-gradient(
-          to bottom,
-          #ffffff 0,
-          #ffffff 11px,
-          #edf5f1 11px,
-          #edf5f1 12px
-        );
-      min-height: 70px;
+      border: 1px solid var(--line); border-radius: 2mm; min-height: 22mm; overflow: hidden;
+      background: repeating-linear-gradient(#fff 0 4.2mm, #f3faf7 4.2mm 4.4mm);
     }
     .rc-remark__head {
-      padding: 0.27rem 0.44rem;
-      background: #f0f6f3;
-      border-bottom: 1px solid #d4e3de;
-      color: #2f5f56;
-      font-size: 0.46rem;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      font-weight: 800;
+      padding: 1.2mm 2mm; background: var(--soft); border-bottom: 1px solid var(--line);
+      font-size: 1.95mm; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--teal-dark);
     }
     .rc-remark__body p {
-      margin: 0;
-      padding: 0.32rem 0.44rem;
-      font-size: 0.5rem;
-      line-height: 1.45;
-      color: #2f4545;
+      margin: 0; padding: 1.4mm 2mm; font-size: 2.15mm; line-height: 1.4; color: #2f4545;
     }
-    .rc-remark__empty {
-      color: #7d9090;
-      font-style: italic;
-    }
+    .rc-remark__empty { color: #94a3b8; font-style: italic; }
 
-    .rc-rail {
-      background: linear-gradient(180deg, #224b79, #1f6e5f);
-      border-left: 3px solid #f1b82d;
-      color: #fff;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      writing-mode: vertical-rl;
-      transform: rotate(180deg);
-      text-transform: uppercase;
-      font-size: 0.51rem;
-      letter-spacing: 0.1em;
-      text-align: center;
-      line-height: 1.5;
-      font-weight: 700;
-      padding: 0.45rem 0;
-    }
-
-    @page {
-      size: A4 landscape;
-      margin: 0;
-    }
+    @page { size: A4 landscape; margin: 0; }
     @media print {
       body { background: #fff; }
-      .rc-page {
-        margin: 0;
-        width: 297mm;
-        height: 210mm;
-        box-shadow: none;
-      }
+      .rc-page { margin: 0; box-shadow: none; width: 297mm; height: 210mm; }
     }
   </style>
 </head>
 <body>
+  <!-- FRONT -->
   <section class="rc-page">
-    <div class="rc-tricolor"><span></span><span></span><span></span></div>
-    <div class="rc-frame"></div>
-    <span class="rc-corner rc-corner--tl"></span>
-    <span class="rc-corner rc-corner--tr"></span>
-    <span class="rc-corner rc-corner--bl"></span>
-    <span class="rc-corner rc-corner--br"></span>
-    <div class="rc-watermark">${logo}</div>
-
+    <div class="rc-page__bar" aria-hidden="true"></div>
     <div class="rc-sheet">
-      <header class="rc-header">
-        ${logo}
-        <div class="rc-header__title">
-          <h1>${schoolName}</h1>
-          <p>Student report card · ${escapeHtml(data.student.academicYear)} · ${escapeHtml(data.student.academicYearEc)} E.C.</p>
-        </div>
-        <div class="rc-badge">Official academic record</div>
-      </header>
+      ${schoolHeader}
 
-      <div class="rc-front-main">
-        <section class="rc-block">
-          <h3 class="rc-block__head">Student identification / የተማሪ መረጃ</h3>
-          <div class="rc-block__body">
-            <div class="rc-student-hero">
-              <div class="rc-avatar" aria-hidden="true">${studentInitials}</div>
-              <div class="rc-student-name">
+      <div class="rc-front">
+        <section class="rc-card">
+          <h2 class="rc-card__h">Student identification · የተማሪ መረጃ</h2>
+          <div class="rc-card__b">
+            <div class="rc-id">
+              ${avatar}
+              <div>
                 <strong>${studentNameUpper}</strong>
-                <span>Academic profile and enrollment details</span>
+                <span>${escapeHtml(data.termName)} · ${escapeHtml(data.student.gradeLabel)}</span>
               </div>
             </div>
-
             <div class="rc-fields">
-              ${infoField('ቁጥር', 'Student number', data.student.number ? escapeHtml(data.student.number) : '—')}
-              ${infoField('መለያ ኮድ', 'Document ID', documentRef)}
-              ${infoField('ጾታ', 'Sex', data.student.sex ? escapeHtml(data.student.sex) : '—')}
-              ${infoField('ዕድሜ', 'Age', data.student.age != null ? String(data.student.age) : '—')}
-              ${infoField('ክፍል', 'Grade / section', escapeHtml(data.student.gradeLabel))}
-              ${infoField('የትምህርት ዓመት', 'Academic year', `${escapeHtml(data.student.academicYearEc)} E.C.`)}
+              <div class="rc-field"><em>Student ID</em><strong>${data.student.number ? escapeHtml(data.student.number) : '—'}</strong></div>
+              <div class="rc-field"><em>Document ref</em><strong>${documentRef}</strong></div>
+              <div class="rc-field"><em>Sex</em><strong>${data.student.sex ? escapeHtml(data.student.sex) : '—'}</strong></div>
+              <div class="rc-field"><em>Age</em><strong>${data.student.age != null ? String(data.student.age) : '—'}</strong></div>
+              <div class="rc-field"><em>Grade / section</em><strong>${escapeHtml(data.student.gradeLabel)}</strong></div>
+              <div class="rc-field"><em>Academic year</em><strong>${escapeHtml(data.student.academicYearEc)} E.C.</strong></div>
             </div>
           </div>
         </section>
 
-        <section class="rc-performance">
-          <article class="rc-block">
-            <h3 class="rc-block__head">Performance overview / የውጤት አጠቃላይ ግምገማ</h3>
-            <div class="rc-block__body">
-              <div class="rc-ring-wrap">
+        <div class="rc-perf">
+          <section class="rc-card">
+            <h2 class="rc-card__h">Performance overview · አጠቃላይ ውጤት</h2>
+            <div class="rc-card__b">
+              <div class="rc-ring-row">
                 <div class="rc-ring-shell">${scoreRingSvg(avgNumeric)}</div>
                 <div class="rc-ring-meta">
                   <h4>Cumulative average</h4>
-                  <p>Graphical score index computed from all recorded terms and semester evaluations.</p>
+                  <p>Year average across recorded terms. Letter grades follow this school’s scale.</p>
                 </div>
               </div>
-
-              <div class="rc-stat-grid">
-                <div class="rc-stat-card">
-                  <em>Class rank</em>
-                  <i>ደረጃ</i>
-                  <strong>${rankLabel}</strong>
-                </div>
-                <div class="rc-stat-card">
-                  <em>Conduct</em>
-                  <i>ስነ-ምግባር</i>
-                  <strong>${data.summary.conduct ? escapeHtml(data.summary.conduct) : '—'}</strong>
-                </div>
-                <div class="rc-stat-card">
-                  <em>Absent days</em>
-                  <i>የቀሩበት ቀን</i>
-                  <strong>${data.summary.absentDays != null ? String(data.summary.absentDays) : '—'}</strong>
-                </div>
-                <div class="rc-stat-card">
-                  <em>Issued on</em>
-                  <i>የተሰጠበት ቀን</i>
-                  <strong>${issuedDate}</strong>
-                </div>
+              <div class="rc-stats" style="margin-top:2.2mm">
+                <div class="rc-stat"><em>Class rank</em><strong>${rankLabel}</strong></div>
+                <div class="rc-stat"><em>Conduct</em><strong>${data.summary.conduct ? escapeHtml(data.summary.conduct) : '—'}</strong></div>
+                <div class="rc-stat"><em>Absent days</em><strong>${data.summary.absentDays != null ? String(data.summary.absentDays) : '—'}</strong></div>
+                <div class="rc-stat"><em>Issued</em><strong>${issuedDate}</strong></div>
               </div>
             </div>
-          </article>
-
-          <article class="rc-security">
-            <div class="rc-security__qr">
-              <img src="${qrUrl}" alt="Verification QR code"/>
+          </section>
+          <section class="rc-verify">
+            <img src="${qrUrl}" alt="Verification QR"/>
+            <div>
+              <strong>Verification seal</strong>
+              <p>Scan to authenticate this report in the school registry. Ref ${documentRef}</p>
             </div>
-            <div class="rc-security__meta">
-              <strong>Security Verification Seal</strong>
-              <p>Scan this encrypted school QR stamp to authenticate this document in the digital registry.</p>
-            </div>
-          </article>
-        </section>
+          </section>
+        </div>
       </div>
 
       <div class="rc-ribbon">
         <strong>${escapeHtml(achievement)}</strong>
-        <span>${escapeHtml(data.student.academicYear)} · ${escapeHtml(data.student.academicYearEc)} E.C.</span>
+        <span>${yearLabel}</span>
       </div>
 
-      ${subjectSnapshot ? `
-      <section class="rc-snapshot">
-        <div class="rc-snapshot__head">
-          <strong>Subject performance snapshot</strong>
-          <span>Term averages</span>
-        </div>
-        <div class="rc-snapshot__grid">${subjectSnapshot}</div>
-      </section>` : ''}
+      ${
+        snap
+          ? `<section class="rc-card"><h2 class="rc-card__h">Subject snapshot</h2><div class="rc-card__b"><div class="rc-snap-grid">${snap}</div></div></section>`
+          : ''
+      }
 
       ${data.promotionText ? `<div class="rc-promo">${escapeHtml(data.promotionText)}</div>` : ''}
 
-      <div class="rc-signatures">
-        <div class="rc-sign">
-          <div class="rc-sign__line"></div>
-          <strong>Director signature</strong>
-          <span>የዳይሬክተር ፊርማ</span>
-        </div>
-        <div class="rc-sign">
-          <div class="rc-sign__line"></div>
-          <strong>Homeroom teacher</strong>
-          <span>የክፍል አስተማሪ ፊርማ</span>
-        </div>
-        <div class="rc-sign">
-          <div class="rc-sign__line"></div>
-          <strong>Parent / guardian</strong>
-          <span>የወላጅ / አሳዳጊ ፊርማ</span>
-        </div>
+      <div class="rc-signs">
+        <div class="rc-sign"><div class="rc-sign__line"></div><strong>Director</strong><span>Director signature</span></div>
+        <div class="rc-sign"><div class="rc-sign__line"></div><strong>Homeroom teacher</strong><span>Class teacher signature</span></div>
+        <div class="rc-sign"><div class="rc-sign__line"></div><strong>Parent / guardian</strong><span>Parent signature</span></div>
       </div>
 
-      <div class="rc-footer-meta">
+      <div class="rc-foot">
         <div>
           <strong>Grading legend</strong><br/>
-          90-100 Excellent (A) · 80-89 Very Good (B) · 70-79 Good (C) · 60-69 Satisfactory (D) · 50-59 Needs support (E) · Below 50 Failing (F)
+          90–100 A · 80–89 B · 70–79 C · 60–69 D · 50–59 E · Below 50 F
         </div>
-        <div class="rc-footer-meta__right">
-          <strong>Document reference</strong><br/>
-          ${documentRef}<br/>
-          ${contactLine ? `<strong>School contact</strong><br/>${contactLine}` : ''}
+        <div class="rc-foot__right">
+          <strong>Print</strong><br/>
+          A4 landscape · duplex (front / back)<br/>
+          ${contactLine || schoolName}
         </div>
       </div>
     </div>
   </section>
 
+  <!-- BACK -->
   <section class="rc-page">
-    <div class="rc-tricolor"><span></span><span></span><span></span></div>
-    <div class="rc-frame"></div>
-    <span class="rc-corner rc-corner--tl"></span>
-    <span class="rc-corner rc-corner--tr"></span>
-    <span class="rc-corner rc-corner--bl"></span>
-    <span class="rc-corner rc-corner--br"></span>
-    <div class="rc-watermark">${logo}</div>
+    <div class="rc-page__bar" aria-hidden="true"></div>
+    <div class="rc-sheet">
+      ${schoolHeaderBack}
 
-    <div class="rc-back">
-      <div class="rc-back__body">
-        <div class="rc-back-head">
-          <div>
-            <h2>Detailed Academic Results</h2>
-            <p>${studentName} · ${escapeHtml(data.student.gradeLabel)}</p>
-          </div>
-          <span>${escapeHtml(data.student.academicYearEc)} E.C. / ${escapeHtml(data.student.academicYear)}</span>
-        </div>
-
-        <div class="rc-table-wrap">
-          <table class="rc-tbl">
-            <thead>
-              <tr>
-                <th>Subject</th>
-                <th>T1</th>
-                <th>T2</th>
-                <th class="rc-sem">S1</th>
-                <th>T3</th>
-                <th>T4</th>
-                <th class="rc-sem">S2</th>
-                <th>Cumulative</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${subjectRows || '<tr><td colspan="8">No scores recorded yet.</td></tr>'}
-              <tr class="rc-tbl__summary">
-                <th scope="row">Total</th>
-                ${summaryTotalCells(data.summary.term1)}
-                ${summaryTotalCells(data.summary.term2)}
-                ${summaryTotalCells(data.summary.semester1)}
-                ${summaryTotalCells(data.summary.term3)}
-                ${summaryTotalCells(data.summary.term4)}
-                ${summaryTotalCells(data.summary.semester2)}
-                ${summaryTotalCells(data.summary.cumulative)}
-              </tr>
-              <tr class="rc-tbl__summary rc-tbl__summary--average">
-                <th scope="row">Average</th>
-                <td>${fmtScoreCell(data.summary.term1.average)}</td>
-                <td>${fmtScoreCell(data.summary.term2.average)}</td>
-                <td>${fmtScoreCell(data.summary.semester1.average, true)}</td>
-                <td>${fmtScoreCell(data.summary.term3.average)}</td>
-                <td>${fmtScoreCell(data.summary.term4.average)}</td>
-                <td>${fmtScoreCell(data.summary.semester2.average, true)}</td>
-                <td>${fmtScoreCell(data.summary.cumulative.average, true)}</td>
-              </tr>
-              <tr class="rc-tbl__summary">
-                <th scope="row">Absent days</th>
-                <td colspan="6"></td>
-                <td>${data.summary.absentDays != null ? String(data.summary.absentDays) : '—'}</td>
-              </tr>
-              <tr class="rc-tbl__summary">
-                <th scope="row">Conduct</th>
-                <td colspan="6"></td>
-                <td>${data.summary.conduct ? escapeHtml(data.summary.conduct) : '—'}</td>
-              </tr>
-              <tr class="rc-tbl__summary">
-                <th scope="row">Rank</th>
-                <td colspan="6"></td>
-                <td>${rankLabel}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div class="rc-remarks">
-          ${remarkCard('1st semester remark', data.remarks.semester1)}
-          ${remarkCard('2nd semester remark', data.remarks.semester2)}
-          ${remarkCard('Cumulative remark', data.remarks.cumulative)}
-        </div>
+      <div class="rc-table-wrap">
+        <table class="rc-tbl">
+          <thead>
+            <tr>
+              <th>Subject</th>
+              <th>T1</th>
+              <th>T2</th>
+              <th class="rc-sem">S1</th>
+              <th>T3</th>
+              <th>T4</th>
+              <th class="rc-sem">S2</th>
+              <th>Cumulative</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${subjectRows || '<tr><td colspan="8">No scores recorded yet.</td></tr>'}
+            <tr class="rc-tbl__sum">
+              <th scope="row">Total</th>
+              ${summaryTotalCells(data.summary.term1)}
+              ${summaryTotalCells(data.summary.term2)}
+              ${summaryTotalCells(data.summary.semester1)}
+              ${summaryTotalCells(data.summary.term3)}
+              ${summaryTotalCells(data.summary.term4)}
+              ${summaryTotalCells(data.summary.semester2)}
+              ${summaryTotalCells(data.summary.cumulative)}
+            </tr>
+            <tr class="rc-tbl__sum rc-tbl__sum--avg">
+              <th scope="row">Average</th>
+              <td>${fmtScoreCell(data.summary.term1.average)}</td>
+              <td>${fmtScoreCell(data.summary.term2.average)}</td>
+              <td>${fmtScoreCell(data.summary.semester1.average, true)}</td>
+              <td>${fmtScoreCell(data.summary.term3.average)}</td>
+              <td>${fmtScoreCell(data.summary.term4.average)}</td>
+              <td>${fmtScoreCell(data.summary.semester2.average, true)}</td>
+              <td>${fmtScoreCell(data.summary.cumulative.average, true)}</td>
+            </tr>
+            <tr class="rc-tbl__sum">
+              <th scope="row">Absent days</th>
+              <td colspan="6"></td>
+              <td>${data.summary.absentDays != null ? String(data.summary.absentDays) : '—'}</td>
+            </tr>
+            <tr class="rc-tbl__sum">
+              <th scope="row">Conduct</th>
+              <td colspan="6"></td>
+              <td>${data.summary.conduct ? escapeHtml(data.summary.conduct) : '—'}</td>
+            </tr>
+            <tr class="rc-tbl__sum">
+              <th scope="row">Rank</th>
+              <td colspan="6"></td>
+              <td>${rankLabel}</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
 
-      <aside class="rc-rail">
-        Verified school result · ${escapeHtml(data.student.academicYearEc)} E.C. · Ref ${documentRef}
-      </aside>
+      <div class="rc-remarks">
+        ${remarkCard('1st semester remark', data.remarks.semester1)}
+        ${remarkCard('2nd semester remark', data.remarks.semester2)}
+        ${remarkCard('Principal / cumulative', data.remarks.cumulative)}
+      </div>
+
+      <div class="rc-foot">
+        <div>
+          <strong>${schoolName}</strong><br/>
+          ${headerTagline ? `${headerTagline}<br/>` : ''}
+          ${contactLine || 'Official academic record'}
+        </div>
+        <div class="rc-foot__right">
+          <strong>Document</strong><br/>
+          ${documentRef} · ${issuedDate}<br/>
+          Flip for student summary (front)
+        </div>
+      </div>
     </div>
   </section>
 </body>

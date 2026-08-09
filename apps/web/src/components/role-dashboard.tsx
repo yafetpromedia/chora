@@ -14,7 +14,7 @@ import {
 } from "@/lib/api";
 import { getFinanceAnalytics, type FinanceAnalytics } from "@/lib/finance";
 import { getSetupStatus } from "@/lib/school-setup";
-import { UserRole } from "@/lib/auth";
+import { AUTH_ROLE_KEY, UserRole } from "@/lib/auth";
 import {
   getAttendanceAnalytics,
   getAttendanceSummary,
@@ -24,6 +24,7 @@ import {
   type ParentNotification,
 } from "@/lib/attendance";
 import { AdminDashboard } from "@/components/dashboard/admin-dashboard";
+import { StaffRoleDashboard } from "@/components/dashboard/staff-role-dashboard";
 import { StudentDashboard } from "@/components/student/student-dashboard";
 import { getAdminAnalytics, type AdminAnalyticsOverview } from "@/lib/dashboard-analytics";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
@@ -31,6 +32,7 @@ import { ParentTodayOverview } from "@/components/dashboard/today-overview";
 import { StudentIdCardPanel } from "@/components/students/student-id-card-panel";
 import type { AdminDayOverview, ParentDayOverview } from "@/lib/dashboard-day";
 import { hasPermission, Permission } from "@/lib/permissions";
+import { getStaffWorkspaceTitle } from "@/lib/staff-workspace";
 import { listLibraryResources, type LibraryResource } from "@/lib/library";
 import { readSchoolBrand } from "@/lib/school-brand";
 
@@ -77,9 +79,14 @@ function formatStatValue(key: string, value: string | number) {
 }
 
 export function RoleDashboard({ role }: Props) {
+  const [workspaceRole, setWorkspaceRole] = useState<UserRole>(() => {
+    if (typeof window === "undefined") return role;
+    return (localStorage.getItem(AUTH_ROLE_KEY) as UserRole | null) ?? role;
+  });
+  const canViewAdminDashboard =
+    workspaceRole === "admin" && hasPermission(Permission.SCHOOL_DASHBOARD);
   const isPrincipalView =
-    hasPermission(Permission.SCHOOL_DASHBOARD) &&
-    !hasPermission(Permission.STUDENTS_CREATE);
+    canViewAdminDashboard && !hasPermission(Permission.STUDENTS_CREATE);
   const canViewFinance = hasPermission(Permission.FINANCE_READ);
 
   const [loading, setLoading] = useState(true);
@@ -100,6 +107,11 @@ export function RoleDashboard({ role }: Props) {
   const [parentDay, setParentDay] = useState<ParentDayOverview | null>(null);
   const [selectedChildId, setSelectedChildId] = useState("");
   const router = useRouter();
+
+  useEffect(() => {
+    const stored = localStorage.getItem(AUTH_ROLE_KEY) as UserRole | null;
+    if (stored && stored !== workspaceRole) setWorkspaceRole(stored);
+  }, [workspaceRole]);
 
   const stats = useMemo(() => {
     if (!dashboard) return [];
@@ -157,7 +169,7 @@ export function RoleDashboard({ role }: Props) {
           setParentAlerts(alerts);
         }
 
-        if (role === "admin") {
+        if (canViewAdminDashboard) {
           if (isPrincipalView) {
             const [schoolRes, analyticsData] = await Promise.all([
               apiFetch<{ school: SchoolInfo | null }>("/schools/me").catch(() => ({
@@ -199,7 +211,7 @@ export function RoleDashboard({ role }: Props) {
     };
 
     void load();
-  }, [role, router]);
+  }, [role, router, canViewAdminDashboard, isPrincipalView]);
 
   useEffect(() => {
     if (parentDay?.children.length) {
@@ -218,9 +230,9 @@ export function RoleDashboard({ role }: Props) {
 
   const schoolName = schoolInfo?.name ?? readSchoolBrand().name ?? "CampusOne";
 
-  if (role === "admin") {
+  if (canViewAdminDashboard) {
     return (
-      <DashboardShell role={role} title="Dashboard">
+      <DashboardShell role={workspaceRole} title="Dashboard">
         <AdminDashboard
           schoolName={schoolName}
           subscription={subscription}
@@ -231,6 +243,14 @@ export function RoleDashboard({ role }: Props) {
           canViewFinance={canViewFinance}
           error={error}
         />
+      </DashboardShell>
+    );
+  }
+
+  if (workspaceRole === "admin" || workspaceRole === "staff") {
+    return (
+      <DashboardShell role={workspaceRole} title={getStaffWorkspaceTitle()}>
+        <StaffRoleDashboard announcements={announcements} error={error} />
       </DashboardShell>
     );
   }

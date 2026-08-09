@@ -1,0 +1,270 @@
+/* School admin → platform support reports */
+
+.sup-v2 {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.sup-v2__alert {
+  margin: 0;
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  font-size: 0.9rem;
+}
+
+.sup-v2__alert--ok {
+  background: #e8f6ef;
+  color: #0f5c38;
+  border: 1px solid #b7e0c8;
+}
+
+.sup-v2__grid {
+  display: grid;
+  gap: 1rem;
+}
+
+@media (min-width: 960px) {
+  .sup-v2__grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+    align-items: start;
+  }
+}
+
+.sup-v2__card {
+  background: #fff;
+  border: 1px solid #e2e8ec;
+  border-radius: 14px;
+  padding: 1.15rem 1.2rem 1.25rem;
+}
+
+.sup-v2__card-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.sup-v2__card-icon {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background: #e8f4f5;
+  color: #0d5c63;
+  flex-shrink: 0;
+}
+
+.sup-v2__card-icon--feed {
+  background: #eef2ff;
+  color: #3b4cca;
+}
+
+.sup-v2__card-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.sup-v2__card-sub {
+  margin: 0.2rem 0 0;
+  font-size: 0.85rem;
+  color: #64748b;
+  line-height: 1.4;
+}
+
+.sup-v2__card-count {
+  margin-left: auto;
+  min-width: 1.75rem;
+  height: 1.75rem;
+  padding: 0 0.45rem;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: #f1f5f9;
+  color: #334155;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.sup-v2__form {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.sup-v2__field {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.sup-v2__label {
+  font-size: 0.78rem;
+  font-weight: 650;
+  color: #475569;
+  letter-spacing: 0.02em;
+}
+
+.sup-v2__input,
+.sup-v2__textarea {
+  width: 100%;
+  border: 1px solid #d7dee5;
+  border-radius: 10px;
+  padding: 0.65rem 0.75rem;
+  font: inherit;
+  color: #0f172a;
+  background: #fff;
+}
+
+.sup-v2__input:focus,
+.sup-v2__textarea:focus {
+  outline: none;
+  border-color: #0d5c63;
+  box-shadow: 0 0 0 3px rgba(13, 92, 99, 0.12);
+}
+
+.sup-v2__textarea {
+  resize: vertical;
+  min-height: 8rem;
+  line-height: 1.45;
+}
+
+.sup-v2__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.sup-v2__btn {
+  border: none;
+  border-radius: 10px;
+  padding: 0.65rem 1rem;
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.sup-v2__btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.sup-v2__btn--primary {
+  background: #0d5c63;
+  color: #fff;
+}
+
+.sup-v2__btn--primary:hover:not(:disabled) {
+  background: #0a4a50;
+}
+
+.sup-v2__empty {
+  margin: 0;
+  padding: 1.25rem 0.25rem;
+  color: #64748b;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.sup-v2__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.45rem;
+  max-height: 18rem;
+  overflow: auto;
+}
+
+.sup-v2__item {
+  width: 100%;
+  text-align: left;
+  border: 1px solid #e8eef2;
+  background: #fbfcfd;
+  border-radius: 10px;
+  padding: 0.7rem 0.8rem;
+  cursor: pointer;
+  font: inherit;
+}
+
+.sup-v2__item:hover {
+  border-color: #c9d8dc;
+}
+
+.sup-v2__item--active {
+  border-color: #0d5c63;
+  background: #f2fafb;
+}
+
+.sup-v2__item-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.sup-v2__item-top strong {
+  font-size: 0.92rem;
+  color: #0f172a;
+}
+
+.sup-v2__item-meta {
+  margin: 0.3rem 0 0;
+  font-size: 0.78rem;
+  color: #64748b;
+}
+
+.sup-v2__detail {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e8eef2;
+}
+
+.sup-v2__detail h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: #0f172a;
+}
+
+.sup-v2__detail-meta {
+  margin: 0.35rem 0 0.75rem;
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.sup-v2__detail-body {
+  margin: 0;
+  white-space: pre-wrap;
+  line-height: 1.5;
+  color: #1e293b;
+  font-size: 0.92rem;
+}
+
+.sup-v2__detail-hint {
+  margin: 0.85rem 0 0;
+  font-size: 0.82rem;
+  color: #94a3b8;
+}
+
+.sup-v2__note {
+  margin-top: 0.9rem;
+  padding: 0.75rem 0.85rem;
+  border-radius: 10px;
+  background: #e8f4f5;
+  border: 1px solid #c5e0e3;
+}
+
+.sup-v2__note strong {
+  display: block;
+  font-size: 0.78rem;
+  color: #0d5c63;
+  margin-bottom: 0.35rem;
+}
+
+.sup-v2__note p {
+  margin: 0;
+  white-space: pre-wrap;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: #134e54;
+}

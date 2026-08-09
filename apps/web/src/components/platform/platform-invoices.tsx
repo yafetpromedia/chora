@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { PlanType } from "@/lib/api";
 import {
   createPlatformInvoice,
@@ -10,7 +11,9 @@ import {
   type InvoiceStatus,
   type PlatformInvoice,
 } from "@/lib/platform-billing";
+import { handlePlatformAuthFailure } from "@/lib/platform-auth";
 import { DashIcon } from "@/components/dashboard/dash-icons";
+import { AppToast } from "@/components/ui/app-toast";
 import type { PlatformSchoolRow } from "./platform-types";
 
 type Props = {
@@ -54,6 +57,7 @@ function monthBounds(offset = 0) {
 }
 
 export function PlatformInvoices({ schools }: Props) {
+  const router = useRouter();
   const [invoices, setInvoices] = useState<PlatformInvoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -62,6 +66,7 @@ export function PlatformInvoices({ schools }: Props) {
   const [query, setQuery] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [busyId, setBusyId] = useState("");
 
   const bounds = monthBounds(0);
   const [form, setForm] = useState({
@@ -74,6 +79,13 @@ export function PlatformInvoices({ schools }: Props) {
     notes: "",
   });
 
+  function fail(err: unknown, fallback: string) {
+    if (handlePlatformAuthFailure(err, () => router.replace("/platform/login"))) {
+      return;
+    }
+    setError(err instanceof Error ? err.message : fallback);
+  }
+
   const load = useCallback(async () => {
     setError("");
     const data = await getPlatformInvoices(
@@ -85,9 +97,23 @@ export function PlatformInvoices({ schools }: Props) {
   useEffect(() => {
     setLoading(true);
     void load()
-      .catch((e) => setError(e instanceof Error ? e.message : "Failed to load invoices"))
+      .catch((e) => fail(e, "Failed to load invoices"))
       .finally(() => setLoading(false));
-  }, [load]);
+  }, [load, router]);
+
+  const stats = useMemo(() => {
+    const outstanding = invoices.filter(
+      (i) => i.status === "SENT" || i.status === "OVERDUE",
+    );
+    return {
+      total: invoices.length,
+      draft: invoices.filter((i) => i.status === "DRAFT").length,
+      sent: invoices.filter((i) => i.status === "SENT").length,
+      paid: invoices.filter((i) => i.status === "PAID").length,
+      overdue: invoices.filter((i) => i.status === "OVERDUE").length,
+      outstandingUsd: outstanding.reduce((sum, i) => sum + i.amountUsd, 0),
+    };
+  }, [invoices]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -122,53 +148,133 @@ export function PlatformInvoices({ schools }: Props) {
       setMessage("Invoice created as draft.");
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not create invoice");
+      fail(e, "Could not create invoice");
     } finally {
       setSaving(false);
     }
   }
 
   async function setStatus(id: string, status: InvoiceStatus) {
+    setBusyId(id);
     setError("");
     try {
       await updatePlatformInvoice(id, { status });
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Update failed");
+      fail(e, "Update failed");
+    } finally {
+      setBusyId("");
     }
   }
 
   if (loading) {
-    return <p className="plat-loading">Loading invoices…</p>;
+    return (
+      <div className="plat-subjects-v2 plat-subjects-v2--loading">
+        <div className="plat-curriculum__skeleton plat-curriculum__skeleton--hero" />
+        <div className="plat-curriculum__skeleton" />
+      </div>
+    );
   }
 
   return (
-    <div className="plat-section plat-invoices">
-      <header className="plat-section-hero plat-section-hero--billing">
-        <div>
-          <p className="plat-section-hero__eyebrow">Accounts receivable</p>
-          <h2 className="plat-section-hero__title">Invoices</h2>
-          <p className="plat-section-hero__sub">
-            Issue monthly invoices to schools and track payment status.
-          </p>
+    <div className="plat-subjects-v2 dash-admin dash-admin--modern plat-billing-v2">
+      <AppToast message={error} tone="error" onDismiss={() => setError("")} />
+      <AppToast message={message} tone="success" onDismiss={() => setMessage("")} />
+
+      <header className="plat-subjects-v2__hero">
+        <div className="plat-subjects-v2__hero-main">
+          <span className="plat-subjects-v2__hero-icon" aria-hidden>
+            <DashIcon name="fees" className="dash-icon--md" />
+          </span>
+          <div>
+            <p className="plat-subjects-v2__eyebrow">Accounts receivable</p>
+            <h2 className="plat-subjects-v2__title">Invoices</h2>
+            <p className="plat-subjects-v2__sub">
+              Issue monthly invoices to schools and track payment status.
+            </p>
+          </div>
+        </div>
+        <div className="plat-subjects-v2__hero-stats">
+          <div className="plat-subjects-v2__stat">
+            <strong>{stats.total}</strong>
+            <span>Total</span>
+          </div>
+          <div className="plat-subjects-v2__stat">
+            <strong>${stats.outstandingUsd.toLocaleString()}</strong>
+            <span>Outstanding</span>
+          </div>
+          <div className="plat-subjects-v2__stat">
+            <strong>{stats.overdue}</strong>
+            <span>Overdue</span>
+          </div>
+        </div>
+      </header>
+
+      <div className="plat-subjects-v2__kpis">
+        <article className="plat-subjects-v2__kpi">
+          <DashIcon name="templates" className="dash-icon--sm" />
+          <div>
+            <strong>{stats.draft}</strong>
+            <span>Draft</span>
+          </div>
+        </article>
+        <article className="plat-subjects-v2__kpi">
+          <DashIcon name="mail" className="dash-icon--sm" />
+          <div>
+            <strong>{stats.sent}</strong>
+            <span>Sent</span>
+          </div>
+        </article>
+        <article className="plat-subjects-v2__kpi">
+          <DashIcon name="finance" className="dash-icon--sm" />
+          <div>
+            <strong>{stats.paid}</strong>
+            <span>Paid</span>
+          </div>
+        </article>
+      </div>
+
+      <div className="plat-subjects-v2__toolbar">
+        <div className="plat-tenants-v2__search plat-subjects-v2__search">
+          <DashIcon name="fees" className="dash-icon--sm" />
+          <input
+            type="search"
+            placeholder="Search invoice or school…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            aria-label="Search invoices"
+          />
+        </div>
+        <div className="plat-filter-tabs plat-subjects-v2__filters" role="tablist">
+          {STATUS_FILTERS.map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              role="tab"
+              aria-selected={statusFilter === f.id}
+              className={`plat-filter-tab${
+                statusFilter === f.id ? " plat-filter-tab--active" : ""
+              }`}
+              onClick={() => setStatusFilter(f.id)}
+            >
+              {f.label}
+            </button>
+          ))}
         </div>
         <button
           type="button"
-          className="plat-btn plat-btn--primary"
+          className="plat-v2__btn plat-v2__btn--primary"
           onClick={() => setShowCreate((v) => !v)}
         >
           <DashIcon name="plus" className="dash-icon--sm" />
-          New invoice
+          {showCreate ? "Cancel" : "New invoice"}
         </button>
-      </header>
-
-      {error ? <p className="auth-alert auth-alert--error">{error}</p> : null}
-      {message ? <p className="plat-plans__ok">{message}</p> : null}
+      </div>
 
       {showCreate ? (
-        <section className="plat-panel plat-invoice-form">
-          <h3 className="plat-panel__title">Create invoice</h3>
-          <p className="plat-panel__hint">
+        <section className="plat-billing-v2__panel plat-billing-v2__form">
+          <h3 className="plat-billing-v2__panel-title">Create invoice</h3>
+          <p className="plat-billing-v2__panel-hint">
             Amounts default from the plan catalog. Invoice starts as draft.
           </p>
           <div className="plat-invoice-form__grid">
@@ -245,7 +351,7 @@ export function PlatformInvoices({ schools }: Props) {
               placeholder="PO number, bank reference…"
             />
           </label>
-          <div className="plat-invoice-form__actions">
+          <div className="plat-subjects-v2__actions">
             <button
               type="button"
               className="plat-btn plat-btn--ghost"
@@ -265,35 +371,8 @@ export function PlatformInvoices({ schools }: Props) {
         </section>
       ) : null}
 
-      <div className="plat-toolbar">
-        <div className="plat-search">
-          <DashIcon name="finance" className="dash-icon--sm" />
-          <input
-            type="search"
-            placeholder="Search invoice or school…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-        </div>
-      </div>
-
-      <div className="plat-filter-tabs" role="tablist">
-        {STATUS_FILTERS.map((f) => (
-          <button
-            key={f.id}
-            type="button"
-            role="tab"
-            aria-selected={statusFilter === f.id}
-            className={`plat-filter-tab${statusFilter === f.id ? " plat-filter-tab--active" : ""}`}
-            onClick={() => setStatusFilter(f.id)}
-          >
-            {f.label}
-          </button>
-        ))}
-      </div>
-
-      <div className="plat-table-wrap">
-        <table className="plat-table plat-table--invoices">
+      <div className="plat-subjects-v2__table-wrap">
+        <table className="plat-subjects-v2__table">
           <thead>
             <tr>
               <th>Invoice</th>
@@ -302,13 +381,13 @@ export function PlatformInvoices({ schools }: Props) {
               <th>Amount</th>
               <th>Due</th>
               <th>Status</th>
-              <th>Actions</th>
+              <th aria-label="Actions" />
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={7} className="plat-table-empty">
+                <td colSpan={7} className="plat-subjects-v2__empty">
                   No invoices yet. Create one for a paid school.
                 </td>
               </tr>
@@ -316,31 +395,38 @@ export function PlatformInvoices({ schools }: Props) {
               filtered.map((inv) => (
                 <tr key={inv.id}>
                   <td>
-                    <strong className="plat-table-name">{inv.invoiceNumber}</strong>
+                    <span className="plat-subjects-v2__name">{inv.invoiceNumber}</span>
                     {inv.plan ? (
-                      <span className="plat-table-sub">{inv.plan}</span>
+                      <code className="plat-subjects-v2__code">{inv.plan}</code>
                     ) : null}
                   </td>
                   <td>
-                    <strong>{inv.schoolName}</strong>
-                    <span className="plat-table-sub">{inv.joinCode}</span>
+                    <span className="plat-subjects-v2__name">{inv.schoolName}</span>
+                    <code className="plat-subjects-v2__code">{inv.joinCode}</code>
                   </td>
-                  <td className="plat-table-muted">
+                  <td className="plat-billing-v2__muted">
                     {formatDate(inv.periodStart)} – {formatDate(inv.periodEnd)}
                   </td>
-                  <td>{formatMoney(inv.amountUsd, inv.amountEtb, inv.currency)}</td>
-                  <td className="plat-table-muted">{formatDate(inv.dueAt)}</td>
                   <td>
-                    <span className={`plat-invoice-status plat-invoice-status--${inv.status.toLowerCase()}`}>
+                    <span className="plat-subjects-v2__count">
+                      {formatMoney(inv.amountUsd, inv.amountEtb, inv.currency)}
+                    </span>
+                  </td>
+                  <td className="plat-billing-v2__muted">{formatDate(inv.dueAt)}</td>
+                  <td>
+                    <span
+                      className={`plat-invoice-status plat-invoice-status--${inv.status.toLowerCase()}`}
+                    >
                       {inv.status}
                     </span>
                   </td>
                   <td>
-                    <div className="plat-invoice-actions">
+                    <div className="plat-subjects-v2__actions">
                       {inv.status === "DRAFT" ? (
                         <button
                           type="button"
                           className="plat-btn plat-btn--ghost plat-btn--xs"
+                          disabled={busyId === inv.id}
                           onClick={() => void setStatus(inv.id, "SENT")}
                         >
                           Mark sent
@@ -350,6 +436,7 @@ export function PlatformInvoices({ schools }: Props) {
                         <button
                           type="button"
                           className="plat-btn plat-btn--primary plat-btn--xs"
+                          disabled={busyId === inv.id}
                           onClick={() => void setStatus(inv.id, "PAID")}
                         >
                           Mark paid
@@ -358,7 +445,8 @@ export function PlatformInvoices({ schools }: Props) {
                       {inv.status !== "VOID" && inv.status !== "PAID" ? (
                         <button
                           type="button"
-                          className="plat-btn plat-btn--ghost plat-btn--xs"
+                          className="plat-btn plat-btn--ghost plat-btn--xs plat-btn--danger"
+                          disabled={busyId === inv.id}
                           onClick={() => void setStatus(inv.id, "VOID")}
                         >
                           Void

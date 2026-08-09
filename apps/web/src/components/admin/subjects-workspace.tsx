@@ -4,11 +4,11 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { DashIcon } from "@/components/dashboard/dash-icons";
 import {
-  AcademicsAlert,
   AcademicsBadge,
   AcademicsEmpty,
   AcademicsHero,
 } from "@/components/academics/academics-ui";
+import { AppToast } from "@/components/ui/app-toast";
 import {
   createSubject,
   listClassSubjects,
@@ -17,21 +17,78 @@ import {
   type Subject,
 } from "@/lib/results";
 
-function subjectHue(code: string) {
-  let h = 0;
-  for (let i = 0; i < code.length; i++) h = (h + code.charCodeAt(i) * 31) % 360;
-  return h;
-}
-
 function subjectInitials(name: string, code: string) {
   const words = name.trim().split(/\s+/).filter(Boolean);
   if (words.length >= 2) return `${words[0][0]}${words[1][0]}`.toUpperCase();
   return code.slice(0, 2).toUpperCase();
 }
 
+type SubjectInsights = {
+  classCount: number;
+  gradeCount: number;
+  teacherCount: number;
+  needsTeacher: number;
+  grades: string[];
+};
+
+function buildSubjectInsights(
+  assignments: Awaited<ReturnType<typeof listClassSubjects>>,
+): Record<string, SubjectInsights> {
+  const map: Record<
+    string,
+    SubjectInsights & { teacherIds: Set<string> }
+  > = {};
+
+  for (const row of assignments) {
+    const id = row.subject.id;
+    const gradeLabel = row.section
+      ? `${row.grade.name} · ${row.section.name}`
+      : row.grade.name;
+
+    if (!map[id]) {
+      map[id] = {
+        classCount: 0,
+        gradeCount: 0,
+        teacherCount: 0,
+        needsTeacher: 0,
+        grades: [],
+        teacherIds: new Set(),
+      };
+    }
+
+    const entry = map[id];
+    entry.classCount += 1;
+    if (!entry.grades.includes(gradeLabel)) {
+      entry.grades.push(gradeLabel);
+    }
+    if (row.teacher?.id) {
+      entry.teacherIds.add(row.teacher.id);
+    } else {
+      entry.needsTeacher += 1;
+    }
+  }
+
+  const result: Record<string, SubjectInsights> = {};
+  for (const [id, entry] of Object.entries(map)) {
+    entry.gradeCount = entry.grades.length;
+    entry.grades.sort((a, b) => a.localeCompare(b));
+    entry.teacherCount = entry.teacherIds.size;
+    const { teacherIds: _teacherIds, ...insights } = entry;
+    result[id] = insights;
+  }
+
+  return result;
+}
+
+function formatGradePreview(grades: string[]) {
+  if (grades.length === 0) return "";
+  if (grades.length <= 2) return grades.join(", ");
+  return `${grades.slice(0, 2).join(", ")} +${grades.length - 2} more`;
+}
+
 export function SubjectsWorkspace() {
   const [subjects, setSubjects] = useState<Subject[]>([]);
-  const [assignmentCounts, setAssignmentCounts] = useState<Record<string, number>>({});
+  const [subjectInsights, setSubjectInsights] = useState<Record<string, SubjectInsights>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -48,12 +105,7 @@ export function SubjectsWorkspace() {
     try {
       const [rows, assignments] = await Promise.all([listSubjects(), listClassSubjects()]);
       setSubjects(rows);
-      const counts: Record<string, number> = {};
-      for (const row of assignments) {
-        const id = row.subject.id;
-        counts[id] = (counts[id] ?? 0) + 1;
-      }
-      setAssignmentCounts(counts);
+      setSubjectInsights(buildSubjectInsights(assignments));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load subjects");
     } finally {
@@ -66,8 +118,8 @@ export function SubjectsWorkspace() {
   }, []);
 
   const assignedCount = useMemo(
-    () => subjects.filter((s) => (assignmentCounts[s.id] ?? 0) > 0).length,
-    [subjects, assignmentCounts],
+    () => subjects.filter((s) => (subjectInsights[s.id]?.classCount ?? 0) > 0).length,
+    [subjects, subjectInsights],
   );
 
   const filtered = useMemo(() => {
@@ -127,7 +179,6 @@ export function SubjectsWorkspace() {
     {
       label: "Unassigned",
       value: loading ? "—" : Math.max(subjects.length - assignedCount, 0),
-      accent: !loading && subjects.length - assignedCount > 0,
     },
     { label: "Showing", value: loading ? "—" : filtered.length },
   ];
@@ -135,6 +186,9 @@ export function SubjectsWorkspace() {
   return (
     <div className="acad-page sub-v2">
       <AcademicsHero
+        chip="Academics"
+        compact
+        backHref="/admin/academics"
         title="Subject catalog"
         subtitle="Define what your school teaches — then assign subjects to grades, sections, and teachers for the active year."
         stats={heroStats}
@@ -152,8 +206,12 @@ export function SubjectsWorkspace() {
         }
       />
 
-      {error ? <AcademicsAlert tone="error">{error}</AcademicsAlert> : null}
-      {success ? <AcademicsAlert tone="success">{success}</AcademicsAlert> : null}
+      <AppToast message={error} tone="error" onDismiss={() => setError("")} />
+      <AppToast
+        message={success}
+        tone="success"
+        onDismiss={() => setSuccess("")}
+      />
 
       <div className="sub-v2__layout">
         <section className="sub-v2__main">
@@ -188,17 +246,12 @@ export function SubjectsWorkspace() {
           ) : (
             <ul className="sub-v2__grid">
               {filtered.map((s) => {
-                const hue = subjectHue(s.code);
-                const classes = assignmentCounts[s.id] ?? 0;
+                const info = subjectInsights[s.id];
+                const classes = info?.classCount ?? 0;
+                const assigned = classes > 0;
                 return (
                   <li key={s.id} className="sub-v2__card">
-                    <div
-                      className="sub-v2__avatar"
-                      style={{
-                        background: `linear-gradient(135deg, hsl(${hue} 62% 42%), hsl(${(hue + 28) % 360} 58% 36%))`,
-                      }}
-                      aria-hidden
-                    >
+                    <div className="sub-v2__avatar" aria-hidden>
                       {subjectInitials(s.name, s.code)}
                     </div>
                     <div className="sub-v2__card-body">
@@ -206,20 +259,52 @@ export function SubjectsWorkspace() {
                         <h3 className="sub-v2__name">{s.name}</h3>
                         <code className="sub-v2__code">{s.code}</code>
                       </div>
-                      <p className="sub-v2__meta">
-                        {classes > 0
-                          ? `${classes} class${classes === 1 ? "" : "es"} this year`
-                          : "Not assigned to any class yet"}
-                      </p>
+
+                      {assigned ? (
+                        <div className="sub-v2__details">
+                          <div className="sub-v2__detail-pills">
+                            <span className="sub-v2__detail-pill">
+                              <strong>{classes}</strong> class{classes === 1 ? "" : "es"}
+                            </span>
+                            <span className="sub-v2__detail-pill">
+                              <strong>{info?.gradeCount ?? 0}</strong> grade
+                              {(info?.gradeCount ?? 0) === 1 ? "" : "s"}
+                            </span>
+                            <span className="sub-v2__detail-pill">
+                              <strong>{info?.teacherCount ?? 0}</strong> teacher
+                              {(info?.teacherCount ?? 0) === 1 ? "" : "s"}
+                            </span>
+                          </div>
+                          {info?.grades.length ? (
+                            <p className="sub-v2__detail-line">
+                              <span>Used in</span> {formatGradePreview(info.grades)}
+                            </p>
+                          ) : null}
+                          {(info?.needsTeacher ?? 0) > 0 ? (
+                            <p className="sub-v2__detail-warn">
+                              {info?.needsTeacher} class{(info?.needsTeacher ?? 0) === 1 ? "" : "es"}{" "}
+                              need a teacher
+                            </p>
+                          ) : null}
+                        </div>
+                      ) : (
+                        <p className="sub-v2__meta">Not assigned to any class yet</p>
+                      )}
+
                       <div className="sub-v2__tags">
                         {s.isSystem ? (
-                          <span className="sub-v2__tag sub-v2__tag--system">Core</span>
+                          <span className="sub-v2__tag sub-v2__tag--system">Core catalog</span>
                         ) : (
-                          <span className="sub-v2__tag">Custom</span>
+                          <span className="sub-v2__tag">School custom</span>
                         )}
                         {s.isCustomized ? (
                           <span className="sub-v2__tag sub-v2__tag--edited">Renamed</span>
                         ) : null}
+                        {assigned ? (
+                          <span className="sub-v2__tag sub-v2__tag--active">In use</span>
+                        ) : (
+                          <span className="sub-v2__tag sub-v2__tag--idle">Unassigned</span>
+                        )}
                       </div>
                     </div>
                     <div className="sub-v2__card-actions">
@@ -227,7 +312,7 @@ export function SubjectsWorkspace() {
                         href="/admin/subjects/assign"
                         className="sub-v2__action sub-v2__action--primary"
                       >
-                        Assign
+                        {assigned ? "Manage" : "Assign"}
                       </Link>
                       <button
                         type="button"

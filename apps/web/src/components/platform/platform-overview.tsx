@@ -38,25 +38,32 @@ export function PlatformOverview({ dashboard, schools, onNavigate }: Props) {
 
   return (
     <div className="plat-v2 dash-admin dash-admin--modern">
-      <header className="dash-admin-hero dash-admin-hero--modern plat-v2__hero">
-        <div className="dash-admin-hero__text">
-          <p className="dash-admin-hero__eyebrow">{todayLabel()}</p>
-          <h2 className="dash-admin-hero__title">Tenant control center</h2>
-          <p className="dash-admin-hero__sub">
-            Monitor every tenant on CampusOne — enrollment, trials, billing, and access
-            from one console.
-          </p>
-        </div>
-        <div className="dash-admin-hero__aside">
-          <div className="dash-admin-hero__chip">
-            <DashIcon name="students" className="dash-icon--sm" />
-            <span>{totalTenants} tenants live</span>
+      <header className="plat-subjects-v2__hero">
+        <div className="plat-subjects-v2__hero-main">
+          <span className="plat-subjects-v2__hero-icon" aria-hidden>
+            <DashIcon name="students" className="dash-icon--md" />
+          </span>
+          <div>
+            <p className="plat-subjects-v2__eyebrow">{todayLabel()}</p>
+            <h2 className="plat-subjects-v2__title">Tenant control center</h2>
+            <p className="plat-subjects-v2__sub">
+              Monitor every tenant on CampusOne — enrollment, trials, billing,
+              and access from one console.
+            </p>
           </div>
-          <div className="dash-admin-hero__chip dash-admin-hero__chip--muted">
-            <DashIcon name="calendar" className="dash-icon--sm" />
-            <span>
-              {dashboard.schools.trial} on trial · {dashboard.schools.paid} paid
-            </span>
+        </div>
+        <div className="plat-subjects-v2__hero-stats">
+          <div className="plat-subjects-v2__stat">
+            <strong>{totalTenants}</strong>
+            <span>Tenants</span>
+          </div>
+          <div className="plat-subjects-v2__stat">
+            <strong>{dashboard.schools.trial}</strong>
+            <span>Trial</span>
+          </div>
+          <div className="plat-subjects-v2__stat">
+            <strong>{dashboard.schools.paid}</strong>
+            <span>Paid</span>
           </div>
         </div>
       </header>

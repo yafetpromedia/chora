@@ -4,12 +4,10 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { DashIcon } from "@/components/dashboard/dash-icons";
-import {
-  AcademicsAlert,
-} from "@/components/academics/academics-ui";
 import { PendingApprovalsPanel } from "@/components/results/pending-approvals-panel";
 import { ScoreMatrixPanel } from "@/components/results/score-matrix-panel";
 import { StudentSubjectScoresPanel } from "@/components/results/student-subject-scores-panel";
+import { AppToast } from "@/components/ui/app-toast";
 import type { StudentRecord } from "@/lib/api";
 import {
   listClassSubjects,
@@ -155,6 +153,11 @@ export function ResultsWorkspace({ students, onError }: Props) {
         id: s.id,
         name: `${s.user.firstName} ${s.user.lastName}`.trim(),
         grade: s.grade.name,
+        gradeId: s.grade.id,
+        section: s.section?.name ?? null,
+        sectionId: s.section?.id ?? null,
+        studentId: s.user.externalRef,
+        photoUrl: s.photoUrl,
       })),
     [students],
   );
@@ -255,7 +258,7 @@ export function ResultsWorkspace({ students, onError }: Props) {
         </div>
       </div>
 
-      {error ? <AcademicsAlert tone="error">{error}</AcademicsAlert> : null}
+      <AppToast message={error} tone="error" onDismiss={() => setError("")} />
 
       {section === "scores" ? (
         <section className="res-v2__panel" aria-label={scoreMode === "matrix" ? "Class sheet" : "By student"}>

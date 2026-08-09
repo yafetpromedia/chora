@@ -152,7 +152,7 @@ export class SubscriptionsService {
         throw new ForbiddenException(
           status.plan === Plan.TRIAL
             ? `Trial limit reached (${limits.students} students). Upgrade your plan to add more.`
-            : `Student limit reached for your ${limits.label} plan.`,
+            : `Student limit reached for your ${limits.label} plan (${status.usage.students}/${limits.students}). Upgrade to add more, or update existing rows only.`,
         );
       }
     }

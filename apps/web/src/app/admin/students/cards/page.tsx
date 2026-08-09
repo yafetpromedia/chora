@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DashboardPage } from "@/components/dashboard/dashboard-page";
+import { DashIcon } from "@/components/dashboard/dash-icons";
 import { StudentIdCardView } from "@/components/students/student-id-card";
 import { StudentIdCardPrintDialog } from "@/components/students/student-id-card-print-dialog";
 import { listGrades } from "@/lib/school-setup";
@@ -11,8 +12,7 @@ import type { GradeWithSections } from "@/lib/api";
 import { countStudentIdCards, listStudentIdCards } from "@/lib/student-cards";
 import type { StudentIdCard } from "@/lib/student-cards";
 import { AUTH_ROLE_KEY, AUTH_TOKEN_KEY, isSchoolWorkspaceRole } from "@/lib/auth";
-
-const PREVIEW_LIMIT = 12;
+import { AppToast } from "@/components/ui/app-toast";
 
 export default function StudentCardsPage() {
   const router = useRouter();
@@ -27,7 +27,6 @@ export default function StudentCardsPage() {
   const [previewBack, setPreviewBack] = useState(false);
 
   const selectedGrade = grades.find((g) => g.id === gradeId);
-  const previewCards = cards.slice(0, PREVIEW_LIMIT);
 
   async function load() {
     setLoading(true);
@@ -41,7 +40,6 @@ export default function StudentCardsPage() {
         listStudentIdCards({
           gradeId: gradeId || undefined,
           sectionId: sectionId || undefined,
-          take: PREVIEW_LIMIT,
         }),
       ]);
       setTotal(count);
@@ -72,16 +70,61 @@ export default function StudentCardsPage() {
   }, [gradeId, sectionId]);
 
   return (
-    <DashboardPage
-      role="admin"
-      title="Student ID cards"
-      eyebrow="Management"
-    >
-      <div className="att-page">
-        {error ? <p className="att-toast att-toast--error">{error}</p> : null}
+    <DashboardPage role="admin" title="Student ID cards">
+      <div className="idcards-page">
+        <AppToast message={error} tone="error" onDismiss={() => setError("")} />
 
-        <div className="idcards-toolbar no-print">
-          <div className="att-field">
+        <header className="idcards-head no-print">
+          <div className="idcards-head__main">
+            <Link href="/admin/students" className="idcards-back">
+              <DashIcon name="chevron" className="dash-icon--xs" />
+              Students
+            </Link>
+            <h2 className="idcards-title">Student ID cards</h2>
+            <p className="idcards-subtitle">
+              Preview campus cards, filter by class, then print the set you need.
+            </p>
+          </div>
+          <div className="idcards-head__aside">
+            <p className="idcards-summary">
+              <span>
+                <strong>{loading ? "—" : cards.length.toLocaleString()}</strong>{" "}
+                shown
+              </span>
+              {gradeId ? (
+                <span>
+                  <strong>
+                    {selectedGrade?.name ?? "Grade"}
+                    {sectionId
+                      ? ` · ${selectedGrade?.sections.find((s) => s.id === sectionId)?.name ?? ""}`
+                      : ""}
+                  </strong>{" "}
+                  filter
+                </span>
+              ) : (
+                <span>
+                  <strong>All grades</strong>
+                </span>
+              )}
+            </p>
+            <div className="idcards-head__actions">
+              <Link href="/admin/attendance" className="idcards-btn idcards-btn--ghost">
+                Scan attendance
+              </Link>
+              <button
+                type="button"
+                className="idcards-btn idcards-btn--primary"
+                disabled={loading || total === 0}
+                onClick={() => setPrintOpen(true)}
+              >
+                Print…
+              </button>
+            </div>
+          </div>
+        </header>
+
+        <div className="idcards-bar no-print">
+          <label className="idcards-control">
             <span>Grade</span>
             <select
               value={gradeId}
@@ -97,11 +140,14 @@ export default function StudentCardsPage() {
                 </option>
               ))}
             </select>
-          </div>
+          </label>
           {selectedGrade && selectedGrade.sections.length > 0 ? (
-            <div className="att-field">
+            <label className="idcards-control">
               <span>Section</span>
-              <select value={sectionId} onChange={(e) => setSectionId(e.target.value)}>
+              <select
+                value={sectionId}
+                onChange={(e) => setSectionId(e.target.value)}
+              >
                 <option value="">All sections</option>
                 {selectedGrade.sections.map((s) => (
                   <option key={s.id} value={s.id}>
@@ -109,56 +155,37 @@ export default function StudentCardsPage() {
                   </option>
                 ))}
               </select>
-            </div>
+            </label>
           ) : null}
-          <button type="button" className="att-btn att-btn--ghost" onClick={() => void load()}>
-            Refresh
-          </button>
-          <label className="sid-modal__toggle">
+          <label className="idcards-toggle">
             <input
               type="checkbox"
               checked={previewBack}
               onChange={(e) => setPreviewBack(e.target.checked)}
             />
-            Preview back
+            <span>Show card back</span>
           </label>
           <button
             type="button"
-            className="att-btn att-btn--primary"
-            disabled={loading || total === 0}
-            onClick={() => setPrintOpen(true)}
+            className="idcards-btn idcards-btn--ghost"
+            onClick={() => void load()}
+            disabled={loading}
           >
-            Print…
+            Refresh
           </button>
-          <Link href="/admin/attendance" className="att-btn att-btn--ghost">
-            Scan attendance →
-          </Link>
-          <Link href="/admin/students" className="att-btn att-btn--ghost">
-            ← Students
-          </Link>
         </div>
 
-        {!loading && total > 0 ? (
-          <p className="idcards-count-hint no-print">
-            <strong>{total.toLocaleString()}</strong> student{total === 1 ? "" : "s"} match this
-            filter.
-            {total > PREVIEW_LIMIT
-              ? ` Showing ${PREVIEW_LIMIT} previews — click Print to choose options and print all.`
-              : null}
-          </p>
-        ) : null}
-
         {loading ? (
-          <p className="setup-hint">Loading cards…</p>
+          <p className="idcards-status">Loading cards…</p>
         ) : error ? null : total === 0 ? (
-          <p className="setup-hint">
+          <p className="idcards-status">
             {gradeId
               ? "No students in this class. Try “All grades” or enroll students first."
               : "No students yet. Register students from the Students page."}
           </p>
         ) : (
           <div className="idcards-preview-grid">
-            {previewCards.map((card) => (
+            {cards.map((card) => (
               <StudentIdCardView
                 key={card.studentProfileId}
                 card={card}

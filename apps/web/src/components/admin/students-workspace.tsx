@@ -6,10 +6,22 @@ import { useRouter } from "next/navigation";
 import { DashIcon } from "@/components/dashboard/dash-icons";
 import { StudentManageDrawer } from "@/components/students/student-manage-drawer";
 import { StudentIdCardModal } from "@/components/students/student-id-card-modal";
+import { StudentImportModal } from "@/components/students/student-import-modal";
 import { StudentRegisterDrawer } from "@/components/students/student-register-drawer";
+import { AppToast } from "@/components/ui/app-toast";
 import { telHref } from "@/lib/student-photo";
-import { deleteStudent, importStudentsCsv, listGrades, listStudents } from "@/lib/school-setup";
-import type { CreateStudentResult, GradeWithSections, StudentRecord } from "@/lib/api";
+import {
+  deleteStudent,
+  downloadStudentsImportTemplate,
+  listGrades,
+  listStudents,
+} from "@/lib/school-setup";
+import type {
+  CreateStudentResult,
+  GradeWithSections,
+  ImportStudentsResult,
+  StudentRecord,
+} from "@/lib/api";
 import { AUTH_ROLE_KEY, AUTH_TOKEN_KEY, isSchoolWorkspaceRole } from "@/lib/auth";
 
 function studentName(s: StudentRecord) {
@@ -143,6 +155,7 @@ export function StudentsWorkspace() {
   const [search, setSearch] = useState("");
   const [gradeFilter, setGradeFilter] = useState("");
   const [registerOpen, setRegisterOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [manageStudent, setManageStudent] = useState<StudentRecord | null>(null);
   const [idCardStudentId, setIdCardStudentId] = useState<string | null>(null);
 
@@ -197,18 +210,23 @@ export function StudentsWorkspace() {
     await refresh();
   }
 
-  async function onImport(file: File) {
-    setBusy(true);
-    setError("");
-    try {
-      const result = await importStudentsCsv(file);
-      setToast(`Imported ${result.success} of ${result.total} students.`);
-      await refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Import failed");
-    } finally {
-      setBusy(false);
-    }
+  async function onImported(result: ImportStudentsResult) {
+    const created = result.created ?? 0;
+    const updated = result.updated ?? 0;
+    const skipped = result.skipped ?? 0;
+    const parts = [
+      created > 0 ? `${created} created` : null,
+      updated > 0 ? `${updated} updated` : null,
+      skipped > 0 ? `${skipped} skipped` : null,
+      result.failed > 0 ? `${result.failed} failed` : null,
+    ].filter(Boolean);
+    setImportOpen(false);
+    setToast(
+      parts.length > 0
+        ? `Import finished: ${parts.join(", ")} (${result.total} rows).`
+        : `Import finished with ${result.total} rows.`,
+    );
+    await refresh();
   }
 
   async function onRemove(s: StudentRecord) {
@@ -230,25 +248,16 @@ export function StudentsWorkspace() {
 
   return (
     <div className="stu-v2">
-      {error ? (
-        <div className="stu-v2__alert stu-v2__alert--err" role="alert">
-          {error}
-        </div>
-      ) : null}
-      {toast ? (
-        <div className="stu-v2__alert stu-v2__alert--ok" role="status">
-          <span>{toast}</span>
-          <button type="button" className="stu-v2__alert-dismiss" onClick={() => setToast(null)}>
-            Dismiss
-          </button>
-        </div>
-      ) : null}
+      <AppToast message={error} tone="error" onDismiss={() => setError("")} />
+      <AppToast message={toast} tone="success" onDismiss={() => setToast(null)} />
 
       <header className="stu-v2__hero">
         <div className="stu-v2__hero-glow" aria-hidden />
         <div className="stu-v2__hero-inner">
           <div className="stu-v2__hero-main">
-            <span className="stu-v2__chip">Admission</span>
+            <Link href="/admin/admissions" className="stu-v2__chip stu-v2__chip--link">
+              Admissions pipeline →
+            </Link>
             <h2 className="stu-v2__hero-title">Student roster</h2>
             <p className="stu-v2__hero-sub">
               Register learners, verify Fayeda IDs, print cards, and manage parent links.
@@ -305,20 +314,21 @@ export function StudentsWorkspace() {
           <Link href="/admin/parents" className="stu-v2__btn stu-v2__btn--ghost">
             Parents
           </Link>
-          <label className="stu-v2__btn stu-v2__btn--ghost">
+          <button
+            type="button"
+            className="stu-v2__btn stu-v2__btn--ghost"
+            onClick={() => downloadStudentsImportTemplate()}
+          >
+            CSV template
+          </button>
+          <button
+            type="button"
+            className="stu-v2__btn stu-v2__btn--ghost"
+            disabled={busy}
+            onClick={() => setImportOpen(true)}
+          >
             Import CSV
-            <input
-              type="file"
-              accept=".csv"
-              hidden
-              disabled={busy}
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) void onImport(f);
-                e.target.value = "";
-              }}
-            />
-          </label>
+          </button>
           <button
             type="button"
             className="stu-v2__btn stu-v2__btn--primary"
@@ -522,6 +532,12 @@ export function StudentsWorkspace() {
           onClose={() => setIdCardStudentId(null)}
         />
       ) : null}
+
+      <StudentImportModal
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        onImported={(result) => void onImported(result)}
+      />
     </div>
   );
 }

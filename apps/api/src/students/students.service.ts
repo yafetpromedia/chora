@@ -1,10 +1,11 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Gender, UserRole } from '@prisma/client';
+import { Gender, Prisma, UserRole } from '@prisma/client';
 import { randomBytes } from 'crypto';
 import { hashSync } from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
@@ -37,6 +38,7 @@ export type StudentRow = {
   studentId?: string;
   idNumber?: string;
   dateOfBirth?: string;
+  fan?: string;
   motherName?: string;
   motherPhone?: string;
   email?: string;
@@ -692,33 +694,237 @@ export class StudentsService {
       include: { sections: true },
     });
 
+    const existingProfiles = await this.prisma.studentProfile.findMany({
+      where: { schoolId },
+      select: {
+        id: true,
+        fan: true,
+        fcn: true,
+        gradeId: true,
+        dateOfBirth: true,
+        user: {
+          select: {
+            firstName: true,
+            lastName: true,
+            externalRef: true,
+            username: true,
+          },
+        },
+        parents: {
+          select: {
+            parent: { select: { phone: true } },
+          },
+          take: 4,
+        },
+      },
+    });
+
+    type IndexMaps = {
+      byFan: Map<string, string>;
+      byStudentId: Map<string, string>;
+      byFcn: Map<string, string>;
+      byNameDobGrade: Map<string, string>;
+      byNamePhoneGrade: Map<string, string>;
+    };
+
+    const indexes: IndexMaps = {
+      byFan: new Map(),
+      byStudentId: new Map(),
+      byFcn: new Map(),
+      byNameDobGrade: new Map(),
+      byNamePhoneGrade: new Map(),
+    };
+
+    const norm = (v: string | null | undefined) =>
+      (v ?? '').trim().toUpperCase();
+    const phoneNorm = (v: string | null | undefined) =>
+      (v ?? '').replace(/\D/g, '');
+    const dobKey = (d: Date | string | null | undefined) => {
+      if (!d) return '';
+      const iso =
+        d instanceof Date ? d.toISOString().slice(0, 10) : String(d).slice(0, 10);
+      return iso;
+    };
+    const nameKey = (first: string, last: string) =>
+      `${norm(first)}|${norm(last)}`;
+
+    const indexProfile = (
+      maps: IndexMaps,
+      profile: (typeof existingProfiles)[number],
+    ) => {
+      const fan = norm(profile.fan);
+      if (fan) maps.byFan.set(fan, profile.id);
+
+      const studentId = norm(
+        profile.user.externalRef || profile.user.username || '',
+      );
+      if (studentId) maps.byStudentId.set(studentId, profile.id);
+
+      const fcn = norm(profile.fcn);
+      // Ignore auto-generated import placeholders when matching
+      if (fcn && !fcn.startsWith('IMPID-')) maps.byFcn.set(fcn, profile.id);
+
+      const nk = nameKey(profile.user.firstName, profile.user.lastName);
+      const dk = dobKey(profile.dateOfBirth);
+      if (nk !== '|' && dk) {
+        maps.byNameDobGrade.set(`${nk}|${dk}|${profile.gradeId}`, profile.id);
+      }
+      for (const link of profile.parents) {
+        const phone = phoneNorm(link.parent.phone);
+        if (nk !== '|' && phone.length >= 9) {
+          maps.byNamePhoneGrade.set(
+            `${nk}|${phone}|${profile.gradeId}`,
+            profile.id,
+          );
+        }
+      }
+    };
+
+    for (const profile of existingProfiles) {
+      indexProfile(indexes, profile);
+    }
+
+    const seenKeys = new Set<string>();
+    let studentSlotsFull = false;
+    let planLimitMessage =
+      'Student plan limit reached — skipped create (existing matches still update)';
     const results: {
       row: number;
       ok: boolean;
+      action?: 'created' | 'updated' | 'skipped';
       error?: string;
       studentName?: string;
     }[] = [];
 
+    const resolveExistingId = (
+      row: StudentRow,
+      gradeId: string,
+    ): { id: string; matchedBy: string } | null => {
+      const fan = norm(row.fan);
+      if (fan && indexes.byFan.has(fan)) {
+        return { id: indexes.byFan.get(fan)!, matchedBy: 'FAN' };
+      }
+
+      const studentId = norm(row.studentId);
+      if (studentId && indexes.byStudentId.has(studentId)) {
+        return {
+          id: indexes.byStudentId.get(studentId)!,
+          matchedBy: 'student ID',
+        };
+      }
+
+      const fcn = norm(row.idNumber);
+      if (fcn && !fcn.startsWith('IMPID-') && indexes.byFcn.has(fcn)) {
+        return { id: indexes.byFcn.get(fcn)!, matchedBy: 'ID number' };
+      }
+
+      const nk = nameKey(row.firstName, row.lastName);
+      const dk = dobKey(row.dateOfBirth);
+      if (nk !== '|' && dk) {
+        const key = `${nk}|${dk}|${gradeId}`;
+        if (indexes.byNameDobGrade.has(key)) {
+          return {
+            id: indexes.byNameDobGrade.get(key)!,
+            matchedBy: 'name + date of birth + grade',
+          };
+        }
+      }
+
+      const phone = phoneNorm(row.parentPhone);
+      if (nk !== '|' && phone.length >= 9) {
+        const key = `${nk}|${phone}|${gradeId}`;
+        if (indexes.byNamePhoneGrade.has(key)) {
+          return {
+            id: indexes.byNamePhoneGrade.get(key)!,
+            matchedBy: 'name + parent phone + grade',
+          };
+        }
+      }
+
+      return null;
+    };
+
+    const rowIdentityKeys = (row: StudentRow, gradeId: string) => {
+      const keys: string[] = [];
+      const fan = norm(row.fan);
+      if (fan) keys.push(`fan:${fan}`);
+      const studentId = norm(row.studentId);
+      if (studentId) keys.push(`sid:${studentId}`);
+      const fcn = norm(row.idNumber);
+      if (fcn && !fcn.startsWith('IMPID-')) keys.push(`fcn:${fcn}`);
+      const nk = nameKey(row.firstName, row.lastName);
+      const dk = dobKey(row.dateOfBirth);
+      if (nk !== '|' && dk) keys.push(`ndg:${nk}|${dk}|${gradeId}`);
+      const phone = phoneNorm(row.parentPhone);
+      if (nk !== '|' && phone.length >= 9) {
+        keys.push(`npg:${nk}|${phone}|${gradeId}`);
+      }
+      return keys;
+    };
+
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
+      const studentName = `${row.firstName} ${row.lastName}`.trim();
       try {
         const grade = grades.find(
           (g) => g.name.toLowerCase() === row.gradeName.trim().toLowerCase(),
         );
         if (!grade) {
-          throw new Error(`Grade "${row.gradeName}" not found`);
+          throw new Error(
+            `Grade "${row.gradeName}" not found — create it in Academics first`,
+          );
         }
+
+        const identityKeys = rowIdentityKeys(row, grade.id);
+        const duplicateInCsv = identityKeys.find((k) => seenKeys.has(k));
+        if (duplicateInCsv) {
+          results.push({
+            row: i + 1,
+            ok: true,
+            action: 'skipped',
+            studentName,
+            error: 'Duplicate row in this CSV — skipped',
+          });
+          continue;
+        }
+        for (const k of identityKeys) seenKeys.add(k);
 
         let sectionId: string | undefined;
         if (row.sectionName?.trim()) {
-          const section = grade.sections.find(
-            (s) =>
-              s.name.toLowerCase() === row.sectionName!.trim().toLowerCase(),
+          const wanted = row.sectionName.trim();
+          let section = grade.sections.find(
+            (s) => s.name.toLowerCase() === wanted.toLowerCase(),
           );
           if (!section) {
-            throw new Error(
-              `Section "${row.sectionName}" not found in ${grade.name}`,
-            );
+            try {
+              section = await this.prisma.section.create({
+                data: { gradeId: grade.id, name: wanted },
+              });
+              grade.sections.push(section);
+            } catch (err) {
+              if (
+                err instanceof Prisma.PrismaClientKnownRequestError &&
+                err.code === 'P2002'
+              ) {
+                const again = await this.prisma.section.findFirst({
+                  where: {
+                    gradeId: grade.id,
+                    name: { equals: wanted, mode: 'insensitive' },
+                  },
+                });
+                if (!again) throw err;
+                section = again;
+                if (
+                  !grade.sections.some(
+                    (s) => s.name.toLowerCase() === wanted.toLowerCase(),
+                  )
+                ) {
+                  grade.sections.push(again);
+                }
+              } else {
+                throw err;
+              }
+            }
           }
           sectionId = section.id;
         }
@@ -731,44 +937,214 @@ export class StudentsService {
           else gender = Gender.OTHER;
         }
 
-        await this.create(schoolId, {
-          firstName: row.firstName.trim(),
-          lastName: row.lastName.trim(),
-          gradeId: grade.id,
-          sectionId,
-          gender: gender ?? Gender.OTHER,
-          ...(row.studentId?.trim() ? { studentId: row.studentId.trim() } : {}),
-          idNumber:
-            row.idNumber?.trim() ||
-            `IMPID-${String(i + 1).padStart(4, '0')}`,
-          dateOfBirth: row.dateOfBirth?.trim() || '2010-01-01',
-          fatherName: row.parentName.trim(),
-          fatherPhone: row.parentPhone.trim(),
-          motherName: row.motherName?.trim() || row.parentName.trim(),
-          motherPhone: row.motherPhone?.trim() || row.parentPhone.trim(),
-          email: row.email,
-        });
+        const match = resolveExistingId(row, grade.id);
+        const fatherName = row.parentName.trim();
+        const fatherPhone = row.parentPhone.trim();
+        const motherName = row.motherName?.trim() || fatherName;
+        const motherPhone = row.motherPhone?.trim() || fatherPhone;
+        const dateOfBirth = row.dateOfBirth?.trim() || '2010-01-01';
+        const fan = row.fan?.trim() || '';
 
-        results.push({
-          row: i + 1,
-          ok: true,
-          studentName: `${row.firstName} ${row.lastName}`,
-        });
+        if (match) {
+          await this.update(schoolId, match.id, {
+            firstName: row.firstName.trim(),
+            lastName: row.lastName.trim(),
+            gradeId: grade.id,
+            sectionId: sectionId ?? null,
+            gender: gender ?? Gender.OTHER,
+            dateOfBirth,
+            ...(row.studentId?.trim()
+              ? { studentId: row.studentId.trim() }
+              : {}),
+            ...(row.idNumber?.trim() ? { idNumber: row.idNumber.trim() } : {}),
+            fatherName,
+            fatherPhone,
+            motherName,
+            motherPhone,
+          });
+
+          // Keep indexes fresh if grade/name/phone changed
+          const refreshed = await this.prisma.studentProfile.findFirst({
+            where: { id: match.id },
+            select: {
+              id: true,
+              fan: true,
+              fcn: true,
+              gradeId: true,
+              dateOfBirth: true,
+              user: {
+                select: {
+                  firstName: true,
+                  lastName: true,
+                  externalRef: true,
+                  username: true,
+                },
+              },
+              parents: {
+                select: { parent: { select: { phone: true } } },
+                take: 4,
+              },
+            },
+          });
+          if (refreshed) indexProfile(indexes, refreshed);
+
+          results.push({
+            row: i + 1,
+            ok: true,
+            action: 'updated',
+            studentName,
+            error: `Matched by ${match.matchedBy}`,
+          });
+          continue;
+        }
+
+        if (studentSlotsFull) {
+          results.push({
+            row: i + 1,
+            ok: true,
+            action: 'skipped',
+            studentName,
+            error: planLimitMessage,
+          });
+          continue;
+        }
+
+        try {
+          const created = await this.create(schoolId, {
+            firstName: row.firstName.trim(),
+            lastName: row.lastName.trim(),
+            gradeId: grade.id,
+            sectionId,
+            gender: gender ?? Gender.OTHER,
+            ...(row.studentId?.trim()
+              ? { studentId: row.studentId.trim() }
+              : {}),
+            idNumber:
+              row.idNumber?.trim() ||
+              `IMPID-${String(i + 1).padStart(4, '0')}`,
+            dateOfBirth,
+            ...(fan ? { fan } : {}),
+            fatherName,
+            fatherPhone,
+            motherName,
+            motherPhone,
+            email: row.email,
+          });
+
+          const createdProfile = await this.prisma.studentProfile.findFirst({
+            where: { id: created.student.id },
+            select: {
+              id: true,
+              fan: true,
+              fcn: true,
+              gradeId: true,
+              dateOfBirth: true,
+              user: {
+                select: {
+                  firstName: true,
+                  lastName: true,
+                  externalRef: true,
+                  username: true,
+                },
+              },
+              parents: {
+                select: { parent: { select: { phone: true } } },
+                take: 4,
+              },
+            },
+          });
+          if (createdProfile) indexProfile(indexes, createdProfile);
+
+          results.push({
+            row: i + 1,
+            ok: true,
+            action: 'created',
+            studentName,
+          });
+        } catch (createErr) {
+          const msg = this.importErrorMessage(createErr);
+          if (/student limit reached|trial limit reached/i.test(msg)) {
+            studentSlotsFull = true;
+            planLimitMessage = `${msg} — further new students skipped; updates still run`;
+            results.push({
+              row: i + 1,
+              ok: true,
+              action: 'skipped',
+              studentName,
+              error: planLimitMessage,
+            });
+            continue;
+          }
+          throw createErr;
+        }
       } catch (err) {
         results.push({
           row: i + 1,
           ok: false,
-          error: err instanceof Error ? err.message : 'Failed',
+          studentName,
+          error: this.importErrorMessage(err),
         });
       }
     }
 
+    const created = results.filter((r) => r.action === 'created').length;
+    const updated = results.filter((r) => r.action === 'updated').length;
+    const skipped = results.filter((r) => r.action === 'skipped').length;
+
     return {
       total: rows.length,
-      success: results.filter((r) => r.ok).length,
+      success: created + updated,
+      created,
+      updated,
+      skipped,
       failed: results.filter((r) => !r.ok).length,
       results,
     };
+  }
+
+  private importErrorMessage(err: unknown): string {
+    if (err instanceof Prisma.PrismaClientKnownRequestError) {
+      if (err.code === 'P2002') {
+        const fields = Array.isArray(err.meta?.target)
+          ? (err.meta.target as string[]).join(', ')
+          : String(err.meta?.target ?? 'unique field');
+        if (fields.includes('fan')) {
+          return 'FAN already registered at this school';
+        }
+        if (fields.includes('fcn')) {
+          return 'ID number already registered at this school';
+        }
+        if (fields.includes('email')) {
+          return 'Email already in use';
+        }
+        return `Already exists (${fields})`;
+      }
+    }
+    if (
+      err instanceof BadRequestException ||
+      err instanceof ConflictException ||
+      err instanceof ForbiddenException
+    ) {
+      const res = err.getResponse();
+      if (typeof res === 'string') return res;
+      if (res && typeof res === 'object' && 'message' in res) {
+        const msg = (res as { message?: string | string[] }).message;
+        if (Array.isArray(msg)) return msg.join(', ');
+        if (typeof msg === 'string') return msg;
+      }
+    }
+    if (err instanceof Error) {
+      // Strip Nest/Prisma stack noise from message for the import UI
+      const msg = err.message.split('\n')[0]?.trim() || 'Failed';
+      if (msg.includes('Unique constraint') && msg.includes('fan')) {
+        return 'FAN already registered at this school';
+      }
+      if (msg.includes('Unique constraint') && msg.includes('fcn')) {
+        return 'ID number already registered at this school';
+      }
+      return msg.length > 180 ? `${msg.slice(0, 177)}…` : msg;
+    }
+    return 'Failed';
   }
 
   parseCsv(buffer: Buffer): StudentRow[] {
@@ -795,6 +1171,29 @@ export class StudentsService {
     const genderIdx = col(['gender']);
     const parentNameIdx = col(['parent name', 'parentname']);
     const phoneIdx = col(['phone', 'parent phone', 'parentphone']);
+    const dobIdx = col([
+      'date of birth',
+      'dateofbirth',
+      'birth date',
+      'birthdate',
+      'dob',
+    ]);
+    const ageIdx = col(['age']);
+    const fanIdx = col(['fan', 'fayeda', 'fayeda fan']);
+    const studentIdIdx = col([
+      'student id',
+      'studentid',
+      'school student id',
+      'admission number',
+      'admission no',
+    ]);
+    const idNumberIdx = col([
+      'id number',
+      'idnumber',
+      'fcn',
+      'national id',
+      'id no',
+    ]);
 
     if (gradeIdx < 0 || parentNameIdx < 0 || phoneIdx < 0) {
       throw new BadRequestException(
@@ -822,6 +1221,12 @@ export class StudentsService {
         throw new BadRequestException('Missing student name columns');
       }
 
+      const rawDob = dobIdx >= 0 ? cells[dobIdx] : undefined;
+      const rawAge = ageIdx >= 0 ? cells[ageIdx] : undefined;
+      const dateOfBirth =
+        this.normalizeImportDateOfBirth(rawDob) ||
+        this.dateOfBirthFromAge(rawAge);
+
       rows.push({
         firstName,
         lastName,
@@ -830,10 +1235,42 @@ export class StudentsService {
         sectionName: sectionIdx >= 0 ? cells[sectionIdx] : undefined,
         parentName: cells[parentNameIdx] ?? '',
         parentPhone: cells[phoneIdx] ?? '',
+        dateOfBirth,
+        fan: fanIdx >= 0 ? cells[fanIdx] : undefined,
+        studentId: studentIdIdx >= 0 ? cells[studentIdIdx] : undefined,
+        idNumber: idNumberIdx >= 0 ? cells[idNumberIdx] : undefined,
       });
     }
 
     return rows;
+  }
+
+  private normalizeImportDateOfBirth(value?: string): string | undefined {
+    const raw = value?.trim();
+    if (!raw) return undefined;
+    // YYYY-MM-DD
+    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+      const d = new Date(raw);
+      return Number.isNaN(d.getTime()) ? undefined : raw;
+    }
+    // DD/MM/YYYY or DD-MM-YYYY
+    const m = raw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+    if (m) {
+      const day = m[1].padStart(2, '0');
+      const month = m[2].padStart(2, '0');
+      const iso = `${m[3]}-${month}-${day}`;
+      const d = new Date(iso);
+      return Number.isNaN(d.getTime()) ? undefined : iso;
+    }
+    const d = new Date(raw);
+    if (Number.isNaN(d.getTime())) return undefined;
+    return d.toISOString().slice(0, 10);
+  }
+
+  private dateOfBirthFromAge(value?: string): string | undefined {
+    const age = Number.parseInt(value?.trim() ?? '', 10);
+    if (!Number.isFinite(age) || age < 0 || age > 100) return undefined;
+    return `${new Date().getFullYear() - age}-01-01`;
   }
 
   async ensureCardCodes(schoolId: string) {

@@ -2,7 +2,11 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { DashIcon } from "@/components/dashboard/dash-icons";
+import { AppToast } from "@/components/ui/app-toast";
+import type { GradeWithSections } from "@/lib/api";
+import { listGrades } from "@/lib/school-setup";
 import {
   approveResultWorkflow,
   getScoreMatrix,
@@ -66,6 +70,31 @@ function studentInitials(name: string) {
   return (parts[0]?.[0] ?? "?").toUpperCase();
 }
 
+function StudentFace({
+  name,
+  photoUrl,
+  className,
+}: {
+  name: string;
+  photoUrl?: string | null;
+  className?: string;
+}) {
+  if (photoUrl) {
+    return (
+      <img
+        className={`${className ?? ""} res-scores-face res-scores-face--photo`.trim()}
+        src={photoUrl}
+        alt=""
+      />
+    );
+  }
+  return (
+    <span className={`${className ?? ""} res-scores-face`.trim()} aria-hidden>
+      {studentInitials(name)}
+    </span>
+  );
+}
+
 function formatWhen(iso: string | null) {
   if (!iso) return null;
   try {
@@ -120,30 +149,99 @@ function statusMessage(
   }
 }
 
-function rowAverage(
+/** Raw sum of component scores (not weighted %). */
+function rowPointsTotal(
   studentProfileId: string,
   assessments: ScoreMatrix["assessments"],
-  draft: Record<string, Record<string, number>>,
+  getScore: (studentProfileId: string, assessmentId: string) => number | null,
 ) {
-  const row = draft[studentProfileId] ?? {};
+  let sum = 0;
+  let hasScore = false;
+  for (const a of assessments) {
+    const score = getScore(studentProfileId, a.id);
+    if (score != null && !Number.isNaN(score)) {
+      sum += score;
+      hasScore = true;
+    }
+  }
+  return hasScore ? sum : null;
+}
+
+function rowMaxPoints(assessments: ScoreMatrix["assessments"]) {
+  return assessments.reduce((n, a) => n + (a.maxScore > 0 ? a.maxScore : 0), 0);
+}
+
+/** Weighted subject % for averages / rank. */
+function rowWeightedAverage(
+  studentProfileId: string,
+  assessments: ScoreMatrix["assessments"],
+  getScore: (studentProfileId: string, assessmentId: string) => number | null,
+) {
   let weighted = 0;
   let totalWeight = 0;
   for (const a of assessments) {
-    const score = row[a.id];
+    const score = getScore(studentProfileId, a.id);
     if (score != null && !Number.isNaN(score) && a.maxScore > 0) {
-      const pct = (score / a.maxScore) * 100;
-      weighted += pct * a.weightPercent;
+      weighted += (score / a.maxScore) * 100 * a.weightPercent;
       totalWeight += a.weightPercent;
     }
   }
   if (totalWeight === 0) return null;
-  return Math.round(weighted / totalWeight);
+  return Math.round((weighted / totalWeight) * 10) / 10;
+}
+
+function formatPct(value: number | null | undefined) {
+  if (value == null || Number.isNaN(value)) return "—";
+  return `${Number.isInteger(value) ? value : value.toFixed(1)}%`;
+}
+
+/** Live subjects avg when this sheet's weighted % changes vs the saved subject total. */
+function adjustedSubjectsAverage(
+  summary: NonNullable<ScoreMatrix["students"][number]["summary"]> | undefined,
+  liveSubjectAverage: number | null,
+) {
+  if (!summary) return liveSubjectAverage;
+  const saved = summary.subjectTotal;
+  const subjectsAvg = summary.subjectsAverage;
+  const count = summary.subjectCount;
+
+  if (liveSubjectAverage == null) {
+    if (saved == null || subjectsAvg == null || count <= 1) {
+      return count <= 1 ? null : subjectsAvg;
+    }
+    const nextCount = count - 1;
+    if (nextCount <= 0) return null;
+    return Math.round(((subjectsAvg * count - saved) / nextCount) * 10) / 10;
+  }
+
+  if (subjectsAvg == null || count === 0) return liveSubjectAverage;
+  if (saved == null) {
+    return (
+      Math.round(((subjectsAvg * count + liveSubjectAverage) / (count + 1)) * 10) / 10
+    );
+  }
+  return (
+    Math.round((subjectsAvg + (liveSubjectAverage - saved) / count) * 10) / 10
+  );
+}
+
+function rankByValue(values: { id: string; value: number | null }[], id: string) {
+  const ranked = values
+    .filter((v): v is { id: string; value: number } => v.value != null)
+    .sort((a, b) => b.value - a.value);
+  const index = ranked.findIndex((v) => v.id === id);
+  if (index < 0) return null;
+  let rank = 1;
+  for (let i = 1; i <= index; i++) {
+    if (ranked[i].value !== ranked[i - 1].value) rank = i + 1;
+  }
+  return rank;
 }
 
 export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
-  const [toolbarReady, setToolbarReady] = useState(false);
   const [terms, setTerms] = useState<AcademicTerm[]>([]);
   const [classSubjects, setClassSubjects] = useState<ClassSubject[]>([]);
+  const [schoolGrades, setSchoolGrades] = useState<GradeWithSections[]>([]);
   const [termId, setTermId] = useState("");
   const [gradeId, setGradeId] = useState("");
   const [subjectId, setSubjectId] = useState("");
@@ -155,12 +253,20 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
   >([]);
   const [draft, setDraft] = useState<Record<string, Record<string, number>>>({});
   const [loading, setLoading] = useState(false);
-  const [booting, setBooting] = useState(true);
+  /** Set only in useEffect — starts false on server and client (hydration-safe). */
+  const [filtersLoaded, setFiltersLoaded] = useState(false);
+  /** Avoid SSR/client mismatch on select `disabled` (React can serialize true as null). */
+  const [filtersInteractive, setFiltersInteractive] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [success, setSuccess] = useState("");
   const [workflowBusy, setWorkflowBusy] = useState(false);
   const [lockToggleBusy, setLockToggleBusy] = useState<string | null>(null);
+  const [lockScope, setLockScope] = useState<"this" | "all">("this");
   const [error, setError] = useState("");
+  const [statsTarget, setStatsTarget] = useState<{
+    studentProfileId: string;
+    classSubjectId: string;
+  } | null>(null);
 
   const workflowStatus: ResultWorkflowStatus | null =
     matrix?.workflow?.status ?? null;
@@ -168,16 +274,22 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
   const canEditScores =
     role === "admin" || role === "staff" || (matrix?.canEditScores ?? true);
   const viewOnlyHomeroom = role === "teacher" && matrix != null && !canEditScores;
+  const isSchoolAdmin = role === "admin" || role === "staff";
 
   useEffect(() => {
-    setToolbarReady(true);
+    setFiltersInteractive(true);
   }, []);
 
   useEffect(() => {
-    void Promise.all([listTerms(), listClassSubjects()])
-      .then(([t, cs]) => {
+    void Promise.all([
+      listTerms(),
+      listClassSubjects(),
+      isSchoolAdmin ? listGrades() : Promise.resolve([] as GradeWithSections[]),
+    ])
+      .then(([t, cs, allGrades]) => {
         setTerms(t);
         setClassSubjects(cs);
+        setSchoolGrades(allGrades);
         const curTerm = t.find((x) => x.isCurrent) ?? t[0];
         if (curTerm) setTermId(curTerm.id);
 
@@ -191,19 +303,30 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
           setSubjectId(initial.subject.id);
           setSectionId(sectionKey(initial));
           setClassSubjectId(initial.id);
+        } else if (allGrades[0]) {
+          setGradeId(allGrades[0].id);
+          setSubjectId("");
+          setSectionId("");
+          setClassSubjectId("");
         }
       })
       .catch(() => setError("Could not load classes or terms"))
-      .finally(() => setBooting(false));
-  }, [initialClassSubjectId]);
+      .finally(() => setFiltersLoaded(true));
+  }, [initialClassSubjectId, isSchoolAdmin]);
+
+  // Only set after mount so SSR HTML and the first client render both omit `disabled`.
+  const filterSelectDisabled = filtersInteractive ? !filtersLoaded : undefined;
 
   const grades = useMemo(() => {
+    if (isSchoolAdmin && schoolGrades.length > 0) {
+      return schoolGrades.map((g) => ({ id: g.id, name: g.name }));
+    }
     const map = new Map<string, string>();
     for (const cs of classSubjects) {
       if (!map.has(cs.grade.id)) map.set(cs.grade.id, cs.grade.name);
     }
     return [...map.entries()].map(([id, name]) => ({ id, name }));
-  }, [classSubjects]);
+  }, [classSubjects, isSchoolAdmin, schoolGrades]);
 
   const subjectsForGrade = useMemo(() => {
     const map = new Map<string, string>();
@@ -260,8 +383,8 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
     const gradeSubjects = classSubjects.filter((c) => c.grade.id === id);
     const first = gradeSubjects[0];
     if (!first) {
-      setSubjectId("");
-      setSectionId("");
+      setSubjectId(ALL);
+      setSectionId(ALL);
       setClassSubjectId("");
       return;
     }
@@ -291,13 +414,11 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
     syncClassSubject(gradeId, subjectId, id);
   }
 
-  const controlsDisabled = booting;
-
   const loadAggregated = useCallback(async () => {
     if (!termId || activeClassSubjects.length === 0) return;
     setLoading(true);
     setError("");
-    setSaved(false);
+    setSuccess("");
     setMatrix(null);
     try {
       const results = await Promise.all(
@@ -319,7 +440,7 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
     if (!termId || !classSubjectId) return;
     setLoading(true);
     setError("");
-    setSaved(false);
+    setSuccess("");
     setAggregatedSheets([]);
     try {
       const data = await getScoreMatrix(termId, classSubjectId);
@@ -341,7 +462,7 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
   }, [termId, classSubjectId]);
 
   useEffect(() => {
-    if (booting || !termId) return;
+    if (!termId) return;
     if (isAggregated && activeClassSubjects.length > 0) void loadAggregated();
     else if (!isAggregated && classSubjectId) void loadMatrix();
     else {
@@ -349,7 +470,6 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
       setAggregatedSheets([]);
     }
   }, [
-    booting,
     termId,
     classSubjectId,
     isAggregated,
@@ -382,27 +502,14 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
     return null;
   }
 
-  function studentRowAverage(studentProfileId: string) {
-    if (!matrix) return null;
-    let weighted = 0;
-    let totalWeight = 0;
-    for (const a of matrix.assessments) {
-      const score = getScoreValue(studentProfileId, a.id);
-      if (score != null && a.maxScore > 0) {
-        const pct = (score / a.maxScore) * 100;
-        weighted += pct * a.weightPercent;
-        totalWeight += a.weightPercent;
-      }
-    }
-    if (totalWeight === 0) return null;
-    return Math.round(weighted / totalWeight);
-  }
-
   async function toggleAssessmentLock(assessmentId: string, open: boolean) {
+    const name =
+      matrix?.assessments.find((a) => a.id === assessmentId)?.name ?? "Component";
     setLockToggleBusy(assessmentId);
     setError("");
+    setSuccess("");
     try {
-      await setAssessmentEntryLock(assessmentId, !open);
+      const result = await setAssessmentEntryLock(assessmentId, !open, lockScope);
       setMatrix((prev) =>
         prev
           ? {
@@ -413,6 +520,19 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
             }
           : prev,
       );
+      if (lockScope === "all") {
+        setSuccess(
+          open
+            ? `${name} unlocked for all grades & subjects this term (${result.updatedCount}).`
+            : `${name} locked for all grades & subjects this term (${result.updatedCount}).`,
+        );
+      } else {
+        setSuccess(
+          open
+            ? `${name} unlocked for this class — teachers can enter scores.`
+            : `${name} locked for this class — score entry is closed.`,
+        );
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not update component lock");
     } finally {
@@ -429,19 +549,29 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
       else row[assessmentId] = num;
       return { ...prev, [studentProfileId]: row };
     });
-    setSaved(false);
+    setSuccess("");
   }
 
   async function onWorkflowAction(action: "submit" | "approve" | "publish" | "reopen") {
     if (!termId || !classSubjectId) return;
     setWorkflowBusy(true);
     setError("");
+    setSuccess("");
     try {
       if (action === "submit") await submitResultWorkflow(termId, classSubjectId);
       else if (action === "approve") await approveResultWorkflow(termId, classSubjectId);
       else if (action === "publish") await publishResultWorkflow(termId, classSubjectId);
       else await reopenResultWorkflow(termId, classSubjectId);
       await loadMatrix();
+      setSuccess(
+        action === "submit"
+          ? "Score sheet submitted."
+          : action === "approve"
+            ? "Score sheet approved."
+            : action === "publish"
+              ? "Results published."
+              : "Score sheet reopened.",
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Workflow action failed");
     } finally {
@@ -468,10 +598,13 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
     }
     setSaving(true);
     setError("");
+    setSuccess("");
     try {
       await saveScoreMatrix({ termId, classSubjectId, entries });
-      setSaved(true);
       await loadMatrix();
+      setSuccess(
+        `Saved ${entries.length} score${entries.length === 1 ? "" : "s"} successfully.`,
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Save failed");
     } finally {
@@ -552,21 +685,43 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
     );
   }
 
-  function sheetRowAverage(sheet: ScoreMatrix, studentProfileId: string) {
-    let weighted = 0;
-    let totalWeight = 0;
-    for (const a of sheet.assessments) {
-      const student = sheet.students.find((s) => s.studentProfileId === studentProfileId);
-      const saved = student?.scores.find((s) => s.assessmentId === a.id);
-      const score = saved?.score ?? null;
-      if (score != null && a.maxScore > 0) {
-        const pct = (score / a.maxScore) * 100;
-        weighted += pct * a.weightPercent;
-        totalWeight += a.weightPercent;
-      }
-    }
-    if (totalWeight === 0) return null;
-    return Math.round(weighted / totalWeight);
+  function sheetGetScore(sheet: ScoreMatrix, studentProfileId: string, assessmentId: string) {
+    const student = sheet.students.find((s) => s.studentProfileId === studentProfileId);
+    return student?.scores.find((s) => s.assessmentId === assessmentId)?.score ?? null;
+  }
+
+  function sheetStudentMetrics(sheet: ScoreMatrix, readOnly: boolean) {
+    const maxPoints = rowMaxPoints(sheet.assessments);
+    const rows = sheet.students.map((st) => {
+      const getScore = readOnly
+        ? (id: string, assessmentId: string) => sheetGetScore(sheet, id, assessmentId)
+        : getScoreValue;
+      const pointsTotal = rowPointsTotal(st.studentProfileId, sheet.assessments, getScore);
+      const subjectAverage = rowWeightedAverage(
+        st.studentProfileId,
+        sheet.assessments,
+        getScore,
+      );
+      const subjectsAvg = readOnly
+        ? (st.summary?.subjectsAverage ?? null)
+        : adjustedSubjectsAverage(st.summary, subjectAverage);
+      return {
+        id: st.studentProfileId,
+        name: st.name,
+        photoUrl: st.photoUrl ?? null,
+        pointsTotal,
+        maxPoints,
+        subjectAverage,
+        subjectsAvg,
+        termsAvg: st.summary?.termsAverage ?? null,
+        classSize: st.summary?.classSize ?? sheet.students.length,
+      };
+    });
+    const rankBySubjects = rows.map((r) => ({ id: r.id, value: r.subjectsAvg }));
+    return rows.map((r) => ({
+      ...r,
+      rank: rankByValue(rankBySubjects, r.id),
+    }));
   }
 
   function renderReadonlyScoreCell(score: number | null, maxScore: number) {
@@ -588,6 +743,18 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
   }
 
   function renderScoreSheetTable(sheet: ScoreMatrix, readOnly: boolean) {
+    const metricsById = new Map(
+      sheetStudentMetrics(sheet, readOnly).map((m) => [m.id, m] as const),
+    );
+    const sheetKey = sheet.classSubject.id;
+    const maxPoints = rowMaxPoints(sheet.assessments);
+    const showStudentView =
+      role !== "teacher" || Boolean(sheet.isHomeroomClass);
+
+    function openStats(studentProfileId: string) {
+      setStatsTarget({ studentProfileId, classSubjectId: sheetKey });
+    }
+
     return (
       <>
         <div className="res-scores-sheet__table">
@@ -603,21 +770,39 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
                     </span>
                   </th>
                 ))}
-                <th className="res-scores-table__avg-col">Avg</th>
+                <th className="res-scores-table__avg-col">
+                  <span className="res-scores-table__col-name">Total</span>
+                  <span className="res-scores-table__col-meta">Sum /{maxPoints}</span>
+                </th>
               </tr>
             </thead>
             <tbody>
               {sheet.students.map((st) => {
-                const avg = readOnly
-                  ? sheetRowAverage(sheet, st.studentProfileId)
-                  : studentRowAverage(st.studentProfileId);
+                const metrics = metricsById.get(st.studentProfileId);
+                const points = metrics?.pointsTotal ?? null;
                 return (
                   <tr key={st.studentProfileId}>
                     <td className="res-scores-table__student">
-                      <span className="res-scores-table__avatar" aria-hidden>
-                        {studentInitials(st.name)}
-                      </span>
-                      <span className="res-scores-table__student-name">{st.name}</span>
+                      <div className="res-scores-table__student-row">
+                        <StudentFace
+                          name={st.name}
+                          photoUrl={st.photoUrl}
+                          className="res-scores-table__avatar"
+                        />
+                        <span className="res-scores-table__student-name">{st.name}</span>
+                        {showStudentView ? (
+                          <button
+                            type="button"
+                            className="res-scores-table__view-btn"
+                            onClick={() => openStats(st.studentProfileId)}
+                            aria-label={`View summary for ${st.name}`}
+                            title="View summary"
+                          >
+                            <DashIcon name="eye" className="dash-icon--sm" />
+                            <span>View</span>
+                          </button>
+                        ) : null}
+                      </div>
                     </td>
                     {sheet.assessments.map((a) => {
                       const saved = st.scores.find((s) => s.assessmentId === a.id);
@@ -632,7 +817,14 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
                       );
                     })}
                     <td className="res-scores-table__avg">
-                      {avg != null ? `${avg}%` : "—"}
+                      {points != null ? (
+                        <>
+                          <strong>{points}</strong>
+                          <span className="res-scores-table__total-max">/{maxPoints}</span>
+                        </>
+                      ) : (
+                        "—"
+                      )}
                     </td>
                   </tr>
                 );
@@ -642,16 +834,35 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
         </div>
         <div className="res-scores-sheet__mobile">
           {sheet.students.map((st) => {
-            const avg = readOnly
-              ? sheetRowAverage(sheet, st.studentProfileId)
-              : studentRowAverage(st.studentProfileId);
+            const metrics = metricsById.get(st.studentProfileId);
+            const points = metrics?.pointsTotal ?? null;
             return (
               <article key={st.studentProfileId} className="res-scores-row-card">
                 <header className="res-scores-row-card__head">
-                  <span className="res-scores-table__avatar">{studentInitials(st.name)}</span>
-                  <div>
-                    <h4>{st.name}</h4>
-                    <p>{avg != null ? `Average ${avg}%` : "No scores yet"}</p>
+                  <div className="res-scores-table__student-row">
+                    <StudentFace
+                      name={st.name}
+                      photoUrl={st.photoUrl}
+                      className="res-scores-table__avatar"
+                    />
+                    <div className="res-scores-row-card__identity">
+                      <h4>{st.name}</h4>
+                      <p>
+                        {points != null ? `Total ${points}/${maxPoints}` : "No scores yet"}
+                      </p>
+                    </div>
+                    {showStudentView ? (
+                      <button
+                        type="button"
+                        className="res-scores-table__view-btn"
+                        onClick={() => openStats(st.studentProfileId)}
+                        aria-label={`View summary for ${st.name}`}
+                        title="View summary"
+                      >
+                        <DashIcon name="eye" className="dash-icon--sm" />
+                        <span>View</span>
+                      </button>
+                    ) : null}
                   </div>
                 </header>
                 <div className="res-scores-row-card__grid">
@@ -710,28 +921,268 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
   const openComponents =
     matrix?.assessments.filter((a) => !a.entryLocked).map((a) => a.name) ?? [];
 
+  const statsSheet = statsTarget
+    ? isAggregated
+      ? aggregatedSheets.find((s) => s.matrix.classSubject.id === statsTarget.classSubjectId)
+          ?.matrix ?? null
+      : matrix?.classSubject.id === statsTarget.classSubjectId
+        ? matrix
+        : null
+    : null;
+  const statsReadOnly = !statsSheet || statsSheet !== matrix || viewOnlyHomeroom;
+  const statsMetrics =
+    statsSheet && statsTarget
+      ? sheetStudentMetrics(statsSheet, statsReadOnly).find(
+          (m) => m.id === statsTarget.studentProfileId,
+        ) ?? null
+      : null;
+  const statsComponents =
+    statsSheet && statsTarget
+      ? statsSheet.assessments.map((a) => {
+          const score = statsReadOnly
+            ? sheetGetScore(statsSheet, statsTarget.studentProfileId, a.id)
+            : getScoreValue(statsTarget.studentProfileId, a.id);
+          const pct =
+            score != null && a.maxScore > 0
+              ? Math.round((score / a.maxScore) * 1000) / 10
+              : null;
+          return { ...a, score, pct };
+        })
+      : [];
+  const statsFilled = statsComponents.filter((c) => c.score != null).length;
+  const statsTotalPct =
+    statsMetrics?.maxPoints && statsMetrics.pointsTotal != null
+      ? Math.round((statsMetrics.pointsTotal / statsMetrics.maxPoints) * 1000) / 10
+      : null;
+
+  const statsModal =
+    statsTarget && statsMetrics && statsSheet ? (
+      <div
+        className="res-scores-stats"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="res-scores-stats-title"
+      >
+        <button
+          type="button"
+          className="res-scores-stats__backdrop"
+          aria-label="Close"
+          onClick={() => setStatsTarget(null)}
+        />
+        <div className="res-scores-stats__panel">
+          <header className="res-scores-stats__hero">
+            <div className="res-scores-stats__hero-main">
+              <StudentFace
+                name={statsMetrics.name}
+                photoUrl={statsMetrics.photoUrl}
+                className="res-scores-stats__avatar"
+              />
+              <div className="res-scores-stats__who">
+                <p className="res-scores-stats__eyebrow">Student summary</p>
+                <h3 id="res-scores-stats-title" className="res-scores-stats__name">
+                  {statsMetrics.name}
+                </h3>
+                <p className="res-scores-stats__meta">
+                  {statsSheet.classSubject.subject}
+                  {statsSheet.classSubject.grade
+                    ? ` · ${statsSheet.classSubject.grade}${
+                        statsSheet.classSubject.section
+                          ? ` ${statsSheet.classSubject.section}`
+                          : ""
+                      }`
+                    : ""}
+                  {selectedTerm ? ` · ${selectedTerm.name}` : ""}
+                  {` · ${statsFilled}/${statsComponents.length} components`}
+                </p>
+              </div>
+            </div>
+
+            <div className="res-scores-stats__kpis">
+              <div className="res-scores-stats__kpi">
+                <p className="res-scores-stats__kpi-label">Total</p>
+                <p className="res-scores-stats__kpi-value">
+                  {statsMetrics.pointsTotal != null
+                    ? statsMetrics.pointsTotal
+                    : "—"}
+                  <span className="res-scores-stats__kpi-suffix">
+                    /{statsMetrics.maxPoints}
+                  </span>
+                </p>
+              </div>
+              <div className="res-scores-stats__kpi">
+                <p className="res-scores-stats__kpi-label">Subject avg</p>
+                <p className="res-scores-stats__kpi-value">
+                  {formatPct(statsMetrics.subjectAverage)}
+                </p>
+              </div>
+              <div className="res-scores-stats__kpi res-scores-stats__kpi--rank">
+                <p className="res-scores-stats__kpi-label">Class rank</p>
+                <p className="res-scores-stats__kpi-value">
+                  {statsMetrics.rank != null ? `#${statsMetrics.rank}` : "—"}
+                </p>
+                <p className="res-scores-stats__kpi-note">
+                  of {statsMetrics.classSize}
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              className="res-scores-stats__close"
+              aria-label="Close"
+              onClick={() => setStatsTarget(null)}
+            >
+              ×
+            </button>
+          </header>
+
+          <div className="res-scores-stats__body">
+            <section className="res-scores-stats__block">
+              <div className="res-scores-stats__block-head">
+                <h4 className="res-scores-stats__block-title">Component scores</h4>
+                <p className="res-scores-stats__block-sub">
+                  {statsTotalPct != null
+                    ? `${statsTotalPct}% of available points`
+                    : "No scores entered yet"}
+                </p>
+              </div>
+              <div className="res-scores-stats__track" aria-hidden>
+                <i
+                  style={{
+                    width: `${Math.min(100, statsTotalPct ?? 0)}%`,
+                  }}
+                />
+              </div>
+              <ul className="res-scores-stats__comps">
+                {statsComponents.map((c) => (
+                  <li key={c.id} className="res-scores-stats__comp">
+                    <div className="res-scores-stats__comp-row">
+                      <div>
+                        <p className="res-scores-stats__comp-name">{c.name}</p>
+                        <p className="res-scores-stats__comp-weight">
+                          {c.weightPercent}% weight
+                        </p>
+                      </div>
+                      <p className="res-scores-stats__comp-score">
+                        {c.score != null ? c.score : "—"}
+                        <span>/{c.maxScore}</span>
+                      </p>
+                    </div>
+                    <div
+                      className="res-scores-stats__track res-scores-stats__track--sm"
+                      aria-hidden
+                    >
+                      <i style={{ width: `${Math.min(100, c.pct ?? 0)}%` }} />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </section>
+
+            <section className="res-scores-stats__block">
+              <div className="res-scores-stats__block-head">
+                <h4 className="res-scores-stats__block-title">Averages</h4>
+                <p className="res-scores-stats__block-sub">Class and year comparison</p>
+              </div>
+              <ul className="res-scores-stats__avgs">
+                <li className="res-scores-stats__avg">
+                  <div>
+                    <p className="res-scores-stats__avg-name">Subjects average</p>
+                    <p className="res-scores-stats__avg-desc">All subjects this term</p>
+                  </div>
+                  <div className="res-scores-stats__avg-right">
+                    <p className="res-scores-stats__avg-pct">
+                      {formatPct(statsMetrics.subjectsAvg)}
+                    </p>
+                    <div
+                      className="res-scores-stats__track res-scores-stats__track--sm"
+                      aria-hidden
+                    >
+                      <i
+                        style={{
+                          width: `${Math.min(100, statsMetrics.subjectsAvg ?? 0)}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                </li>
+                <li className="res-scores-stats__avg">
+                  <div>
+                    <p className="res-scores-stats__avg-name">Terms average</p>
+                    <p className="res-scores-stats__avg-desc">Across terms this year</p>
+                  </div>
+                  <div className="res-scores-stats__avg-right">
+                    <p className="res-scores-stats__avg-pct">
+                      {formatPct(statsMetrics.termsAvg)}
+                    </p>
+                    <div
+                      className="res-scores-stats__track res-scores-stats__track--sm"
+                      aria-hidden
+                    >
+                      <i
+                        style={{
+                          width: `${Math.min(100, statsMetrics.termsAvg ?? 0)}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                </li>
+                <li className="res-scores-stats__avg">
+                  <div>
+                    <p className="res-scores-stats__avg-name">Subject average</p>
+                    <p className="res-scores-stats__avg-desc">Weighted for this subject</p>
+                  </div>
+                  <div className="res-scores-stats__avg-right">
+                    <p className="res-scores-stats__avg-pct">
+                      {formatPct(statsMetrics.subjectAverage)}
+                    </p>
+                    <div
+                      className="res-scores-stats__track res-scores-stats__track--sm"
+                      aria-hidden
+                    >
+                      <i
+                        style={{
+                          width: `${Math.min(100, statsMetrics.subjectAverage ?? 0)}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                </li>
+              </ul>
+            </section>
+          </div>
+        </div>
+      </div>
+    ) : null;
+
   return (
     <div className="res-scores">
-      {error ? (
-        <div className="res-scores-alert res-scores-alert--error" role="alert">{error}</div>
-      ) : null}
-      {saved ? (
-        <div className="res-scores-alert res-scores-alert--success" role="status">
-          Scores saved successfully.
-        </div>
-      ) : null}
+      <AppToast
+        message={error}
+        tone="error"
+        onDismiss={() => setError("")}
+      />
+      <AppToast
+        message={success}
+        tone="success"
+        onDismiss={() => setSuccess("")}
+      />
+
+      {statsModal && filtersLoaded
+        ? createPortal(statsModal, document.body)
+        : null}
 
       <div className="res-scores-head res-scores-head--modern">
-        {toolbarReady ? (
         <div className="res-scores-filters res-scores-toolbar res-scores-toolbar--quad">
           <label className="res-scores-field">
             <span>Term</span>
             <select
               value={termId}
               onChange={(e) => setTermId(e.target.value)}
-              disabled={controlsDisabled}
             >
-              {terms.length === 0 ? <option value="">No terms</option> : null}
+              {terms.length === 0 ? (
+                <option value="">Loading…</option>
+              ) : null}
               {terms.map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.name}
@@ -745,9 +1196,12 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
             <select
               value={gradeId}
               onChange={(e) => selectGrade(e.target.value)}
-              disabled={controlsDisabled || grades.length === 0}
+              disabled={filterSelectDisabled}
+              suppressHydrationWarning
             >
-              {grades.length === 0 ? <option value="">No grades</option> : null}
+              {!filtersLoaded || grades.length === 0 ? (
+                <option value="">Loading…</option>
+              ) : null}
               {grades.map((g) => (
                 <option key={g.id} value={g.id}>
                   {g.name}
@@ -760,12 +1214,10 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
             <select
               value={subjectId}
               onChange={(e) => selectSubject(e.target.value)}
-              disabled={controlsDisabled || subjectsForGrade.length === 0}
+              disabled={filterSelectDisabled}
+              suppressHydrationWarning
             >
               <option value={ALL}>All subjects</option>
-              {subjectsForGrade.length === 0 ? (
-                <option value="">No subjects assigned</option>
-              ) : null}
               {subjectsForGrade.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name}
@@ -779,7 +1231,6 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
               <select
                 value={sectionId}
                 onChange={(e) => selectSection(e.target.value)}
-                disabled={controlsDisabled}
               >
                 <option value={ALL}>All sections</option>
                 {sectionsForFilter
@@ -793,37 +1244,6 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
             </label>
           ) : null}
         </div>
-        ) : (
-        <div
-          className="res-scores-toolbar res-scores-toolbar--quad res-scores-toolbar--placeholder"
-          aria-hidden
-        >
-          <label className="res-scores-field">
-            <span>Term</span>
-            <select disabled defaultValue="">
-              <option value="">Loading…</option>
-            </select>
-          </label>
-          <label className="res-scores-field">
-            <span>Grade</span>
-            <select disabled defaultValue="">
-              <option value="">Loading…</option>
-            </select>
-          </label>
-          <label className="res-scores-field res-scores-field--wide">
-            <span>Subject</span>
-            <select disabled defaultValue="">
-              <option value="">Loading…</option>
-            </select>
-          </label>
-          <label className="res-scores-field res-scores-field--section">
-            <span>Section</span>
-            <select disabled defaultValue="">
-              <option value="">Loading…</option>
-            </select>
-          </label>
-        </div>
-        )}
 
         <div className="res-scores-context">
           <div className="res-scores-context__main">
@@ -934,7 +1354,7 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
         ) : null}
       </div>
 
-      {booting || loading ? (
+      {!filtersLoaded || loading ? (
         <div className="res-scores-loading">
           <span className="res-scores-loading__spinner" aria-hidden />
           <p>Loading score sheet…</p>
@@ -1034,10 +1454,41 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
           {role === "admin" || role === "staff" ? (
             <div className="res-scores-components">
               <div className="res-scores-components__head">
-                <h3 className="res-scores-components__title">Score components</h3>
-                <p className="res-scores-components__hint">
-                  Turn on a component to let teachers enter scores. Turn off to lock it.
-                </p>
+                <div className="res-scores-components__head-row">
+                  <div>
+                    <h3 className="res-scores-components__title">Score components</h3>
+                    <p className="res-scores-components__hint">
+                      Turn on a component to let teachers enter scores. Turn off to lock it.
+                    </p>
+                  </div>
+                  <div
+                    className="res-scores-components__scope"
+                    role="group"
+                    aria-label="Apply lock to"
+                  >
+                    <span className="res-scores-components__scope-label">Apply to</span>
+                    <button
+                      type="button"
+                      className={`res-scores-components__scope-btn${
+                        lockScope === "this" ? " is-active" : ""
+                      }`}
+                      aria-pressed={lockScope === "this"}
+                      onClick={() => setLockScope("this")}
+                    >
+                      This class
+                    </button>
+                    <button
+                      type="button"
+                      className={`res-scores-components__scope-btn${
+                        lockScope === "all" ? " is-active" : ""
+                      }`}
+                      aria-pressed={lockScope === "all"}
+                      onClick={() => setLockScope("all")}
+                    >
+                      All grades & subjects
+                    </button>
+                  </div>
+                </div>
               </div>
               <div className="res-scores-components__toggles">
                 {matrix!.assessments.map((a) => {

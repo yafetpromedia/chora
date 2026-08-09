@@ -357,6 +357,8 @@ export type AssessmentTemplate = {
 export type ScoreMatrix = {
   workflow: WorkflowSheet;
   canEditScores?: boolean;
+  /** Homeroom teacher for this class (admins/staff always true). */
+  isHomeroomClass?: boolean;
   classSubject: {
     id: string;
     subject: string;
@@ -379,7 +381,17 @@ export type ScoreMatrix = {
   students: {
     studentProfileId: string;
     name: string;
+    photoUrl?: string | null;
+    studentId?: string | null;
     scores: { assessmentId: string; score: number | null }[];
+    summary?: {
+      subjectTotal: number | null;
+      subjectsAverage: number | null;
+      termsAverage: number | null;
+      classRank: number | null;
+      classSize: number;
+      subjectCount: number;
+    };
   }[];
 };
 
@@ -511,6 +523,7 @@ export async function saveStudentSubjectMatrix(body: {
 export async function setAssessmentEntryLock(
   assessmentId: string,
   entryLocked: boolean,
+  scope: "this" | "all" = "this",
 ) {
   return apiPatch<{
     id: string;
@@ -518,7 +531,9 @@ export async function setAssessmentEntryLock(
     entryLocked: boolean;
     termId: string;
     classSubjectId: string;
-  }>(`/results/assessments/${assessmentId}/entry-lock`, { entryLocked });
+    scope: "this" | "all";
+    updatedCount: number;
+  }>(`/results/assessments/${assessmentId}/entry-lock`, { entryLocked, scope });
 }
 
 export async function listPendingWorkflow(params?: {

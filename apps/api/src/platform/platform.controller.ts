@@ -7,9 +7,16 @@ import {
   Patch,
   Post,
   Query,
+  Res,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
+  BadRequestException,
 } from '@nestjs/common';
-import { PlatformInvoiceStatus, PlatformRole } from '@prisma/client';
+import { FileInterceptor } from '@nestjs/platform-express';
+import type { Response } from 'express';
+import { createReadStream, existsSync } from 'fs';
+import { PlatformInvoiceStatus, PlatformRole, SupportTicketStatus } from '@prisma/client';
 import { UpdatePlatformProfileDto } from './dto/update-platform-profile.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentPlatformUser } from '../common/decorators/current-platform-user.decorator';
@@ -26,12 +33,32 @@ import {
   CreatePlatformInvoiceDto,
   UpdatePlatformInvoiceDto,
 } from './dto/platform-invoice.dto';
+import { UpdateSupportTicketDto } from '../support/dto/update-support-ticket.dto';
 import { PlatformAuthService } from './platform-auth.service';
 import { PlatformBillingService } from './platform-billing.service';
 import { PlatformService } from './platform.service';
 import { AssessmentTemplatesService } from '../results/assessment-templates.service';
 import { CreateAssessmentTemplateDto } from '../results/dto/create-assessment-template.dto';
 import { UpdateAssessmentTemplateDto } from '../results/dto/update-assessment-template.dto';
+import {
+  CreatePackageDepartmentDto,
+  UpdatePackageDepartmentDto,
+} from './dto/platform-department.dto';
+import {
+  AddPackageLibraryItemDto,
+  CreatePlatformLibraryResourceDto,
+  UpdatePlatformLibraryResourceDto,
+} from './dto/platform-library.dto';
+import {
+  CreatePlatformStructureDto,
+  UpdatePlatformStructureDto,
+} from './dto/platform-structure.dto';
+import {
+  AddPackageTemplateDto,
+  CreatePlatformMessageTemplateDto,
+  UpdatePlatformMessageTemplateDto,
+  UpdatePackageTemplateDto,
+} from './dto/platform-template.dto';
 import {
   AddPackageSubjectDto,
   CreatePlatformSubjectDto,
@@ -40,7 +67,10 @@ import {
 } from './dto/platform-subject.dto';
 import { PlatformContentService } from './platform-content.service';
 import { PlatformCurriculumAdminService } from './platform-curriculum-admin.service';
+import { UpdatePlatformSettingsDto } from './dto/update-platform-settings.dto';
+import { PlatformSettingsService } from './platform-settings.service';
 import { PlatformSubjectsService } from './platform-subjects.service';
+import { SupportService } from '../support/support.service';
 
 @Controller('platform')
 export class PlatformController {
@@ -52,6 +82,8 @@ export class PlatformController {
     private readonly platformSubjectsService: PlatformSubjectsService,
     private readonly curriculumAdmin: PlatformCurriculumAdminService,
     private readonly platformContent: PlatformContentService,
+    private readonly platformSettings: PlatformSettingsService,
+    private readonly supportService: SupportService,
   ) {}
 
   @Post('auth/login')
@@ -78,6 +110,21 @@ export class PlatformController {
     @Body() dto: UpdatePlatformProfileDto,
   ) {
     return this.platformAuthService.updateProfile(user, dto);
+  }
+
+  @Get('settings')
+  @UseGuards(JwtAuthGuard, PlatformGuard)
+  getSettings() {
+    return this.platformSettings.getSettings();
+  }
+
+  @Patch('settings')
+  @UseGuards(JwtAuthGuard, PlatformGuard)
+  updateSettings(
+    @CurrentPlatformUser() user: PlatformAuthUser,
+    @Body() dto: UpdatePlatformSettingsDto,
+  ) {
+    return this.platformSettings.updateSettings(dto, user.role);
   }
 
   @Get('dashboard')
@@ -135,6 +182,83 @@ export class PlatformController {
     @Param('packageSubjectId') packageSubjectId: string,
   ) {
     return this.curriculumAdmin.removeSubjectFromPackage(key, packageSubjectId);
+  }
+
+  @Post('curriculum-packages/:key/library')
+  @UseGuards(JwtAuthGuard, PlatformGuard)
+  addPackageLibraryItem(
+    @Param('key') key: string,
+    @Body() dto: AddPackageLibraryItemDto,
+  ) {
+    return this.curriculumAdmin.addLibraryItemToPackage(key, dto);
+  }
+
+  @Post('curriculum-packages/:key/library/:packageLibraryItemId/remove')
+  @UseGuards(JwtAuthGuard, PlatformGuard)
+  removePackageLibraryItem(
+    @Param('key') key: string,
+    @Param('packageLibraryItemId') packageLibraryItemId: string,
+  ) {
+    return this.curriculumAdmin.removeLibraryItemFromPackage(
+      key,
+      packageLibraryItemId,
+    );
+  }
+
+  @Post('curriculum-packages/:key/templates')
+  @UseGuards(JwtAuthGuard, PlatformGuard)
+  addPackageTemplate(
+    @Param('key') key: string,
+    @Body() dto: AddPackageTemplateDto,
+  ) {
+    return this.curriculumAdmin.addTemplateToPackage(key, dto);
+  }
+
+  @Patch('curriculum-packages/:key/templates/:packageTemplateId')
+  @UseGuards(JwtAuthGuard, PlatformGuard)
+  updatePackageTemplate(
+    @Param('key') key: string,
+    @Param('packageTemplateId') packageTemplateId: string,
+    @Body() dto: UpdatePackageTemplateDto,
+  ) {
+    return this.curriculumAdmin.updatePackageTemplate(key, packageTemplateId, dto);
+  }
+
+  @Post('curriculum-packages/:key/templates/:packageTemplateId/remove')
+  @UseGuards(JwtAuthGuard, PlatformGuard)
+  removePackageTemplate(
+    @Param('key') key: string,
+    @Param('packageTemplateId') packageTemplateId: string,
+  ) {
+    return this.curriculumAdmin.removeTemplateFromPackage(key, packageTemplateId);
+  }
+
+  @Post('curriculum-packages/:key/departments')
+  @UseGuards(JwtAuthGuard, PlatformGuard)
+  addPackageDepartment(
+    @Param('key') key: string,
+    @Body() dto: CreatePackageDepartmentDto,
+  ) {
+    return this.curriculumAdmin.addDepartmentToPackage(key, dto);
+  }
+
+  @Patch('curriculum-packages/:key/departments/:departmentId')
+  @UseGuards(JwtAuthGuard, PlatformGuard)
+  updatePackageDepartment(
+    @Param('key') key: string,
+    @Param('departmentId') departmentId: string,
+    @Body() dto: UpdatePackageDepartmentDto,
+  ) {
+    return this.curriculumAdmin.updatePackageDepartment(key, departmentId, dto);
+  }
+
+  @Post('curriculum-packages/:key/departments/:departmentId/remove')
+  @UseGuards(JwtAuthGuard, PlatformGuard)
+  removePackageDepartment(
+    @Param('key') key: string,
+    @Param('departmentId') departmentId: string,
+  ) {
+    return this.curriculumAdmin.removeDepartmentFromPackage(key, departmentId);
   }
 
   @Post('catalog/sync')
@@ -206,6 +330,27 @@ export class PlatformController {
     return this.platformContent.listStructures(includeArchived === 'true');
   }
 
+  @Post('academic-structures')
+  @UseGuards(JwtAuthGuard, PlatformGuard)
+  createAcademicStructure(@Body() dto: CreatePlatformStructureDto) {
+    return this.platformContent.createStructure(dto);
+  }
+
+  @Patch('academic-structures/:id')
+  @UseGuards(JwtAuthGuard, PlatformGuard)
+  updateAcademicStructure(
+    @Param('id') id: string,
+    @Body() dto: UpdatePlatformStructureDto,
+  ) {
+    return this.platformContent.updateStructure(id, dto);
+  }
+
+  @Delete('academic-structures/:id')
+  @UseGuards(JwtAuthGuard, PlatformGuard)
+  deleteAcademicStructure(@Param('id') id: string) {
+    return this.platformContent.deleteStructure(id);
+  }
+
   @Get('library/categories')
   @UseGuards(JwtAuthGuard, PlatformGuard)
   listPlatformLibraryCategories() {
@@ -218,10 +363,85 @@ export class PlatformController {
     return this.platformContent.listLibraryResources(includeArchived === 'true');
   }
 
+  @Post('library/resources')
+  @UseGuards(JwtAuthGuard, PlatformGuard)
+  createPlatformLibraryResource(@Body() dto: CreatePlatformLibraryResourceDto) {
+    return this.platformContent.createLibraryResource(dto);
+  }
+
+  @Patch('library/resources/:id')
+  @UseGuards(JwtAuthGuard, PlatformGuard)
+  updatePlatformLibraryResource(
+    @Param('id') id: string,
+    @Body() dto: UpdatePlatformLibraryResourceDto,
+  ) {
+    return this.platformContent.updateLibraryResource(id, dto);
+  }
+
+  @Post('library/resources/:id/archive')
+  @UseGuards(JwtAuthGuard, PlatformGuard)
+  archivePlatformLibraryResource(@Param('id') id: string) {
+    return this.platformContent.archiveLibraryResource(id);
+  }
+
+  @Delete('library/resources/:id')
+  @UseGuards(JwtAuthGuard, PlatformGuard)
+  deletePlatformLibraryResource(@Param('id') id: string) {
+    return this.platformContent.deleteLibraryResource(id);
+  }
+
+  @Post('library/upload')
+  @UseGuards(JwtAuthGuard, PlatformGuard)
+  @UseInterceptors(FileInterceptor('file'))
+  uploadPlatformLibraryFile(
+    @UploadedFile()
+    file: { originalname: string; buffer: Buffer; mimetype: string } | undefined,
+  ) {
+    if (!file?.buffer) {
+      throw new BadRequestException('Upload a file');
+    }
+    return this.platformContent.saveUploadedFile(file);
+  }
+
+  @Get('library/files/:filename')
+  @UseGuards(JwtAuthGuard, PlatformGuard)
+  downloadPlatformLibraryFile(
+    @Param('filename') filename: string,
+    @Res() res: Response,
+  ) {
+    const path = this.platformContent.getFilePath(filename);
+    if (!existsSync(path)) {
+      throw new BadRequestException('File not found');
+    }
+    res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+    createReadStream(path).pipe(res);
+  }
+
   @Get('message-templates')
   @UseGuards(JwtAuthGuard, PlatformGuard)
   listPlatformMessageTemplates(@Query('includeArchived') includeArchived?: string) {
     return this.platformContent.listMessageTemplates(includeArchived === 'true');
+  }
+
+  @Post('message-templates')
+  @UseGuards(JwtAuthGuard, PlatformGuard)
+  createPlatformMessageTemplate(@Body() dto: CreatePlatformMessageTemplateDto) {
+    return this.platformContent.createMessageTemplate(dto);
+  }
+
+  @Patch('message-templates/:id')
+  @UseGuards(JwtAuthGuard, PlatformGuard)
+  updatePlatformMessageTemplate(
+    @Param('id') id: string,
+    @Body() dto: UpdatePlatformMessageTemplateDto,
+  ) {
+    return this.platformContent.updateMessageTemplate(id, dto);
+  }
+
+  @Post('message-templates/:id/archive')
+  @UseGuards(JwtAuthGuard, PlatformGuard)
+  archivePlatformMessageTemplate(@Param('id') id: string) {
+    return this.platformContent.archiveMessageTemplate(id);
   }
 
   @Get('assessment-templates/catalog')
@@ -364,5 +584,29 @@ export class PlatformController {
   @UseGuards(JwtAuthGuard, PlatformGuard)
   updateInvoice(@Param('id') id: string, @Body() dto: UpdatePlatformInvoiceDto) {
     return this.platformBillingService.updateInvoice(id, dto);
+  }
+
+  @Get('support-tickets')
+  @UseGuards(JwtAuthGuard, PlatformGuard)
+  listSupportTickets(
+    @Query('schoolId') schoolId?: string,
+    @Query('status') status?: SupportTicketStatus,
+  ) {
+    return this.supportService.listForPlatform({ schoolId, status });
+  }
+
+  @Get('support-tickets/:id')
+  @UseGuards(JwtAuthGuard, PlatformGuard)
+  getSupportTicket(@Param('id') id: string) {
+    return this.supportService.getForPlatform(id);
+  }
+
+  @Patch('support-tickets/:id')
+  @UseGuards(JwtAuthGuard, PlatformGuard)
+  updateSupportTicket(
+    @Param('id') id: string,
+    @Body() dto: UpdateSupportTicketDto,
+  ) {
+    return this.supportService.updateForPlatform(id, dto);
   }
 }

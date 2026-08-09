@@ -267,6 +267,7 @@ export class ResultsController {
       user.schoolId,
       id,
       dto.entryLocked,
+      dto.scope ?? 'this',
     );
   }
 

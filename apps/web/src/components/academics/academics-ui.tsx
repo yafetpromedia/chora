@@ -50,19 +50,39 @@ export function AcademicsHero({
   badges,
   stats,
   chip,
+  compact,
+  backHref,
+  backLabel = "Academics",
 }: {
   title: string;
   subtitle: string;
   badges?: ReactNode;
   stats?: AcademicsStatItem[];
   chip?: string;
+  compact?: boolean;
+  backHref?: string;
+  backLabel?: string;
 }) {
   return (
-    <header className="acad-v2__hero">
+    <header className={`acad-v2__hero${compact ? " acad-v2__hero--compact" : ""}`}>
       <div className="acad-v2__hero-glow" aria-hidden />
       <div className="acad-v2__hero-inner">
         <div className="acad-v2__hero-main">
-          {chip ? <span className="acad-v2__chip">{chip}</span> : null}
+          {backHref || chip ? (
+            <div className="acad-v2__hero-top">
+              {backHref ? (
+                <Link
+                  href={backHref}
+                  className="acad-v2__back"
+                  aria-label={`Back to ${backLabel}`}
+                  title={`Back to ${backLabel}`}
+                >
+                  <DashIcon name="chevron" className="dash-icon--xs acad-v2__back-icon" />
+                </Link>
+              ) : null}
+              {chip ? <span className="acad-v2__chip">{chip}</span> : null}
+            </div>
+          ) : null}
           <h2 className="acad-v2__hero-title">{title}</h2>
           <p className="acad-v2__hero-sub">{subtitle}</p>
           {badges ? <div className="acad-v2__hero-badges">{badges}</div> : null}

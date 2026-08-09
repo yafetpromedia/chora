@@ -212,6 +212,10 @@ model School {
   email         String?
   country       String?
   phone         String?
+  /// Shown on report-card header (defaults to "Student Report Card")
+  reportCardTitle   String?
+  /// Optional motto / tagline under the school name on report cards
+  reportCardTagline String?
   bankName              String?
   bankAccountHolder     String?
   bankAccountNumber     String?
@@ -236,10 +240,14 @@ model School {
   departments           SchoolDepartment[]
   messageTemplates      SchoolMessageTemplate[]
   provisioningLogs      SchoolProvisioningLog[]
+  admissionCycles       AdmissionCycle[]
+  admissionApplications AdmissionApplication[]
+  admissionPlacementRules AdmissionPlacementRule[]
   feeTypes       FeeType[]
   feeSchedules   FeeSchedule[]
   roleTemplates  RoleTemplate[]
   platformInvoices PlatformInvoice[]
+  supportTickets   SupportTicket[]
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 }
@@ -347,6 +355,42 @@ model PlatformInvoice {
   @@index([dueAt])
 }
 
+enum SupportTicketStatus {
+  OPEN
+  IN_PROGRESS
+  WAITING_ON_SCHOOL
+  RESOLVED
+  CLOSED
+}
+
+enum SupportTicketCategory {
+  BILLING
+  TECHNICAL
+  ONBOARDING
+  ACCOUNT
+  OTHER
+}
+
+/// School admin issues reported to the platform control center
+model SupportTicket {
+  id           String                @id @default(cuid())
+  schoolId     String
+  school       School                @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  createdById  String
+  createdBy    User                  @relation("SupportTicketsCreated", fields: [createdById], references: [id], onDelete: Cascade)
+  subject      String
+  body         String                @db.Text
+  category     SupportTicketCategory @default(OTHER)
+  status       SupportTicketStatus   @default(OPEN)
+  platformNote String?               @db.Text
+  resolvedAt   DateTime?
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
+
+  @@index([schoolId, status, createdAt])
+  @@index([status, createdAt])
+}
+
 model SchoolInvite {
   id        String    @id @default(cuid())
   schoolId  String
@@ -379,6 +423,9 @@ model Grade {
   assessmentTemplateGrades   AssessmentTemplateGrade[]
   timetableEntries           TimetableEntry[]
   libraryResources           LibraryResource[]
+  admissionTargetGrades      AdmissionApplication[]    @relation("ApplicationTargetGrade")
+  admissionPlacedGrades      AdmissionApplication[]    @relation("ApplicationPlacedGrade")
+  admissionPlacementRules      AdmissionPlacementRule[]
 
   @@unique([schoolId, name])
   @@index([schoolId, sortOrder])
@@ -395,6 +442,8 @@ model Section {
   homeroomTeachers      TeacherProfile[]    @relation("TeacherHomeroomSection")
   studentEnrollments    StudentEnrollment[]
   timetableEntries      TimetableEntry[]
+  admissionPlacements   AdmissionApplication[]
+  admissionPlacementRules AdmissionPlacementRule[]
 
   @@unique([gradeId, name])
 }
@@ -436,6 +485,7 @@ model User {
   classworkGraded          ClassworkSubmission[] @relation("ClassworkGradedBy")
   attendancePermissionsRequested AttendancePermissionRequest[] @relation("AttendancePermissionRequester")
   attendancePermissionsReviewed  AttendancePermissionRequest[] @relation("AttendancePermissionReviewer")
+  supportTicketsCreated          SupportTicket[]               @relation("SupportTicketsCreated")
   createdAt       DateTime            @default(now())
   updatedAt       DateTime            @updatedAt
 
@@ -443,6 +493,16 @@ model User {
   @@index([schoolId, role])
   @@index([schoolId, staffRole])
   @@index([phone])
+}
+
+enum AdmissionStatus {
+  APPLIED
+  SCORED
+  PLACED
+  ACCEPTED
+  REJECTED
+  ENROLLED
+  WITHDRAWN
 }
 
 enum StudentRecordStatus {
@@ -516,6 +576,7 @@ model StudentProfile {
   /// Shown to admins while student has not changed their portal password.
   portalTempPassword String?
   parents            ParentStudent[]
+  admissionApplication AdmissionApplication?
   attendanceRecords  AttendanceRecord[]
   parentNotifications ParentNotification[]
   studentFees         StudentFee[]
@@ -861,6 +922,31 @@ model PlatformUser {
   updatedAt    DateTime     @updatedAt
 }
 
+model PlatformSettings {
+  id                    String           @id @default("default")
+  platformName          String           @default("CampusOne")
+  supportEmail          String?
+  supportPhone          String?
+  defaultCountry        String           @default("Ethiopia")
+  defaultTimezone       String           @default("Africa/Addis_Ababa")
+  allowSelfRegistration Boolean          @default(true)
+  requireAdminApproval  Boolean          @default(false)
+  defaultTrialDays      Int              @default(14)
+  welcomeMessage        String?          @db.Text
+  defaultBillingCurrency BillingCurrency @default(USD)
+  invoicePrefix         String           @default("INV")
+  invoiceGraceDays      Int              @default(14)
+  autoSuspendOverdue    Boolean          @default(false)
+  emailFromName         String?
+  emailReplyTo          String?
+  smsSenderName         String?
+  maintenanceMode       Boolean          @default(false)
+  maintenanceMessage    String?          @db.Text
+  sessionTimeoutMinutes Int              @default(60)
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+}
+
 model AcademicYear {
   id        String        @id @default(cuid())
   schoolId  String
@@ -876,6 +962,7 @@ model AcademicYear {
   teacherAssignments  TeacherAssignment[]
   studentEnrollments  StudentEnrollment[]
   timetable             Timetable?
+  admissionCycles       AdmissionCycle[]
 
   @@unique([schoolId, name])
   @@index([schoolId, isCurrent])
@@ -1571,4 +1658,92 @@ model SchoolMessageTemplate {
   @@unique([schoolId, key])
   @@index([schoolId])
   @@index([platformMessageTemplateId])
+}
+
+// ── Admissions (applicant pipeline → score placement → enroll) ──
+
+model AdmissionCycle {
+  id             String   @id @default(cuid())
+  schoolId       String
+  school         School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  academicYearId String
+  academicYear   AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+  name           String
+  isOpen         Boolean  @default(true)
+  /// Place applicant as soon as entrance/interview score is saved.
+  autoPlaceOnScore   Boolean @default(true)
+  /// Skip manual Accept — mark ACCEPTED right after placement.
+  autoAcceptOnPlace  Boolean @default(true)
+  /// Enroll into student roster when placement completes (requires ID, gender, DOB).
+  autoEnrollOnPlace  Boolean @default(false)
+  createdAt      DateTime @default(now())
+  applications   AdmissionApplication[]
+  placementRules AdmissionPlacementRule[]
+
+  @@unique([schoolId, academicYearId, name])
+  @@index([schoolId, isOpen])
+}
+
+model AdmissionApplication {
+  id                String           @id @default(cuid())
+  schoolId          String
+  school            School           @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  cycleId           String
+  cycle             AdmissionCycle   @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  status            AdmissionStatus  @default(APPLIED)
+  firstName         String
+  lastName          String
+  middleName        String?
+  gender            Gender?
+  dateOfBirth       DateTime?
+  idNumber          String?
+  phone             String?
+  fatherName        String
+  fatherPhone       String
+  motherName        String
+  motherPhone       String
+  email             String?
+  targetGradeId     String?
+  targetGrade       Grade?           @relation("ApplicationTargetGrade", fields: [targetGradeId], references: [id], onDelete: SetNull)
+  entranceScore     Int?
+  interviewScore    Int?
+  totalScore        Int?
+  placedGradeId     String?
+  placedGrade       Grade?           @relation("ApplicationPlacedGrade", fields: [placedGradeId], references: [id], onDelete: SetNull)
+  placedSectionId   String?
+  placedSection     Section?         @relation(fields: [placedSectionId], references: [id], onDelete: SetNull)
+  placementRuleId   String?
+  placementRule     AdmissionPlacementRule? @relation(fields: [placementRuleId], references: [id], onDelete: SetNull)
+  placementNote     String?
+  enrolledProfileId String?          @unique
+  enrolledProfile   StudentProfile?  @relation(fields: [enrolledProfileId], references: [id], onDelete: SetNull)
+  appliedAt         DateTime         @default(now())
+  placedAt          DateTime?
+  enrolledAt        DateTime?
+  notes             String?          @db.Text
+
+  @@index([schoolId, cycleId, status])
+  @@index([schoolId, totalScore])
+}
+
+model AdmissionPlacementRule {
+  id              String         @id @default(cuid())
+  schoolId        String
+  school          School         @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  cycleId         String
+  cycle           AdmissionCycle @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  label           String
+  minScore        Int
+  maxScore        Int
+  targetGradeId   String
+  targetGrade     Grade          @relation(fields: [targetGradeId], references: [id], onDelete: Cascade)
+  targetSectionId String?
+  targetSection   Section?       @relation(fields: [targetSectionId], references: [id], onDelete: SetNull)
+  /// When set (e.g. "Natural", "Social"), auto-pick least-filled matching section in the grade.
+  streamMatch     String?
+  sortOrder       Int            @default(0)
+  isActive        Boolean        @default(true)
+  applications    AdmissionApplication[]
+
+  @@index([cycleId, sortOrder])
 }

@@ -6,6 +6,7 @@ import { PlatformCurriculum } from "@/components/platform/platform-curriculum";
 import { PlatformSubjects } from "@/components/platform/platform-subjects";
 import { PlatformLibraryRepo } from "@/components/platform/platform-library-repo";
 import { PlatformMessages } from "@/components/platform/platform-messages";
+import { PlatformSupportInbox } from "@/components/platform/platform-support-inbox";
 import { PlatformStructures } from "@/components/platform/platform-structures";
 import { PlatformProvisioning } from "@/components/platform/platform-provisioning";
 import { PlatformAssessments } from "@/components/platform/platform-assessments";
@@ -142,6 +143,7 @@ export default function PlatformDashboardPage() {
           {section === "subjects" ? <PlatformSubjects /> : null}
           {section === "library" ? <PlatformLibraryRepo /> : null}
           {section === "messages" ? <PlatformMessages /> : null}
+          {section === "support" ? <PlatformSupportInbox /> : null}
           {section === "structures" ? <PlatformStructures /> : null}
           {section === "provisioning" ? <PlatformProvisioning /> : null}
           {section === "assessments" ? <PlatformAssessments schools={schools} /> : null}
@@ -160,7 +162,11 @@ export default function PlatformDashboardPage() {
           ) : null}
           {section === "profile" ? <PlatformProfilePanel /> : null}
           {section === "settings" ? (
-            <PlatformSettings user={user} onOpenProfile={() => setSection("profile")} />
+            <PlatformSettings
+              user={user}
+              onOpenProfile={() => setSection("profile")}
+              onNavigate={setSection}
+            />
           ) : null}
         </>
       ) : (

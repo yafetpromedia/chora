@@ -7,6 +7,7 @@ import { listGradesForAttendance } from "@/lib/attendance";
 import type { GradeWithSections } from "@/lib/api";
 import { getMyTeacherProfile } from "@/lib/teachers";
 import { scanStudentAttendance, type ScanAttendanceResult } from "@/lib/student-cards";
+import { AppToast } from "@/components/ui/app-toast";
 
 const SCANNER_ID = "attendance-qr-reader";
 
@@ -196,11 +197,16 @@ function AttendanceScannerInner() {
         </div>
       </section>
 
-      {flash ? (
-        <p className={`att-v4__flash att-v4__flash--${flash.type}`} role="status">
-          {flash.text}
-        </p>
-      ) : null}
+      <AppToast
+        message={flash?.type === "ok" ? flash.text : ""}
+        tone="success"
+        onDismiss={() => setFlash(null)}
+      />
+      <AppToast
+        message={flash?.type === "err" ? flash.text : ""}
+        tone="error"
+        onDismiss={() => setFlash(null)}
+      />
 
       <div className="att-v4__scan-layout">
         <section className="att-v4__scan-main">

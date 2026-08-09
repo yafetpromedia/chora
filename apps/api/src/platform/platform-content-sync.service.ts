@@ -129,15 +129,22 @@ export class PlatformContentSyncService implements OnModuleInit {
     const categories = await this.prisma.platformLibraryCategory.findMany();
     const slugToId = new Map(categories.map((c) => [c.slug, c.id]));
 
+    // Seed starter package library items only on an empty catalog.
+    // If operators delete samples, do not recreate them on API restart or Sync.
+    const existingCount = await this.prisma.platformLibraryResource.count();
+    if (existingCount > 0) {
+      return;
+    }
+
+    const seeded = new Set<string>();
+    let order = 0;
     for (const pkg of CURRICULUM_PACKAGE_DEFINITIONS) {
-      for (const [i, item] of pkg.libraryItems.entries()) {
+      for (const item of pkg.libraryItems) {
         const categoryId = slugToId.get(item.categorySlug);
         if (!categoryId) continue;
-
-        const existing = await this.prisma.platformLibraryResource.findFirst({
-          where: { title: item.title, categoryId },
-        });
-        if (existing) continue;
+        const key = `${categoryId}::${item.title}`;
+        if (seeded.has(key)) continue;
+        seeded.add(key);
 
         await this.prisma.platformLibraryResource.create({
           data: {
@@ -147,7 +154,7 @@ export class PlatformContentSyncService implements OnModuleInit {
             resourceType: item.resourceType,
             subject: item.subject ?? null,
             gradeLabel: item.gradeLabel ?? null,
-            sortOrder: i,
+            sortOrder: order++,
           },
         });
       }

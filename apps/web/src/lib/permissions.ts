@@ -71,6 +71,27 @@ export function hasPermission(required: PermissionKey | string): boolean {
   return permissionMatches(getStoredPermissions(), required);
 }
 
+export type PermissionModule = {
+  id: string;
+  label: string;
+  description: string;
+  keys: PermissionKey[];
+};
+
+/** One-switch module access (maps to multiple permission keys). */
+export const PERMISSION_MODULES: PermissionModule[] = [
+  {
+    id: "admissions",
+    label: "Admissions",
+    description: "Applications, placement rules, and enrollment",
+    keys: [Permission.ADMISSIONS_READ, Permission.ADMISSIONS_MANAGE],
+  },
+];
+
+export const PERMISSION_MODULE_KEY_SET = new Set(
+  PERMISSION_MODULES.flatMap((module) => module.keys),
+);
+
 export const ROLE_TEMPLATE_LABELS: Record<string, string> = {
   school_admin: "School admin",
   principal: "Principal",

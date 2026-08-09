@@ -1,7 +1,13 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
-import { platformFetch } from "@/lib/platform-auth";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { DashIcon } from "@/components/dashboard/dash-icons";
+import { AppToast } from "@/components/ui/app-toast";
+import {
+  handlePlatformAuthFailure,
+  platformFetch,
+} from "@/lib/platform-auth";
 import {
   TemplateComponentsEditor,
   type TemplateComponentDraft,
@@ -45,8 +51,10 @@ type CatalogRow = {
 type AssessTab = "catalog" | "school";
 
 export function PlatformAssessments({ schools }: { schools: PlatformSchoolRow[] }) {
+  const router = useRouter();
   const [tab, setTab] = useState<AssessTab>("catalog");
   const [catalog, setCatalog] = useState<CatalogRow[]>([]);
+  const [catalogQ, setCatalogQ] = useState("");
   const [catalogLoading, setCatalogLoading] = useState(true);
   const [schoolId, setSchoolId] = useState("");
   const [templates, setTemplates] = useState<TemplateRow[]>([]);
@@ -55,7 +63,15 @@ export function PlatformAssessments({ schools }: { schools: PlatformSchoolRow[] 
   const [editingTemplateId, setEditingTemplateId] = useState("");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [copyingId, setCopyingId] = useState("");
   const [error, setError] = useState("");
+
+  function fail(err: unknown, fallback: string) {
+    if (handlePlatformAuthFailure(err, () => router.replace("/platform/login"))) {
+      return;
+    }
+    setError(err instanceof Error ? err.message : fallback);
+  }
 
   useEffect(() => {
     if (!schoolId && schools[0]) {
@@ -63,13 +79,24 @@ export function PlatformAssessments({ schools }: { schools: PlatformSchoolRow[] 
     }
   }, [schoolId, schools]);
 
-  useEffect(() => {
+  const loadCatalog = useCallback(async () => {
     setCatalogLoading(true);
-    void platformFetch<CatalogRow[]>("/platform/assessment-templates/catalog")
-      .then(setCatalog)
-      .catch(() => setCatalog([]))
-      .finally(() => setCatalogLoading(false));
-  }, []);
+    try {
+      const rows = await platformFetch<CatalogRow[]>(
+        "/platform/assessment-templates/catalog",
+      );
+      setCatalog(rows);
+    } catch (err) {
+      fail(err, "Failed to load catalog");
+      setCatalog([]);
+    } finally {
+      setCatalogLoading(false);
+    }
+  }, [router]);
+
+  useEffect(() => {
+    void loadCatalog();
+  }, [loadCatalog]);
 
   async function loadTemplates(targetSchoolId: string) {
     if (!targetSchoolId) return;
@@ -81,7 +108,7 @@ export function PlatformAssessments({ schools }: { schools: PlatformSchoolRow[] 
       );
       setTemplates(rows);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load templates");
+      fail(err, "Failed to load templates");
     } finally {
       setLoading(false);
     }
@@ -95,6 +122,26 @@ export function PlatformAssessments({ schools }: { schools: PlatformSchoolRow[] 
     () => schools.find((s) => s.id === schoolId) ?? null,
     [schoolId, schools],
   );
+
+  const catalogStats = useMemo(() => {
+    return {
+      total: catalog.length,
+      packages: catalog.reduce((sum, t) => sum + t._count.packageLinks, 0),
+      schools: catalog.reduce((sum, t) => sum + t._count.schoolTemplates, 0),
+      components: catalog.reduce((sum, t) => sum + t.components.length, 0),
+    };
+  }, [catalog]);
+
+  const filteredCatalog = useMemo(() => {
+    const q = catalogQ.trim().toLowerCase();
+    if (!q) return catalog;
+    return catalog.filter(
+      (t) =>
+        t.name.toLowerCase().includes(q) ||
+        t.key.toLowerCase().includes(q) ||
+        (t.description ?? "").toLowerCase().includes(q),
+    );
+  }, [catalog, catalogQ]);
 
   function resetForm() {
     setEditingTemplateId("");
@@ -132,7 +179,7 @@ export function PlatformAssessments({ schools }: { schools: PlatformSchoolRow[] 
       resetForm();
       await loadTemplates(schoolId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save template");
+      fail(err, "Failed to save template");
     } finally {
       setSaving(false);
     }
@@ -152,6 +199,7 @@ export function PlatformAssessments({ schools }: { schools: PlatformSchoolRow[] 
 
   async function onDeleteTemplate(templateId: string) {
     if (!schoolId) return;
+    if (!confirm("Delete this school template?")) return;
     setError("");
     try {
       await platformFetch(
@@ -163,12 +211,13 @@ export function PlatformAssessments({ schools }: { schools: PlatformSchoolRow[] 
       }
       await loadTemplates(schoolId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete template");
+      fail(err, "Failed to delete template");
     }
   }
 
   async function copyCatalogToSchool(platformTemplateId: string) {
     if (!schoolId) return;
+    setCopyingId(platformTemplateId);
     setError("");
     try {
       await platformFetch(
@@ -178,73 +227,152 @@ export function PlatformAssessments({ schools }: { schools: PlatformSchoolRow[] 
       await loadTemplates(schoolId);
       setTab("school");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Copy failed");
+      fail(err, "Copy failed");
+    } finally {
+      setCopyingId("");
     }
   }
 
   return (
-    <div className="plat-section">
-      <header className="plat-section-hero">
-        <div>
-          <p className="plat-section-hero__eyebrow">Content & Curriculum Engine</p>
-          <h2 className="plat-section-hero__title">Assessment templates</h2>
-          <p className="plat-section-hero__sub">
-            Platform catalog copied on school provision; override per school when needed.
-          </p>
+    <div className="plat-subjects-v2 dash-admin dash-admin--modern plat-assessments-v2">
+      <AppToast message={error} tone="error" onDismiss={() => setError("")} />
+
+      <header className="plat-subjects-v2__hero">
+        <div className="plat-subjects-v2__hero-main">
+          <span className="plat-subjects-v2__hero-icon" aria-hidden>
+            <DashIcon name="results" className="dash-icon--md" />
+          </span>
+          <div>
+            <p className="plat-subjects-v2__eyebrow">Content & Curriculum Engine</p>
+            <h2 className="plat-subjects-v2__title">Assessment templates</h2>
+            <p className="plat-subjects-v2__sub">
+              Platform catalog copied on school provision; override per school when needed.
+            </p>
+          </div>
+        </div>
+        <div className="plat-subjects-v2__hero-stats">
+          <div className="plat-subjects-v2__stat">
+            <strong>{catalogStats.total}</strong>
+            <span>Catalog</span>
+          </div>
+          <div className="plat-subjects-v2__stat">
+            <strong>{catalogStats.packages}</strong>
+            <span>In packages</span>
+          </div>
+          <div className="plat-subjects-v2__stat">
+            <strong>{templates.length}</strong>
+            <span>School copies</span>
+          </div>
         </div>
       </header>
 
-      {error ? <p className="auth-alert auth-alert--error">{error}</p> : null}
+      <div className="plat-subjects-v2__kpis">
+        <article className="plat-subjects-v2__kpi">
+          <DashIcon name="results" className="dash-icon--sm" />
+          <div>
+            <strong>{catalogStats.total}</strong>
+            <span>Platform templates</span>
+          </div>
+        </article>
+        <article className="plat-subjects-v2__kpi">
+          <DashIcon name="chart" className="dash-icon--sm" />
+          <div>
+            <strong>{catalogStats.components}</strong>
+            <span>Components</span>
+          </div>
+        </article>
+        <article className="plat-subjects-v2__kpi">
+          <DashIcon name="students" className="dash-icon--sm" />
+          <div>
+            <strong>{catalogStats.schools}</strong>
+            <span>School deployments</span>
+          </div>
+        </article>
+      </div>
 
-      <div className="plat-filter-tabs plat-curriculum-tabs" role="tablist">
+      <div className="plat-filter-tabs plat-assessments-v2__tabs" role="tablist">
         <button
           type="button"
+          role="tab"
+          aria-selected={tab === "catalog"}
           className={`plat-filter-tab${tab === "catalog" ? " plat-filter-tab--active" : ""}`}
           onClick={() => setTab("catalog")}
         >
+          <DashIcon name="templates" className="dash-icon--xs plat-templates-v2__tab-icon" />
           Platform catalog
         </button>
         <button
           type="button"
+          role="tab"
+          aria-selected={tab === "school"}
           className={`plat-filter-tab${tab === "school" ? " plat-filter-tab--active" : ""}`}
           onClick={() => setTab("school")}
         >
+          <DashIcon name="building" className="dash-icon--xs plat-templates-v2__tab-icon" />
           Per school
         </button>
       </div>
 
       {tab === "catalog" ? (
-        <section className="plat-panel">
+        <section className="plat-assessments-v2__panel">
+          <div className="plat-subjects-v2__toolbar plat-assessments-v2__toolbar">
+            <div className="plat-tenants-v2__search plat-subjects-v2__search">
+              <DashIcon name="results" className="dash-icon--sm" />
+              <input
+                type="search"
+                placeholder="Search catalog…"
+                value={catalogQ}
+                onChange={(e) => setCatalogQ(e.target.value)}
+                aria-label="Search assessment catalog"
+              />
+            </div>
+            {selectedSchool ? (
+              <p className="plat-assessments-v2__school-hint">
+                Copy to <strong>{selectedSchool.name}</strong>
+              </p>
+            ) : null}
+          </div>
+
           {catalogLoading ? (
-            <p className="plat-panel__hint">Loading catalog…</p>
+            <div className="plat-curriculum__skeleton" />
+          ) : filteredCatalog.length === 0 ? (
+            <p className="plat-assessments-v2__empty">No catalog templates match.</p>
           ) : (
-            <div className="dash-list">
-              {catalog.map((t) => (
-                <article key={t.id} className="res-template-card">
-                  <strong>{t.name}</strong>
-                  <p className="tch-meta">
-                    <code>{t.key}</code>
-                    {t.gradeMin != null && t.gradeMax != null
-                      ? ` · Grades ${t.gradeMin}–${t.gradeMax}`
-                      : ""}
-                  </p>
-                  <div className="res-template-card__components">
+            <div className="plat-assessments-v2__grid">
+              {filteredCatalog.map((t) => (
+                <article key={t.id} className="plat-assessments-v2__card">
+                  <header className="plat-assessments-v2__card-head">
+                    <span className="plat-assessments-v2__icon" aria-hidden>
+                      <DashIcon name="results" className="dash-icon--md" />
+                    </span>
+                    <div>
+                      <strong className="plat-assessments-v2__name">{t.name}</strong>
+                      <p className="plat-assessments-v2__meta">
+                        <code>{t.key}</code>
+                        {t.gradeMin != null && t.gradeMax != null
+                          ? ` · Grades ${t.gradeMin}–${t.gradeMax}`
+                          : ""}
+                      </p>
+                    </div>
+                  </header>
+                  <div className="plat-assessments-v2__pills">
                     {t.components.map((c) => (
-                      <span key={c.id} className="res-template-pill">
+                      <span key={c.id} className="plat-assessments-v2__pill">
                         {c.name} {c.weightPercent}%
                       </span>
                     ))}
                   </div>
-                  <p className="tch-meta">
+                  <p className="plat-assessments-v2__meta">
                     {t._count.packageLinks} package(s) · {t._count.schoolTemplates} school(s)
                   </p>
                   {schoolId ? (
                     <button
                       type="button"
-                      className="dash-copy-btn"
+                      className="plat-btn plat-btn--ghost plat-btn--sm"
+                      disabled={copyingId === t.id}
                       onClick={() => void copyCatalogToSchool(t.id)}
                     >
-                      Copy to selected school
+                      {copyingId === t.id ? "Copying…" : "Copy to selected school"}
                     </button>
                   ) : null}
                 </article>
@@ -255,96 +383,113 @@ export function PlatformAssessments({ schools }: { schools: PlatformSchoolRow[] 
       ) : null}
 
       {tab === "school" ? (
-      <>
-      <section className="plat-panel">
-        <label className="att-field att-field--wide">
-          <span>School</span>
-          <select value={schoolId} onChange={(e) => setSchoolId(e.target.value)}>
-            {schools.map((school) => (
-              <option key={school.id} value={school.id}>
-                {school.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        {selectedSchool ? (
-          <p className="plat-panel__hint">
-            Managing templates for <strong>{selectedSchool.name}</strong>
-          </p>
-        ) : null}
-      </section>
-
-      <section className="plat-panel">
-        <h3 className="plat-panel__title">Current templates</h3>
-        {loading ? (
-          <p className="plat-panel__hint">Loading templates…</p>
-        ) : templates.length === 0 ? (
-          <p className="plat-panel__hint">No templates found for this school.</p>
-        ) : (
-          <div className="dash-list">
-            {templates.map((template) => (
-              <article key={template.id} className="res-template-card">
-                <strong>{template.name}</strong>
-                <p className="tch-meta">Weight total: {template.weightTotal}%</p>
-                <div className="res-template-card__components">
-                  {template.components.map((component) => (
-                    <span key={component.id} className="res-template-pill">
-                      {component.name} {component.weightPercent}% (/{component.maxScore})
-                    </span>
-                  ))}
-                </div>
-                <div className="setup-actions-row" style={{ marginTop: "0.5rem" }}>
-                  <button
-                    type="button"
-                    className="dash-copy-btn"
-                    onClick={() => onEditTemplate(template)}
-                  >
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    className="dash-copy-btn"
-                    onClick={() => void onDeleteTemplate(template.id)}
-                  >
-                    Delete
-                  </button>
-                </div>
-              </article>
-            ))}
-          </div>
-        )}
-      </section>
-
-      <section className="plat-panel">
-        <h3 className="plat-panel__title">
-          {editingTemplateId ? "Edit template" : "Create template for selected school"}
-        </h3>
-        <form onSubmit={(e) => void onSaveTemplate(e)}>
-          <label className="att-field att-field--wide">
-            <span>Name</span>
-            <input
-              className="auth-input auth-input--login auth-input--login-plain"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-            />
-          </label>
-
-          <TemplateComponentsEditor components={components} onChange={setComponents} />
-
-          <div className="setup-actions-row">
-            <button type="submit" className="auth-page-submit" disabled={saving || !schoolId}>
-              {saving ? "Saving…" : editingTemplateId ? "Save template" : "Create school template"}
-            </button>
-            {editingTemplateId ? (
-              <button type="button" className="dash-copy-btn" onClick={resetForm}>
-                Cancel edit
-              </button>
+        <>
+          <section className="plat-assessments-v2__panel">
+            <label className="att-field att-field--wide">
+              <span>School</span>
+              <select value={schoolId} onChange={(e) => setSchoolId(e.target.value)}>
+                {schools.map((school) => (
+                  <option key={school.id} value={school.id}>
+                    {school.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {selectedSchool ? (
+              <p className="plat-assessments-v2__school-hint">
+                Managing templates for <strong>{selectedSchool.name}</strong>
+              </p>
             ) : null}
-          </div>
-        </form>
-      </section>
-      </>
+          </section>
+
+          <section className="plat-assessments-v2__panel">
+            <h3 className="plat-assessments-v2__section-title">Current templates</h3>
+            {loading ? (
+              <div className="plat-curriculum__skeleton" />
+            ) : templates.length === 0 ? (
+              <p className="plat-assessments-v2__empty">No templates found for this school.</p>
+            ) : (
+              <div className="plat-assessments-v2__grid">
+                {templates.map((template) => (
+                  <article key={template.id} className="plat-assessments-v2__card">
+                    <header className="plat-assessments-v2__card-head">
+                      <span className="plat-assessments-v2__icon" aria-hidden>
+                        <DashIcon name="chart" className="dash-icon--md" />
+                      </span>
+                      <div>
+                        <strong className="plat-assessments-v2__name">{template.name}</strong>
+                        <p className="plat-assessments-v2__meta">
+                          Weight total: {template.weightTotal}%
+                        </p>
+                      </div>
+                    </header>
+                    <div className="plat-assessments-v2__pills">
+                      {template.components.map((component) => (
+                        <span key={component.id} className="plat-assessments-v2__pill">
+                          {component.name} {component.weightPercent}% (/{component.maxScore})
+                        </span>
+                      ))}
+                    </div>
+                    <div className="plat-subjects-v2__actions">
+                      <button
+                        type="button"
+                        className="plat-btn plat-btn--ghost plat-btn--xs"
+                        onClick={() => onEditTemplate(template)}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        className="plat-btn plat-btn--ghost plat-btn--xs plat-btn--danger"
+                        onClick={() => void onDeleteTemplate(template.id)}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
+
+          <section className="plat-assessments-v2__panel plat-assessments-v2__form-panel">
+            <h3 className="plat-assessments-v2__section-title">
+              {editingTemplateId ? "Edit template" : "Create template for selected school"}
+            </h3>
+            <form onSubmit={(e) => void onSaveTemplate(e)}>
+              <label className="att-field att-field--wide">
+                <span>Name</span>
+                <input
+                  className="auth-input auth-input--login auth-input--login-plain"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required
+                />
+              </label>
+
+              <TemplateComponentsEditor components={components} onChange={setComponents} />
+
+              <div className="plat-subjects-v2__actions" style={{ marginTop: "0.75rem" }}>
+                <button
+                  type="submit"
+                  className="plat-v2__btn plat-v2__btn--primary"
+                  disabled={saving || !schoolId}
+                >
+                  {saving
+                    ? "Saving…"
+                    : editingTemplateId
+                      ? "Save template"
+                      : "Create school template"}
+                </button>
+                {editingTemplateId ? (
+                  <button type="button" className="plat-btn plat-btn--ghost" onClick={resetForm}>
+                    Cancel edit
+                  </button>
+                ) : null}
+              </div>
+            </form>
+          </section>
+        </>
       ) : null}
     </div>
   );

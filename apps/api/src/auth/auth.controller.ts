@@ -32,6 +32,11 @@ export class AuthController {
     return this.authService.verifyStudentEnrollment(dto);
   }
 
+  @Get('platform-config')
+  platformConfig() {
+    return this.authService.getPublicPlatformConfig();
+  }
+
   @Post('register-school')
   registerSchool(@Body() dto: RegisterSchoolDto) {
     return this.authService.registerSchool(dto);

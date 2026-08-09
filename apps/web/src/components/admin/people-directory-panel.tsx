@@ -21,6 +21,7 @@ import {
   type StaffPermissionsDetail,
   type TeacherRecord,
 } from "@/lib/teachers";
+import { AppToast } from "@/components/ui/app-toast";
 
 type Props = {
   group: PeopleGroup;
@@ -196,7 +197,7 @@ export function PeopleDirectoryPanel({ group }: Props) {
 
   return (
     <div className="att-page">
-      {error ? <p className="att-toast att-toast--error">{error}</p> : null}
+      <AppToast message={error} tone="error" onDismiss={() => setError("")} />
 
       <div className="tch-toolbar">
         <button type="button" className="att-btn att-btn--primary" onClick={openCreate}>

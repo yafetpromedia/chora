@@ -2,7 +2,6 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import {
-  AcademicsAlert,
   AcademicsBadge,
   AcademicsHero,
 } from "@/components/academics/academics-ui";
@@ -10,6 +9,7 @@ import { DashIcon } from "@/components/dashboard/dash-icons";
 import { DashboardPage } from "@/components/dashboard/dashboard-page";
 import { Announcement, apiFetch, apiPost } from "@/lib/api";
 import { draftAnnouncement, getAiStatus } from "@/lib/ai";
+import { AppToast } from "@/components/ui/app-toast";
 
 function formatDate(iso: string) {
   try {
@@ -143,12 +143,8 @@ export default function AdminAnnouncementsPage() {
           }
         />
 
-        {error ? <AcademicsAlert tone="error">{error}</AcademicsAlert> : null}
-        {success ? (
-          <p className="ann-v2__alert ann-v2__alert--ok" role="status">
-            {success}
-          </p>
-        ) : null}
+        <AppToast message={error} tone="error" onDismiss={() => setError("")} />
+        <AppToast message={success} tone="success" onDismiss={() => setSuccess("")} />
 
         <div className="ann-v2__toolbar">
           <div className="ann-v2__audience" aria-label="Audience">

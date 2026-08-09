@@ -8,6 +8,7 @@ import {
   type ClassworkType,
 } from "@/lib/classwork";
 import { openClassworkFile } from "@/lib/teacher-cards";
+import { AppToast } from "@/components/ui/app-toast";
 
 type Props = {
   assignment: ClassworkAssignment;
@@ -157,7 +158,7 @@ export function ClassworkSubmissionReview({
         </div>
       </header>
 
-      {error ? <p className="cw-alert cw-alert--error">{error}</p> : null}
+      <AppToast message={error} tone="error" onDismiss={() => setError("")} />
 
       <div className="cw-review__stats">
         <div className="cw-review__stat">

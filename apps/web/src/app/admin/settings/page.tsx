@@ -4,7 +4,6 @@ import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  AcademicsAlert,
   AcademicsBadge,
   AcademicsHero,
 } from "@/components/academics/academics-ui";
@@ -26,6 +25,7 @@ import {
 import type { SchoolType } from "@/lib/api";
 import { getSchoolSubscription, type SubscriptionStatus } from "@/lib/api";
 import { SchoolLogoUpload } from "@/components/school/school-logo-upload";
+import { AppToast } from "@/components/ui/app-toast";
 import {
   AUTH_ROLE_KEY,
   AUTH_TOKEN_KEY,
@@ -159,6 +159,8 @@ export default function AdminSettingsPage() {
   const [bankAccountHolder, setBankAccountHolder] = useState("");
   const [bankAccountNumber, setBankAccountNumber] = useState("");
   const [paymentInstructions, setPaymentInstructions] = useState("");
+  const [reportCardTitle, setReportCardTitle] = useState("");
+  const [reportCardTagline, setReportCardTagline] = useState("");
   const [attendanceMode, setAttendanceMode] = useState<AttendanceMode>("DAILY");
 
   const [exportFrom, setExportFrom] = useState(() => {
@@ -182,6 +184,8 @@ export default function AdminSettingsPage() {
     setBankAccountHolder(s.bankAccountHolder ?? "");
     setBankAccountNumber(s.bankAccountNumber ?? "");
     setPaymentInstructions(s.paymentInstructions ?? "");
+    setReportCardTitle(s.reportCardTitle ?? "");
+    setReportCardTagline(s.reportCardTagline ?? "");
     setAttendanceMode(s.attendanceMode);
   }
 
@@ -227,6 +231,8 @@ export default function AdminSettingsPage() {
         bankAccountHolder: bankAccountHolder.trim(),
         bankAccountNumber: bankAccountNumber.trim(),
         paymentInstructions: paymentInstructions.trim(),
+        reportCardTitle: reportCardTitle.trim(),
+        reportCardTagline: reportCardTagline.trim(),
       });
       applySchool(updated);
       persistSchoolBrand({
@@ -327,19 +333,8 @@ export default function AdminSettingsPage() {
           }
         />
 
-        {error ? <AcademicsAlert tone="error">{error}</AcademicsAlert> : null}
-        {toast ? (
-          <p className="set-v2__alert set-v2__alert--ok" role="status">
-            {toast}
-            <button
-              type="button"
-              className="set-v2__alert-dismiss"
-              onClick={() => setToast(null)}
-            >
-              Dismiss
-            </button>
-          </p>
-        ) : null}
+        <AppToast message={error} tone="error" onDismiss={() => setError("")} />
+        <AppToast message={toast} tone="success" onDismiss={() => setToast(null)} />
 
         <div className="set-v2__toolbar">
           <nav className="set-v2__tabs" aria-label="Settings sections">
@@ -484,6 +479,27 @@ export default function AdminSettingsPage() {
                   placeholder="Include student name in transfer reference…"
                 />
               </div>
+              <div className="cfg-field">
+                <label htmlFor="cfg-rc-title">Report card title</label>
+                <input
+                  id="cfg-rc-title"
+                  value={reportCardTitle}
+                  onChange={(e) => setReportCardTitle(e.target.value)}
+                  placeholder="Student Report Card"
+                />
+                <p className="cfg-hint">
+                  Shown at the top of the landscape print booklet. Leave blank for the default.
+                </p>
+              </div>
+              <div className="cfg-field">
+                <label htmlFor="cfg-rc-tag">Report card motto / tagline</label>
+                <input
+                  id="cfg-rc-tag"
+                  value={reportCardTagline}
+                  onChange={(e) => setReportCardTagline(e.target.value)}
+                  placeholder="Excellence · Integrity · Service"
+                />
+              </div>
               <SchoolLogoUpload
                 schoolName={name.trim() || school?.name || "Your school"}
                 value={logoUrl}
@@ -548,8 +564,9 @@ export default function AdminSettingsPage() {
                 <div>
                   <h2 className="set-v2__panel-title">School join code</h2>
                   <p className="set-v2__panel-sub">
-                    Teachers, students, and parents enter this at{" "}
-                    <Link href="/join">/join</Link> to connect to your school.
+                    Users enter this school code on the{" "}
+                    <Link href="/login">sign in</Link> page with the username and
+                    password you create for them.
                   </p>
                 </div>
               </div>

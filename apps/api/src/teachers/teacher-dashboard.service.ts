@@ -173,26 +173,16 @@ export class TeacherDashboardService {
         },
       });
 
-      const scopes = await this.teacherScope.getClassScopes(
-        schoolId,
-        userId,
-        'teacher',
-      );
-
-      const allowedSubjects = classSubjects.filter((cs) => {
-        if (cs.teacherId === userId) return true;
-        if (scopes === null) return true;
-        try {
-          this.teacherScope.assertCanAccessClass(
-            scopes,
-            cs.gradeId,
-            cs.sectionId,
-          );
-          return true;
-        } catch {
-          return false;
-        }
-      });
+      const allowedSubjects: typeof classSubjects = [];
+      for (const cs of classSubjects) {
+        const ok = await this.teacherScope.canViewClassSubject(
+          schoolId,
+          userId,
+          'teacher',
+          cs,
+        );
+        if (ok) allowedSubjects.push(cs);
+      }
 
       const assessments = await this.prisma.assessment.findMany({
         where: {

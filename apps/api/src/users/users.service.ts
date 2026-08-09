@@ -43,6 +43,20 @@ export class UsersService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
+    // SchoolsModule may init after UsersModule — ensure the demo school exists
+    // before role templates / users so FK constraints succeed.
+    await this.prisma.school.upsert({
+      where: { id: 'school-addis' },
+      create: {
+        id: 'school-addis',
+        name: 'Bright Side International School',
+        slug: 'bright-side',
+        joinCode: 'BRIGHT1',
+        country: 'Ethiopia',
+      },
+      update: {},
+    });
+
     const passwordHash = hashSync('Passw0rd!', 10);
     const users = [
       this.makeUserSeed(

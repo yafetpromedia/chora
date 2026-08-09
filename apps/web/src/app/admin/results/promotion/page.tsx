@@ -13,6 +13,7 @@ import { listGrades } from "@/lib/school-setup";
 import type { GradeWithSections } from "@/lib/api";
 import { listAcademicYears, type AcademicYear } from "@/lib/results";
 import { AUTH_ROLE_KEY, AUTH_TOKEN_KEY, isSchoolWorkspaceRole } from "@/lib/auth";
+import { AppToast } from "@/components/ui/app-toast";
 
 export default function YearPromotionPage() {
   const router = useRouter();
@@ -116,10 +117,9 @@ export default function YearPromotionPage() {
     <DashboardPage
       role="admin"
       title="End-of-year promotion"
-      eyebrow="Academics"
     >
-      {error ? <p className="auth-alert auth-alert--error">{error}</p> : null}
-      {success ? <p className="att-toast">{success}</p> : null}
+      <AppToast message={error} tone="error" onDismiss={() => setError("")} />
+      <AppToast message={success} tone="success" onDismiss={() => setSuccess("")} />
 
       <section className="att-admin-section" style={{ borderTop: "none" }}>
         <h2 className="setup-panel-label">Before you promote</h2>

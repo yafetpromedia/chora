@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 import { Announcement, AttendanceRecord, ResultRecord } from "@/lib/api";
-import { DashIcon, type DashIconName } from "@/components/dashboard/dash-icons";
+import { DashIcon } from "@/components/dashboard/dash-icons";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import {
   resolveLibraryAssetUrl,
@@ -21,58 +22,6 @@ type Props = {
   error: string;
 };
 
-const QUICK_LINKS: {
-  href: string;
-  label: string;
-  desc: string;
-  icon: DashIconName;
-}[] = [
-  {
-    href: "/student/results",
-    label: "Results",
-    desc: "View subject scores and report card",
-    icon: "results",
-  },
-  {
-    href: "/student/fees",
-    label: "Fees",
-    desc: "Check balance and payment history",
-    icon: "fees",
-  },
-  {
-    href: "/student/timetable",
-    label: "Timetable",
-    desc: "Today and weekly class schedule",
-    icon: "calendar",
-  },
-  {
-    href: "/student/library",
-    label: "eLibrary",
-    desc: "Learning resources and notes",
-    icon: "library",
-  },
-  {
-    href: "/student/id-card",
-    label: "Campus ID",
-    desc: "Your ID card and print view",
-    icon: "profile",
-  },
-  {
-    href: "/student/classwork",
-    label: "Assignments",
-    desc: "Homework and graded tasks",
-    icon: "chart",
-  },
-];
-
-function todayLabel() {
-  return new Date().toLocaleDateString(undefined, {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-  });
-}
-
 function formatDate(iso: string) {
   try {
     return new Date(iso).toLocaleDateString(undefined, {
@@ -89,6 +38,111 @@ function statusLabel(status: string) {
   return status.charAt(0).toUpperCase() + status.slice(1);
 }
 
+function firstName(full: string | undefined) {
+  if (!full?.trim()) return null;
+  return full.trim().split(/\s+/)[0] ?? null;
+}
+
+function AttendanceRing({ rate }: { rate: number | null }) {
+  const r = 42;
+  const c = 2 * Math.PI * r;
+  const value = rate != null ? Math.max(0, Math.min(100, rate)) : 0;
+  const offset = c - (value / 100) * c;
+  const tone =
+    rate == null ? "muted" : rate >= 90 ? "good" : rate >= 75 ? "ok" : "low";
+
+  return (
+    <div className={`stu-chart-ring stu-chart-ring--${tone}`}>
+      <svg viewBox="0 0 108 108" aria-hidden>
+        <circle className="stu-chart-ring__track" cx="54" cy="54" r={r} />
+        <circle
+          className="stu-chart-ring__value"
+          cx="54"
+          cy="54"
+          r={r}
+          strokeDasharray={c}
+          strokeDashoffset={offset}
+        />
+      </svg>
+      <div className="stu-chart-ring__label">
+        <strong>{rate != null ? `${rate}%` : "—"}</strong>
+        <span>Attendance</span>
+      </div>
+    </div>
+  );
+}
+
+function SubjectBars({ results }: { results: ResultRecord[] }) {
+  const max = Math.max(100, ...results.map((r) => r.score), 1);
+  if (results.length === 0) {
+    return (
+      <div className="stu-dash__empty stu-dash__empty--compact">
+        <DashIcon name="results" className="dash-icon--lg" />
+        <p>No published scores yet</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="stu-chart-bars" role="img" aria-label="Subject scores">
+      {results.slice(0, 8).map((row) => {
+        const h = Math.max(8, Math.round((row.score / max) * 100));
+        const tone =
+          row.score >= 85 ? "excellent" : row.score >= 70 ? "good" : row.score >= 50 ? "fair" : "low";
+        return (
+          <div key={row.id} className="stu-chart-bars__col" title={`${row.subject}: ${row.score}%`}>
+            <span className="stu-chart-bars__val">{row.score}</span>
+            <div className="stu-chart-bars__track">
+              <div className={`stu-chart-bars__fill stu-chart-bars__fill--${tone}`} style={{ height: `${h}%` }} />
+            </div>
+            <span className="stu-chart-bars__label">{row.subject}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function AttendanceBreakdown({
+  counts,
+}: {
+  counts: AttendanceSummary["counts"];
+}) {
+  const total =
+    counts.present + counts.absent + counts.late + counts.excused || 1;
+  const segments = [
+    { key: "present", label: "Present", value: counts.present, tone: "present" },
+    { key: "absent", label: "Absent", value: counts.absent, tone: "absent" },
+    { key: "late", label: "Late", value: counts.late, tone: "late" },
+    { key: "excused", label: "Excused", value: counts.excused, tone: "excused" },
+  ];
+
+  return (
+    <div className="stu-chart-stack">
+      <div className="stu-chart-stack__bar" aria-hidden>
+        {segments.map((s) =>
+          s.value > 0 ? (
+            <i
+              key={s.key}
+              className={`stu-chart-stack__seg stu-chart-stack__seg--${s.tone}`}
+              style={{ width: `${(s.value / total) * 100}%` }}
+            />
+          ) : null,
+        )}
+      </div>
+      <ul className="stu-chart-stack__legend">
+        {segments.map((s) => (
+          <li key={s.key}>
+            <span className={`stu-chart-stack__dot stu-chart-stack__dot--${s.tone}`} />
+            <em>{s.label}</em>
+            <strong>{s.value}</strong>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export function StudentDashboard({
   schoolName,
   dashboard,
@@ -99,6 +153,20 @@ export function StudentDashboard({
   studentResources,
   error,
 }: Props) {
+  const [mounted, setMounted] = useState(false);
+  const [today, setToday] = useState("");
+
+  useEffect(() => {
+    setMounted(true);
+    setToday(
+      new Date().toLocaleDateString(undefined, {
+        weekday: "long",
+        month: "long",
+        day: "numeric",
+      }),
+    );
+  }, []);
+
   const attendanceRate =
     typeof dashboard?.attendanceRate === "number"
       ? dashboard.attendanceRate
@@ -119,6 +187,23 @@ export function StudentDashboard({
         }));
 
   const studentName = attendanceSummary?.student.name;
+  const hello = firstName(studentName);
+  const classLabel = attendanceSummary
+    ? [attendanceSummary.student.grade, attendanceSummary.student.section]
+        .filter(Boolean)
+        .join(" · ")
+    : null;
+
+  const avgScore = useMemo(() => {
+    if (results.length === 0) return null;
+    const sum = results.reduce((a, r) => a + r.score, 0);
+    return Math.round((sum / results.length) * 10) / 10;
+  }, [results]);
+
+  const sortedResults = useMemo(
+    () => [...results].sort((a, b) => b.score - a.score),
+    [results],
+  );
 
   return (
     <DashboardShell role="student" title="Student dashboard">
@@ -135,10 +220,12 @@ export function StudentDashboard({
             <div className="stu-dash__hero-main">
               <p className="stu-dash__eyebrow">Welcome back</p>
               <h2 className="stu-dash__hero-title">
-                {studentName ? `Hi, ${studentName.split(" ")[0]}` : "Your student workspace"}
+                {hello ? `Hi, ${hello}` : "Your student workspace"}
               </h2>
               <p className="stu-dash__hero-sub">
-                {todayLabel()} · {schoolName}
+                {mounted && today ? `${today} · ` : ""}
+                {schoolName}
+                {classLabel ? ` · ${classLabel}` : ""}
               </p>
             </div>
             <div className="stu-dash__hero-stats">
@@ -147,8 +234,8 @@ export function StudentDashboard({
                 <span>Attendance</span>
               </div>
               <div className="stu-dash__stat">
-                <strong>{results.length}</strong>
-                <span>Subjects</span>
+                <strong>{avgScore != null ? `${avgScore}%` : "—"}</strong>
+                <span>Avg score</span>
               </div>
               <div className="stu-dash__stat stu-dash__stat--accent">
                 <strong>{upcomingAssignments}</strong>
@@ -162,56 +249,52 @@ export function StudentDashboard({
           </div>
         </header>
 
-        <section className="stu-dash__quick" aria-label="Quick access">
-          {QUICK_LINKS.map((link) => (
-            <Link key={link.href} href={link.href} className="stu-dash__quick-card">
-              <span className="stu-dash__quick-icon" aria-hidden>
-                <DashIcon name={link.icon} className="dash-icon--sm" />
-              </span>
-              <span className="stu-dash__quick-label">{link.label}</span>
-              <span className="stu-dash__quick-desc">{link.desc}</span>
-            </Link>
-          ))}
-        </section>
+        <div className="stu-dash__charts">
+          <article className="stu-dash__panel stu-dash__panel--chart">
+            <header className="stu-dash__panel-head">
+              <div>
+                <h3 className="stu-dash__panel-title">Attendance</h3>
+                <p className="stu-dash__panel-sub">Overall rate and status mix</p>
+              </div>
+              <Link href="/student/attendance" className="stu-dash__panel-link">
+                Details
+              </Link>
+            </header>
+            <div className="stu-dash__chart-layout">
+              <AttendanceRing rate={attendanceRate} />
+              {attendanceSummary ? (
+                <AttendanceBreakdown counts={attendanceSummary.counts} />
+              ) : (
+                <p className="stu-dash__muted">Attendance summary will appear here once marked.</p>
+              )}
+            </div>
+          </article>
+
+          <article className="stu-dash__panel stu-dash__panel--chart">
+            <header className="stu-dash__panel-head">
+              <div>
+                <h3 className="stu-dash__panel-title">Subject scores</h3>
+                <p className="stu-dash__panel-sub">Published averages by subject</p>
+              </div>
+              <Link href="/student/results" className="stu-dash__panel-link">
+                View all
+              </Link>
+            </header>
+            <SubjectBars results={sortedResults} />
+          </article>
+        </div>
 
         <div className="stu-dash__grid">
           <article className="stu-dash__panel">
             <header className="stu-dash__panel-head">
               <div>
-                <h3 className="stu-dash__panel-title">Attendance</h3>
-                <p className="stu-dash__panel-sub">Your recent roll call record</p>
+                <h3 className="stu-dash__panel-title">Recent attendance</h3>
+                <p className="stu-dash__panel-sub">Latest roll call days</p>
               </div>
               <Link href="/student/attendance" className="stu-dash__panel-link">
                 Permission
               </Link>
             </header>
-
-            {attendanceSummary ? (
-              <div className="stu-dash__att-summary">
-                <div className="stu-dash__att-rate">
-                  <strong>{attendanceSummary.rate}%</strong>
-                  <span>Overall rate</span>
-                </div>
-                <ul className="stu-dash__att-counts">
-                  <li>
-                    <span>Present</span>
-                    <strong>{attendanceSummary.counts.present}</strong>
-                  </li>
-                  <li>
-                    <span>Absent</span>
-                    <strong>{attendanceSummary.counts.absent}</strong>
-                  </li>
-                  <li>
-                    <span>Late</span>
-                    <strong>{attendanceSummary.counts.late}</strong>
-                  </li>
-                  <li>
-                    <span>Excused</span>
-                    <strong>{attendanceSummary.counts.excused}</strong>
-                  </li>
-                </ul>
-              </div>
-            ) : null}
 
             {recentAttendance.length === 0 ? (
               <div className="stu-dash__empty">
@@ -222,10 +305,7 @@ export function StudentDashboard({
               <ul className="stu-dash__list">
                 {recentAttendance.map((row) => (
                   <li key={row.id} className="stu-dash__list-row">
-                    <div>
-                      <p className="stu-dash__list-title">{formatDate(row.date)}</p>
-                      <p className="stu-dash__list-meta">{statusLabel(row.status)}</p>
-                    </div>
+                    <p className="stu-dash__list-title">{formatDate(row.date)}</p>
                     <span className={`stu-dash__badge stu-dash__badge--${row.status}`}>
                       {statusLabel(row.status)}
                     </span>
@@ -238,23 +318,24 @@ export function StudentDashboard({
           <article className="stu-dash__panel">
             <header className="stu-dash__panel-head">
               <div>
-                <h3 className="stu-dash__panel-title">Results</h3>
-                <p className="stu-dash__panel-sub">Published subject scores</p>
+                <h3 className="stu-dash__panel-title">Top subjects</h3>
+                <p className="stu-dash__panel-sub">Highest published scores</p>
               </div>
-              <Link href="/student/results" className="stu-dash__panel-link">
-                View all
+              <Link href="/student/report-card" className="stu-dash__panel-link">
+                Report card
               </Link>
             </header>
 
-            {results.length === 0 ? (
+            {sortedResults.length === 0 ? (
               <div className="stu-dash__empty">
                 <DashIcon name="results" className="dash-icon--lg" />
                 <p>No results published yet</p>
               </div>
             ) : (
               <ul className="stu-dash__list stu-dash__list--scores">
-                {results.slice(0, 6).map((row) => (
+                {sortedResults.slice(0, 5).map((row, index) => (
                   <li key={row.id} className="stu-dash__score-row">
+                    <span className="stu-dash__score-rank">{index + 1}</span>
                     <span className="stu-dash__score-subject">{row.subject}</span>
                     <strong className="stu-dash__score-value">{row.score}%</strong>
                   </li>
@@ -270,7 +351,10 @@ export function StudentDashboard({
               <h3 className="stu-dash__panel-title">Learning resources</h3>
               <p className="stu-dash__panel-sub">Books and materials from your school</p>
             </div>
-            <Link href="/student/library" className="stu-dash__panel-link stu-dash__panel-link--primary">
+            <Link
+              href="/student/library"
+              className="stu-dash__panel-link stu-dash__panel-link--primary"
+            >
               Open eLibrary
             </Link>
           </header>
@@ -282,7 +366,7 @@ export function StudentDashboard({
             </div>
           ) : (
             <ul className="stu-dash__resource-list">
-              {studentResources.map((resource) => {
+              {studentResources.slice(0, 4).map((resource) => {
                 const href =
                   resolveLibraryAssetUrl(resource.fileUrl) ??
                   resource.externalUrl ??
@@ -328,7 +412,7 @@ export function StudentDashboard({
             </div>
           ) : (
             <ul className="stu-dash__announce-list">
-              {announcements.slice(0, 5).map((item) => (
+              {announcements.slice(0, 4).map((item) => (
                 <li key={item.id} className="stu-dash__announce-row">
                   <span className="stu-dash__announce-dot" aria-hidden />
                   <div>

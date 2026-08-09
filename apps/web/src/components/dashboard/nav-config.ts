@@ -29,7 +29,6 @@ export const DASHBOARD_NAV: NavItem[] = [
     label: "Overview",
     icon: "overview",
     roles: ["admin", "staff"],
-    permission: Permission.SCHOOL_DASHBOARD,
   },
   {
     href: "/admin/students",
@@ -37,6 +36,13 @@ export const DASHBOARD_NAV: NavItem[] = [
     icon: "students",
     roles: ["admin", "staff"],
     permission: Permission.STUDENTS_READ,
+  },
+  {
+    href: "/admin/admissions",
+    label: "Admissions",
+    icon: "students",
+    roles: ["admin", "staff"],
+    permission: Permission.ADMISSIONS_READ,
   },
   {
     href: "/admin/parents",
@@ -141,6 +147,13 @@ export const DASHBOARD_NAV: NavItem[] = [
     icon: "announcements",
     roles: ["admin", "staff"],
     permission: Permission.ANNOUNCEMENTS_MANAGE,
+  },
+  {
+    href: "/admin/support",
+    label: "Support",
+    icon: "support",
+    roles: ["admin", "staff"],
+    permission: Permission.SCHOOL_SETTINGS,
   },
   {
     href: "/admin/settings",
@@ -293,4 +306,59 @@ export function isNavChildActive(pathname: string, href: string) {
     return pathname === href;
   }
   return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+/** Preferred bottom-tab destinations per role (first available wins). */
+const MOBILE_TAB_PREFERENCE: Record<UserRole, string[]> = {
+  admin: [
+    "/admin",
+    "/admin/students",
+    "/admin/attendance",
+    "/admin/results",
+    "/admin/finance",
+  ],
+  staff: [
+    "/admin",
+    "/admin/students",
+    "/admin/attendance",
+    "/admin/results",
+    "/admin/finance",
+  ],
+  teacher: ["/teacher", "/teacher/results", "/teacher/classwork", "/teacher/timetable"],
+  parent: ["/parent", "/parent/fees", "/parent/timetable", "/parent/profile"],
+  student: ["/student", "/student/results", "/student/classwork", "/student/timetable"],
+};
+
+/**
+ * Pick up to `maxTabs` primary items for the mobile bottom tab bar.
+ * Falls back to remaining nav items when preferred routes are unavailable
+ * (e.g. staff without Results permission).
+ */
+export function mobilePrimaryNav(nav: NavItem[], role: UserRole, maxTabs = 4): NavItem[] {
+  const prefs = MOBILE_TAB_PREFERENCE[role] ?? [];
+  const remaining = new Map(nav.map((item) => [item.href, item]));
+  const picked: NavItem[] = [];
+
+  for (const href of prefs) {
+    const item = remaining.get(href);
+    if (!item) continue;
+    picked.push(item);
+    remaining.delete(href);
+    if (picked.length >= maxTabs) return picked;
+  }
+
+  for (const item of nav) {
+    if (!remaining.has(item.href)) continue;
+    if (item.href.endsWith("/profile") && nav.length > maxTabs) continue;
+    picked.push(item);
+    remaining.delete(item.href);
+    if (picked.length >= maxTabs) break;
+  }
+
+  return picked;
+}
+
+/** True when pathname is not covered by any primary tab (More should highlight). */
+export function isMobileMoreActive(pathname: string, tabs: NavItem[]) {
+  return !tabs.some((tab) => isNavActive(pathname, tab.href));
 }

@@ -2,10 +2,16 @@
 
 import { useMemo, useState } from "react";
 import type { PermissionCatalogItem, StaffPermissionsDetail } from "@/lib/teachers";
+import {
+  PERMISSION_MODULES,
+  PERMISSION_MODULE_KEY_SET,
+  type PermissionModule,
+} from "@/lib/permissions";
 
 const CATEGORY_LABELS: Record<string, string> = {
   school: "School",
   students: "Students",
+  admissions: "Admissions",
   teachers: "Staff",
   attendance: "Attendance",
   results: "Results",
@@ -16,6 +22,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 const CATEGORY_ORDER = [
   "school",
   "students",
+  "admissions",
   "teachers",
   "attendance",
   "results",
@@ -52,9 +59,36 @@ export function StaffPermissionsDrawer({
 }: Props) {
   const [query, setQuery] = useState("");
 
+  function moduleEnabled(module: PermissionModule) {
+    return module.keys.some((key) => draft[key] === true);
+  }
+
+  function moduleFromTemplate(module: PermissionModule) {
+    return module.keys.some((key) => detail.templatePermissions.includes(key));
+  }
+
+  function moduleIsCustom(module: PermissionModule) {
+    return moduleFromTemplate(module) !== moduleEnabled(module);
+  }
+
+  function setModuleEnabled(module: PermissionModule, enabled: boolean) {
+    for (const key of module.keys) {
+      onChange(key, enabled);
+    }
+  }
+
+  const visibleModules = useMemo(
+    () =>
+      PERMISSION_MODULES.filter((module) =>
+        module.keys.some((key) => catalog.some((item) => item.key === key)),
+      ),
+    [catalog],
+  );
+
   const grouped = useMemo(() => {
     const q = query.trim().toLowerCase();
     const filtered = catalog.filter((item) => {
+      if (!q && PERMISSION_MODULE_KEY_SET.has(item.key)) return false;
       if (!q) return true;
       return (
         item.label.toLowerCase().includes(q) ||
@@ -142,6 +176,52 @@ export function StaffPermissionsDrawer({
           <p className="perm-drawer__hint">
             Toggle access beyond the role template. Changes apply when you save.
           </p>
+
+          {visibleModules.length > 0 ? (
+            <section className="perm-modules" aria-label="Module access">
+              <h3 className="perm-modules__title">Module access</h3>
+              <ul className="perm-modules__list">
+                {visibleModules.map((module) => {
+                  const checked = moduleEnabled(module);
+                  const fromTemplate = moduleFromTemplate(module);
+                  const isCustom = moduleIsCustom(module);
+
+                  return (
+                    <li
+                      key={module.id}
+                      className={`perm-module${checked ? " perm-module--on" : ""}`}
+                    >
+                      <div className="perm-module__text">
+                        <span className="perm-module__label">{module.label}</span>
+                        <span className="perm-module__desc">{module.description}</span>
+                        <div className="perm-module__meta">
+                          {fromTemplate ? (
+                            <span className="perm-badge perm-badge--template">Role</span>
+                          ) : null}
+                          {isCustom ? (
+                            <span className="perm-badge perm-badge--custom">Custom</span>
+                          ) : null}
+                          <span className="perm-module__state">
+                            {checked ? "On" : "Off"}
+                          </span>
+                        </div>
+                      </div>
+                      <label className="perm-toggle perm-toggle--module">
+                        <input
+                          type="checkbox"
+                          role="switch"
+                          checked={checked}
+                          aria-label={`${module.label} access`}
+                          onChange={(e) => setModuleEnabled(module, e.target.checked)}
+                        />
+                        <span className="perm-toggle__track" aria-hidden />
+                      </label>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          ) : null}
 
           <div className="perm-drawer__search">
             <input

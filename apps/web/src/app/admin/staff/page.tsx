@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { DashboardPage } from "@/components/dashboard/dashboard-page";
-import { PeopleDirectoryPanel } from "@/components/admin/people-directory-panel";
+import { StaffWorkspace } from "@/components/admin/staff-workspace";
 import { AUTH_ROLE_KEY, AUTH_TOKEN_KEY, type UserRole } from "@/lib/auth";
 
 export default function AdminStaffPage() {
@@ -21,12 +21,8 @@ export default function AdminStaffPage() {
   }, [router]);
 
   return (
-    <DashboardPage
-      role={shellRole}
-      title="Staff & teams"
-      eyebrow="School admin"
-    >
-      <PeopleDirectoryPanel group="staff" />
+    <DashboardPage role={shellRole} title="Staff & teams">
+      <StaffWorkspace />
     </DashboardPage>
   );
 }

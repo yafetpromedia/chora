@@ -19,7 +19,14 @@ import {
 import { SchoolBrandLockup } from "./school-brand-lockup";
 import { DashIcon } from "./dash-icons";
 import { getMyTeacherProfile } from "@/lib/teachers";
-import { isNavActive, isNavChildActive, navForRole, type NavItem } from "./nav-config";
+import {
+  isMobileMoreActive,
+  isNavActive,
+  isNavChildActive,
+  mobilePrimaryNav,
+  navForRole,
+  type NavItem,
+} from "./nav-config";
 import { AiChatWidget } from "@/components/ai/ai-chat-widget";
 
 type Props = {
@@ -245,9 +252,13 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
   const actionAlertCount = actionAlerts.length;
   const notifyBadgeCount = unreadCount + (isAdminWorkspace ? actionAlertCount : 0);
   const pageTitle = title ?? (isAdminWorkspace ? "Dashboard" : `${roleLabel} dashboard`);
+  const mobileTabs = mobilePrimaryNav(nav, navRole);
+  const moreActive = isMobileMoreActive(pathname, mobileTabs);
+  const showMobileTabs = shellReady && mobileTabs.length > 0;
+
   return (
     <div
-      className={`dash-shell dash-shell--pro${mobileNav ? " dash-shell--nav-open" : ""}`}
+      className={`dash-shell dash-shell--pro${mobileNav ? " dash-shell--nav-open" : ""}${showMobileTabs ? " dash-shell--tabs" : ""}`}
     >
       <aside
         className={`dash-sidebar dash-sidebar--pro${mobileNav ? " dash-sidebar--open" : ""}`}
@@ -374,74 +385,77 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
             <h1 className="dash-topbar-title">{pageTitle}</h1>
             {subtitle ? <p className="dash-topbar-sub">{subtitle}</p> : null}
           </div>
-          <div className="dash-notify-wrap" ref={notifyRef}>
-            <button
-              type="button"
-              className="dash-notify"
-              title={
-                notifyBadgeCount > 0
-                  ? `${notifyBadgeCount} notification${notifyBadgeCount === 1 ? "" : "s"}`
-                  : "Notifications"
-              }
-              onClick={() => void toggleNotifications()}
-            >
-              <DashIcon name="alert" className="dash-icon--sm" />
-              {notifyBadgeCount > 0 ? (
-                <span className="dash-notify-badge">
-                  {notifyBadgeCount > 99 ? "99+" : notifyBadgeCount}
-                </span>
-              ) : null}
-            </button>
-            {notificationsOpen ? (
-              <section className="dash-notify-panel" aria-label="Notifications">
-                <header className="dash-notify-head">
-                  <h2>Notifications</h2>
-                  <button
-                    type="button"
-                    className="dash-notify-mark-all"
-                    onClick={() => void markAllNotificationsRead()}
-                    disabled={unreadCount === 0}
-                  >
-                    Mark all read
-                  </button>
-                </header>
-                {notifyLoading ? (
-                  <p className="dash-notify-empty">Loading…</p>
-                ) : actionAlerts.length === 0 && notifications.length === 0 ? (
-                  <p className="dash-notify-empty">No notifications yet.</p>
-                ) : (
-                  <>
-                    {actionAlerts.length > 0 ? (
-                      <>
-                        <p className="dash-notify-section">Action needed</p>
-                        <ul className="dash-notify-list dash-notify-list--actions">
-                          {actionAlerts.map((alert) => (
-                            <li key={alert.type}>
-                              <Link
-                                href={alert.href}
-                                className="dash-notify-action"
-                                onClick={() => setNotificationsOpen(false)}
-                              >
-                                <span className="dash-notify-action__count">{alert.count}</span>
-                                <span className="dash-notify-action__text">
-                                  <strong>{alert.label}</strong>
-                                  <span>Tap to review</span>
-                                </span>
-                                <DashIcon name="chevron" className="dash-icon--xs" />
-                              </Link>
-                            </li>
-                          ))}
-                        </ul>
-                      </>
-                    ) : null}
-                    {notifications.length > 0 ? (
-                      <>
-                        {actionAlerts.length > 0 ? (
-                          <p className="dash-notify-section">Announcements</p>
-                        ) : null}
-                        <ul className="dash-notify-list">
-                          {(showAllNotifications ? notifications : notifications.slice(0, 8)).map(
-                            (item) => (
+          <div className="dash-topbar-actions">
+            <div className="dash-notify-wrap" ref={notifyRef}>
+              <button
+                type="button"
+                className="dash-notify"
+                title={
+                  notifyBadgeCount > 0
+                    ? `${notifyBadgeCount} notification${notifyBadgeCount === 1 ? "" : "s"}`
+                    : "Notifications"
+                }
+                onClick={() => void toggleNotifications()}
+              >
+                <DashIcon name="alert" className="dash-icon--sm" />
+                {notifyBadgeCount > 0 ? (
+                  <span className="dash-notify-badge">
+                    {notifyBadgeCount > 99 ? "99+" : notifyBadgeCount}
+                  </span>
+                ) : null}
+              </button>
+              {notificationsOpen ? (
+                <section className="dash-notify-panel" aria-label="Notifications">
+                  <header className="dash-notify-head">
+                    <h2>Notifications</h2>
+                    <button
+                      type="button"
+                      className="dash-notify-mark-all"
+                      onClick={() => void markAllNotificationsRead()}
+                      disabled={unreadCount === 0}
+                    >
+                      Mark all read
+                    </button>
+                  </header>
+                  {notifyLoading ? (
+                    <p className="dash-notify-empty">Loading…</p>
+                  ) : actionAlerts.length === 0 && notifications.length === 0 ? (
+                    <p className="dash-notify-empty">No notifications yet.</p>
+                  ) : (
+                    <>
+                      {actionAlerts.length > 0 ? (
+                        <>
+                          <p className="dash-notify-section">Action needed</p>
+                          <ul className="dash-notify-list dash-notify-list--actions">
+                            {actionAlerts.map((alert) => (
+                              <li key={alert.type}>
+                                <Link
+                                  href={alert.href}
+                                  className="dash-notify-action"
+                                  onClick={() => setNotificationsOpen(false)}
+                                >
+                                  <span className="dash-notify-action__count">{alert.count}</span>
+                                  <span className="dash-notify-action__text">
+                                    <strong>{alert.label}</strong>
+                                    <span>Tap to review</span>
+                                  </span>
+                                  <DashIcon name="chevron" className="dash-icon--xs" />
+                                </Link>
+                              </li>
+                            ))}
+                          </ul>
+                        </>
+                      ) : null}
+                      {notifications.length > 0 ? (
+                        <>
+                          {actionAlerts.length > 0 ? (
+                            <p className="dash-notify-section">Announcements</p>
+                          ) : null}
+                          <ul className="dash-notify-list">
+                            {(showAllNotifications
+                              ? notifications
+                              : notifications.slice(0, 8)
+                            ).map((item) => (
                               <li key={item.id}>
                                 <button
                                   type="button"
@@ -457,43 +471,77 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
                                   </p>
                                 </button>
                               </li>
-                            ),
-                          )}
-                        </ul>
-                      </>
-                    ) : null}
-                    <footer className="dash-notify-foot">
-                      {notifications.length > 8 ? (
-                        <button
-                          type="button"
-                          className="dash-notify-view-all"
-                          onClick={() => setShowAllNotifications((v) => !v)}
-                        >
-                          {showAllNotifications
-                            ? "Show less"
-                            : `View all (${notifications.length})`}
-                        </button>
-                      ) : (
-                        <span className="dash-notify-count">
-                          {unreadCount} unread
-                          {actionAlertCount > 0
-                            ? ` · ${actionAlertCount} action${actionAlertCount === 1 ? "" : "s"}`
-                            : ""}
-                        </span>
-                      )}
-                    </footer>
-                  </>
-                )}
-              </section>
-            ) : null}
+                            ))}
+                          </ul>
+                        </>
+                      ) : null}
+                      <footer className="dash-notify-foot">
+                        {notifications.length > 8 ? (
+                          <button
+                            type="button"
+                            className="dash-notify-view-all"
+                            onClick={() => setShowAllNotifications((v) => !v)}
+                          >
+                            {showAllNotifications
+                              ? "Show less"
+                              : `View all (${notifications.length})`}
+                          </button>
+                        ) : (
+                          <span className="dash-notify-count">
+                            {unreadCount} unread
+                            {actionAlertCount > 0
+                              ? ` · ${actionAlertCount} action${actionAlertCount === 1 ? "" : "s"}`
+                              : ""}
+                          </span>
+                        )}
+                      </footer>
+                    </>
+                  )}
+                </section>
+              ) : null}
+            </div>
+            <button type="button" onClick={logout} className="dash-logout dash-logout--pro">
+              <DashIcon name="logout" className="dash-icon--sm" />
+              <span>Log out</span>
+            </button>
           </div>
-          <button type="button" onClick={logout} className="dash-logout dash-logout--pro">
-            <DashIcon name="logout" className="dash-icon--sm" />
-            <span>Log out</span>
-          </button>
         </header>
         <div className="dash-content dash-content--pro">{children}</div>
       </div>
+
+      {showMobileTabs ? (
+        <nav className="dash-tabbar" aria-label="Primary navigation">
+          {mobileTabs.map((item) => {
+            const active = isNavActive(pathname, item.href);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`dash-tabbar__item${active ? " dash-tabbar__item--active" : ""}`}
+                onClick={() => setMobileNav(false)}
+              >
+                <span className="dash-tabbar__icon" aria-hidden>
+                  <DashIcon name={item.icon} />
+                </span>
+                <span className="dash-tabbar__label">{item.label}</span>
+              </Link>
+            );
+          })}
+          <button
+            type="button"
+            className={`dash-tabbar__item${moreActive || mobileNav ? " dash-tabbar__item--active" : ""}`}
+            aria-label="More menu"
+            aria-expanded={mobileNav}
+            onClick={() => setMobileNav((open) => !open)}
+          >
+            <span className="dash-tabbar__icon" aria-hidden>
+              <DashIcon name="menu" />
+            </span>
+            <span className="dash-tabbar__label">More</span>
+          </button>
+        </nav>
+      ) : null}
+
       <AiChatWidget role={navRole} />
     </div>
   );

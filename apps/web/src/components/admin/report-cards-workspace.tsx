@@ -4,11 +4,15 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { DashIcon } from "@/components/dashboard/dash-icons";
 import {
-  AcademicsAlert,
   AcademicsBadge,
   AcademicsHero,
 } from "@/components/academics/academics-ui";
 import { ReportCardCommentsPanel } from "@/components/results/report-card-comments-panel";
+import {
+  ResultsStudentPicker,
+  type ResultsStudentOption,
+} from "@/components/results/results-student-picker";
+import { AppToast } from "@/components/ui/app-toast";
 import type { StudentRecord } from "@/lib/api";
 import {
   getReportCard,
@@ -57,6 +61,21 @@ export function ReportCardsWorkspace({ students, onError }: Props) {
 
   const currentTerm = terms.find((t) => t.isCurrent) ?? terms.find((t) => t.id === termId);
   const selectedStudent = students.find((s) => s.id === viewStudentId);
+
+  const studentOptions = useMemo<ResultsStudentOption[]>(
+    () =>
+      students.map((s) => ({
+        id: s.id,
+        name: `${s.user.firstName} ${s.user.lastName}`.trim(),
+        grade: s.grade.name,
+        gradeId: s.grade.id,
+        section: s.section?.name ?? null,
+        sectionId: s.section?.id ?? null,
+        studentId: s.user.externalRef,
+        photoUrl: s.photoUrl,
+      })),
+    [students],
+  );
 
   const heroStats = useMemo(
     () => [
@@ -130,27 +149,17 @@ export function ReportCardsWorkspace({ students, onError }: Props) {
         }
       />
 
-      {error ? <AcademicsAlert tone="error">{error}</AcademicsAlert> : null}
+      <AppToast message={error} tone="error" onDismiss={() => setError("")} />
 
       <div className="rc-v2__toolbar">
-        <label className="rc-v2__field rc-v2__field--wide">
-          <DashIcon name="students" className="dash-icon--sm" />
-          <span>Student</span>
-          <select
+        <div className="rc-v2__student-pick">
+          <ResultsStudentPicker
+            students={studentOptions}
             value={viewStudentId}
-            onChange={(e) => onSelectionChange(e.target.value, termId)}
+            onChange={(id) => onSelectionChange(id, termId)}
             disabled={loading || students.length === 0}
-          >
-            {students.length === 0 ? (
-              <option value="">No students enrolled</option>
-            ) : null}
-            {students.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.user.firstName} {s.user.lastName} — {s.grade.name}
-              </option>
-            ))}
-          </select>
-        </label>
+          />
+        </div>
         <label className="rc-v2__field">
           <DashIcon name="calendar" className="dash-icon--sm" />
           <span>Term</span>
@@ -203,73 +212,149 @@ export function ReportCardsWorkspace({ students, onError }: Props) {
           </header>
 
           {report ? (
-            <div className="rc-preview">
-              <div className="rc-preview__hero">
-                <div className="rc-preview__identity">
-                  <span className="rc-preview__avatar" aria-hidden>
-                    {studentInitials(report.student.name)}
-                  </span>
-                  <div>
-                    <h4>{report.student.name}</h4>
-                    <p>
-                      {report.student.grade}
-                      {report.student.section ? ` · ${report.student.section}` : ""} ·{" "}
-                      {report.term.name}
-                    </p>
-                  </div>
-                </div>
-                <div
-                  className="rc-preview__ring"
-                  style={
-                    report.overallAverage != null
-                      ? ({ "--pct": `${report.overallAverage}%` } as CSSProperties)
-                      : undefined
-                  }
-                >
-                  <strong>{report.overallAverage ?? "—"}%</strong>
-                  <span>Overall</span>
-                  {report.overallLetter ? <em>{report.overallLetter}</em> : null}
-                </div>
-              </div>
+            <div className="rc-booklet">
+              <p className="rc-booklet__hint">
+                A4 landscape · front &amp; back · school header from Settings
+              </p>
 
-              <div className="rc-preview__chips">
-                {report.rank ? (
-                  <div className="rc-preview__chip">
-                    <strong>
-                      {report.rank}/{report.classSize}
-                    </strong>
-                    <span>Class rank</span>
-                  </div>
-                ) : null}
-                {report.attendance?.rate != null ? (
-                  <div className="rc-preview__chip">
-                    <strong>{report.attendance.rate}%</strong>
-                    <span>Attendance</span>
-                  </div>
-                ) : null}
-                <div className="rc-preview__chip rc-preview__chip--accent">
-                  <strong>{report.subjects.length}</strong>
-                  <span>Subjects</span>
-                </div>
-              </div>
-
-              <div className="rc-preview__subjects">
-                {report.subjects.map((s) => (
-                  <article key={s.subject} className="rc-preview__subject">
-                    <div className="rc-preview__subject-head">
-                      <strong>{s.subject}</strong>
-                      <span>
-                        {s.average}% <em>{s.letter}</em>
+              <div className="rc-booklet__pages">
+                <article className="rc-booklet__page" aria-label="Front page preview">
+                  <header className="rc-booklet__brand">
+                    {report.school.logoUrl ? (
+                      <img src={report.school.logoUrl} alt="" className="rc-booklet__logo" />
+                    ) : (
+                      <span className="rc-booklet__logo rc-booklet__logo--fallback" aria-hidden>
+                        {report.school.name.slice(0, 2).toUpperCase()}
                       </span>
+                    )}
+                    <div>
+                      <p className="rc-booklet__doc">Student report card</p>
+                      <h4>{report.school.name}</h4>
+                      <p>
+                        {report.term.academicYear} · {report.term.name}
+                      </p>
                     </div>
-                    <div className={`rc-preview__bar ${scoreToneClass(s.average)}`}>
-                      <i style={{ width: `${Math.min(100, s.average)}%` }} />
+                    <span className="rc-booklet__side">Front</span>
+                  </header>
+
+                  <div className="rc-booklet__front">
+                    <div className="rc-booklet__student">
+                      <span className="rc-booklet__avatar" aria-hidden>
+                        {studentInitials(report.student.name)}
+                      </span>
+                      <div>
+                        <strong>{report.student.name}</strong>
+                        <span>
+                          {report.student.grade}
+                          {report.student.section ? ` · ${report.student.section}` : ""}
+                          {report.student.studentId ? ` · ${report.student.studentId}` : ""}
+                        </span>
+                      </div>
                     </div>
-                  </article>
-                ))}
+
+                    <div
+                      className="rc-booklet__ring"
+                      style={
+                        report.overallAverage != null
+                          ? ({ "--pct": `${report.overallAverage}%` } as CSSProperties)
+                          : undefined
+                      }
+                    >
+                      <strong>{report.overallAverage ?? "—"}%</strong>
+                      <span>Overall{report.overallLetter ? ` · ${report.overallLetter}` : ""}</span>
+                    </div>
+                  </div>
+
+                  <div className="rc-booklet__chips">
+                    {report.rank != null ? (
+                      <div>
+                        <strong>
+                          {report.rank}/{report.classSize}
+                        </strong>
+                        <span>Rank</span>
+                      </div>
+                    ) : null}
+                    {report.attendance?.rate != null ? (
+                      <div>
+                        <strong>{report.attendance.rate}%</strong>
+                        <span>Attendance</span>
+                      </div>
+                    ) : null}
+                    <div>
+                      <strong>{report.subjects.length}</strong>
+                      <span>Subjects</span>
+                    </div>
+                  </div>
+
+                  <ul className="rc-booklet__subjects">
+                    {report.subjects.slice(0, 6).map((s) => (
+                      <li key={s.subject}>
+                        <span>{s.subject}</span>
+                        <strong>
+                          {s.average}% <em>{s.letter}</em>
+                        </strong>
+                        <i
+                          className={scoreToneClass(s.average)}
+                          style={{ width: `${Math.min(100, s.average)}%` }}
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                  {(report.teacherComment || report.principalComment) && (
+                    <div className="rc-booklet__notes">
+                      {report.teacherComment ? (
+                        <p>
+                          <strong>Teacher</strong> {report.teacherComment}
+                        </p>
+                      ) : null}
+                      {report.principalComment ? (
+                        <p>
+                          <strong>Principal</strong> {report.principalComment}
+                        </p>
+                      ) : null}
+                    </div>
+                  )}
+                </article>
+
+                <article className="rc-booklet__page" aria-label="Back page preview">
+                  <header className="rc-booklet__brand rc-booklet__brand--compact">
+                    <div>
+                      <p className="rc-booklet__doc">Detailed results</p>
+                      <h4>{report.school.name}</h4>
+                      <p>
+                        {report.student.name} · year grid T1–T4 / S1–S2
+                      </p>
+                    </div>
+                    <span className="rc-booklet__side">Back</span>
+                  </header>
+                  <div className="rc-booklet__table-wrap">
+                    <table className="rc-booklet__table">
+                      <thead>
+                        <tr>
+                          <th>Subject</th>
+                          <th>Avg</th>
+                          <th>Letter</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {report.subjects.map((s) => (
+                          <tr key={s.subject}>
+                            <th scope="row">{s.subject}</th>
+                            <td>{s.average}%</td>
+                            <td>{s.letter}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <p className="rc-booklet__back-note">
+                    Full print includes all terms, semester averages, cumulative totals, absent
+                    days, conduct, rank, and remarks on the back of the landscape sheet.
+                  </p>
+                </article>
               </div>
 
-              <div className="rc-preview__actions">
+              <div className="rc-booklet__actions">
                 <button
                   type="button"
                   className="rc-v2__btn rc-v2__btn--primary"
@@ -277,7 +362,7 @@ export function ReportCardsWorkspace({ students, onError }: Props) {
                 >
                   Open print booklet
                 </button>
-                <p>Landscape duplex print · official 2-page report card</p>
+                <p>Print duplex · landscape A4 · customize header in Settings</p>
               </div>
             </div>
           ) : (

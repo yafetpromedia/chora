@@ -77,8 +77,8 @@ export default function InvitePage() {
               <h1 className="auth-heading">Invalid invitation</h1>
               <p className="auth-subheading">{loadError}</p>
               <p className="auth-card-footer mt-6">
-                <Link href="/join" className="auth-link">
-                  Join with school code
+                <Link href="/login" className="auth-link">
+                  Go to sign in
                 </Link>
               </p>
             </>

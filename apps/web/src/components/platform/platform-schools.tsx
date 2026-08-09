@@ -36,14 +36,6 @@ function canDeleteTenant(role: PlatformUser["role"] | undefined) {
   return role === "OWNER";
 }
 
-function todayLabel() {
-  return new Date().toLocaleDateString(undefined, {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-  });
-}
-
 function planLabel(plan: string | undefined) {
   if (!plan) return "—";
   return plan.charAt(0) + plan.slice(1).toLowerCase();
@@ -99,35 +91,33 @@ export function PlatformSchools({
 
   return (
     <div className="plat-tenants-v2 dash-admin dash-admin--modern">
-      <header className="dash-admin-hero dash-admin-hero--modern plat-tenants-v2__hero">
-        <div className="dash-admin-hero__text">
-          <p className="dash-admin-hero__eyebrow">{todayLabel()}</p>
-          <h2 className="dash-admin-hero__title">Tenant directory</h2>
-          <p className="dash-admin-hero__sub">
-            Create workspaces, inspect usage, suspend access, or permanently remove tenants.
-          </p>
+      <header className="plat-subjects-v2__hero">
+        <div className="plat-subjects-v2__hero-main">
+          <span className="plat-subjects-v2__hero-icon" aria-hidden>
+            <DashIcon name="students" className="dash-icon--md" />
+          </span>
+          <div>
+            <p className="plat-subjects-v2__eyebrow">Tenant operations</p>
+            <h2 className="plat-subjects-v2__title">Tenant directory</h2>
+            <p className="plat-subjects-v2__sub">
+              Create workspaces, inspect usage, suspend access, or permanently
+              remove tenants.
+            </p>
+          </div>
         </div>
-        <div className="dash-admin-hero__aside">
-          <div className="dash-admin-hero__chip">
-            <DashIcon name="students" className="dash-icon--sm" />
-            <span>{counts.all} tenants</span>
+        <div className="plat-subjects-v2__hero-stats">
+          <div className="plat-subjects-v2__stat">
+            <strong>{counts.all}</strong>
+            <span>Tenants</span>
           </div>
-          <div className="dash-admin-hero__chip dash-admin-hero__chip--muted">
-            <DashIcon name="calendar" className="dash-icon--sm" />
-            <span>
-              {counts.trial} trial · {counts.active} active
-            </span>
+          <div className="plat-subjects-v2__stat">
+            <strong>{counts.active}</strong>
+            <span>Active</span>
           </div>
-          {canCreateTenant(user?.role) ? (
-            <button
-              type="button"
-              className="plat-v2__btn plat-v2__btn--primary"
-              onClick={() => setCreateOpen(true)}
-            >
-              <DashIcon name="plus" className="dash-icon--sm" />
-              New tenant
-            </button>
-          ) : null}
+          <div className="plat-subjects-v2__stat">
+            <strong>{counts.trial}</strong>
+            <span>Trial</span>
+          </div>
         </div>
       </header>
 

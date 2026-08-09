@@ -6,12 +6,9 @@ import Link from "next/link";
 import { DashboardPage } from "@/components/dashboard/dashboard-page";
 import { DashIcon } from "@/components/dashboard/dash-icons";
 import {
-  AcademicsAlert,
   AcademicsBadge,
-  AcademicsBreadcrumb,
   AcademicsEmpty,
   AcademicsHero,
-  AcademicsStatGrid,
   formatAcadDate,
   termDaysRemaining,
   termDurationDays,
@@ -29,6 +26,7 @@ import {
   type AcademicYear,
 } from "@/lib/results";
 import { AUTH_ROLE_KEY, AUTH_TOKEN_KEY, isSchoolWorkspaceRole } from "@/lib/auth";
+import { AppToast } from "@/components/ui/app-toast";
 
 function toDateInput(iso: string) {
   return iso.slice(0, 10);
@@ -198,36 +196,33 @@ export default function AcademicTermsPage() {
     const daysLeft = currentTerm ? termDaysRemaining(currentTerm.endDate) : null;
     return [
       {
-        label: "Terms this year",
+        label: "Terms",
         value: loading ? "—" : terms.length,
-        hint: terms.length < 3 ? "Ethiopian schools often use 3" : "Full year coverage",
+        hint: terms.length < 3 ? "Often 3 per year" : "Configured",
       },
       {
-        label: "Active term",
-        value: currentTerm?.name ?? "None set",
+        label: "Current term",
+        value: currentTerm?.name ?? "None",
         hint: activeTerm
           ? `${termProgress(activeTerm.startDate, activeTerm.endDate)}% elapsed`
-          : "Mark one term as current",
+          : "Mark one current",
       },
       {
         label: "Year progress",
         value: selectedYear ? `${yearPct}%` : "—",
-        hint: daysLeft != null ? `${daysLeft} days left in current term` : "Select a year",
+        hint: daysLeft != null ? `${daysLeft} days left` : selectedYear?.name,
+        accent: true,
       },
     ];
   }, [loading, terms, currentTerm, activeTerm, selectedYear]);
 
   return (
-    <DashboardPage role="admin" title="Terms" eyebrow="Academics">
+    <DashboardPage role="admin" title="Terms">
       <div className="acad-page acad-page--terms">
-        <AcademicsBreadcrumb
-          items={[
-            { label: "Academics", href: "/admin/academics" },
-            { label: "Terms" },
-          ]}
-        />
-
         <AcademicsHero
+          chip="Academics"
+          compact
+          backHref="/admin/academics"
           title="Terms & semesters"
           subtitle="Results, attendance, and report cards are scoped to a term. Set up Term 1, 2, and 3 for the school year."
           badges={
@@ -242,39 +237,40 @@ export default function AcademicTermsPage() {
               )}
             </>
           }
+          stats={stats}
         />
 
-        {error ? <AcademicsAlert tone="error">{error}</AcademicsAlert> : null}
-        {success ? <AcademicsAlert tone="success">{success}</AcademicsAlert> : null}
+        <AppToast message={error} tone="error" onDismiss={() => setError("")} />
+        <AppToast message={success} tone="success" onDismiss={() => setSuccess("")} />
 
-        <AcademicsStatGrid items={stats} />
-
-        <div className="acad-year-picker">
-          <div className="acad-year-picker__label">
-            <DashIcon name="calendar" className="dash-icon--xs" />
-            <span>Academic year</span>
-          </div>
-          <select
-            className="acad-year-picker__select"
-            value={academicYearId}
-            onChange={(e) => void onYearChange(e.target.value)}
-            disabled={years.length === 0}
-          >
+        <div className="acad-terms-toolbar">
+          <div className="acad-year-picker acad-year-picker--inline">
+            <div className="acad-year-picker__label">
+              <DashIcon name="calendar" className="dash-icon--xs" />
+              <span>Academic year</span>
+            </div>
+            <select
+              className="acad-year-picker__select"
+              value={academicYearId}
+              onChange={(e) => void onYearChange(e.target.value)}
+              disabled={years.length === 0}
+            >
+              {years.length === 0 ? (
+                <option value="">No years — create one first</option>
+              ) : null}
+              {years.map((y) => (
+                <option key={y.id} value={y.id}>
+                  {y.name}
+                  {y.isCurrent ? " (current)" : ""}
+                </option>
+              ))}
+            </select>
             {years.length === 0 ? (
-              <option value="">No years — create one first</option>
+              <Link href="/admin/results/academic-years" className="acad-year-picker__link">
+                Create year →
+              </Link>
             ) : null}
-            {years.map((y) => (
-              <option key={y.id} value={y.id}>
-                {y.name}
-                {y.isCurrent ? " (current)" : ""}
-              </option>
-            ))}
-          </select>
-          {years.length === 0 ? (
-            <Link href="/admin/results/academic-years" className="acad-year-picker__link">
-              Create year →
-            </Link>
-          ) : null}
+          </div>
         </div>
 
         <div className="acad-terms-layout">

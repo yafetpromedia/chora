@@ -32,9 +32,12 @@ export function Faq() {
 
   return (
     <section id="faq" className="lp3-section lp3-faq">
-      <span className="lp3-eyebrow">FAQ</span>
-      <h2 className="lp3-heading">Questions school leaders ask</h2>
-      <div className="lp3-faq__list">
+      <div className="lp3-faq__panel">
+        <div className="lp3-section__head lp3-section__head--center">
+          <span className="lp3-eyebrow">FAQ</span>
+          <h2 className="lp3-heading">Questions school leaders ask</h2>
+        </div>
+        <div className="lp3-faq__list">
         {FAQS.map((item, i) => {
           const isOpen = open === i;
           return (
@@ -70,6 +73,7 @@ export function Faq() {
             </div>
           );
         })}
+        </div>
       </div>
     </section>
   );

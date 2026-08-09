@@ -451,15 +451,11 @@ export class AssessmentTemplatesService implements OnModuleInit {
     if (!cs) throw new NotFoundException('Class subject not found');
 
     if (userId && role === 'teacher') {
-      const scopes = await this.teacherScope.getClassScopes(
+      await this.teacherScope.assertCanViewClassSubject(
         schoolId,
         userId,
         role,
-      );
-      this.teacherScope.assertCanAccessClass(
-        scopes,
-        cs.gradeId,
-        cs.sectionId,
+        cs,
       );
     }
 
@@ -489,7 +485,11 @@ export class AssessmentTemplatesService implements OnModuleInit {
         gradeId: cs.gradeId,
         ...(cs.sectionId ? { sectionId: cs.sectionId } : {}),
       },
-      include: { user: { select: { firstName: true, lastName: true } } },
+      include: {
+        user: {
+          select: { firstName: true, lastName: true, externalRef: true },
+        },
+      },
       orderBy: { user: { firstName: 'asc' } },
     });
 
@@ -503,9 +503,31 @@ export class AssessmentTemplatesService implements OnModuleInit {
             classSubjectId,
           );
 
+    const isHomeroomClass =
+      !userId || !role
+        ? true
+        : await this.teacherScope.isHomeroomForClass(
+            schoolId,
+            userId,
+            role,
+            cs.gradeId,
+            cs.sectionId,
+          );
+
+    const summaries = await this.buildScoreMatrixSummaries({
+      schoolId,
+      termId,
+      classSubjectId,
+      academicYearId: cs.academicYearId,
+      gradeId: cs.gradeId,
+      sectionId: cs.sectionId,
+      studentIds: students.map((s) => s.id),
+    });
+
     return {
       workflow: workflowSheet,
       canEditScores,
+      isHomeroomClass,
       classSubject: {
         id: cs.id,
         subject: cs.subject.name,
@@ -534,6 +556,8 @@ export class AssessmentTemplatesService implements OnModuleInit {
       students: students.map((s) => ({
         studentProfileId: s.id,
         name: `${s.user.firstName} ${s.user.lastName}`,
+        photoUrl: s.photoUrl ?? null,
+        studentId: s.user.externalRef ?? null,
         scores: assessments.map((a) => {
           const sc = a.scores.find((x) => x.studentProfileId === s.id);
           return {
@@ -541,8 +565,195 @@ export class AssessmentTemplatesService implements OnModuleInit {
             score: sc?.score ?? null,
           };
         }),
+        summary: summaries.get(s.id) ?? {
+          subjectTotal: null,
+          subjectsAverage: null,
+          termsAverage: null,
+          classRank: null,
+          classSize: students.length,
+          subjectCount: 0,
+        },
       })),
     };
+  }
+
+  /**
+   * Batch-compute per-student totals used on the score sheet:
+   * subject total, average across subjects (this term), average across terms (year), class rank.
+   */
+  private async buildScoreMatrixSummaries(params: {
+    schoolId: string;
+    termId: string;
+    classSubjectId: string;
+    academicYearId: string;
+    gradeId: string;
+    sectionId: string | null;
+    studentIds: string[];
+  }) {
+    const {
+      schoolId,
+      termId,
+      classSubjectId,
+      academicYearId,
+      gradeId,
+      sectionId,
+      studentIds,
+    } = params;
+
+    type Summary = {
+      subjectTotal: number | null;
+      subjectsAverage: number | null;
+      termsAverage: number | null;
+      classRank: number | null;
+      classSize: number;
+      subjectCount: number;
+    };
+
+    const empty = (): Summary => ({
+      subjectTotal: null,
+      subjectsAverage: null,
+      termsAverage: null,
+      classRank: null,
+      classSize: studentIds.length,
+      subjectCount: 0,
+    });
+
+    const result = new Map<string, Summary>(
+      studentIds.map((id) => [id, empty()]),
+    );
+    if (studentIds.length === 0) return result;
+
+    const [yearTerms, classSubjects] = await Promise.all([
+      this.prisma.academicTerm.findMany({
+        where: { schoolId, academicYearId },
+        select: { id: true },
+        orderBy: { sortOrder: 'asc' },
+      }),
+      this.prisma.classSubject.findMany({
+        where: {
+          schoolId,
+          academicYearId,
+          gradeId,
+          ...(sectionId ? { sectionId } : {}),
+        },
+        select: { id: true },
+      }),
+    ]);
+
+    const termIds = yearTerms.map((t) => t.id);
+    const classSubjectIds = classSubjects.map((c) => c.id);
+    if (termIds.length === 0 || classSubjectIds.length === 0) return result;
+
+    const assessments = await this.prisma.assessment.findMany({
+      where: {
+        schoolId,
+        termId: { in: termIds },
+        classSubjectId: { in: classSubjectIds },
+      },
+      select: {
+        id: true,
+        termId: true,
+        classSubjectId: true,
+        maxScore: true,
+        weightPercent: true,
+        scores: {
+          where: { studentProfileId: { in: studentIds } },
+          select: { studentProfileId: true, score: true },
+        },
+      },
+    });
+
+    // studentId -> termId -> classSubjectId -> score items
+    const byStudentTermSubject = new Map<
+      string,
+      Map<string, Map<string, { score: number; maxScore: number; weightPercent: number }[]>>
+    >();
+
+    for (const a of assessments) {
+      for (const sc of a.scores) {
+        let byTerm = byStudentTermSubject.get(sc.studentProfileId);
+        if (!byTerm) {
+          byTerm = new Map();
+          byStudentTermSubject.set(sc.studentProfileId, byTerm);
+        }
+        let bySubject = byTerm.get(a.termId);
+        if (!bySubject) {
+          bySubject = new Map();
+          byTerm.set(a.termId, bySubject);
+        }
+        let items = bySubject.get(a.classSubjectId);
+        if (!items) {
+          items = [];
+          bySubject.set(a.classSubjectId, items);
+        }
+        items.push({
+          score: sc.score,
+          maxScore: a.maxScore,
+          weightPercent: a.weightPercent,
+        });
+      }
+    }
+
+    const termOverall = new Map<string, number>();
+
+    for (const studentId of studentIds) {
+      const byTerm = byStudentTermSubject.get(studentId);
+      const summary = empty();
+
+      if (byTerm) {
+        const termAvgs: number[] = [];
+        for (const [tId, bySubject] of byTerm) {
+          const subjectAvgs: number[] = [];
+          for (const [csId, items] of bySubject) {
+            const avg = weightedTermAverage(items);
+            if (avg == null) continue;
+            subjectAvgs.push(avg);
+            if (tId === termId && csId === classSubjectId) {
+              summary.subjectTotal = avg;
+            }
+          }
+          if (subjectAvgs.length === 0) continue;
+          const termAvg =
+            Math.round(
+              (subjectAvgs.reduce((s, n) => s + n, 0) / subjectAvgs.length) * 10,
+            ) / 10;
+          termAvgs.push(termAvg);
+          if (tId === termId) {
+            summary.subjectsAverage = termAvg;
+            summary.subjectCount = subjectAvgs.length;
+            termOverall.set(studentId, termAvg);
+          }
+        }
+        if (termAvgs.length > 0) {
+          summary.termsAverage =
+            Math.round(
+              (termAvgs.reduce((s, n) => s + n, 0) / termAvgs.length) * 10,
+            ) / 10;
+        }
+      }
+
+      result.set(studentId, summary);
+    }
+
+    const ranked = [...termOverall.entries()].sort((a, b) => b[1] - a[1]);
+    for (let i = 0; i < ranked.length; i++) {
+      const [studentId] = ranked[i];
+      const summary = result.get(studentId);
+      if (!summary) continue;
+      // Dense rank: same average shares the same rank
+      if (i > 0 && ranked[i][1] === ranked[i - 1][1]) {
+        summary.classRank = result.get(ranked[i - 1][0])?.classRank ?? i + 1;
+      } else {
+        summary.classRank = i + 1;
+      }
+      summary.classSize = studentIds.length;
+    }
+
+    for (const summary of result.values()) {
+      summary.classSize = studentIds.length;
+    }
+
+    return result;
   }
 
   async saveScoreMatrix(
@@ -672,7 +883,7 @@ export class AssessmentTemplatesService implements OnModuleInit {
       }
     }
 
-    const classSubjects = await this.prisma.classSubject.findMany({
+    const classSubjectRows = await this.prisma.classSubject.findMany({
       where: {
         schoolId,
         gradeId: profile.gradeId,
@@ -682,6 +893,21 @@ export class AssessmentTemplatesService implements OnModuleInit {
       include: { subject: true },
       orderBy: { subject: { name: 'asc' } },
     });
+
+    const classSubjects: typeof classSubjectRows = [];
+    for (const cs of classSubjectRows) {
+      if (!userId || role !== 'teacher') {
+        classSubjects.push(cs);
+        continue;
+      }
+      const ok = await this.teacherScope.canViewClassSubject(
+        schoolId,
+        userId,
+        role,
+        cs,
+      );
+      if (ok) classSubjects.push(cs);
+    }
 
     type ColumnMeta = {
       key: string;
@@ -899,12 +1125,33 @@ export class AssessmentTemplatesService implements OnModuleInit {
     schoolId: string,
     assessmentId: string,
     entryLocked: boolean,
+    scope: 'this' | 'all' = 'this',
   ) {
     const assessment = await this.prisma.assessment.findFirst({
       where: { id: assessmentId, schoolId },
     });
     if (!assessment) {
       throw new NotFoundException('Assessment not found');
+    }
+
+    if (scope === 'all') {
+      const result = await this.prisma.assessment.updateMany({
+        where: {
+          schoolId,
+          termId: assessment.termId,
+          name: assessment.name,
+        },
+        data: { entryLocked },
+      });
+      return {
+        id: assessment.id,
+        name: assessment.name,
+        entryLocked,
+        termId: assessment.termId,
+        classSubjectId: assessment.classSubjectId,
+        scope,
+        updatedCount: result.count,
+      };
     }
 
     const updated = await this.prisma.assessment.update({
@@ -919,7 +1166,7 @@ export class AssessmentTemplatesService implements OnModuleInit {
       },
     });
 
-    return updated;
+    return { ...updated, scope, updatedCount: 1 };
   }
 
   private formatTemplate(t: {

@@ -3,8 +3,9 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DashIcon } from "@/components/dashboard/dash-icons";
-import { AcademicsAlert, AcademicsHero } from "@/components/academics/academics-ui";
+import { AcademicsHero } from "@/components/academics/academics-ui";
 import { DashboardPage } from "@/components/dashboard/dashboard-page";
+import { AppToast } from "@/components/ui/app-toast";
 import {
   TemplateComponentsEditor,
   type TemplateComponentDraft,
@@ -217,7 +218,7 @@ export default function AssessmentTemplatesPage() {
           ]}
         />
 
-        {error ? <AcademicsAlert tone="error">{error}</AcademicsAlert> : null}
+        <AppToast message={error} tone="error" onDismiss={() => setError("")} />
 
         {loading ? (
           <div className="tpl-v2__loading">

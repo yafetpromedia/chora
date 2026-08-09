@@ -25,6 +25,7 @@ import { VerifyStudentEnrollmentDto } from './dto/verify-student-enrollment.dto'
 import { InvitesService } from '../schools/invites.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { PlatformSettingsService } from '../platform/platform-settings.service';
 import { normalizeUsername } from '../users/username.util';
 import { UserRole as PrismaUserRole } from '@prisma/client';
 
@@ -39,6 +40,7 @@ export class AuthService {
     private readonly configService: ConfigService,
     private readonly permissionsService: PermissionsService,
     private readonly prisma: PrismaService,
+    private readonly platformSettings: PlatformSettingsService,
   ) {}
 
   async getProfile(actor: AuthUser) {
@@ -176,7 +178,35 @@ export class AuthService {
     return this.getProfile(actor);
   }
 
+  async getPublicPlatformConfig() {
+    const settings = await this.platformSettings.getSettings();
+    return {
+      platformName: settings.platformName,
+      allowSelfRegistration: settings.allowSelfRegistration,
+      maintenanceMode: settings.maintenanceMode,
+      maintenanceMessage: settings.maintenanceMessage,
+      welcomeMessage: settings.welcomeMessage,
+      supportEmail: settings.supportEmail,
+      supportPhone: settings.supportPhone,
+      defaultCountry: settings.defaultCountry,
+      defaultTrialDays: settings.defaultTrialDays,
+    };
+  }
+
   async registerSchool(dto: RegisterSchoolDto) {
+    const settings = await this.platformSettings.getSettings();
+    if (settings.maintenanceMode) {
+      throw new ForbiddenException(
+        settings.maintenanceMessage?.trim() ||
+          'New school registration is temporarily unavailable.',
+      );
+    }
+    if (!settings.allowSelfRegistration) {
+      throw new ForbiddenException(
+        'Self-service school registration is disabled. Contact CampusOne support.',
+      );
+    }
+
     const school = await this.schoolsService.createSchool({
       name: dto.schoolName,
       schoolType: dto.schoolType,

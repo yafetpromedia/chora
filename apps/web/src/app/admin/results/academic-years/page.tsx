@@ -5,9 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { DashboardPage } from "@/components/dashboard/dashboard-page";
 import {
-  AcademicsAlert,
   AcademicsBadge,
-  AcademicsBreadcrumb,
   AcademicsEmpty,
   AcademicsHero,
   AcademicsPanel,
@@ -21,6 +19,7 @@ import {
   type AcademicYear,
 } from "@/lib/results";
 import { AUTH_ROLE_KEY, AUTH_TOKEN_KEY, isSchoolWorkspaceRole } from "@/lib/auth";
+import { AppToast } from "@/components/ui/app-toast";
 
 export default function AcademicYearsPage() {
   const router = useRouter();
@@ -83,35 +82,49 @@ export default function AcademicYearsPage() {
   }
 
   const current = years.find((y) => y.isCurrent);
+  const totalTerms = years.reduce((sum, y) => sum + (y._count?.academicTerms ?? 0), 0);
+  const totalSubjects = years.reduce((sum, y) => sum + (y._count?.classSubjects ?? 0), 0);
+  const currentProgress = current
+    ? yearProgress(current.startDate, current.endDate)
+    : 0;
 
   return (
-    <DashboardPage role="admin" title="Academic years" eyebrow="Academics">
-      <div className="acad-page">
-        <AcademicsBreadcrumb
-          items={[
-            { label: "Academics", href: "/admin/academics" },
-            { label: "Academic years" },
-          ]}
-        />
-
+    <DashboardPage role="admin" title="Academic years">
+      <div className="acad-page acad-page--years">
         <AcademicsHero
+          chip="Academics"
+          compact
+          backHref="/admin/academics"
           title="Academic years"
-          subtitle="Each year is the container for terms, class subjects, results, and finance. Only one year should be marked current at a time."
+          subtitle="Each year holds terms, class subjects, results, and finance. Mark one year as current."
           badges={
             current ? <AcademicsBadge variant="live">Current: {current.name}</AcademicsBadge> : null
           }
+          stats={[
+            { label: "Years", value: years.length },
+            { label: "Terms", value: totalTerms },
+            { label: "Class subjects", value: totalSubjects },
+            {
+              label: "Year progress",
+              value: current ? `${currentProgress}%` : "—",
+              hint: current?.name,
+              accent: true,
+            },
+          ]}
         />
 
-        {error ? <AcademicsAlert tone="error">{error}</AcademicsAlert> : null}
-        {success ? <AcademicsAlert tone="success">{success}</AcademicsAlert> : null}
+        <AppToast message={error} tone="error" onDismiss={() => setError("")} />
+        <AppToast message={success} tone="success" onDismiss={() => setSuccess("")} />
 
         <AcademicsPanel
           title="School years"
-          subtitle="Open terms for a year after it is created."
+          subtitle="Open terms for each year after it is created."
           aside={
-            <form className="acad-form" onSubmit={(e) => void onCreate(e)}>
-              <h3 className="acad-panel__title">New academic year</h3>
-              <p className="acad-panel__sub">Example: 2026/2027 · Sep 2026 – Jun 2027</p>
+            <form className="acad-form acad-form-card" onSubmit={(e) => void onCreate(e)}>
+              <div className="acad-form-card__head">
+                <h3 className="acad-form-card__title">New academic year</h3>
+                <p className="acad-form-card__sub">e.g. 2026/2027 · Sep 2026 – Jun 2027</p>
+              </div>
               <label>
                 Year label
                 <input
@@ -149,7 +162,7 @@ export default function AcademicYearsPage() {
                 />
                 Set as current school year
               </label>
-              <button type="submit" className="acad-btn acad-btn--primary" disabled={saving}>
+              <button type="submit" className="acad-btn acad-btn--primary acad-btn--block" disabled={saving}>
                 {saving ? "Creating…" : "Create year"}
               </button>
             </form>
@@ -160,39 +173,55 @@ export default function AcademicYearsPage() {
           ) : years.length === 0 ? (
             <AcademicsEmpty message="No academic years yet. Create your first year using the form." />
           ) : (
-            <ul className="acad-year-list">
-              {years.map((y) => (
-                <li
-                  key={y.id}
-                  className={`acad-year-card${y.isCurrent ? " acad-year-card--current" : ""}`}
-                >
-                  <div className="acad-year-card__top">
-                    <span className="acad-year-card__name">{y.name}</span>
-                    {y.isCurrent ? (
-                      <AcademicsBadge variant="live">Current</AcademicsBadge>
-                    ) : (
-                      <button
-                        type="button"
-                        className="acad-btn acad-btn--ghost"
-                        onClick={() => void onSetCurrent(y.id)}
-                      >
-                        Set current
-                      </button>
-                    )}
-                  </div>
-                  <p className="acad-year-card__meta">
-                    {formatAcadDate(y.startDate)} – {formatAcadDate(y.endDate)}
-                  </p>
-                  <div className="acad-year-card__counts">
-                    <span>{y._count?.academicTerms ?? 0} terms</span>
-                    <span>{y._count?.classSubjects ?? 0} class subjects</span>
-                    <Link href={`/admin/results/terms`}>Manage terms →</Link>
-                  </div>
-                  <div className="acad-year-card__bar" title="Year progress">
-                    <span style={{ width: `${yearProgress(y.startDate, y.endDate)}%` }} />
-                  </div>
-                </li>
-              ))}
+            <ul className="acad-year-list acad-year-list--grid">
+              {years.map((y) => {
+                const progress = yearProgress(y.startDate, y.endDate);
+                return (
+                  <li
+                    key={y.id}
+                    className={`acad-year-card${y.isCurrent ? " acad-year-card--current" : ""}`}
+                  >
+                    <div className="acad-year-card__top">
+                      <div className="acad-year-card__identity">
+                        <span className="acad-year-card__name">{y.name}</span>
+                        <p className="acad-year-card__meta">
+                          {formatAcadDate(y.startDate)} – {formatAcadDate(y.endDate)}
+                        </p>
+                      </div>
+                      {y.isCurrent ? (
+                        <AcademicsBadge variant="live">Current</AcademicsBadge>
+                      ) : (
+                        <button
+                          type="button"
+                          className="acad-btn acad-btn--ghost acad-btn--sm"
+                          onClick={() => void onSetCurrent(y.id)}
+                        >
+                          Set current
+                        </button>
+                      )}
+                    </div>
+                    <div className="acad-year-card__stats">
+                      <span className="acad-year-card__pill">
+                        <strong>{y._count?.academicTerms ?? 0}</strong> terms
+                      </span>
+                      <span className="acad-year-card__pill">
+                        <strong>{y._count?.classSubjects ?? 0}</strong> class subjects
+                      </span>
+                      <span className="acad-year-card__pill acad-year-card__pill--muted">
+                        <strong>{progress}%</strong> elapsed
+                      </span>
+                    </div>
+                    <div className="acad-year-card__foot">
+                      <div className="acad-year-card__bar" title="Year progress">
+                        <span style={{ width: `${progress}%` }} />
+                      </div>
+                      <Link href="/admin/results/terms" className="acad-year-card__cta">
+                        Manage terms →
+                      </Link>
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </AcademicsPanel>

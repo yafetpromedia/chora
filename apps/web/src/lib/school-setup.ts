@@ -107,3 +107,20 @@ export async function createStudent(body: CreateStudentPayload) {
 export async function importStudentsCsv(file: File) {
   return apiUpload<ImportStudentsResult>("/schools/students/import", file);
 }
+
+/** CSV headers accepted by POST /schools/students/import (required + optional). */
+const STUDENTS_IMPORT_TEMPLATE_CSV = [
+  "First Name,Last Name,Grade,Section,Gender,Date of Birth,Age,FAN,Parent Name,Phone",
+  "Abebe,Kebede,Grade 1,A,Male,2015-03-12,,FAN1234567890,Tigist Hailu,0911234567",
+].join("\n");
+
+export function downloadStudentsImportTemplate() {
+  const blob = new Blob([STUDENTS_IMPORT_TEMPLATE_CSV], {
+    type: "text/csv;charset=utf-8",
+  });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "students-import-template.csv";
+  a.click();
+  URL.revokeObjectURL(a.href);
+}

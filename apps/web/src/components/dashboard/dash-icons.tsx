@@ -35,7 +35,16 @@ export type DashIconName =
   | "chart"
   | "plus"
   | "arrow"
-  | "library";
+  | "library"
+  | "building"
+  | "flask"
+  | "globe"
+  | "monitor"
+  | "palette"
+  | "mail"
+  | "message"
+  | "support"
+  | "eye";
 
 export function DashIcon({ name, className }: { name: DashIconName; className?: string }) {
   const p = { ...base, className: className ?? "dash-icon" };
@@ -218,6 +227,76 @@ export function DashIcon({ name, className }: { name: DashIconName; className?: 
           <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
           <line x1="12" y1="6" x2="12" y2="14" />
           <line x1="8" y1="10" x2="16" y2="10" />
+        </svg>
+      );
+    case "building":
+      return (
+        <svg {...p}>
+          <path d="M3 21h18" />
+          <path d="M5 21V7l7-4 7 4v14" />
+          <path d="M9 21v-6h6v6" />
+          <path d="M9 9h.01M15 9h.01M9 13h.01M15 13h.01" />
+        </svg>
+      );
+    case "flask":
+      return (
+        <svg {...p}>
+          <path d="M9 3h6" />
+          <path d="M10 3v5.5L5 18a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2l-5-9.5V3" />
+          <path d="M8.5 14h7" />
+        </svg>
+      );
+    case "globe":
+      return (
+        <svg {...p}>
+          <circle cx="12" cy="12" r="10" />
+          <path d="M2 12h20" />
+          <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+        </svg>
+      );
+    case "monitor":
+      return (
+        <svg {...p}>
+          <rect x="2" y="3" width="20" height="14" rx="2" />
+          <line x1="8" y1="21" x2="16" y2="21" />
+          <line x1="12" y1="17" x2="12" y2="21" />
+        </svg>
+      );
+    case "palette":
+      return (
+        <svg {...p}>
+          <circle cx="13.5" cy="6.5" r="1.5" />
+          <circle cx="17.5" cy="10.5" r="1.5" />
+          <circle cx="8.5" cy="7.5" r="1.5" />
+          <circle cx="6.5" cy="12.5" r="1.5" />
+          <path d="M12 2a10 10 0 1 0 10 10c0-2.5-2.5-3-5-3s-3 1.5-5 1.5-2-1-2-3.5A10 10 0 0 0 12 2z" />
+        </svg>
+      );
+    case "mail":
+      return (
+        <svg {...p}>
+          <rect x="2" y="4" width="20" height="16" rx="2" />
+          <path d="m22 7-10 7L2 7" />
+        </svg>
+      );
+    case "message":
+      return (
+        <svg {...p}>
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+        </svg>
+      );
+    case "support":
+      return (
+        <svg {...p}>
+          <path d="M3 11h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3" />
+          <path d="M21 16v2a4 4 0 0 1-4 4h-5" />
+        </svg>
+      );
+    case "eye":
+      return (
+        <svg {...p}>
+          <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" />
+          <circle cx="12" cy="12" r="3" />
         </svg>
       );
     default:

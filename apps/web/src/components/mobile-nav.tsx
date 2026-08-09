@@ -50,9 +50,6 @@ export function MobileNav() {
             <Link href="/login" className="mobile-menu-link" onClick={() => setOpen(false)}>
               Sign in
             </Link>
-            <Link href="/join" className="mobile-menu-link" onClick={() => setOpen(false)}>
-              Join with code
-            </Link>
             <Link href="/register" className="btn-brand mt-2 text-center" onClick={() => setOpen(false)}>
               Start free trial
             </Link>

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { fetchCurriculumPackages, type CurriculumPackageOption } from "@/lib/api";
 import { platformFetch } from "@/lib/platform-auth";
+import { AppToast } from "@/components/ui/app-toast";
 
 type Props = {
   open: boolean;
@@ -96,7 +97,7 @@ export function CreateSchoolDrawer({ open, onClose, onCreated }: Props) {
         </header>
 
         <form className="stu-drawer__body" onSubmit={(e) => void submit(e)}>
-          {error ? <p className="auth-alert auth-alert--error">{error}</p> : null}
+          <AppToast message={error} tone="error" onDismiss={() => setError("")} />
 
           <label className="plat-field">
             <span>Organization name</span>

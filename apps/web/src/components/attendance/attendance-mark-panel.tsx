@@ -14,6 +14,7 @@ import {
   type AttendanceStatus,
   type RosterStudent,
 } from "@/lib/attendance";
+import { AppToast } from "@/components/ui/app-toast";
 
 const STATUSES: AttendanceStatus[] = ["present", "absent", "late", "excused"];
 
@@ -243,12 +244,16 @@ function AttendanceMarkPanelInner() {
 
   return (
     <div className="att-v4__workspace">
-      {error ? <p className="att-v4__flash att-v4__flash--err">{error}</p> : null}
-      {saved ? (
-        <p className="att-v4__flash att-v4__flash--ok" role="status">
-          Attendance saved. Parents are notified for absences and late arrivals.
-        </p>
-      ) : null}
+      <AppToast message={error} tone="error" onDismiss={() => setError("")} />
+      <AppToast
+        message={
+          saved
+            ? "Attendance saved. Parents are notified for absences and late arrivals."
+            : ""
+        }
+        tone="success"
+        onDismiss={() => setSaved(false)}
+      />
 
       <section className="att-v4__filters">
         <div className="att-v4__field">

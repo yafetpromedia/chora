@@ -382,7 +382,8 @@
 .stu-drawer-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 50;
+  /* Above mobile tab bar (z-index 105) so Save / footer actions stay clickable */
+  z-index: 220;
   background: rgba(15, 45, 45, 0.45);
   backdrop-filter: blur(4px);
   animation: co-fade-in 0.2s ease;
@@ -392,7 +393,7 @@
   position: fixed;
   top: 0;
   right: 0;
-  z-index: 51;
+  z-index: 221;
   width: min(100%, 420px);
   max-width: 100%;
   height: 100dvh;

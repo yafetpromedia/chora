@@ -70,6 +70,8 @@ export class SchoolsController {
       bankAccountHolder: dto.bankAccountHolder,
       bankAccountNumber: dto.bankAccountNumber,
       paymentInstructions: dto.paymentInstructions,
+      reportCardTitle: dto.reportCardTitle,
+      reportCardTagline: dto.reportCardTagline,
     });
   }
 

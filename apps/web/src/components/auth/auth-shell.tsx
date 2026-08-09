@@ -61,7 +61,7 @@ export function AuthShell({
                 <p className="auth-demo-text">
                   Demo: <strong>BRIGHT1</strong> · <strong>admin</strong> / <strong>Passw0rd!</strong>
                   <br />
-                  Join code: <strong>BRIGHT1</strong> (for /join)
+                  School code: <strong>BRIGHT1</strong> (for sign in)
                 </p>
               </div>
             ) : null}

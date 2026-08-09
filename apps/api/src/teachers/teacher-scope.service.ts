@@ -72,7 +72,118 @@ export class TeacherScopeService {
     return this.dedupeScopes(scopes);
   }
 
-  /** Subject teacher assigned on ClassSubject — homeroom-only teachers may view but not edit. */
+  /**
+   * Teachers may view a class-subject if they teach it, or if it belongs to
+   * their homeroom class (review-only). Teaching one subject in a class must
+   * not unlock every other subject in that class.
+   */
+  async canViewClassSubject(
+    schoolId: string,
+    userId: string,
+    role: string,
+    classSubject: {
+      teacherId: string | null;
+      gradeId: string;
+      sectionId: string | null;
+    },
+  ): Promise<boolean> {
+    if (role === UserRole.admin || role === UserRole.staff) {
+      return true;
+    }
+    if (role !== UserRole.teacher) {
+      return false;
+    }
+    if (classSubject.teacherId === userId) {
+      return true;
+    }
+
+    const profile = await this.prisma.teacherProfile.findUnique({
+      where: { userId },
+      select: {
+        schoolId: true,
+        homeroomGradeId: true,
+        homeroomSectionId: true,
+      },
+    });
+    if (!profile || profile.schoolId !== schoolId || !profile.homeroomGradeId) {
+      return false;
+    }
+    if (profile.homeroomGradeId !== classSubject.gradeId) {
+      return false;
+    }
+    if (
+      profile.homeroomSectionId &&
+      classSubject.sectionId &&
+      profile.homeroomSectionId !== classSubject.sectionId
+    ) {
+      return false;
+    }
+    return true;
+  }
+
+  async assertCanViewClassSubject(
+    schoolId: string,
+    userId: string,
+    role: string,
+    classSubject: {
+      teacherId: string | null;
+      gradeId: string;
+      sectionId: string | null;
+    },
+  ) {
+    const ok = await this.canViewClassSubject(
+      schoolId,
+      userId,
+      role,
+      classSubject,
+    );
+    if (!ok) {
+      throw new ForbiddenException(
+        'You can only open subjects you teach (or your homeroom class)',
+      );
+    }
+  }
+
+  /** Homeroom teacher for this grade/section (admins/staff always true). */
+  async isHomeroomForClass(
+    schoolId: string,
+    userId: string,
+    role: string,
+    gradeId: string,
+    sectionId: string | null,
+  ): Promise<boolean> {
+    if (role === UserRole.admin || role === UserRole.staff) {
+      return true;
+    }
+    if (role !== UserRole.teacher) {
+      return false;
+    }
+
+    const profile = await this.prisma.teacherProfile.findUnique({
+      where: { userId },
+      select: {
+        schoolId: true,
+        homeroomGradeId: true,
+        homeroomSectionId: true,
+      },
+    });
+    if (!profile || profile.schoolId !== schoolId || !profile.homeroomGradeId) {
+      return false;
+    }
+    if (profile.homeroomGradeId !== gradeId) {
+      return false;
+    }
+    if (
+      profile.homeroomSectionId &&
+      sectionId &&
+      profile.homeroomSectionId !== sectionId
+    ) {
+      return false;
+    }
+    return true;
+  }
+
+  /** Subject teacher assigned on ClassSubject — homeroom teachers may view but not edit. */
   async canEditClassSubjectScores(
     schoolId: string,
     userId: string,

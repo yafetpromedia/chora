@@ -80,6 +80,7 @@ export default function SchoolInvoicesPage() {
           { label: "Overdue", value: stats.overdue, accent: stats.overdue > 0 },
         ]}
         error={error}
+        onDismissError={() => setError("")}
         loading={loading}
         loadingLabel="Loading invoices…"
       >

@@ -334,13 +334,21 @@ export class SchoolProvisioningService {
           null
         : null;
 
+      let fileUrl = platformRes?.fileUrl ?? null;
+      if (fileUrl?.startsWith('/platform/library/files/')) {
+        fileUrl = await this.platformContent.copyPlatformFileToSchool(
+          schoolId,
+          fileUrl,
+        );
+      }
+
       await this.prisma.libraryResource.create({
         data: {
           schoolId,
           categoryId,
           title,
           description: platformRes?.description ?? item.description,
-          fileUrl: platformRes?.fileUrl ?? null,
+          fileUrl,
           externalUrl: platformRes?.externalUrl ?? null,
           coverUrl: platformRes?.coverUrl ?? null,
           resourceType: platformRes?.resourceType ?? item.resourceType,

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DashIcon } from "@/components/dashboard/dash-icons";
+import { AppToast } from "@/components/ui/app-toast";
 import { telHref } from "@/lib/student-photo";
 import {
   listParents,
@@ -162,11 +163,8 @@ export function ParentsWorkspace() {
 
   return (
     <div className="par-v2">
-      {error && !manageTarget ? (
-        <div className="par-v2__alert par-v2__alert--err" role="alert">
-          {error}
-        </div>
-      ) : null}
+      <AppToast message={error} tone="error" onDismiss={() => setError("")} />
+      <AppToast message={saved} tone="success" onDismiss={() => setSaved("")} />
 
       <header className="par-v2__hero">
         <div className="par-v2__hero-glow" aria-hidden />
@@ -308,17 +306,6 @@ export function ParentsWorkspace() {
                 ×
               </button>
             </header>
-
-            {error ? (
-              <div className="par-v2__alert par-v2__alert--err" role="alert">
-                {error}
-              </div>
-            ) : null}
-            {saved ? (
-              <div className="par-v2__alert par-v2__alert--ok" role="status">
-                {saved}
-              </div>
-            ) : null}
 
             {tempPassword ? (
               <div className="par-v2__cred-box">

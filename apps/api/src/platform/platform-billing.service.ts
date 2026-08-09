@@ -7,6 +7,7 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { PlanCatalogService } from '../subscriptions/plan-catalog.service';
+import { PlatformSettingsService } from '../platform/platform-settings.service';
 import type { CreatePlatformInvoiceDto } from './dto/platform-invoice.dto';
 import type { UpdatePlatformInvoiceDto } from './dto/platform-invoice.dto';
 
@@ -61,6 +62,7 @@ export class PlatformBillingService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly planCatalog: PlanCatalogService,
+    private readonly platformSettings: PlatformSettingsService,
   ) {}
 
   async getBillingSummary(): Promise<BillingSummaryDto> {
@@ -230,9 +232,10 @@ export class PlatformBillingService {
     const catalogRow = (await this.planCatalog.findAll()).find((p) => p.plan === plan);
     const amountUsd = dto.amountUsd ?? catalogRow?.usdMonthly ?? 0;
     const amountEtb = dto.amountEtb ?? catalogRow?.etbMonthly ?? 0;
-    const currency = dto.currency ?? BillingCurrency.USD;
+    const settings = await this.platformSettings.getSettings();
+    const currency = dto.currency ?? settings.defaultBillingCurrency;
 
-    const invoiceNumber = await this.nextInvoiceNumber();
+    const invoiceNumber = await this.nextInvoiceNumber(settings.invoicePrefix);
 
     const created = await this.prisma.platformInvoice.create({
       data: {
@@ -284,9 +287,9 @@ export class PlatformBillingService {
     return this.toInvoiceDto(updated);
   }
 
-  private async nextInvoiceNumber(): Promise<string> {
+  private async nextInvoiceNumber(prefixCode: string): Promise<string> {
     const year = new Date().getFullYear();
-    const prefix = `INV-${year}-`;
+    const prefix = `${prefixCode.trim().toUpperCase()}-${year}-`;
     const latest = await this.prisma.platformInvoice.findFirst({
       where: { invoiceNumber: { startsWith: prefix } },
       orderBy: { invoiceNumber: 'desc' },

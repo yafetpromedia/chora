@@ -1,7 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { DashIcon } from "@/components/dashboard/dash-icons";
+import { AppToast } from "@/components/ui/app-toast";
+import { handlePlatformAuthFailure } from "@/lib/platform-auth";
 import { getPlatformUsage, type UsageRow } from "@/lib/platform-billing";
 
 function formatLimit(n: number | null) {
@@ -16,11 +19,19 @@ function pctLabel(ratio: number | null) {
 type UsageFilter = "ALL" | "OVER" | "HIGH";
 
 export function PlatformUsage() {
+  const router = useRouter();
   const [rows, setRows] = useState<UsageRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<UsageFilter>("ALL");
+
+  function fail(err: unknown, fallback: string) {
+    if (handlePlatformAuthFailure(err, () => router.replace("/platform/login"))) {
+      return;
+    }
+    setError(err instanceof Error ? err.message : fallback);
+  }
 
   const load = useCallback(async () => {
     setError("");
@@ -29,15 +40,27 @@ export function PlatformUsage() {
   }, []);
 
   useEffect(() => {
+    setLoading(true);
     void load()
-      .catch((e) => setError(e instanceof Error ? e.message : "Failed to load usage"))
+      .catch((e) => fail(e, "Failed to load usage"))
       .finally(() => setLoading(false));
-  }, [load]);
+  }, [load, router]);
 
   const overCount = useMemo(
     () =>
       rows.filter(
         (r) => r.overLimit.students || r.overLimit.teachers || r.overLimit.admins,
+      ).length,
+    [rows],
+  );
+
+  const highCount = useMemo(
+    () =>
+      rows.filter(
+        (r) =>
+          (r.utilization.students ?? 0) >= 0.85 ||
+          (r.utilization.teachers ?? 0) >= 0.85 ||
+          (r.utilization.admins ?? 0) >= 0.85,
       ).length,
     [rows],
   );
@@ -62,30 +85,77 @@ export function PlatformUsage() {
   }, [rows, query, filter]);
 
   if (loading) {
-    return <p className="plat-loading">Loading usage…</p>;
+    return (
+      <div className="plat-subjects-v2 plat-subjects-v2--loading">
+        <div className="plat-curriculum__skeleton plat-curriculum__skeleton--hero" />
+        <div className="plat-curriculum__skeleton" />
+      </div>
+    );
   }
 
   return (
-    <div className="plat-section plat-usage">
-      <header className="plat-section-hero plat-section-hero--billing">
-        <div>
-          <p className="plat-section-hero__eyebrow">Capacity</p>
-          <h2 className="plat-section-hero__title">Usage vs plan limits</h2>
-          <p className="plat-section-hero__sub">
-            See how each school uses seats against their subscription limits.
-          </p>
+    <div className="plat-subjects-v2 dash-admin dash-admin--modern plat-billing-v2">
+      <AppToast message={error} tone="error" onDismiss={() => setError("")} />
+
+      <header className="plat-subjects-v2__hero">
+        <div className="plat-subjects-v2__hero-main">
+          <span className="plat-subjects-v2__hero-icon" aria-hidden>
+            <DashIcon name="students" className="dash-icon--md" />
+          </span>
+          <div>
+            <p className="plat-subjects-v2__eyebrow">Capacity</p>
+            <h2 className="plat-subjects-v2__title">Usage vs plan limits</h2>
+            <p className="plat-subjects-v2__sub">
+              See how each school uses seats against their subscription limits.
+            </p>
+          </div>
         </div>
-        <div className="plat-billing-mrr">
-          <span className="plat-billing-mrr__label">Over limit</span>
-          <span className="plat-billing-mrr__value">{overCount}</span>
-          <span className="plat-billing-mrr__hint">Schools exceeding caps</span>
+        <div className="plat-subjects-v2__hero-stats">
+          <div className="plat-subjects-v2__stat">
+            <strong>{rows.length}</strong>
+            <span>Schools</span>
+          </div>
+          <div className="plat-subjects-v2__stat">
+            <strong>{overCount}</strong>
+            <span>Over limit</span>
+          </div>
+          <div className="plat-subjects-v2__stat">
+            <strong>{highCount}</strong>
+            <span>85%+ usage</span>
+          </div>
         </div>
       </header>
 
-      {error ? <p className="auth-alert auth-alert--error">{error}</p> : null}
+      <div className="plat-subjects-v2__kpis">
+        <article className="plat-subjects-v2__kpi">
+          <DashIcon name="students" className="dash-icon--sm" />
+          <div>
+            <strong>
+              {rows.reduce((sum, r) => sum + r.usage.students, 0).toLocaleString()}
+            </strong>
+            <span>Total students</span>
+          </div>
+        </article>
+        <article className="plat-subjects-v2__kpi">
+          <DashIcon name="teachers" className="dash-icon--sm" />
+          <div>
+            <strong>
+              {rows.reduce((sum, r) => sum + r.usage.teachers, 0).toLocaleString()}
+            </strong>
+            <span>Total teachers</span>
+          </div>
+        </article>
+        <article className="plat-subjects-v2__kpi">
+          <DashIcon name="alert" className="dash-icon--sm" />
+          <div>
+            <strong>{overCount}</strong>
+            <span>Needs upgrade</span>
+          </div>
+        </article>
+      </div>
 
-      <div className="plat-toolbar">
-        <div className="plat-search">
+      <div className="plat-subjects-v2__toolbar">
+        <div className="plat-tenants-v2__search plat-subjects-v2__search">
           <DashIcon name="students" className="dash-icon--sm" />
           <input
             type="search"
@@ -95,41 +165,31 @@ export function PlatformUsage() {
             aria-label="Search usage"
           />
         </div>
+        <div className="plat-filter-tabs plat-subjects-v2__filters" role="tablist">
+          {(
+            [
+              { id: "ALL" as const, label: "All", count: rows.length },
+              { id: "OVER" as const, label: "Over limit", count: overCount },
+              { id: "HIGH" as const, label: "85%+ usage", count: highCount },
+            ] as const
+          ).map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              role="tab"
+              aria-selected={filter === f.id}
+              className={`plat-filter-tab${filter === f.id ? " plat-filter-tab--active" : ""}`}
+              onClick={() => setFilter(f.id)}
+            >
+              {f.label}
+              <span className="plat-filter-count">{f.count}</span>
+            </button>
+          ))}
+        </div>
       </div>
 
-      <div className="plat-filter-tabs" role="tablist">
-        {(
-          [
-            { id: "ALL" as const, label: "All", count: rows.length },
-            { id: "OVER" as const, label: "Over limit", count: overCount },
-            {
-              id: "HIGH" as const,
-              label: "85%+ usage",
-              count: rows.filter(
-                (r) =>
-                  (r.utilization.students ?? 0) >= 0.85 ||
-                  (r.utilization.teachers ?? 0) >= 0.85 ||
-                  (r.utilization.admins ?? 0) >= 0.85,
-              ).length,
-            },
-          ] as const
-        ).map((f) => (
-          <button
-            key={f.id}
-            type="button"
-            role="tab"
-            aria-selected={filter === f.id}
-            className={`plat-filter-tab${filter === f.id ? " plat-filter-tab--active" : ""}`}
-            onClick={() => setFilter(f.id)}
-          >
-            {f.label}
-            <span className="plat-filter-count">{f.count}</span>
-          </button>
-        ))}
-      </div>
-
-      <div className="plat-table-wrap">
-        <table className="plat-table plat-table--usage">
+      <div className="plat-subjects-v2__table-wrap">
+        <table className="plat-subjects-v2__table">
           <thead>
             <tr>
               <th>School</th>
@@ -143,7 +203,7 @@ export function PlatformUsage() {
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={6} className="plat-table-empty">
+                <td colSpan={6} className="plat-subjects-v2__empty">
                   No schools match your filters.
                 </td>
               </tr>
@@ -152,13 +212,18 @@ export function PlatformUsage() {
                 const anyOver =
                   r.overLimit.students || r.overLimit.teachers || r.overLimit.admins;
                 return (
-                  <tr key={r.schoolId} className={anyOver ? "plat-table-row--urgent" : undefined}>
+                  <tr
+                    key={r.schoolId}
+                    className={anyOver ? "plat-billing-v2__row--urgent" : undefined}
+                  >
                     <td>
-                      <strong className="plat-table-name">{r.schoolName}</strong>
-                      <span className="plat-table-sub">{r.joinCode}</span>
+                      <span className="plat-subjects-v2__name">{r.schoolName}</span>
+                      <code className="plat-subjects-v2__code">{r.joinCode}</code>
                     </td>
                     <td>
-                      <span className={`plat-plan-badge plat-plan-badge--${r.plan.toLowerCase()}`}>
+                      <span
+                        className={`plat-plan-badge plat-plan-badge--${r.plan.toLowerCase()}`}
+                      >
                         {r.plan}
                       </span>
                     </td>
@@ -180,7 +245,7 @@ export function PlatformUsage() {
                       ratio={r.utilization.admins}
                       over={r.overLimit.admins}
                     />
-                    <td className="plat-table-muted">{r.usage.parents}</td>
+                    <td className="plat-billing-v2__muted">{r.usage.parents}</td>
                   </tr>
                 );
               })
@@ -212,12 +277,18 @@ function UsageCell({
         {ratio != null ? (
           <div className="plat-usage-bar">
             <div
-              className={`plat-usage-bar__fill${over ? " plat-usage-bar__fill--over" : ratio >= 0.85 ? " plat-usage-bar__fill--warn" : ""}`}
+              className={`plat-usage-bar__fill${
+                over
+                  ? " plat-usage-bar__fill--over"
+                  : ratio >= 0.85
+                    ? " plat-usage-bar__fill--warn"
+                    : ""
+              }`}
               style={{ width: `${Math.min(100, Math.round(ratio * 100))}%` }}
             />
           </div>
         ) : (
-          <span className="plat-table-sub">{pctLabel(ratio)}</span>
+          <span className="plat-billing-v2__muted">{pctLabel(ratio)}</span>
         )}
       </div>
     </td>

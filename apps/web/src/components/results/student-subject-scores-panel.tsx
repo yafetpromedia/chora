@@ -12,6 +12,11 @@ import {
   type ClassSubject,
   type StudentSubjectMatrix,
 } from "@/lib/results";
+import { AppToast } from "@/components/ui/app-toast";
+import {
+  ResultsStudentPicker,
+  type ResultsStudentOption,
+} from "@/components/results/results-student-picker";
 
 function useHydrated() {
   return useSyncExternalStore(
@@ -21,11 +26,7 @@ function useHydrated() {
   );
 }
 
-type StudentOption = {
-  id: string;
-  name: string;
-  grade?: string;
-};
+type StudentOption = ResultsStudentOption;
 
 type Props = {
   role: "admin" | "teacher" | "staff" | "student" | "parent";
@@ -126,8 +127,8 @@ export function StudentSubjectScoresPanel({
         const match =
           initialClassSubjectId && cs.some((c) => c.id === initialClassSubjectId)
             ? initialClassSubjectId
-            : cs[0]?.id ?? "";
-        if (match) setClassSubjectId(match);
+            : "";
+        setClassSubjectId(match);
       })
       .catch(() => setError("Could not load classes"));
   }, [loadStudentsFromClasses, studentsProp.length, initialClassSubjectId]);
@@ -137,16 +138,47 @@ export function StudentSubjectScoresPanel({
   }, [defaultStudentId]);
 
   useEffect(() => {
-    if (!loadStudentsFromClasses || studentsProp.length > 0 || !termId || !classSubjectId) {
+    if (!loadStudentsFromClasses || studentsProp.length > 0 || !termId) {
       return;
     }
+    let sources: ClassSubject[];
+    if (classSubjectId && classSubjects.some((c) => c.id === classSubjectId)) {
+      sources = classSubjects.filter((c) => c.id === classSubjectId);
+    } else {
+      // One roster fetch per grade+section (not per subject)
+      const seen = new Set<string>();
+      sources = [];
+      for (const cs of classSubjects) {
+        const key = `${cs.grade.id}:${cs.section?.id ?? ""}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        sources.push(cs);
+      }
+    }
+    if (sources.length === 0) return;
+
     setLoadingStudents(true);
-    void getScoreMatrix(termId, classSubjectId)
-      .then((data) => {
-        const next = data.students.map((s) => ({
-          id: s.studentProfileId,
-          name: s.name,
-        }));
+    void Promise.all(sources.map((cs) => getScoreMatrix(termId, cs.id)))
+      .then((matrices) => {
+        const byId = new Map<string, StudentOption>();
+        for (let i = 0; i < matrices.length; i++) {
+          const cs = sources[i];
+          const data = matrices[i];
+          for (const s of data.students) {
+            if (byId.has(s.studentProfileId)) continue;
+            byId.set(s.studentProfileId, {
+              id: s.studentProfileId,
+              name: s.name,
+              grade: cs.grade.name,
+              gradeId: cs.grade.id,
+              section: cs.section?.name ?? null,
+              sectionId: cs.section?.id ?? null,
+              studentId: s.studentId ?? null,
+              photoUrl: s.photoUrl ?? null,
+            });
+          }
+        }
+        const next = [...byId.values()].sort((a, b) => a.name.localeCompare(b.name));
         setLoadedStudents(next);
         setStudentId((current) => {
           if (current && next.some((s) => s.id === current)) return current;
@@ -155,7 +187,13 @@ export function StudentSubjectScoresPanel({
       })
       .catch((err) => setError(err instanceof Error ? err.message : "Could not load students"))
       .finally(() => setLoadingStudents(false));
-  }, [loadStudentsFromClasses, studentsProp.length, termId, classSubjectId]);
+  }, [
+    loadStudentsFromClasses,
+    studentsProp.length,
+    termId,
+    classSubjectId,
+    classSubjects,
+  ]);
 
   const loadMatrix = useCallback(async () => {
     if (!termId) return;
@@ -356,10 +394,12 @@ export function StudentSubjectScoresPanel({
         />
       ) : null}
 
-      {error ? <p className="res-scores-alert res-scores-alert--error">{error}</p> : null}
-      {saved ? (
-        <p className="res-scores-alert res-scores-alert--success">Scores saved.</p>
-      ) : null}
+      <AppToast message={error} tone="error" onDismiss={() => setError("")} />
+      <AppToast
+        message={saved ? "Scores saved." : ""}
+        tone="success"
+        onDismiss={() => setSaved(false)}
+      />
 
       {!isPortalView ? (
         <div className="res-scores-head res-scores-head--modern">
@@ -371,8 +411,21 @@ export function StudentSubjectScoresPanel({
               </h2>
               <p className="res-scores-context__meta">
                 {selectedTerm?.name ?? "Select term"}
-                {matrix?.student.grade ? ` · ${matrix.student.grade}` : ""}
-                {matrix?.student.section ? ` · ${matrix.student.section}` : ""}
+                {matrix?.student.grade
+                  ? ` · ${matrix.student.grade}`
+                  : selectedStudent?.grade
+                    ? ` · ${selectedStudent.grade}`
+                    : ""}
+                {matrix?.student.section
+                  ? ` · ${matrix.student.section}`
+                  : selectedStudent?.section
+                    ? ` · ${selectedStudent.section}`
+                    : ""}
+                {matrix?.student.studentId
+                  ? ` · ID ${matrix.student.studentId}`
+                  : selectedStudent?.studentId
+                    ? ` · ID ${selectedStudent.studentId}`
+                    : ""}
                 {" · One row per subject"}
               </p>
             </div>
@@ -406,12 +459,13 @@ export function StudentSubjectScoresPanel({
             </label>
             {showClassPicker ? (
               <label className="res-scores-field res-scores-field--wide">
-                <span>Class</span>
+                <span>Roster from</span>
                 <select
                   value={classSubjectId}
                   onChange={(e) => setClassSubjectId(e.target.value)}
                   disabled={controlsDisabled}
                 >
+                  <option value="">All my classes</option>
                   {classSubjects.map((c) => (
                     <option key={c.id} value={c.id}>
                       {classLabel(c)}
@@ -421,21 +475,12 @@ export function StudentSubjectScoresPanel({
               </label>
             ) : null}
             {showStudentPicker ? (
-              <label className="res-scores-field res-scores-field--wide">
-                <span>Student</span>
-                <select
-                  value={studentId}
-                  onChange={(e) => setStudentId(e.target.value)}
-                  disabled={controlsDisabled}
-                >
-                  {students.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                      {s.grade ? ` — ${s.grade}` : ""}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <ResultsStudentPicker
+                students={students}
+                value={studentId}
+                onChange={setStudentId}
+                disabled={controlsDisabled}
+              />
             ) : null}
           </div>
         </div>

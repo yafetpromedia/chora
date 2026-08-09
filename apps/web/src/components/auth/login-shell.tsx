@@ -8,16 +8,14 @@ import { LoginVisualPanel } from "@/components/auth/login-visual-panel";
 type LoginShellProps = {
   children: ReactNode;
   error?: string;
-  schoolCode?: string;
-  schoolName?: string;
 };
 
-export function LoginShell({ children, error, schoolCode, schoolName }: LoginShellProps) {
+export function LoginShell({ children, error }: LoginShellProps) {
   const reduce = useReducedMotion();
 
   return (
-    <div className="reg-scene">
-      <div className="reg-layout">
+    <div className="reg-scene reg-scene--login">
+      <div className="reg-layout reg-layout--login">
         <section className="reg-panel">
           <div className="reg-panel__mesh" aria-hidden />
 
@@ -65,8 +63,8 @@ export function LoginShell({ children, error, schoolCode, schoolName }: LoginShe
           </motion.main>
         </section>
 
-        <section className="reg-visual-col" aria-hidden={false}>
-          <LoginVisualPanel schoolCode={schoolCode} schoolName={schoolName} />
+        <section className="reg-visual-col reg-visual-col--login" aria-hidden={false}>
+          <LoginVisualPanel />
         </section>
       </div>
     </div>
@@ -78,8 +76,6 @@ export function LoginFooterLinks() {
     <p className="reg-footer__line">
       New school?{" "}
       <Link href="/register">Register</Link>
-      <span aria-hidden>·</span>
-      <Link href="/join">Join with a code</Link>
       <span aria-hidden>·</span>
       <Link href="/platform/login">Platform admin</Link>
     </p>

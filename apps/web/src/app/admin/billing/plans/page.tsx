@@ -225,6 +225,8 @@ function SchoolPlansPageContent() {
         heroExtra={heroExtra}
         error={error}
         success={success}
+        onDismissError={() => setError("")}
+        onDismissSuccess={() => setSuccess("")}
         loading={loading}
         loadingLabel="Loading plans…"
       >

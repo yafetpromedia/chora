@@ -6,6 +6,7 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { ProvisioningModule } from '../provisioning/provisioning.module';
 import { SchoolsModule } from '../schools/schools.module';
 import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
+import { SupportModule } from '../support/support.module';
 import { UsersModule } from '../users/users.module';
 import { ResultsModule } from '../results/results.module';
 import { PlatformAuthService } from './platform-auth.service';
@@ -15,6 +16,7 @@ import { PlatformContentSyncService } from './platform-content-sync.service';
 import { PlatformContentService } from './platform-content.service';
 import { PlatformCurriculumAdminService } from './platform-curriculum-admin.service';
 import { PlatformSubjectsService } from './platform-subjects.service';
+import { PlatformSettingsService } from './platform-settings.service';
 import { PlatformService } from './platform.service';
 
 @Module({
@@ -39,6 +41,7 @@ import { PlatformService } from './platform.service';
     UsersModule,
     SubscriptionsModule,
     ResultsModule,
+    SupportModule,
   ],
   controllers: [PlatformController],
   providers: [
@@ -49,12 +52,14 @@ import { PlatformService } from './platform.service';
     PlatformCurriculumAdminService,
     PlatformContentSyncService,
     PlatformContentService,
+    PlatformSettingsService,
   ],
   exports: [
     PlatformAuthService,
     PlatformSubjectsService,
     PlatformContentService,
     PlatformContentSyncService,
+    PlatformSettingsService,
   ],
 })
 export class PlatformModule {}

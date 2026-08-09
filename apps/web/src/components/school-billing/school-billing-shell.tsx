@@ -2,11 +2,11 @@
 
 import type { ReactNode } from "react";
 import {
-  AcademicsAlert,
   AcademicsHero,
   type AcademicsStatItem,
 } from "@/components/academics/academics-ui";
 import { SchoolBillingNav } from "@/components/school-billing/school-billing-nav";
+import { AppToast } from "@/components/ui/app-toast";
 
 type Props = {
   title: string;
@@ -16,6 +16,8 @@ type Props = {
   heroExtra?: ReactNode;
   error?: string;
   success?: string;
+  onDismissError?: () => void;
+  onDismissSuccess?: () => void;
   loading?: boolean;
   loadingLabel?: string;
   children: ReactNode;
@@ -29,6 +31,8 @@ export function SchoolBillingShell({
   heroExtra,
   error,
   success,
+  onDismissError,
+  onDismissSuccess,
   loading,
   loadingLabel = "Loading billing…",
   children,
@@ -42,12 +46,16 @@ export function SchoolBillingShell({
         badges={badges}
       />
 
-      {error ? <AcademicsAlert tone="error">{error}</AcademicsAlert> : null}
-      {success ? (
-        <p className="sb-v2__alert sb-v2__alert--ok" role="status">
-          {success}
-        </p>
-      ) : null}
+      <AppToast
+        message={error}
+        tone="error"
+        onDismiss={onDismissError ?? (() => undefined)}
+      />
+      <AppToast
+        message={success}
+        tone="success"
+        onDismiss={onDismissSuccess ?? (() => undefined)}
+      />
 
       <div className="sb-v2__toolbar">
         <SchoolBillingNav />

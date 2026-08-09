@@ -20,6 +20,8 @@ export type SchoolSettings = {
   bankAccountHolder: string | null;
   bankAccountNumber: string | null;
   paymentInstructions: string | null;
+  reportCardTitle: string | null;
+  reportCardTagline: string | null;
 };
 
 export async function getSchoolSettings() {
@@ -43,6 +45,8 @@ export type UpdateSchoolSettingsPayload = {
   bankAccountHolder?: string;
   bankAccountNumber?: string;
   paymentInstructions?: string;
+  reportCardTitle?: string;
+  reportCardTagline?: string;
 };
 
 export async function updateSchoolSettings(body: UpdateSchoolSettingsPayload) {

@@ -195,8 +195,17 @@ export type StudentRecord = {
 export type ImportStudentsResult = {
   total: number;
   success: number;
+  created?: number;
+  updated?: number;
+  skipped?: number;
   failed: number;
-  results: { row: number; ok: boolean; error?: string; studentName?: string }[];
+  results: {
+    row: number;
+    ok: boolean;
+    action?: "created" | "updated" | "skipped";
+    error?: string;
+    studentName?: string;
+  }[];
 };
 
 export type LoginResponse = {

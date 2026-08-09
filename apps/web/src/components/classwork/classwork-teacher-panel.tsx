@@ -27,6 +27,7 @@ import {
   type ClassworkType,
 
 } from "@/lib/classwork";
+import { AppToast } from "@/components/ui/app-toast";
 
 
 
@@ -370,9 +371,8 @@ export function ClassworkTeacherPanel({ mode }: Props) {
 
     <div className={`cw-page cw-page--${mode === "ASSIGNMENT" ? "assignment" : "worksheet"}`}>
 
-      {error ? <p className="cw-alert cw-alert--error">{error}</p> : null}
-
-      {saved ? <p className="cw-alert cw-alert--ok">{saved}</p> : null}
+      <AppToast message={error} tone="error" onDismiss={() => setError("")} />
+      <AppToast message={saved} tone="success" onDismiss={() => setSaved("")} />
 
 
 

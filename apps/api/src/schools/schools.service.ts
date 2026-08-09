@@ -28,6 +28,8 @@ export type SchoolRecord = {
   bankAccountHolder: string | null;
   bankAccountNumber: string | null;
   paymentInstructions: string | null;
+  reportCardTitle: string | null;
+  reportCardTagline: string | null;
 };
 
 @Injectable()
@@ -217,6 +219,8 @@ export class SchoolsService implements OnModuleInit {
       bankAccountHolder?: string | null;
       bankAccountNumber?: string | null;
       paymentInstructions?: string | null;
+      reportCardTitle?: string | null;
+      reportCardTagline?: string | null;
     },
   ): Promise<SchoolRecord> {
     const existing = await this.prisma.school.findUnique({ where: { id: schoolId } });
@@ -249,6 +253,12 @@ export class SchoolsService implements OnModuleInit {
     }
     if (input.attendanceMode !== undefined) {
       data.attendanceMode = input.attendanceMode;
+    }
+    if (input.reportCardTitle !== undefined) {
+      data.reportCardTitle = input.reportCardTitle.trim() || null;
+    }
+    if (input.reportCardTagline !== undefined) {
+      data.reportCardTagline = input.reportCardTagline.trim() || null;
     }
 
     const school = await this.prisma.school.update({
@@ -316,6 +326,8 @@ export class SchoolsService implements OnModuleInit {
     bankAccountHolder: string | null;
     bankAccountNumber: string | null;
     paymentInstructions: string | null;
+    reportCardTitle?: string | null;
+    reportCardTagline?: string | null;
   }): SchoolRecord {
     return {
       id: school.id,
@@ -337,6 +349,8 @@ export class SchoolsService implements OnModuleInit {
       bankAccountHolder: school.bankAccountHolder,
       bankAccountNumber: school.bankAccountNumber,
       paymentInstructions: school.paymentInstructions,
+      reportCardTitle: school.reportCardTitle ?? null,
+      reportCardTagline: school.reportCardTagline ?? null,
     };
   }
 }

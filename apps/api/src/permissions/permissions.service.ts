@@ -47,6 +47,14 @@ export class PermissionsService implements OnModuleInit {
   }
 
   async ensureSchoolRoleTemplates(schoolId: string) {
+    const school = await this.prisma.school.findUnique({
+      where: { id: schoolId },
+      select: { id: true },
+    });
+    if (!school) {
+      return;
+    }
+
     for (const tpl of DEFAULT_ROLE_TEMPLATES) {
       const patterns =
         tpl.permissionPatterns[0] === '*'

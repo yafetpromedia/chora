@@ -50,4 +50,12 @@ export class UpdateSchoolSettingsDto {
   @IsString()
   @IsOptional()
   paymentInstructions?: string;
+
+  @IsString()
+  @IsOptional()
+  reportCardTitle?: string;
+
+  @IsString()
+  @IsOptional()
+  reportCardTagline?: string;
 }

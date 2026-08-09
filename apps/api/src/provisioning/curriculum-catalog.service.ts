@@ -7,10 +7,15 @@ export class CurriculumCatalogService implements OnModuleInit {
   constructor(private readonly prisma: PrismaService) {}
 
   async onModuleInit() {
-    await this.syncCatalogFromDefinitions();
+    await this.ensurePackagesFromDefinitions();
   }
 
-  async syncCatalogFromDefinitions() {
+  /**
+   * Upsert package shells from code definitions.
+   * Seed subjects / departments / library / templates only when that package
+   * section is empty — never wipe operator edits on restart or sync.
+   */
+  async ensurePackagesFromDefinitions() {
     for (const def of CURRICULUM_PACKAGE_DEFINITIONS) {
       const pkg = await this.prisma.curriculumPackage.upsert({
         where: { key: def.key },
@@ -34,10 +39,23 @@ export class CurriculumCatalogService implements OnModuleInit {
         },
       });
 
-      await this.prisma.curriculumPackageSubject.deleteMany({
-        where: { packageId: pkg.id },
-      });
-      if (def.subjects.length) {
+      const [subjectCount, deptCount, libraryCount, templateCount] =
+        await Promise.all([
+          this.prisma.curriculumPackageSubject.count({
+            where: { packageId: pkg.id },
+          }),
+          this.prisma.curriculumPackageDepartment.count({
+            where: { packageId: pkg.id },
+          }),
+          this.prisma.curriculumPackageLibraryItem.count({
+            where: { packageId: pkg.id },
+          }),
+          this.prisma.curriculumPackageTemplate.count({
+            where: { packageId: pkg.id },
+          }),
+        ]);
+
+      if (subjectCount === 0 && def.subjects.length) {
         await this.prisma.curriculumPackageSubject.createMany({
           data: def.subjects.map((s, i) => ({
             packageId: pkg.id,
@@ -49,10 +67,7 @@ export class CurriculumCatalogService implements OnModuleInit {
         });
       }
 
-      await this.prisma.curriculumPackageDepartment.deleteMany({
-        where: { packageId: pkg.id },
-      });
-      if (def.departments.length) {
+      if (deptCount === 0 && def.departments.length) {
         await this.prisma.curriculumPackageDepartment.createMany({
           data: def.departments.map((name, i) => ({
             packageId: pkg.id,
@@ -62,10 +77,7 @@ export class CurriculumCatalogService implements OnModuleInit {
         });
       }
 
-      await this.prisma.curriculumPackageLibraryItem.deleteMany({
-        where: { packageId: pkg.id },
-      });
-      if (def.libraryItems.length) {
+      if (libraryCount === 0 && def.libraryItems.length) {
         await this.prisma.curriculumPackageLibraryItem.createMany({
           data: def.libraryItems.map((item, i) => ({
             packageId: pkg.id,
@@ -80,10 +92,7 @@ export class CurriculumCatalogService implements OnModuleInit {
         });
       }
 
-      await this.prisma.curriculumPackageTemplate.deleteMany({
-        where: { packageId: pkg.id },
-      });
-      if (def.templates.length) {
+      if (templateCount === 0 && def.templates.length) {
         await this.prisma.curriculumPackageTemplate.createMany({
           data: def.templates.map((t, i) => ({
             packageId: pkg.id,
@@ -96,6 +105,11 @@ export class CurriculumCatalogService implements OnModuleInit {
         });
       }
     }
+  }
+
+  /** @deprecated Prefer ensurePackagesFromDefinitions — kept for callers. */
+  async syncCatalogFromDefinitions() {
+    return this.ensurePackagesFromDefinitions();
   }
 
   listPackages() {

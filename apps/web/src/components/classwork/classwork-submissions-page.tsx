@@ -15,6 +15,7 @@ import {
 } from "@/lib/classwork";
 import { openClassworkFile } from "@/lib/teacher-cards";
 import { ClassworkSubmissionReview } from "@/components/classwork/classwork-submission-review";
+import { AppToast } from "@/components/ui/app-toast";
 
 type Props = {
   mode: ClassworkType;
@@ -159,7 +160,7 @@ export function ClassworkSubmissionsPage({ mode, assignmentId }: Props) {
           </button>
         </div>
       ) : null}
-      {saved ? <p className="cw-alert cw-alert--ok">{saved}</p> : null}
+      <AppToast message={saved} tone="success" onDismiss={() => setSaved("")} />
 
       <section className="cw-card cw-detail cw-detail--modern">
         <header className="cw-detail__head cw-detail__head--modern">

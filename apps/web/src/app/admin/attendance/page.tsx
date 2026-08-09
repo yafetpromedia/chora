@@ -12,6 +12,7 @@ import {
   type AttendanceAnalytics,
 } from "@/lib/attendance";
 import { AUTH_ROLE_KEY, AUTH_TOKEN_KEY, isSchoolWorkspaceRole } from "@/lib/auth";
+import { AppToast } from "@/components/ui/app-toast";
 
 type Tab = "mark" | "scan";
 
@@ -71,7 +72,7 @@ export default function AdminAttendancePage() {
   return (
     <DashboardPage role="admin" title="Attendance">
       <div className="att-v2">
-        {error ? <p className="att-v2__alert att-v2__alert--err">{error}</p> : null}
+        <AppToast message={error} tone="error" onDismiss={() => setError("")} />
 
         <header className="att-v2__hero">
           <div className="att-v2__hero-glow" aria-hidden />

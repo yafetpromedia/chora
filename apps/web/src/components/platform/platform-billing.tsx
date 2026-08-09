@@ -1,7 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { DashIcon } from "@/components/dashboard/dash-icons";
+import { AppToast } from "@/components/ui/app-toast";
+import { handlePlatformAuthFailure } from "@/lib/platform-auth";
 import { getBillingSummary, type BillingSummary } from "@/lib/platform-billing";
 import type { PlatformDashboard, PlatformSchoolRow, PlatformSection } from "./platform-types";
 
@@ -33,9 +36,19 @@ function daysUntil(iso: string | null | undefined) {
 }
 
 export function PlatformBilling({ dashboard, schools, onNavigate }: Props) {
+  const router = useRouter();
   const [query, setQuery] = useState("");
   const [planFilter, setPlanFilter] = useState<PlanFilter>("ALL");
   const [summary, setSummary] = useState<BillingSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  function fail(err: unknown, fallback: string) {
+    if (handlePlatformAuthFailure(err, () => router.replace("/platform/login"))) {
+      return;
+    }
+    setError(err instanceof Error ? err.message : fallback);
+  }
 
   const loadSummary = useCallback(async () => {
     const data = await getBillingSummary();
@@ -43,8 +56,11 @@ export function PlatformBilling({ dashboard, schools, onNavigate }: Props) {
   }, []);
 
   useEffect(() => {
-    void loadSummary().catch(() => setSummary(null));
-  }, [loadSummary, schools]);
+    setLoading(true);
+    void loadSummary()
+      .catch((err) => fail(err, "Failed to load billing summary"))
+      .finally(() => setLoading(false));
+  }, [loadSummary, schools, router]);
 
   const planCounts = useMemo(() => {
     const counts: Record<string, number> = {
@@ -99,95 +115,170 @@ export function PlatformBilling({ dashboard, schools, onNavigate }: Props) {
     { id: "INACTIVE", label: "Inactive", count: inactiveBilling.length },
   ];
 
+  if (loading) {
+    return (
+      <div className="plat-subjects-v2 plat-subjects-v2--loading">
+        <div className="plat-curriculum__skeleton plat-curriculum__skeleton--hero" />
+        <div className="plat-curriculum__skeleton" />
+      </div>
+    );
+  }
+
   return (
-    <div className="plat-section plat-billing">
-      <header className="plat-section-hero plat-section-hero--billing">
-        <div>
-          <p className="plat-section-hero__eyebrow">Revenue & subscriptions</p>
-          <h2 className="plat-section-hero__title">Billing</h2>
-          <p className="plat-section-hero__sub">
-            MRR estimates, subscription health, and trial conversion risk.
-          </p>
+    <div className="plat-subjects-v2 dash-admin dash-admin--modern plat-billing-v2">
+      <AppToast message={error} tone="error" onDismiss={() => setError("")} />
+
+      <header className="plat-subjects-v2__hero">
+        <div className="plat-subjects-v2__hero-main">
+          <span className="plat-subjects-v2__hero-icon" aria-hidden>
+            <DashIcon name="finance" className="dash-icon--md" />
+          </span>
+          <div>
+            <p className="plat-subjects-v2__eyebrow">Revenue & subscriptions</p>
+            <h2 className="plat-subjects-v2__title">Billing</h2>
+            <p className="plat-subjects-v2__sub">
+              MRR estimates, subscription health, and trial conversion risk.
+            </p>
+          </div>
         </div>
-        {summary ? (
-          <div className="plat-billing-mrr">
-            <span className="plat-billing-mrr__label">Est. MRR (USD)</span>
-            <span className="plat-billing-mrr__value">${summary.mrrUsd.toLocaleString()}</span>
-            <span className="plat-billing-mrr__hint">
-              {summary.mrrEtb.toLocaleString()} ETB · {summary.paidSchools} paid schools
-            </span>
+        <div className="plat-subjects-v2__hero-stats">
+          <div className="plat-subjects-v2__stat">
+            <strong>${(summary?.mrrUsd ?? 0).toLocaleString()}</strong>
+            <span>Est. MRR</span>
           </div>
-        ) : (
-          <div className="plat-billing-mrr">
-            <span className="plat-billing-mrr__label">Paid tenants</span>
-            <span className="plat-billing-mrr__value">{dashboard.schools.paid}</span>
+          <div className="plat-subjects-v2__stat">
+            <strong>{summary?.paidSchools ?? dashboard.schools.paid}</strong>
+            <span>Paid</span>
           </div>
-        )}
+          <div className="plat-subjects-v2__stat">
+            <strong>{summary?.trialSchools ?? dashboard.schools.trial}</strong>
+            <span>On trial</span>
+          </div>
+        </div>
       </header>
 
+      <div className="plat-subjects-v2__kpis">
+        <button
+          type="button"
+          className="plat-subjects-v2__kpi plat-billing-v2__kpi-btn"
+          onClick={() => onNavigate?.("invoices")}
+          disabled={!onNavigate}
+        >
+          <DashIcon name="fees" className="dash-icon--sm" />
+          <div>
+            <strong>
+              {summary
+                ? `$${summary.invoices.outstandingUsd.toLocaleString()}`
+                : "—"}
+            </strong>
+            <span>Outstanding</span>
+          </div>
+        </button>
+        <button
+          type="button"
+          className="plat-subjects-v2__kpi plat-billing-v2__kpi-btn"
+          onClick={() => onNavigate?.("usage")}
+          disabled={!onNavigate}
+        >
+          <DashIcon name="students" className="dash-icon--sm" />
+          <div>
+            <strong>{schools.length}</strong>
+            <span>Usage & limits</span>
+          </div>
+        </button>
+        <button
+          type="button"
+          className="plat-subjects-v2__kpi plat-billing-v2__kpi-btn"
+          onClick={() => onNavigate?.("plans")}
+          disabled={!onNavigate}
+        >
+          <DashIcon name="settings" className="dash-icon--sm" />
+          <div>
+            <strong>4</strong>
+            <span>Plan tiers</span>
+          </div>
+        </button>
+      </div>
+
       {onNavigate ? (
-        <div className="plat-billing-links">
-          <button type="button" className="plat-btn plat-btn--ghost" onClick={() => onNavigate("invoices")}>
+        <div className="plat-billing-v2__nav">
+          <button
+            type="button"
+            className="plat-billing-v2__nav-card"
+            onClick={() => onNavigate("invoices")}
+          >
             <DashIcon name="fees" className="dash-icon--sm" />
-            Invoices
-            {summary ? (
-              <span className="plat-filter-count">{summary.invoices.total}</span>
-            ) : null}
+            <div>
+              <strong>Invoices</strong>
+              <span>
+                {summary
+                  ? `${summary.invoices.sent + summary.invoices.overdue} open`
+                  : "Accounts receivable"}
+              </span>
+            </div>
           </button>
-          <button type="button" className="plat-btn plat-btn--ghost" onClick={() => onNavigate("usage")}>
+          <button
+            type="button"
+            className="plat-billing-v2__nav-card"
+            onClick={() => onNavigate("usage")}
+          >
             <DashIcon name="students" className="dash-icon--sm" />
-            Usage & limits
+            <div>
+              <strong>Usage & limits</strong>
+              <span>Seat utilization per school</span>
+            </div>
           </button>
-          <button type="button" className="plat-btn plat-btn--ghost" onClick={() => onNavigate("plans")}>
+          <button
+            type="button"
+            className="plat-billing-v2__nav-card"
+            onClick={() => onNavigate("plans")}
+          >
             <DashIcon name="settings" className="dash-icon--sm" />
-            Edit plan catalog
+            <div>
+              <strong>Plan catalog</strong>
+              <span>Prices, limits, and features</span>
+            </div>
           </button>
         </div>
       ) : null}
 
-      <div className="dash-admin-kpis plat-kpis">
-        <article className="dash-admin-kpi">
-          <div className="dash-admin-kpi__icon dash-admin-kpi__icon--green">
-            <DashIcon name="finance" />
+      <div className="plat-billing-v2__stats-row">
+        <article className="plat-billing-v2__mini-kpi">
+          <DashIcon name="finance" className="dash-icon--sm" />
+          <div>
+            <strong>{summary?.paidSchools ?? dashboard.schools.paid}</strong>
+            <span>Paid subscriptions</span>
           </div>
-          <p className="dash-admin-kpi__label">Paid</p>
-          <p className="dash-admin-kpi__value">{summary?.paidSchools ?? dashboard.schools.paid}</p>
-          <p className="dash-admin-kpi__hint">Active paid subscriptions</p>
         </article>
-        <article className="dash-admin-kpi">
-          <div className="dash-admin-kpi__icon dash-admin-kpi__icon--amber">
-            <DashIcon name="calendar" />
+        <article className="plat-billing-v2__mini-kpi">
+          <DashIcon name="calendar" className="dash-icon--sm" />
+          <div>
+            <strong>{trialEndingSoon.length}</strong>
+            <span>Trials ending in 14d</span>
           </div>
-          <p className="dash-admin-kpi__label">On trial</p>
-          <p className="dash-admin-kpi__value">{summary?.trialSchools ?? dashboard.schools.trial}</p>
-          <p className="dash-admin-kpi__hint">{trialEndingSoon.length} ending in 14d</p>
         </article>
-        <article className="dash-admin-kpi">
-          <div className="dash-admin-kpi__icon dash-admin-kpi__icon--blue">
-            <DashIcon name="fees" />
+        <article className="plat-billing-v2__mini-kpi">
+          <DashIcon name="alert" className="dash-icon--sm" />
+          <div>
+            <strong>{inactiveBilling.length}</strong>
+            <span>Billing inactive</span>
           </div>
-          <p className="dash-admin-kpi__label">Outstanding</p>
-          <p className="dash-admin-kpi__value">
-            {summary ? `$${summary.invoices.outstandingUsd.toLocaleString()}` : "—"}
-          </p>
-          <p className="dash-admin-kpi__hint">
-            {summary
-              ? `${summary.invoices.sent + summary.invoices.overdue} open invoices`
-              : "Sent + overdue"}
-          </p>
         </article>
-        <article className="dash-admin-kpi">
-          <div className="dash-admin-kpi__icon dash-admin-kpi__icon--slate">
-            <DashIcon name="alert" />
+        <article className="plat-billing-v2__mini-kpi">
+          <DashIcon name="fees" className="dash-icon--sm" />
+          <div>
+            <strong>
+              {summary
+                ? summary.invoices.sent + summary.invoices.overdue
+                : "—"}
+            </strong>
+            <span>Open invoices</span>
           </div>
-          <p className="dash-admin-kpi__label">Billing off</p>
-          <p className="dash-admin-kpi__value">{inactiveBilling.length}</p>
-          <p className="dash-admin-kpi__hint">Needs follow-up</p>
         </article>
       </div>
 
-      <section className="plat-panel">
-        <h3 className="plat-panel__title">Plan distribution</h3>
+      <section className="plat-billing-v2__panel">
+        <h3 className="plat-billing-v2__panel-title">Plan distribution</h3>
         <div className="plat-plan-bars">
           {(["TRIAL", "STARTER", "PROFESSIONAL", "ENTERPRISE"] as const).map((plan) => (
             <div key={plan} className="plat-plan-bar-row">
@@ -205,15 +296,15 @@ export function PlatformBilling({ dashboard, schools, onNavigate }: Props) {
       </section>
 
       {trialEndingSoon.length > 0 ? (
-        <section className="plat-alert-strip">
+        <section className="plat-billing-v2__alert">
           <DashIcon name="alert" className="dash-icon--sm" />
-          <div className="plat-alert-strip__body">
+          <div className="plat-billing-v2__alert-body">
             <strong>
               {trialEndingSoon.length} trial{trialEndingSoon.length > 1 ? "s" : ""} ending soon
             </strong>
             <p>Reach out before access expires — convert to Starter or extend trial.</p>
           </div>
-          <ul className="plat-alert-strip__list">
+          <ul className="plat-billing-v2__alert-list">
             {trialEndingSoon.slice(0, 4).map((s) => (
               <li key={s.id}>
                 <strong>{s.name}</strong>
@@ -224,18 +315,14 @@ export function PlatformBilling({ dashboard, schools, onNavigate }: Props) {
         </section>
       ) : null}
 
-      <section className="plat-panel">
-        <div className="plat-panel__head plat-panel__head--stack">
-          <div>
-            <h3 className="plat-panel__title">Subscription ledger</h3>
-            <p className="plat-panel__hint">
-              Per-school plan and billing status. Assign plans from Schools → Billing tab.
-            </p>
-          </div>
-        </div>
+      <section className="plat-billing-v2__panel">
+        <h3 className="plat-billing-v2__panel-title">Subscription ledger</h3>
+        <p className="plat-billing-v2__panel-hint">
+          Per-school plan and billing status. Assign plans from Schools → Billing tab.
+        </p>
 
-        <div className="plat-toolbar">
-          <div className="plat-search">
+        <div className="plat-subjects-v2__toolbar">
+          <div className="plat-tenants-v2__search plat-subjects-v2__search">
             <DashIcon name="finance" className="dash-icon--sm" />
             <input
               type="search"
@@ -247,14 +334,16 @@ export function PlatformBilling({ dashboard, schools, onNavigate }: Props) {
           </div>
         </div>
 
-        <div className="plat-filter-tabs" role="tablist" aria-label="Filter by plan">
+        <div className="plat-filter-tabs plat-subjects-v2__filters" role="tablist">
           {planFilters.map((f) => (
             <button
               key={f.id}
               type="button"
               role="tab"
               aria-selected={planFilter === f.id}
-              className={`plat-filter-tab${planFilter === f.id ? " plat-filter-tab--active" : ""}`}
+              className={`plat-filter-tab${
+                planFilter === f.id ? " plat-filter-tab--active" : ""
+              }`}
               onClick={() => setPlanFilter(f.id)}
             >
               {f.label}
@@ -263,8 +352,8 @@ export function PlatformBilling({ dashboard, schools, onNavigate }: Props) {
           ))}
         </div>
 
-        <div className="plat-table-wrap">
-          <table className="plat-table plat-table--billing">
+        <div className="plat-subjects-v2__table-wrap">
+          <table className="plat-subjects-v2__table">
             <thead>
               <tr>
                 <th>School</th>
@@ -277,7 +366,7 @@ export function PlatformBilling({ dashboard, schools, onNavigate }: Props) {
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="plat-table-empty">
+                  <td colSpan={5} className="plat-subjects-v2__empty">
                     No subscriptions match your filters.
                   </td>
                 </tr>
@@ -285,12 +374,16 @@ export function PlatformBilling({ dashboard, schools, onNavigate }: Props) {
                 filtered.map((s) => {
                   const sub = s.subscription;
                   const days = daysUntil(sub?.trialEndsAt);
-                  const urgent = sub?.plan === "TRIAL" && days !== null && days >= 0 && days <= 7;
+                  const urgent =
+                    sub?.plan === "TRIAL" && days !== null && days >= 0 && days <= 7;
                   return (
-                    <tr key={s.id} className={urgent ? "plat-table-row--urgent" : undefined}>
+                    <tr
+                      key={s.id}
+                      className={urgent ? "plat-billing-v2__row--urgent" : undefined}
+                    >
                       <td>
-                        <strong className="plat-table-name">{s.name}</strong>
-                        <span className="plat-table-sub">{s.joinCode}</span>
+                        <span className="plat-subjects-v2__name">{s.name}</span>
+                        <code className="plat-subjects-v2__code">{s.joinCode}</code>
                       </td>
                       <td>
                         <span
@@ -310,20 +403,22 @@ export function PlatformBilling({ dashboard, schools, onNavigate }: Props) {
                           "—"
                         )}
                       </td>
-                      <td className="plat-table-muted">
+                      <td>
                         {sub?.plan === "TRIAL" && sub.trialEndsAt ? (
                           <>
                             {formatDate(sub.trialEndsAt)}
                             {days !== null && days >= 0 ? (
                               <span
-                                className={`plat-renewal-tag${urgent ? " plat-renewal-tag--urgent" : ""}`}
+                                className={`plat-renewal-tag${
+                                  urgent ? " plat-renewal-tag--urgent" : ""
+                                }`}
                               >
                                 {days}d left
                               </span>
                             ) : null}
                           </>
                         ) : sub?.plan && sub.plan !== "TRIAL" ? (
-                          <span className="plat-table-sub">Monthly billing</span>
+                          <span className="plat-billing-v2__muted">Monthly billing</span>
                         ) : (
                           "—"
                         )}

@@ -19,8 +19,7 @@ import {
 } from "@/lib/classwork";
 
 import { openClassworkFile } from "@/lib/teacher-cards";
-
-
+import { AppToast } from "@/components/ui/app-toast";
 
 type Props = {
 
@@ -292,8 +291,8 @@ export function ClassworkStudentPanel({ mode }: Props) {
 
   return (
     <div className={`cw-page cw-page--${mode === "ASSIGNMENT" ? "assignment" : "worksheet"}`}>
-      {error ? <p className="cw-alert cw-alert--error">{error}</p> : null}
-      {saved ? <p className="cw-alert cw-alert--ok">{saved}</p> : null}
+      <AppToast message={error} tone="error" onDismiss={() => setError("")} />
+      <AppToast message={saved} tone="success" onDismiss={() => setSaved("")} />
 
       <header className="cw-hero">
         <div className="cw-hero__glow" aria-hidden />

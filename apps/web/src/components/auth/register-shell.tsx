@@ -5,14 +5,13 @@ import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
 import { RegisterVisualPanel } from "@/components/auth/register-visual-panel";
 
+const STEPS = ["School", "Admin"] as const;
+
 type RegisterShellProps = {
   children: ReactNode;
   footer?: ReactNode;
   error?: string;
   activeStep: number;
-  stepCount: number;
-  stepLabel: string;
-  schoolName?: string;
 };
 
 export function RegisterShell({
@@ -20,12 +19,9 @@ export function RegisterShell({
   footer,
   error,
   activeStep,
-  stepCount,
-  stepLabel,
-  schoolName,
 }: RegisterShellProps) {
   const reduce = useReducedMotion();
-  const progress = ((activeStep + 1) / stepCount) * 100;
+  const progress = ((activeStep + 1) / STEPS.length) * 100;
 
   return (
     <div className="reg-scene">
@@ -38,32 +34,43 @@ export function RegisterShell({
               <span className="logo-mark reg-top__logo">C1</span>
               <span>CampusOne</span>
             </Link>
-            <Link href="/" className="reg-top__link">
-              Home
+            <Link href="/login" className="reg-top__link">
+              Sign in
             </Link>
           </header>
 
+          <div className="reg-mobile-banner" aria-hidden>
+            <img src="/images/hero-campus.png" alt="" />
+            <div className="reg-mobile-banner__tint" />
+            <p>Free 14-day trial</p>
+          </div>
+
           <motion.main
             className="reg-main"
-            initial={reduce ? false : { opacity: 0, y: 14 }}
+            initial={reduce ? false : { opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+            transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
           >
             <div className="reg-hero">
               <p className="reg-hero__eyebrow">
-                <span className="reg-hero__pulse" aria-hidden />
                 Free 14-day trial · No credit card
               </p>
               <h1 className="reg-hero__title">
                 Create your <span>school workspace</span>
               </h1>
               <p className="reg-hero__sub">
-                Join Ethiopian schools running attendance, grades, fees, and parent
-                communication on one platform.
+                Two short steps. Add staff and students from the dashboard after
+                you launch.
               </p>
             </div>
 
             <div className="reg-progress" aria-label="Registration progress">
+              <div className="reg-progress__meta">
+                <span>
+                  Step {activeStep + 1} of {STEPS.length}
+                </span>
+                <strong>{STEPS[activeStep]}</strong>
+              </div>
               <div className="reg-progress__track">
                 <motion.div
                   className="reg-progress__bar"
@@ -71,10 +78,23 @@ export function RegisterShell({
                   transition={{ duration: 0.35, ease: "easeOut" }}
                 />
               </div>
-              <p className="reg-progress__meta">
-                <span>Step {activeStep + 1} of {stepCount}</span>
-                <strong>{stepLabel}</strong>
-              </p>
+              <ol className="reg-progress__steps">
+                {STEPS.map((label, index) => (
+                  <li
+                    key={label}
+                    className={
+                      index === activeStep
+                        ? "is-active"
+                        : index < activeStep
+                          ? "is-done"
+                          : undefined
+                    }
+                    aria-current={index === activeStep ? "step" : undefined}
+                  >
+                    {label}
+                  </li>
+                ))}
+              </ol>
             </div>
 
             {error ? (
@@ -90,7 +110,7 @@ export function RegisterShell({
         </section>
 
         <section className="reg-visual-col" aria-hidden={false}>
-          <RegisterVisualPanel activeStep={activeStep} schoolName={schoolName} />
+          <RegisterVisualPanel activeStep={activeStep} />
         </section>
       </div>
     </div>
@@ -102,8 +122,6 @@ export function RegisterFooterLinks() {
     <p className="reg-footer__line">
       Already have a workspace?{" "}
       <Link href="/login">Sign in</Link>
-      <span aria-hidden>·</span>
-      <Link href="/join">Join with a code</Link>
     </p>
   );
 }

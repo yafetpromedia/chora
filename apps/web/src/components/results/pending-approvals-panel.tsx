@@ -10,6 +10,7 @@ import {
   type AcademicTerm,
   type PendingWorkflowItem,
 } from "@/lib/results";
+import { AppToast } from "@/components/ui/app-toast";
 
 const PAGE_SIZE = 40;
 
@@ -189,7 +190,7 @@ export function PendingApprovalsPanel({
         <span className="res-approvals__count">{loading ? "…" : pending.length}</span>
       </div>
 
-      {flash ? <p className="res-approvals__flash">{flash}</p> : null}
+      <AppToast message={flash} tone="success" onDismiss={() => setFlash("")} />
 
       <div className="res-approvals__toolbar">
         <label className="res-approvals__filter">

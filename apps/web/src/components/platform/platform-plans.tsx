@@ -1,12 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { PlanType } from "@/lib/api";
+import { handlePlatformAuthFailure } from "@/lib/platform-auth";
 import {
   getPlatformPlans,
   updatePlatformPlan,
   type PlatformPlanCatalog,
 } from "@/lib/platform-plans";
+import { DashIcon } from "@/components/dashboard/dash-icons";
+import { AppToast } from "@/components/ui/app-toast";
 
 const ALL_PLANS: PlanType[] = ["TRIAL", "STARTER", "PROFESSIONAL", "ENTERPRISE"];
 
@@ -52,13 +56,28 @@ function parseLimit(v: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+function planIcon(plan: PlanType) {
+  if (plan === "TRIAL") return "calendar";
+  if (plan === "ENTERPRISE") return "building";
+  if (plan === "PROFESSIONAL") return "chart";
+  return "finance";
+}
+
 export function PlatformPlans() {
+  const router = useRouter();
   const [plans, setPlans] = useState<PlatformPlanCatalog[]>([]);
   const [draft, setDraft] = useState<Draft>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<PlanType | null>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+
+  function fail(err: unknown, fallback: string) {
+    if (handlePlatformAuthFailure(err, () => router.replace("/platform/login"))) {
+      return;
+    }
+    setError(err instanceof Error ? err.message : fallback);
+  }
 
   const load = useCallback(async () => {
     setError("");
@@ -69,9 +88,23 @@ export function PlatformPlans() {
 
   useEffect(() => {
     void load()
-      .catch((e) => setError(e instanceof Error ? e.message : "Failed to load plans"))
+      .catch((e) => fail(e, "Failed to load plans"))
       .finally(() => setLoading(false));
-  }, [load]);
+  }, [load, router]);
+
+  const stats = useMemo(() => {
+    const listed = plans.filter((p) => p.isListed && p.plan !== "TRIAL").length;
+    const avgUsd =
+      plans.filter((p) => p.plan !== "ENTERPRISE" && p.plan !== "TRIAL").length > 0
+        ? Math.round(
+            plans
+              .filter((p) => p.plan !== "ENTERPRISE" && p.plan !== "TRIAL")
+              .reduce((sum, p) => sum + p.usdMonthly, 0) /
+              plans.filter((p) => p.plan !== "ENTERPRISE" && p.plan !== "TRIAL").length,
+          )
+        : 0;
+    return { total: plans.length, listed, avgUsd };
+  }, [plans]);
 
   async function save(plan: PlanType) {
     const d = draft[plan];
@@ -98,7 +131,7 @@ export function PlatformPlans() {
       setPlans((prev) => prev.map((p) => (p.plan === plan ? updated : p)));
       setMessage(`${updated.label} saved. Schools see new prices on upgrade.`);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Save failed");
+      fail(e, "Save failed");
     } finally {
       setSaving(null);
     }
@@ -112,52 +145,116 @@ export function PlatformPlans() {
   }
 
   if (loading) {
-    return <p className="plat-loading">Loading plans…</p>;
+    return (
+      <div className="plat-subjects-v2 plat-subjects-v2--loading">
+        <div className="plat-curriculum__skeleton plat-curriculum__skeleton--hero" />
+        <div className="plat-curriculum__skeleton" />
+      </div>
+    );
   }
 
   return (
-    <div className="plat-plans">
-      <header className="plat-section-hero plat-section-hero--billing">
-        <div>
-          <h2 className="plat-section-hero__title">Plan catalog</h2>
-          <p className="plat-section-hero__sub">
-            Set prices in USD and ETB, limits, and what schools see on the upgrade page.
-          </p>
+    <div className="plat-subjects-v2 dash-admin dash-admin--modern plat-billing-v2">
+      <AppToast message={error} tone="error" onDismiss={() => setError("")} />
+      <AppToast message={message} tone="success" onDismiss={() => setMessage("")} />
+
+      <header className="plat-subjects-v2__hero">
+        <div className="plat-subjects-v2__hero-main">
+          <span className="plat-subjects-v2__hero-icon" aria-hidden>
+            <DashIcon name="settings" className="dash-icon--md" />
+          </span>
+          <div>
+            <p className="plat-subjects-v2__eyebrow">Subscription catalog</p>
+            <h2 className="plat-subjects-v2__title">Plan catalog</h2>
+            <p className="plat-subjects-v2__sub">
+              Set prices in USD and ETB, limits, and what schools see on the upgrade page.
+            </p>
+          </div>
+        </div>
+        <div className="plat-subjects-v2__hero-stats">
+          <div className="plat-subjects-v2__stat">
+            <strong>{stats.total}</strong>
+            <span>Plans</span>
+          </div>
+          <div className="plat-subjects-v2__stat">
+            <strong>{stats.listed}</strong>
+            <span>Listed</span>
+          </div>
+          <div className="plat-subjects-v2__stat">
+            <strong>${stats.avgUsd}</strong>
+            <span>Avg USD</span>
+          </div>
         </div>
       </header>
 
-      {error ? <p className="auth-alert auth-alert--error">{error}</p> : null}
-      {message ? <p className="plat-plans__ok">{message}</p> : null}
+      <div className="plat-subjects-v2__kpis">
+        <article className="plat-subjects-v2__kpi">
+          <DashIcon name="finance" className="dash-icon--sm" />
+          <div>
+            <strong>{stats.listed}</strong>
+            <span>On upgrade page</span>
+          </div>
+        </article>
+        <article className="plat-subjects-v2__kpi">
+          <DashIcon name="calendar" className="dash-icon--sm" />
+          <div>
+            <strong>
+              {plans.find((p) => p.plan === "TRIAL")?.trialDays ?? "—"}
+            </strong>
+            <span>Trial days</span>
+          </div>
+        </article>
+        <article className="plat-subjects-v2__kpi">
+          <DashIcon name="building" className="dash-icon--sm" />
+          <div>
+            <strong>1</strong>
+            <span>Enterprise (custom)</span>
+          </div>
+        </article>
+      </div>
 
-      <div className="plat-plans__grid">
+      <div className="plat-billing-v2__plans-grid">
         {ALL_PLANS.map((planKey) => {
           const d = draft[planKey];
           if (!d) return null;
           const isTrial = planKey === "TRIAL";
           const isEnterprise = planKey === "ENTERPRISE";
+          const catalog = plans.find((p) => p.plan === planKey);
 
           return (
-            <article key={planKey} className="plat-plan-editor">
-              <header className="plat-plan-editor__head">
-                <span className="plat-plan-editor__code">{planKey}</span>
+            <article key={planKey} className="plat-billing-v2__plan-card">
+              <header className="plat-billing-v2__plan-head">
+                <span className="plat-billing-v2__plan-icon" aria-hidden>
+                  <DashIcon name={planIcon(planKey)} className="dash-icon--md" />
+                </span>
+                <div>
+                  <span className="plat-plan-editor__code">{planKey}</span>
+                  <strong className="plat-billing-v2__plan-title">{d.label}</strong>
+                  {catalog ? (
+                    <p className="plat-billing-v2__plan-price">
+                      {isEnterprise
+                        ? "Custom pricing"
+                        : isTrial
+                          ? `${d.trialDays || catalog.trialDays} day trial`
+                          : `$${d.usdMonthly}/mo · ${d.etbMonthly} ETB`}
+                    </p>
+                  ) : null}
+                </div>
                 {!isTrial ? (
-                  <label className="plat-plan-editor__listed">
+                  <label className="plat-billing-v2__listed">
                     <input
                       type="checkbox"
                       checked={d.isListed}
                       onChange={(e) => patch(planKey, "isListed", e.target.checked)}
                     />
-                    Listed on upgrade page
+                    Listed
                   </label>
                 ) : null}
               </header>
 
               <label className="plat-field">
                 <span>Display name</span>
-                <input
-                  value={d.label}
-                  onChange={(e) => patch(planKey, "label", e.target.value)}
-                />
+                <input value={d.label} onChange={(e) => patch(planKey, "label", e.target.value)} />
               </label>
 
               <label className="plat-field">
@@ -243,7 +340,7 @@ export function PlatformPlans() {
 
               <button
                 type="button"
-                className="plat-btn plat-btn--primary plat-btn--block"
+                className="plat-v2__btn plat-v2__btn--primary"
                 disabled={saving !== null}
                 onClick={() => void save(planKey)}
               >

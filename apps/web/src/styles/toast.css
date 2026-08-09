@@ -1,0 +1,87 @@
+/* Shared floating toast (CampusOne) */
+
+.app-toast {
+  position: fixed;
+  z-index: 240;
+  left: 50%;
+  top: calc(1.1rem + env(safe-area-inset-top, 0px));
+  transform: translateX(-50%);
+  width: min(28rem, calc(100vw - 1.5rem));
+  pointer-events: none;
+  animation: app-toast-in 0.28s ease;
+}
+
+.app-toast__card {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  padding: 0.85rem 0.95rem;
+  border-radius: 0.95rem;
+  background: #0f3d42;
+  color: #fff;
+  box-shadow: 0 16px 40px rgba(15, 45, 45, 0.28);
+}
+
+.app-toast--error .app-toast__card {
+  background: #7f1d1d;
+}
+
+.app-toast__dot {
+  width: 0.55rem;
+  height: 0.55rem;
+  margin-top: 0.35rem;
+  border-radius: 999px;
+  background: #34d399;
+  flex-shrink: 0;
+}
+
+.app-toast--error .app-toast__dot {
+  background: #fca5a5;
+}
+
+.app-toast__card p {
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+  font-size: 0.88rem;
+  font-weight: 650;
+  line-height: 1.4;
+}
+
+.app-toast__close {
+  flex-shrink: 0;
+  width: 1.6rem;
+  height: 1.6rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 0.45rem;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.app-toast__close:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+@keyframes app-toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -0.65rem);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+@media (max-width: 720px) {
+  .app-toast {
+    top: calc(0.85rem + env(safe-area-inset-top, 0px));
+  }
+}

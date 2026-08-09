@@ -5,6 +5,7 @@ export type PlatformSection =
   | "subjects"
   | "library"
   | "messages"
+  | "support"
   | "structures"
   | "provisioning"
   | "assessments"
@@ -100,6 +101,10 @@ export const SECTION_META: Record<
   messages: {
     title: "Communication templates",
     subtitle: "SMS, email, and teacher message starters",
+  },
+  support: {
+    title: "Support inbox",
+    subtitle: "Issues reported by school admins",
   },
   structures: {
     title: "Academic structures",

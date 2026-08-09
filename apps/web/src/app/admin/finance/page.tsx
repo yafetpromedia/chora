@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DashIcon } from "@/components/dashboard/dash-icons";
-import { AcademicsAlert, AcademicsHero, AcademicsBadge } from "@/components/academics/academics-ui";
+import { AcademicsHero, AcademicsBadge } from "@/components/academics/academics-ui";
 import { DashboardPage } from "@/components/dashboard/dashboard-page";
 import { listGrades, listStudents } from "@/lib/school-setup";
 import type { GradeWithSections, StudentRecord } from "@/lib/api";
@@ -28,6 +28,7 @@ import {
   type FeeType,
   type FinanceAnalytics,
 } from "@/lib/finance";
+import { AppToast } from "@/components/ui/app-toast";
 import { AUTH_ROLE_KEY, AUTH_TOKEN_KEY, isSchoolWorkspaceRole } from "@/lib/auth";
 
 type Tab = "pending" | "billing" | "payments" | "tools";
@@ -256,12 +257,8 @@ export default function AdminFinancePage() {
           }
         />
 
-        {error ? <AcademicsAlert tone="error">{error}</AcademicsAlert> : null}
-        {success ? (
-          <p className="fin-v2__alert fin-v2__alert--ok" role="status">
-            {success}
-          </p>
-        ) : null}
+        <AppToast message={error} tone="error" onDismiss={() => setError("")} />
+        <AppToast message={success} tone="success" onDismiss={() => setSuccess("")} />
 
         <div className="fin-v2__toolbar">
           <nav className="fin-v2__tabs" aria-label="Finance">

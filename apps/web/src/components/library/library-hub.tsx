@@ -28,6 +28,7 @@ import {
   type LibraryResource,
   type LibraryResourceType,
 } from "@/lib/library";
+import { AppToast } from "@/components/ui/app-toast";
 
 type Props = {
   role: UserRole;
@@ -508,8 +509,8 @@ export function LibraryHubView({
         />
       ) : null}
 
-      {error ? <p className="lib-alert lib-alert--error">{error}</p> : null}
-      {saved ? <p className="lib-alert lib-alert--ok">{saved}</p> : null}
+      <AppToast message={error} tone="error" onDismiss={() => setError("")} />
+      <AppToast message={saved} tone="success" onDismiss={() => setSaved("")} />
 
       {showMain ? (
       <section className="lib-card lib-card--search">

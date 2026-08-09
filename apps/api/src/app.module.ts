@@ -31,6 +31,8 @@ import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { UsersModule } from './users/users.module';
 import { PaymentsModule } from './payments/payments.module';
 import { AiModule } from './ai/ai.module';
+import { AdmissionsModule } from './admissions/admissions.module';
+import { SupportModule } from './support/support.module';
 
 @Module({
   imports: [
@@ -40,8 +42,8 @@ import { AiModule } from './ai/ai.module';
     PermissionsModule,
     CommonModule,
     SubscriptionsModule,
-    UsersModule,
     SchoolsModule,
+    UsersModule,
     GradesModule,
     StudentsModule,
     TeachersModule,
@@ -61,6 +63,8 @@ import { AiModule } from './ai/ai.module';
     PlatformModule,
     PaymentsModule,
     AiModule,
+    AdmissionsModule,
+    SupportModule,
   ],
   controllers: [AppController],
   providers: [

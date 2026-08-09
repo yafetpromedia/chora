@@ -4,13 +4,13 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DashboardPage } from "@/components/dashboard/dashboard-page";
 import {
-  AcademicsAlert,
   AcademicsBadge,
   AcademicsHero,
   AcademicsPipeline,
   type PipelineStep,
 } from "@/components/academics/academics-ui";
 import { AUTH_ROLE_KEY, AUTH_TOKEN_KEY, isSchoolWorkspaceRole } from "@/lib/auth";
+import { AppToast } from "@/components/ui/app-toast";
 import {
   listAcademicYears,
   listClassSubjects,
@@ -140,9 +140,10 @@ export default function AcademicsSetupPage() {
 
   return (
     <DashboardPage role="admin" title="Academics">
-      <div className="acad-v2">
+      <div className="acad-page acad-page--hub acad-v2">
         <AcademicsHero
           chip="Academics"
+          compact
           title="Academic structure"
           subtitle="Configure your year, terms, teachers, and class subjects. Each step opens its own workspace so registrar, academics, and HR can work independently."
           badges={
@@ -173,7 +174,7 @@ export default function AcademicsSetupPage() {
           }
         />
 
-        {error ? <AcademicsAlert tone="error">{error}</AcademicsAlert> : null}
+        <AppToast message={error} tone="error" onDismiss={() => setError("")} />
 
         {loading ? (
           <div className="acad-v2__loading">

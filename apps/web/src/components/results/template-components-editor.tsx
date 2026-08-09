@@ -12,8 +12,6 @@ type Props = {
 };
 
 export function TemplateComponentsEditor({ components, onChange }: Props) {
-  const weightTotal = components.reduce((sum, c) => sum + (c.weightPercent || 0), 0);
-
   function updateRow(index: number, patch: Partial<TemplateComponentDraft>) {
     const next = [...components];
     next[index] = { ...next[index], ...patch };
@@ -43,85 +41,84 @@ export function TemplateComponentsEditor({ components, onChange }: Props) {
 
   return (
     <div className="res-components-editor">
-      <div className="res-components-editor__head">
-        <p className="setup-panel-label" style={{ margin: 0 }}>
-          Assessment components
-        </p>
-        <p
-          className={`tch-meta res-components-editor__total${
-            weightTotal === 100 ? " res-components-editor__total--ok" : ""
-          }`}
-        >
-          Weight total: <strong>{weightTotal}%</strong>
-          {weightTotal !== 100 ? " (must equal 100%)" : ""}
-        </p>
+      <p className="res-components-editor__title">Assessment components</p>
+
+      <div className="res-components-editor__grid" role="table" aria-label="Template components">
+        <div className="res-components-editor__grid-head" role="row">
+          <span role="columnheader">Component</span>
+          <span role="columnheader">Wt %</span>
+          <span role="columnheader">Max</span>
+          <span className="res-components-editor__grid-actions-label" role="columnheader">
+            Order
+          </span>
+        </div>
+
+        {components.map((c, i) => (
+          <div key={i} className="res-components-editor__grid-row" role="row">
+            <label className="res-components-editor__cell res-components-editor__cell--name">
+              <span className="res-components-editor__sr-only">Component</span>
+              <input
+                value={c.name}
+                onChange={(e) => updateRow(i, { name: e.target.value })}
+                placeholder="e.g. Quiz"
+              />
+            </label>
+            <label className="res-components-editor__cell res-components-editor__cell--num">
+              <span className="res-components-editor__sr-only">Weight percent</span>
+              <input
+                type="number"
+                min={0}
+                max={100}
+                value={c.weightPercent}
+                onChange={(e) =>
+                  updateRow(i, { weightPercent: Number(e.target.value) })
+                }
+              />
+            </label>
+            <label className="res-components-editor__cell res-components-editor__cell--num">
+              <span className="res-components-editor__sr-only">Max score</span>
+              <input
+                type="number"
+                min={1}
+                value={c.maxScore}
+                onChange={(e) => updateRow(i, { maxScore: Number(e.target.value) })}
+              />
+            </label>
+            <div className="res-components-editor__actions" role="cell">
+              <button
+                type="button"
+                className="res-components-editor__icon-btn"
+                disabled={i === 0}
+                onClick={() => moveRow(i, -1)}
+                title="Move up"
+                aria-label="Move up"
+              >
+                ↑
+              </button>
+              <button
+                type="button"
+                className="res-components-editor__icon-btn"
+                disabled={i === components.length - 1}
+                onClick={() => moveRow(i, 1)}
+                title="Move down"
+                aria-label="Move down"
+              >
+                ↓
+              </button>
+              <button
+                type="button"
+                className="res-components-editor__remove-btn"
+                disabled={components.length <= 1}
+                onClick={() => removeRow(i)}
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+        ))}
       </div>
 
-      {components.map((c, i) => (
-        <div key={i} className="att-filters res-components-editor__row">
-          <label className="att-field">
-            <span>Component</span>
-            <input
-              className="auth-input auth-input--login auth-input--login-plain"
-              value={c.name}
-              onChange={(e) => updateRow(i, { name: e.target.value })}
-            />
-          </label>
-          <label className="att-field">
-            <span>Weight %</span>
-            <input
-              type="number"
-              min={0}
-              max={100}
-              className="auth-input auth-input--login auth-input--login-plain"
-              value={c.weightPercent}
-              onChange={(e) =>
-                updateRow(i, { weightPercent: Number(e.target.value) })
-              }
-            />
-          </label>
-          <label className="att-field">
-            <span>Max score</span>
-            <input
-              type="number"
-              min={1}
-              className="auth-input auth-input--login auth-input--login-plain"
-              value={c.maxScore}
-              onChange={(e) => updateRow(i, { maxScore: Number(e.target.value) })}
-            />
-          </label>
-          <div className="res-components-editor__actions">
-            <button
-              type="button"
-              className="dash-copy-btn"
-              disabled={i === 0}
-              onClick={() => moveRow(i, -1)}
-              title="Move up"
-            >
-              ↑
-            </button>
-            <button
-              type="button"
-              className="dash-copy-btn"
-              disabled={i === components.length - 1}
-              onClick={() => moveRow(i, 1)}
-              title="Move down"
-            >
-              ↓
-            </button>
-            <button
-              type="button"
-              className="dash-copy-btn"
-              disabled={components.length <= 1}
-              onClick={() => removeRow(i)}
-            >
-              Remove
-            </button>
-          </div>
-        </div>
-      ))}
-
-      <button type="button" className="dash-copy-btn" onClick={addRow}>
+      <button type="button" className="res-components-editor__add" onClick={addRow}>
         + Add component
       </button>
     </div>

@@ -69,15 +69,34 @@ export function PlatformPermissions({ user }: Props) {
   const yourGrants = ROLES.find((r) => r.id === user?.role)?.grants ?? [];
 
   return (
-    <div className="plat-section plat-permissions">
-      <header className="plat-section-hero plat-section-hero--permissions">
-        <div>
-          <p className="plat-section-hero__eyebrow">Access control</p>
-          <h2 className="plat-section-hero__title">Platform permissions</h2>
-          <p className="plat-section-hero__sub">
-            Roles define what operators can do in this console. Enforcement is on the API for every
-            request.
-          </p>
+    <div className="plat-subjects-v2 dash-admin dash-admin--modern plat-permissions">
+      <header className="plat-subjects-v2__hero">
+        <div className="plat-subjects-v2__hero-main">
+          <span className="plat-subjects-v2__hero-icon" aria-hidden>
+            <DashIcon name="settings" className="dash-icon--md" />
+          </span>
+          <div>
+            <p className="plat-subjects-v2__eyebrow">Access control</p>
+            <h2 className="plat-subjects-v2__title">Platform permissions</h2>
+            <p className="plat-subjects-v2__sub">
+              Roles define what operators can do in this console. Enforcement is
+              on the API for every request.
+            </p>
+          </div>
+        </div>
+        <div className="plat-subjects-v2__hero-stats">
+          <div className="plat-subjects-v2__stat">
+            <strong>{ROLES.length}</strong>
+            <span>Roles</span>
+          </div>
+          <div className="plat-subjects-v2__stat">
+            <strong>{PERMISSIONS.length}</strong>
+            <span>Capabilities</span>
+          </div>
+          <div className="plat-subjects-v2__stat">
+            <strong>{yourGrants.length}</strong>
+            <span>Your grants</span>
+          </div>
         </div>
       </header>
 

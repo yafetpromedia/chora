@@ -352,26 +352,17 @@ export class AcademicsService implements OnModuleInit {
       return rows;
     }
 
-    const scopes = await this.teacherScope.getClassScopes(schoolId, userId, role);
-    if (scopes === null) {
-      return rows;
+    const visible: typeof rows = [];
+    for (const cs of rows) {
+      const ok = await this.teacherScope.canViewClassSubject(
+        schoolId,
+        userId,
+        role,
+        cs,
+      );
+      if (ok) visible.push(cs);
     }
-
-    return rows.filter((cs) => {
-      if (cs.teacherId === userId) {
-        return true;
-      }
-      try {
-        this.teacherScope.assertCanAccessClass(
-          scopes,
-          cs.gradeId,
-          cs.sectionId,
-        );
-        return true;
-      } catch {
-        return false;
-      }
-    });
+    return visible;
   }
 
   createClassSubject(schoolId: string, dto: CreateClassSubjectDto) {
@@ -928,10 +919,17 @@ export class AcademicsService implements OnModuleInit {
     });
     if (!profile) throw new NotFoundException('Student not found');
 
-    const school = await this.prisma.school.findUnique({
+    const school = (await this.prisma.school.findUnique({
       where: { id: schoolId },
-      select: { name: true, logoUrl: true, address: true, email: true, phone: true },
-    });
+    })) as {
+      name: string;
+      logoUrl: string | null;
+      address: string | null;
+      email: string | null;
+      phone: string | null;
+      reportCardTitle?: string | null;
+      reportCardTagline?: string | null;
+    } | null;
 
     const term = await this.prisma.academicTerm.findFirst({
       where: { id: termId, schoolId },
@@ -1041,6 +1039,8 @@ export class AcademicsService implements OnModuleInit {
         address: school?.address ?? null,
         email: school?.email ?? null,
         phone: school?.phone ?? null,
+        headerTitle: school?.reportCardTitle ?? null,
+        headerTagline: school?.reportCardTagline ?? null,
       },
       student: {
         name: report.student.name,
@@ -1056,7 +1056,9 @@ export class AcademicsService implements OnModuleInit {
         academicYearEc: String(ethiopianCalendarYear(new Date(term.endDate))),
         academicYear: term.academicYear.name,
         cardCode: profile.cardCode,
+        photoUrl: profile.photoUrl ?? null,
       },
+      termName: term.name,
       promotionText,
       subjectGrid,
       summary: buildSummaryFromGrid(

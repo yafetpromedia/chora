@@ -11,6 +11,7 @@ import {
   type TeacherIdCard,
 } from "@/lib/teacher-cards";
 import { AUTH_ROLE_KEY, AUTH_TOKEN_KEY, isSchoolWorkspaceRole } from "@/lib/auth";
+import { AppToast } from "@/components/ui/app-toast";
 
 const PREVIEW_LIMIT = 8;
 
@@ -67,8 +68,8 @@ export default function TeacherCardsPage() {
   return (
     <DashboardPage role="admin" title="Teacher ID cards" eyebrow="Staff">
       <div className="idcards-page">
-        {error ? <p className="att-toast att-toast--error">{error}</p> : null}
-        {message ? <p className="att-toast">{message}</p> : null}
+        <AppToast message={error} tone="error" onDismiss={() => setError("")} />
+        <AppToast message={message} tone="success" onDismiss={() => setMessage("")} />
 
         <div className="idcards-toolbar">
           <Link href="/admin/teachers" className="att-btn att-btn--ghost">

@@ -4,11 +4,11 @@ import Link from "next/link";
 import { BackToTop } from "@/components/back-to-top";
 import { Faq } from "@/components/faq";
 import { AppStoreBadges } from "@/components/landing/app-store-badges";
+import { LandingFooter } from "@/components/landing/landing-footer";
 import { LandingAppSection } from "@/components/landing/landing-app-section";
 import { LandingNav } from "@/components/landing/landing-nav";
 import { LandingPricing } from "@/components/landing/landing-pricing";
 import { Reveal, Stagger, StaggerItem } from "@/components/motion/reveal";
-import { ProductPreview } from "@/components/product-preview";
 import {
   IconAdmin,
   IconAnnouncements,
@@ -102,30 +102,46 @@ const PORTALS = [
   {
     n: "01",
     role: "Admin",
+    glyph: "AD",
+    tagline: "School operations",
+    highlights: ["Enrollment", "Billing", "Reports"],
     desc: "Enrollment, billing, academics setup, and school-wide reports",
     href: "/login",
     tone: "admin",
+    icon: <IconAdmin />,
   },
   {
     n: "02",
     role: "Teacher",
+    glyph: "TC",
+    tagline: "Classroom daily",
+    highlights: ["Attendance", "Grades", "Timetable"],
     desc: "Attendance, grade entry, classwork, timetable, and eLibrary",
     href: "/login",
     tone: "teacher",
+    icon: <IconTimetable />,
   },
   {
     n: "03",
     role: "Student",
+    glyph: "ST",
+    tagline: "Campus life",
+    highlights: ["Campus ID", "Results", "Fees"],
     desc: "Campus ID, results, assignments, fees, and digital library",
     href: "/login",
     tone: "student",
+    icon: <IconGrades />,
   },
   {
     n: "04",
     role: "Parent",
+    glyph: "PR",
+    tagline: "Family updates",
+    highlights: ["Attendance", "Payments", "Notices"],
     desc: "Child attendance, fee payments, results, and school notices",
     href: "/login",
     tone: "parent",
+    icon: <IconAttendance />,
   },
 ];
 
@@ -135,12 +151,17 @@ export function LandingPage() {
       <LandingNav />
 
       <main>
-        <section className="lp3-hero lp3-hero--simple">
-          <div className="lp3-hero__glow" aria-hidden />
+        <section id="hero" className="lp3-hero lp3-hero--simple">
+          <div className="lp3-hero__photo" aria-hidden>
+            <img src="/images/hero-campus.png" alt="" />
+          </div>
+          <div className="lp3-hero__overlay" aria-hidden />
           <div className="lp3-container lp3-hero__grid">
             <div className="lp3-hero__copy">
-              <p className="lp3-hero__kicker">CampusOne for schools</p>
-              <h1 className="lp3-hero__title">Run your campus in one place</h1>
+              <h1 className="lp3-hero__title">
+                Run your campus in{" "}
+                <span className="lp3-hero__title-accent">one place</span>
+              </h1>
               <p className="lp3-hero__lead">
                 Attendance, results, fees, and parent updates — without spreadsheets or chat
                 groups.
@@ -153,38 +174,12 @@ export function LandingPage() {
                   Sign in
                 </Link>
               </div>
-              <p className="lp3-hero__note">14-day trial · No card required · ETB &amp; USD</p>
-              <ul className="lp3-hero__proof" aria-label="Platform highlights">
-                <li>Chapa checkout</li>
-                <li>QR campus ID</li>
-                <li>Parent mobile app</li>
-              </ul>
-            </div>
-
-            <div id="preview" className="lp3-hero__visual">
-              <div className="lp3-hero__visual-frame">
-                <ProductPreview />
-              </div>
             </div>
           </div>
-        </section>
 
-        <section className="lp3-strip" aria-label="Platform capabilities">
-          <div className="lp3-strip__track">
-            {[
-              "Attendance",
-              "Report cards",
-              "Fee collection",
-              "Parent portal",
-              "Campus ID",
-              "Timetable",
-              "eLibrary",
-              "AI study assistant",
-              "Announcements",
-              "USD & ETB billing",
-              "Staff roles",
-            ]
-              .concat([
+          <div className="lp3-strip lp3-strip--hero" aria-label="Platform capabilities">
+            <div className="lp3-strip__track">
+              {[
                 "Attendance",
                 "Report cards",
                 "Fee collection",
@@ -196,12 +191,26 @@ export function LandingPage() {
                 "Announcements",
                 "USD & ETB billing",
                 "Staff roles",
-              ])
-              .map((item, i) => (
-                <span key={`${item}-${i}`} className="lp3-strip__pill">
-                  {item}
-                </span>
-              ))}
+              ]
+                .concat([
+                  "Attendance",
+                  "Report cards",
+                  "Fee collection",
+                  "Parent portal",
+                  "Campus ID",
+                  "Timetable",
+                  "eLibrary",
+                  "AI study assistant",
+                  "Announcements",
+                  "USD & ETB billing",
+                  "Staff roles",
+                ])
+                .map((item, i) => (
+                  <span key={`${item}-${i}`} className="lp3-strip__pill">
+                    {item}
+                  </span>
+                ))}
+            </div>
           </div>
         </section>
 
@@ -231,7 +240,7 @@ export function LandingPage() {
           </div>
         </section>
 
-        <section id="features" className="lp3-section">
+        <section id="features" className="lp3-section lp3-section--surface">
           <div className="lp3-container">
             <Reveal>
               <div className="lp3-section__head">
@@ -261,7 +270,7 @@ export function LandingPage() {
 
         <LandingAppSection />
 
-        <section id="portals" className="lp3-section lp3-section--muted">
+        <section id="portals" className="lp3-section lp3-section--portals">
           <div className="lp3-container">
             <Reveal>
               <div className="lp3-section__head">
@@ -277,10 +286,31 @@ export function LandingPage() {
               {PORTALS.map((p) => (
                 <StaggerItem key={p.role}>
                   <Link href={p.href} className={`lp3-portal lp3-portal--${p.tone}`}>
+                    <div className="lp3-portal__glow" aria-hidden />
+                    <div className="lp3-portal__top">
+                      <div className="lp3-portal__icon">{p.icon}</div>
+                      <span className="lp3-portal__arrow" aria-hidden>
+                        <svg viewBox="0 0 24 24" fill="none">
+                          <path
+                            d="M7 17L17 7M17 7H9M17 7V15"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      </span>
+                    </div>
                     <span className="lp3-portal__n">{p.n}</span>
+                    <p className="lp3-portal__tagline">{p.tagline}</p>
                     <h3>{p.role}</h3>
-                    <p>{p.desc}</p>
-                    <span className="lp3-portal__link">Sign in →</span>
+                    <p className="lp3-portal__desc">{p.desc}</p>
+                    <ul className="lp3-portal__highlights">
+                      {p.highlights.map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ul>
+                    <span className="lp3-portal__link">Sign in to portal</span>
                   </Link>
                 </StaggerItem>
               ))}
@@ -288,7 +318,7 @@ export function LandingPage() {
           </div>
         </section>
 
-        <section id="pricing" className="lp3-section">
+        <section id="pricing" className="lp3-section lp3-section--surface">
           <div className="lp3-container">
             <Reveal>
               <div className="lp3-section__head lp3-section__head--center">
@@ -330,9 +360,6 @@ export function LandingPage() {
                     <Link href="/login" className="lp3-btn lp3-btn--ghost lp3-btn--on-dark">
                       Sign in
                     </Link>
-                    <Link href="/join" className="lp3-btn lp3-btn--ghost lp3-btn--on-dark">
-                      Join with code
-                    </Link>
                   </div>
                 </div>
                 <div className="lp3-cta__app">
@@ -345,34 +372,7 @@ export function LandingPage() {
         </section>
       </main>
 
-      <footer className="lp3-footer">
-        <div className="lp3-container lp3-footer__grid">
-          <div className="lp3-footer__brand">
-            <span className="lp3-nav__mark">C1</span>
-            <div>
-              <strong>CampusOne</strong>
-              <p>
-                School management for Ethiopian and international campuses — admins, teachers,
-                students &amp; parents.
-              </p>
-            </div>
-          </div>
-          <nav className="lp3-footer__nav" aria-label="Footer">
-            <Link href="/register">Register school</Link>
-            <Link href="/login">Sign in</Link>
-            <Link href="/join">Join with code</Link>
-            <a href="#app">Mobile app</a>
-            <Link href="/platform/login">Platform admin</Link>
-          </nav>
-          <div className="lp3-footer__stores">
-            <AppStoreBadges />
-          </div>
-          <p className="lp3-footer__copy">
-            © {new Date().getFullYear()} CampusOne. All rights reserved.{" "}
-            <span className="lp3-footer__ai">Powered by AI</span>
-          </p>
-        </div>
-      </footer>
+      <LandingFooter />
 
       <BackToTop />
     </div>

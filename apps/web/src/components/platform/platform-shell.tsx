@@ -21,6 +21,7 @@ const NAV: { id: PlatformSection; label: string; icon: DashIconName }[] = [
   { id: "subjects", label: "Subjects", icon: "library" },
   { id: "library", label: "eLibrary", icon: "library" },
   { id: "messages", label: "Messages", icon: "announcements" },
+  { id: "support", label: "Support", icon: "support" },
   { id: "structures", label: "Structures", icon: "calendar" },
   { id: "assessments", label: "Assessments", icon: "results" },
   { id: "provisioning", label: "Provisioning", icon: "settings" },
@@ -31,6 +32,13 @@ const NAV: { id: PlatformSection; label: string; icon: DashIconName }[] = [
   { id: "permissions", label: "Permissions", icon: "users" },
   { id: "profile", label: "Profile", icon: "profile" },
   { id: "settings", label: "Settings", icon: "settings" },
+];
+
+const PLATFORM_MOBILE_TABS: PlatformSection[] = [
+  "overview",
+  "schools",
+  "support",
+  "billing",
 ];
 
 type Props = {
@@ -67,10 +75,15 @@ export function PlatformShell({
   const displayName = user
     ? `${user.firstName} ${user.lastName}`.trim() || user.email
     : "Platform operator";
+  const mobileTabs = PLATFORM_MOBILE_TABS.flatMap((id) => {
+    const item = NAV.find((entry) => entry.id === id);
+    return item ? [item] : [];
+  });
+  const moreActive = !PLATFORM_MOBILE_TABS.includes(section);
 
   return (
     <div
-      className={`dash-shell dash-shell--pro plat-shell${mobileNav ? " dash-shell--nav-open" : ""}`}
+      className={`dash-shell dash-shell--pro dash-shell--tabs plat-shell${mobileNav ? " dash-shell--nav-open" : ""}`}
     >
       <aside
         className={`dash-sidebar dash-sidebar--pro plat-sidebar${mobileNav ? " dash-sidebar--open" : ""}`}
@@ -158,6 +171,40 @@ export function PlatformShell({
         </header>
         <div className="dash-content dash-content--pro">{children}</div>
       </div>
+
+      <nav className="dash-tabbar" aria-label="Primary navigation">
+        {mobileTabs.map((item) => {
+          const active = section === item.id;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              className={`dash-tabbar__item${active ? " dash-tabbar__item--active" : ""}`}
+              onClick={() => {
+                onSectionChange(item.id);
+                setMobileNav(false);
+              }}
+            >
+              <span className="dash-tabbar__icon" aria-hidden>
+                <DashIcon name={item.icon} />
+              </span>
+              <span className="dash-tabbar__label">{item.label}</span>
+            </button>
+          );
+        })}
+        <button
+          type="button"
+          className={`dash-tabbar__item${moreActive || mobileNav ? " dash-tabbar__item--active" : ""}`}
+          aria-label="More menu"
+          aria-expanded={mobileNav}
+          onClick={() => setMobileNav((open) => !open)}
+        >
+          <span className="dash-tabbar__icon" aria-hidden>
+            <DashIcon name="menu" />
+          </span>
+          <span className="dash-tabbar__label">More</span>
+        </button>
+      </nav>
     </div>
   );
 }

@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { DashIcon } from "@/components/dashboard/dash-icons";
+import { AppToast } from "@/components/ui/app-toast";
 import { listGrades } from "@/lib/school-setup";
 import type { GradeWithSections } from "@/lib/api";
 import { TEACHER_ROLE_SLUGS } from "@/lib/people";
@@ -40,6 +41,39 @@ function homeroomLine(h: TeacherRecord["homeroom"]) {
 
 function teachingSlotClass(slot: TeacherRecord["teachingSlots"][0]) {
   return slot.sectionName ? `${slot.gradeName} · ${slot.sectionName}` : slot.gradeName;
+}
+
+/** Unique subject names a teacher teaches (class-subject assignments). */
+function subjectNames(t: TeacherRecord) {
+  const names = new Set<string>();
+  for (const slot of t.teachingSlots) {
+    if (slot.subjectName?.trim()) names.add(slot.subjectName.trim());
+  }
+  for (const a of t.assignments) {
+    if (!a.isHomeroom && a.subjectName?.trim()) names.add(a.subjectName.trim());
+  }
+  return Array.from(names).sort((a, b) => a.localeCompare(b));
+}
+
+function SubjectsCell({ teacher }: { teacher: TeacherRecord }) {
+  const subjects = subjectNames(teacher);
+  if (subjects.length === 0) {
+    return <span className="tch-v2__dash">—</span>;
+  }
+  const shown = subjects.slice(0, 3);
+  const rest = subjects.length - shown.length;
+  return (
+    <div className="tch-v2__chips" title={subjects.join(", ")}>
+      {shown.map((name) => (
+        <span key={name} className="tch-v2__chip tch-v2__chip--subject">
+          {name}
+        </span>
+      ))}
+      {rest > 0 ? (
+        <span className="tch-v2__chip tch-v2__chip--more">+{rest}</span>
+      ) : null}
+    </div>
+  );
 }
 
 function assignSlotHref(
@@ -148,7 +182,8 @@ export function TeachersWorkspace() {
           (t.teacherId ?? "").toLowerCase().includes(q) ||
           (t.homeroom?.gradeName ?? "").toLowerCase().includes(q) ||
           (t.homeroom?.sectionName ?? "").toLowerCase().includes(q) ||
-          roleLabel(t).toLowerCase().includes(q),
+          roleLabel(t).toLowerCase().includes(q) ||
+          subjectNames(t).some((s) => s.toLowerCase().includes(q)),
       );
     }
 
@@ -259,6 +294,7 @@ export function TeachersWorkspace() {
       }
       setDrawerOpen(false);
       resetForm();
+      setToast(editTarget ? `${displayName(editTarget)} updated.` : "Teacher added.");
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Save failed");
@@ -326,16 +362,8 @@ export function TeachersWorkspace() {
 
   return (
     <div className="tch-v2">
-      {error ? (
-        <div className="tch-v2__alert tch-v2__alert--err" role="alert">
-          {error}
-        </div>
-      ) : null}
-      {toast ? (
-        <div className="tch-v2__alert tch-v2__alert--ok" role="status">
-          {toast}
-        </div>
-      ) : null}
+      <AppToast message={error} tone="error" onDismiss={() => setError("")} />
+      <AppToast message={toast} tone="success" onDismiss={() => setToast("")} />
 
       <header className="tch-v2__hero">
         <div className="tch-v2__hero-glow" aria-hidden />
@@ -344,7 +372,8 @@ export function TeachersWorkspace() {
             <span className="tch-v2__chip">Faculty</span>
             <h2 className="tch-v2__hero-title">Teachers</h2>
             <p className="tch-v2__hero-sub">
-              Add staff and homeroom classes. Subject teaching lives on{" "}
+              Homeroom and taught subjects are listed below. Manage class
+              assignments on{" "}
               <Link href="/admin/subjects/assign" className="tch-v2__hero-link">
                 Assign subjects
               </Link>
@@ -379,7 +408,7 @@ export function TeachersWorkspace() {
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search name, email, ID, homeroom…"
+            placeholder="Search name, email, ID, subject, homeroom…"
           />
         </label>
         <select
@@ -475,6 +504,7 @@ export function TeachersWorkspace() {
                 <tr>
                   <th>Teacher</th>
                   <th>Homeroom</th>
+                  <th>Subjects</th>
                   <th aria-label="Actions" />
                 </tr>
               </thead>
@@ -505,6 +535,9 @@ export function TeachersWorkspace() {
                       ) : (
                         <span className="tch-v2__dash">—</span>
                       )}
+                    </td>
+                    <td className="tch-v2__cell tch-v2__cell--subjects">
+                      <SubjectsCell teacher={t} />
                     </td>
                     <td className="tch-v2__cell tch-v2__cell--actions">{renderActions(t)}</td>
                   </tr>
@@ -538,6 +571,10 @@ export function TeachersWorkspace() {
                   ) : (
                     <span className="tch-v2__muted">Not assigned</span>
                   )}
+                </div>
+                <div className="tch-v2__card-block">
+                  <span className="tch-v2__card-label">Subjects</span>
+                  <SubjectsCell teacher={t} />
                 </div>
                 {renderActions(t, true)}
               </article>
