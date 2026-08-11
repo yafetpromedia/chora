@@ -32,6 +32,7 @@ import "../styles/announcements-admin.css";
 import "../styles/student-dashboard.css";
 import "../styles/student-portal.css";
 import "../styles/parents.css";
+import "../styles/parent-portal.css";
 import "../styles/admissions-admin.css";
 import "../styles/support-admin.css";
 import "../styles/toast.css";

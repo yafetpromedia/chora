@@ -21,7 +21,17 @@ function LockIcon({ className }: { className?: string }) {
   );
 }
 
-export function StudentReportCardPanel() {
+type Props = {
+  role?: "student" | "parent";
+  studentProfileId?: string;
+  resultsHref?: string;
+};
+
+export function StudentReportCardPanel({
+  role = "student",
+  studentProfileId,
+  resultsHref,
+}: Props) {
   const [hydrated, setHydrated] = useState(false);
   const [loading, setLoading] = useState(true);
   const [terms, setTerms] = useState<AcademicTerm[]>([]);
@@ -35,6 +45,10 @@ export function StudentReportCardPanel() {
   const currentTerm = terms.find((t) => t.id === termId);
   const selectDisabled = !hydrated || loading || terms.length === 0;
   const refreshDisabled = !hydrated || !termId || reportLoading;
+  const resolvedResultsHref =
+    resultsHref ?? (role === "parent" ? "/parent/results" : "/student/results");
+  const printBase = role === "parent" ? "/parent" : "/student";
+  const waitingForChild = role === "parent" && !studentProfileId;
 
   useEffect(() => {
     setHydrated(true);
@@ -53,15 +67,16 @@ export function StudentReportCardPanel() {
 
   const loadReport = useCallback(async () => {
     if (!termId) return;
+    if (role === "parent" && !studentProfileId) return;
     setReportError("");
     setReportLoading(true);
     setReport(null);
     setReportPublished(null);
     try {
-      const status = await getMyReportCardStatus(termId);
+      const status = await getMyReportCardStatus(termId, studentProfileId);
       setReportPublished(status.published);
       if (status.published) {
-        setReport(await getMyReportCard(termId));
+        setReport(await getMyReportCard(termId, studentProfileId));
       }
     } catch (err) {
       setReportError(err instanceof Error ? err.message : "Failed to load report card");
@@ -69,12 +84,12 @@ export function StudentReportCardPanel() {
     } finally {
       setReportLoading(false);
     }
-  }, [termId]);
+  }, [termId, role, studentProfileId]);
 
   useEffect(() => {
-    if (!hydrated || loading || !termId) return;
+    if (!hydrated || loading || !termId || waitingForChild) return;
     void loadReport();
-  }, [hydrated, loading, termId, loadReport]);
+  }, [hydrated, loading, termId, waitingForChild, loadReport]);
 
   return (
     <div className="stu-res stu-res--report-page">
@@ -87,8 +102,12 @@ export function StudentReportCardPanel() {
             </h2>
             <p className="stu-res__hero-sub">
               {printMode === "annual"
-                ? "Full-year summary with all terms. After promotion is recorded, the printout includes a promotion stamp for the next grade."
-                : "Scores for the selected term. Your school publishes this after results are approved."}
+                ? role === "parent"
+                  ? "Full-year summary for your child. After promotion is recorded, the printout includes a promotion stamp."
+                  : "Full-year summary with all terms. After promotion is recorded, the printout includes a promotion stamp for the next grade."
+                : role === "parent"
+                  ? "Scores for the selected term. Your school publishes this after results are approved."
+                  : "Scores for the selected term. Your school publishes this after results are approved."}
             </p>
           </div>
           {reportPublished ? (
@@ -147,7 +166,7 @@ export function StudentReportCardPanel() {
               type="button"
               className="stu-res__btn stu-res__btn--primary"
               onClick={() => void loadReport()}
-              disabled={refreshDisabled}
+              disabled={refreshDisabled || waitingForChild}
             >
               {reportLoading ? "Loading…" : "Refresh report card"}
             </button>
@@ -155,7 +174,12 @@ export function StudentReportCardPanel() {
               <button
                 type="button"
                 className="stu-res__btn stu-res__btn--ghost"
-                onClick={() => openMyReportCardPrint(termId, printMode)}
+                onClick={() =>
+                  openMyReportCardPrint(termId, printMode, {
+                    studentProfileId,
+                    basePath: printBase,
+                  })
+                }
               >
                 Print / PDF
               </button>
@@ -165,7 +189,12 @@ export function StudentReportCardPanel() {
 
         {reportError ? <p className="stu-res__alert stu-res__alert--error">{reportError}</p> : null}
 
-        {reportLoading ? (
+        {waitingForChild ? (
+          <div className="stu-res__loading">
+            <span className="stu-res__spinner" aria-hidden />
+            <p>Select a child to view their report card…</p>
+          </div>
+        ) : reportLoading ? (
           <div className="stu-res__loading">
             <span className="stu-res__spinner" aria-hidden />
             <p>Checking report card status…</p>
@@ -176,13 +205,17 @@ export function StudentReportCardPanel() {
             <h3>Report card not ready</h3>
             <p>
               {currentTerm
-                ? `Your ${currentTerm.name} report card has not been published yet.`
-                : "Your report card has not been published yet."}{" "}
+                ? role === "parent"
+                  ? `The ${currentTerm.name} report card has not been published yet.`
+                  : `Your ${currentTerm.name} report card has not been published yet.`
+                : role === "parent"
+                  ? "This report card has not been published yet."
+                  : "Your report card has not been published yet."}{" "}
               The school releases this at the end of the term after all subjects are approved.
             </p>
             <p className="stu-res__empty-note">
               For day-to-day marks, see{" "}
-              <Link href="/student/results" className="stu-res__inline-link">
+              <Link href={resolvedResultsHref} className="stu-res__inline-link">
                 Results
               </Link>
               .

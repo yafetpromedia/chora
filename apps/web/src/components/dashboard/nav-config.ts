@@ -217,6 +217,8 @@ export const DASHBOARD_NAV: NavItem[] = [
   { href: "/teacher/id-card", label: "Staff ID", icon: "students", roles: ["teacher"] },
   { href: "/teacher/profile", label: "Profile", icon: "profile", roles: ["teacher"] },
   { href: "/parent", label: "Overview", icon: "overview", roles: ["parent"] },
+  { href: "/parent/results", label: "Results", icon: "results", roles: ["parent"] },
+  { href: "/parent/report-card", label: "Report card", icon: "report-card", roles: ["parent"] },
   { href: "/parent/fees", label: "Fees", icon: "fees", roles: ["parent"] },
   { href: "/parent/timetable", label: "Timetable", icon: "calendar", roles: ["parent"] },
   { href: "/parent/profile", label: "Profile", icon: "profile", roles: ["parent"] },
@@ -291,10 +293,12 @@ export function isNavActive(pathname: string, href: string) {
       pathname.startsWith("/admin/results/print")
     );
   }
-  if (href === "/student/results") {
+  if (href === "/student/results" || href === "/parent/results") {
+    const reportCard =
+      href === "/student/results" ? "/student/report-card" : "/parent/report-card";
     return (
       (pathname === href || pathname.startsWith(`${href}/`)) &&
-      !pathname.startsWith("/student/report-card")
+      !pathname.startsWith(reportCard)
     );
   }
   if (href === "/student/library" || href === "/teacher/library" || href === "/teacher/results") {
@@ -331,7 +335,7 @@ const MOBILE_TAB_PREFERENCE: Record<UserRole, string[]> = {
     "/admin/finance",
   ],
   teacher: ["/teacher", "/teacher/results", "/teacher/classwork", "/teacher/timetable"],
-  parent: ["/parent", "/parent/fees", "/parent/timetable", "/parent/profile"],
+  parent: ["/parent", "/parent/results", "/parent/fees", "/parent/timetable"],
   student: ["/student", "/student/results", "/student/classwork", "/student/timetable"],
 };
 

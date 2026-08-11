@@ -1,5 +1,5 @@
-import { RoleDashboard } from "@/components/role-dashboard";
+import { ParentDashboard } from "@/components/parent/parent-dashboard";
 
 export default function ParentPage() {
-  return <RoleDashboard role="parent" />;
+  return <ParentDashboard />;
 }

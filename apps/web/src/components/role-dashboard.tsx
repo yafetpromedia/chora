@@ -18,19 +18,15 @@ import { AUTH_ROLE_KEY, UserRole } from "@/lib/auth";
 import {
   getAttendanceAnalytics,
   getAttendanceSummary,
-  listParentNotifications,
   type AttendanceAnalytics,
   type AttendanceSummary,
-  type ParentNotification,
 } from "@/lib/attendance";
 import { AdminDashboard } from "@/components/dashboard/admin-dashboard";
 import { StaffRoleDashboard } from "@/components/dashboard/staff-role-dashboard";
 import { StudentDashboard } from "@/components/student/student-dashboard";
 import { getAdminAnalytics, type AdminAnalyticsOverview } from "@/lib/dashboard-analytics";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
-import { ParentTodayOverview } from "@/components/dashboard/today-overview";
-import { StudentIdCardPanel } from "@/components/students/student-id-card-panel";
-import type { AdminDayOverview, ParentDayOverview } from "@/lib/dashboard-day";
+import type { AdminDayOverview } from "@/lib/dashboard-day";
 import { hasPermission, Permission } from "@/lib/permissions";
 import { getStaffWorkspaceTitle } from "@/lib/staff-workspace";
 import { listLibraryResources, type LibraryResource } from "@/lib/library";
@@ -100,12 +96,9 @@ export function RoleDashboard({ role }: Props) {
   const [attendanceSummary, setAttendanceSummary] = useState<AttendanceSummary | null>(null);
   const [attendanceAnalytics, setAttendanceAnalytics] = useState<AttendanceAnalytics | null>(null);
   const [financeAnalytics, setFinanceAnalytics] = useState<FinanceAnalytics | null>(null);
-  const [parentAlerts, setParentAlerts] = useState<ParentNotification[]>([]);
   const [studentResources, setStudentResources] = useState<LibraryResource[]>([]);
   const [adminDay, setAdminDay] = useState<AdminDayOverview | null>(null);
   const [adminAnalytics, setAdminAnalytics] = useState<AdminAnalyticsOverview | null>(null);
-  const [parentDay, setParentDay] = useState<ParentDayOverview | null>(null);
-  const [selectedChildId, setSelectedChildId] = useState("");
   const router = useRouter();
 
   useEffect(() => {
@@ -132,7 +125,7 @@ export function RoleDashboard({ role }: Props) {
       try {
         const dashboardData = await apiFetch<
           Record<string, string | number> & {
-            day?: AdminDayOverview | ParentDayOverview;
+            day?: AdminDayOverview;
           }
         >("/dashboards/me");
         const announcementData = await apiFetch<Announcement[]>("/announcements");
@@ -140,9 +133,6 @@ export function RoleDashboard({ role }: Props) {
         setAnnouncements(announcementData);
         if (dashboardData.day?.kind === "admin_day") {
           setAdminDay(dashboardData.day);
-        }
-        if (dashboardData.day?.kind === "parent_day") {
-          setParentDay(dashboardData.day);
         }
 
         if (role === "student") {
@@ -158,15 +148,6 @@ export function RoleDashboard({ role }: Props) {
           setResults(resultsData);
           setAttendanceSummary(summary);
           setStudentResources(resources);
-        }
-
-        if (role === "parent") {
-          const [summary, alerts] = await Promise.all([
-            getAttendanceSummary(),
-            listParentNotifications(),
-          ]);
-          setAttendanceSummary(summary);
-          setParentAlerts(alerts);
         }
 
         if (canViewAdminDashboard) {
@@ -212,12 +193,6 @@ export function RoleDashboard({ role }: Props) {
 
     void load();
   }, [role, router, canViewAdminDashboard, isPrincipalView]);
-
-  useEffect(() => {
-    if (parentDay?.children.length) {
-      setSelectedChildId(parentDay.children[0].profileId);
-    }
-  }, [parentDay]);
 
   if (loading) {
     return (
@@ -276,50 +251,13 @@ export function RoleDashboard({ role }: Props) {
       <section className="dash-welcome dash-welcome--modern">
         <div>
           <p className="dash-welcome-eyebrow">Welcome back</p>
-          <h2>
-            {role === "teacher"
-              ? "Your classroom at a glance"
-              : `Here’s what’s happening at ${schoolName}`}
-          </h2>
+          <h2>Your classroom at a glance</h2>
         </div>
       </section>
 
       {error ? (
         <section className="auth-alert auth-alert--error dash-alert">{error}</section>
       ) : null}
-
-      {role === "parent" && parentDay && parentDay.children.length > 1 ? (
-        <div className="sid-my-panel__selector att-field no-print">
-          <span>Select child</span>
-          <select
-            value={selectedChildId}
-            onChange={(e) => setSelectedChildId(e.target.value)}
-          >
-            {parentDay.children.map((child) => (
-              <option key={child.profileId} value={child.profileId}>
-                {child.name} · {child.grade}
-                {child.section ? `-${child.section}` : ""}
-              </option>
-            ))}
-          </select>
-        </div>
-      ) : null}
-
-      {role === "parent" && parentDay && parentDay.children.length > 0 ? (
-        <StudentIdCardPanel
-          key={selectedChildId || parentDay.children[0]?.profileId}
-          source="child"
-          profileId={selectedChildId || parentDay.children[0]?.profileId}
-          className="sid-my-panel--wide"
-          title={
-            parentDay.children.length > 1
-              ? "Child ID card"
-              : `ID card · ${parentDay.children[0]?.name ?? "Student"}`
-          }
-        />
-      ) : null}
-
-      {role === "parent" && parentDay ? <ParentTodayOverview day={parentDay} /> : null}
 
       {stats.length > 0 ? (
         <section className="dash-stats dash-stats--modern" aria-label="Key metrics">
@@ -393,11 +331,9 @@ export function RoleDashboard({ role }: Props) {
                 📋
               </div>
               <p>No attendance records yet.</p>
-              {role === "teacher" ? (
-                <Link href="/teacher/attendance" className="dash-link-btn">
-                  Mark attendance
-                </Link>
-              ) : null}
+              <Link href="/teacher/attendance" className="dash-link-btn">
+                Mark attendance
+              </Link>
             </div>
           ) : (
             <ul className="dash-list">
@@ -426,11 +362,9 @@ export function RoleDashboard({ role }: Props) {
                 📊
               </div>
               <p>No results published yet.</p>
-              {role === "teacher" ? (
-                <Link href="/teacher/results" className="dash-link-btn">
-                  Enter scores
-                </Link>
-              ) : null}
+              <Link href="/teacher/results" className="dash-link-btn">
+                Enter scores
+              </Link>
             </div>
           ) : (
             <ul className="dash-list">
@@ -448,25 +382,6 @@ export function RoleDashboard({ role }: Props) {
         </article>
       </section>
 
-      {role === "parent" && parentAlerts.length > 0 ? (
-        <article className="dash-panel dash-panel--flat dash-alert-panel">
-          <div className="dash-panel-head">
-            <h2 className="dash-panel-title">Attendance alerts</h2>
-            <span className="dash-panel-badge">{parentAlerts.length}</span>
-          </div>
-          <ul className="dash-list">
-            {parentAlerts.slice(0, 5).map((n) => (
-              <li key={n.id} className="dash-list-item dash-list-item--stack">
-                <div>
-                  <p className="dash-list-title">{n.title}</p>
-                  <p className="dash-list-meta dash-announce-body">{n.body}</p>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </article>
-      ) : null}
-
       <article className="dash-panel dash-panel--flat">
         <div className="dash-panel-head">
           <h2 className="dash-panel-title">Announcements</h2>
@@ -478,7 +393,6 @@ export function RoleDashboard({ role }: Props) {
               📣
             </div>
             <p>No announcements yet.</p>
-            null
           </div>
         ) : (
           <ul className="dash-list">

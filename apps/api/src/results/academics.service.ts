@@ -1356,6 +1356,16 @@ export class AcademicsService implements OnModuleInit {
       }
       return profile.id;
     }
+    if (role === 'parent' && !requested) {
+      const link = await this.prisma.parentStudent.findFirst({
+        where: { parentId: userId, student: { schoolId } },
+        select: { studentId: true },
+      });
+      if (!link) {
+        throw new NotFoundException('No linked student found for this parent');
+      }
+      return link.studentId;
+    }
     if (!requested) {
       throw new NotFoundException('studentProfileId is required');
     }

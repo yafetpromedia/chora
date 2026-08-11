@@ -283,8 +283,9 @@ export async function upsertTermReport(
   return apiPatch(`/results/student-term-reports?${q}`, data);
 }
 
-export async function getMyReportCard(termId: string) {
+export async function getMyReportCard(termId: string, studentProfileId?: string) {
   const q = new URLSearchParams({ termId });
+  if (studentProfileId) q.set("studentProfileId", studentProfileId);
   return apiFetch<ReportCard>(`/results/report-card?${q}`);
 }
 
@@ -304,13 +305,20 @@ export type StudentScoreUpdate = {
   releasedAt: string;
 };
 
-export async function listMyScoreUpdates(termId?: string) {
-  const q = termId ? `?termId=${encodeURIComponent(termId)}` : "";
-  return apiFetch<StudentScoreUpdate[]>(`/results/student/scores${q}`);
+export async function listMyScoreUpdates(termId?: string, studentProfileId?: string) {
+  const q = new URLSearchParams();
+  if (termId) q.set("termId", termId);
+  if (studentProfileId) q.set("studentProfileId", studentProfileId);
+  const suffix = q.toString() ? `?${q}` : "";
+  return apiFetch<StudentScoreUpdate[]>(`/results/student/scores${suffix}`);
 }
 
-export async function getMyReportCardStatus(termId: string) {
+export async function getMyReportCardStatus(
+  termId: string,
+  studentProfileId?: string,
+) {
   const q = new URLSearchParams({ termId });
+  if (studentProfileId) q.set("studentProfileId", studentProfileId);
   return apiFetch<{ published: boolean; termId: string }>(
     `/results/student/report-card-status?${q}`,
   );
@@ -377,9 +385,12 @@ export function openReportCardPrint(
 export function openMyReportCardPrint(
   termId: string,
   mode: ReportCardPrintMode = "term",
+  options?: { studentProfileId?: string; basePath?: "/student" | "/parent" },
 ) {
   const q = new URLSearchParams({ termId, mode });
-  window.open(`/student/report-card/print?${q}`, "_blank");
+  if (options?.studentProfileId) q.set("studentProfileId", options.studentProfileId);
+  const base = options?.basePath ?? "/student";
+  window.open(`${base}/report-card/print?${q}`, "_blank");
 }
 
 export function resultsExportUrl(termId: string, gradeId?: string) {

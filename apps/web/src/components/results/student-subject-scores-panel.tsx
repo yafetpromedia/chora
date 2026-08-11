@@ -33,6 +33,8 @@ type Props = {
   students?: StudentOption[];
   defaultTermId?: string;
   defaultStudentId?: string;
+  /** Parent/student portal: explicit child when role is parent (or multi-account). */
+  portalStudentProfileId?: string;
   readOnly?: boolean;
   hideStudentPicker?: boolean;
   loadStudentsFromClasses?: boolean;
@@ -80,6 +82,7 @@ export function StudentSubjectScoresPanel({
   students: studentsProp = [],
   defaultTermId,
   defaultStudentId,
+  portalStudentProfileId,
   readOnly = false,
   hideStudentPicker = false,
   loadStudentsFromClasses = false,
@@ -198,13 +201,16 @@ export function StudentSubjectScoresPanel({
   const loadMatrix = useCallback(async () => {
     if (!termId) return;
     if (!isPortalView && !studentId) return;
+    if (role === "parent" && !portalStudentProfileId) return;
 
     setLoading(true);
     setError("");
     try {
       const data = await getStudentSubjectMatrix(
         termId,
-        isPortalView ? undefined : studentId,
+        isPortalView
+          ? portalStudentProfileId || undefined
+          : studentId,
       );
       setMatrix(data);
       setDraft({});
@@ -216,7 +222,7 @@ export function StudentSubjectScoresPanel({
     } finally {
       setLoading(false);
     }
-  }, [termId, studentId, isPortalView]);
+  }, [termId, studentId, isPortalView, role, portalStudentProfileId]);
 
   useEffect(() => {
     void loadMatrix();
@@ -372,8 +378,12 @@ export function StudentSubjectScoresPanel({
         <StudentSectionBanner
           tone="results"
           eyebrow={selectedTerm?.name ?? matrix?.term.name ?? "Term scores"}
-          title="My results"
-          subtitle="Scores released by your teachers, organized by subject."
+          title={role === "parent" ? "Child results" : "My results"}
+          subtitle={
+            role === "parent"
+              ? "Scores released by teachers, organized by subject."
+              : "Scores released by your teachers, organized by subject."
+          }
           icon="📊"
           stats={
             portalStats

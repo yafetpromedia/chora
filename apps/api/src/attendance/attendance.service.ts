@@ -466,7 +466,21 @@ export class AttendanceService {
           profile.sectionId,
         );
       }
+      if (role === 'parent') {
+        await this.assertParentStudentAccess(userId, profile.id);
+      }
       return profile.id;
+    }
+
+    if (role === 'parent') {
+      const link = await this.prisma.parentStudent.findFirst({
+        where: { parentId: userId, student: { schoolId } },
+        select: { studentId: true },
+      });
+      if (!link) {
+        throw new NotFoundException('No linked student found for this parent');
+      }
+      return link.studentId;
     }
 
     throw new BadRequestException('studentProfileId is required');
