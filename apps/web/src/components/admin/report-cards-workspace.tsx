@@ -16,10 +16,14 @@ import { AppToast } from "@/components/ui/app-toast";
 import type { StudentRecord } from "@/lib/api";
 import {
   getReportCard,
+  getReportCardPublishStatus,
   listTerms,
   openReportCardPrint,
+  publishReportCardsForStudent,
   type AcademicTerm,
   type ReportCard,
+  type ReportCardPrintMode,
+  type ReportCardPublishStatus,
 } from "@/lib/results";
 
 type Props = {
@@ -31,10 +35,14 @@ export function ReportCardsWorkspace({ students, onError }: Props) {
   const [terms, setTerms] = useState<AcademicTerm[]>([]);
   const [loading, setLoading] = useState(true);
   const [termId, setTermId] = useState("");
+  const [printMode, setPrintMode] = useState<ReportCardPrintMode>("term");
   const [viewStudentId, setViewStudentId] = useState("");
   const [report, setReport] = useState<ReportCard | null>(null);
+  const [publishStatus, setPublishStatus] = useState<ReportCardPublishStatus | null>(null);
   const [previewBusy, setPreviewBusy] = useState(false);
+  const [publishBusy, setPublishBusy] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
   const setErr = useCallback(
     (message: string) => {
@@ -107,7 +115,26 @@ export function ReportCardsWorkspace({ students, onError }: Props) {
     setViewStudentId(studentId);
     setTermId(nextTermId);
     setReport(null);
+    setPublishStatus(null);
+    setSuccess("");
   }
+
+  async function refreshPublishStatus(studentId: string, nextTermId: string) {
+    if (!studentId || !nextTermId) {
+      setPublishStatus(null);
+      return;
+    }
+    try {
+      setPublishStatus(await getReportCardPublishStatus(studentId, nextTermId));
+    } catch {
+      setPublishStatus(null);
+    }
+  }
+
+  useEffect(() => {
+    if (!viewStudentId || !termId) return;
+    void refreshPublishStatus(viewStudentId, termId);
+  }, [viewStudentId, termId]);
 
   async function onPreviewReport() {
     if (!viewStudentId || !termId) return;
@@ -115,10 +142,41 @@ export function ReportCardsWorkspace({ students, onError }: Props) {
     setError("");
     try {
       setReport(await getReportCard(viewStudentId, termId));
+      await refreshPublishStatus(viewStudentId, termId);
     } catch (err) {
       setErr(err instanceof Error ? err.message : "Could not load report card");
     } finally {
       setPreviewBusy(false);
+    }
+  }
+
+  async function onPublishReportCards() {
+    if (!viewStudentId || !termId || !selectedStudent) return;
+    const gradeLabel = `${selectedStudent.grade.name}${
+      selectedStudent.section ? ` · ${selectedStudent.section.name}` : ""
+    }`;
+    if (
+      !window.confirm(
+        `Publish report cards for ${gradeLabel} in this term?\n\nStudents and parents will be able to open the official report card. This publishes all subject sheets for the class.`,
+      )
+    ) {
+      return;
+    }
+    setPublishBusy(true);
+    setError("");
+    setSuccess("");
+    try {
+      const result = await publishReportCardsForStudent(viewStudentId, termId);
+      await refreshPublishStatus(viewStudentId, termId);
+      setSuccess(
+        result.published > 0
+          ? `Published ${result.published} subject sheet${result.published === 1 ? "" : "s"} for ${gradeLabel}. Families can open the report card now.`
+          : `Report cards already published for ${gradeLabel}.`,
+      );
+    } catch (err) {
+      setErr(err instanceof Error ? err.message : "Could not publish report cards");
+    } finally {
+      setPublishBusy(false);
     }
   }
 
@@ -150,6 +208,7 @@ export function ReportCardsWorkspace({ students, onError }: Props) {
       />
 
       <AppToast message={error} tone="error" onDismiss={() => setError("")} />
+      <AppToast message={success} tone="success" onDismiss={() => setSuccess("")} />
 
       <div className="rc-v2__toolbar">
         <div className="rc-v2__student-pick">
@@ -176,7 +235,39 @@ export function ReportCardsWorkspace({ students, onError }: Props) {
             ))}
           </select>
         </label>
+        <div className="rc-v2__field" role="group" aria-label="Report type">
+          <span>Report type</span>
+          <div className="rc-v2__mode-toggle">
+            <button
+              type="button"
+              className={`rc-v2__mode-btn${printMode === "term" ? " is-active" : ""}`}
+              aria-pressed={printMode === "term"}
+              onClick={() => setPrintMode("term")}
+            >
+              Term
+            </button>
+            <button
+              type="button"
+              className={`rc-v2__mode-btn${printMode === "annual" ? " is-active" : ""}`}
+              aria-pressed={printMode === "annual"}
+              onClick={() => setPrintMode("annual")}
+            >
+              Year-end
+            </button>
+          </div>
+        </div>
         <div className="rc-v2__toolbar-actions">
+          {publishStatus ? (
+            <span
+              className={`rc-v2__publish-pill${
+                publishStatus.published ? " is-live" : ""
+              }`}
+            >
+              {publishStatus.published
+                ? "Visible to families"
+                : `${publishStatus.publishedCount}/${publishStatus.total} sheets published`}
+            </span>
+          ) : null}
           <button
             type="button"
             className="rc-v2__btn rc-v2__btn--primary"
@@ -188,8 +279,27 @@ export function ReportCardsWorkspace({ students, onError }: Props) {
           {viewStudentId && termId ? (
             <button
               type="button"
+              className="rc-v2__btn rc-v2__btn--accent"
+              disabled={
+                publishBusy ||
+                !publishStatus?.canPublish ||
+                publishStatus.published
+              }
+              onClick={() => void onPublishReportCards()}
+              title="Publish all subject sheets for this student's class so families can open the report card"
+            >
+              {publishBusy
+                ? "Publishing…"
+                : publishStatus?.published
+                  ? "Published"
+                  : "Publish to families"}
+            </button>
+          ) : null}
+          {viewStudentId && termId ? (
+            <button
+              type="button"
               className="rc-v2__btn rc-v2__btn--ghost"
-              onClick={() => openReportCardPrint(viewStudentId, termId)}
+              onClick={() => openReportCardPrint(viewStudentId, termId, printMode)}
             >
               Print / PDF
             </button>
@@ -206,7 +316,9 @@ export function ReportCardsWorkspace({ students, onError }: Props) {
             <div>
               <h3 className="rc-v2__card-title">Preview &amp; print</h3>
               <p className="rc-v2__card-sub">
-                Review scores and rankings before sending the family booklet.
+                {printMode === "annual"
+                  ? "Year-end report with full-year scores and promotion stamp when available."
+                  : "Term report for the selected period — one page for families."}
               </p>
             </div>
           </header>
@@ -214,7 +326,9 @@ export function ReportCardsWorkspace({ students, onError }: Props) {
           {report ? (
             <div className="rc-booklet">
               <p className="rc-booklet__hint">
-                A4 landscape · front &amp; back · school header from Settings
+                {printMode === "annual"
+                  ? "A4 landscape · year-end summary + results grid · promotion stamp when recorded"
+                  : "A4 landscape · single-page term report · school header from Settings"}
               </p>
 
               <div className="rc-booklet__pages">
@@ -358,9 +472,9 @@ export function ReportCardsWorkspace({ students, onError }: Props) {
                 <button
                   type="button"
                   className="rc-v2__btn rc-v2__btn--primary"
-                  onClick={() => openReportCardPrint(viewStudentId, termId)}
+                  onClick={() => openReportCardPrint(viewStudentId, termId, printMode)}
                 >
-                  Open print booklet
+                  Open print {printMode === "annual" ? "year-end" : "term"} report
                 </button>
                 <p>Print duplex · landscape A4 · customize header in Settings</p>
               </div>

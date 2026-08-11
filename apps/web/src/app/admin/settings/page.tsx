@@ -12,16 +12,7 @@ import { PilotHandoutPanel } from "@/components/admin/pilot-handout-panel";
 import { TrialBanner } from "@/components/trial-banner";
 import { DashIcon } from "@/components/dashboard/dash-icons";
 import { DashboardPage } from "@/components/dashboard/dashboard-page";
-import {
-  downloadAttendanceExport,
-  type AttendanceMode,
-} from "@/lib/attendance";
-import { downloadFinanceExport } from "@/lib/finance";
-import {
-  downloadParentsReport,
-  downloadStudentsReport,
-  downloadTeachersReport,
-} from "@/lib/school-reports";
+import { type AttendanceMode } from "@/lib/attendance";
 import type { SchoolType } from "@/lib/api";
 import { getSchoolSubscription, type SubscriptionStatus } from "@/lib/api";
 import { SchoolLogoUpload } from "@/components/school/school-logo-upload";
@@ -57,69 +48,6 @@ const ATTENDANCE_MODES: {
   { value: "DAILY", label: "Daily", desc: "Once per day — primary schools", mark: "D" },
   { value: "PERIOD", label: "Period", desc: "Each class period", mark: "P" },
   { value: "BOTH", label: "Both", desc: "Daily + period tracking", mark: "B" },
-];
-
-type ReportKind =
-  | "attendance"
-  | "finance"
-  | "students"
-  | "teachers"
-  | "parents";
-
-const REPORTS: {
-  id: ReportKind;
-  title: string;
-  desc: string;
-  tag: string;
-  tagClass?: string;
-  icon: "attendance" | "finance" | "students" | "teachers" | "users";
-  iconClass?: string;
-  usesRange?: boolean;
-}[] = [
-  {
-    id: "attendance",
-    title: "Attendance records",
-    desc: "Daily and period marks for the selected date range.",
-    tag: "Date range",
-    tagClass: "set-v2__report-tag--range",
-    icon: "attendance",
-    iconClass: "set-v2__report-icon--attendance",
-    usesRange: true,
-  },
-  {
-    id: "finance",
-    title: "Fee payments",
-    desc: "Collections, allocations, and payment activity.",
-    tag: "Date range",
-    tagClass: "set-v2__report-tag--range",
-    icon: "finance",
-    iconClass: "set-v2__report-icon--finance",
-    usesRange: true,
-  },
-  {
-    id: "students",
-    title: "Student roster",
-    desc: "All enrolled students with grade, contact, and parent info.",
-    tag: "Snapshot",
-    icon: "students",
-    iconClass: "set-v2__report-icon--people",
-  },
-  {
-    id: "teachers",
-    title: "Teachers & staff",
-    desc: "Staff directory with homeroom and teaching assignments.",
-    tag: "Snapshot",
-    icon: "teachers",
-    iconClass: "set-v2__report-icon--people",
-  },
-  {
-    id: "parents",
-    title: "Parent accounts",
-    desc: "Linked parent logins and their children.",
-    tag: "Snapshot",
-    icon: "users",
-    iconClass: "set-v2__report-icon--people",
-  },
 ];
 
 const TABS: { id: Tab; label: string; icon: "settings" | "attendance" | "users" | "finance" }[] = [
@@ -162,14 +90,6 @@ export default function AdminSettingsPage() {
   const [reportCardTitle, setReportCardTitle] = useState("");
   const [reportCardTagline, setReportCardTagline] = useState("");
   const [attendanceMode, setAttendanceMode] = useState<AttendanceMode>("DAILY");
-
-  const [exportFrom, setExportFrom] = useState(() => {
-    const d = new Date();
-    d.setDate(1);
-    return d.toISOString().slice(0, 10);
-  });
-  const [exportTo, setExportTo] = useState(() => new Date().toISOString().slice(0, 10));
-  const [exportingReport, setExportingReport] = useState<ReportKind | null>(null);
 
   function applySchool(s: SchoolSettings) {
     setSchool(s);
@@ -265,34 +185,6 @@ export default function AdminSettingsPage() {
     void navigator.clipboard.writeText(school.joinCode);
     setCodeCopied(true);
     window.setTimeout(() => setCodeCopied(false), 2000);
-  }
-
-  async function runReport(kind: ReportKind) {
-    setExportingReport(kind);
-    setError("");
-    setToast(null);
-    try {
-      if (kind === "attendance") {
-        await downloadAttendanceExport(exportFrom, exportTo);
-        setToast("Attendance report downloaded.");
-      } else if (kind === "finance") {
-        await downloadFinanceExport(exportFrom, exportTo);
-        setToast("Fee payments report downloaded.");
-      } else if (kind === "students") {
-        await downloadStudentsReport();
-        setToast("Student roster downloaded.");
-      } else if (kind === "teachers") {
-        await downloadTeachersReport();
-        setToast("Teachers & staff report downloaded.");
-      } else if (kind === "parents") {
-        await downloadParentsReport();
-        setToast("Parent accounts report downloaded.");
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Export failed");
-    } finally {
-      setExportingReport(null);
-    }
   }
 
   const planShortLabel = subscription?.planLabel?.split(" ")[0] ?? "Plan";
@@ -645,62 +537,14 @@ export default function AdminSettingsPage() {
                 <div>
                   <h2 className="set-v2__panel-title">School reports & exports</h2>
                   <p className="set-v2__panel-sub">
-                    Download CSV files for attendance, finance, students, teachers, and parents.
+                    CSV downloads for attendance, fees, results, and rosters now live under
+                    Reports.
                   </p>
                 </div>
               </div>
-
-              <div className="set-v2__report-range">
-                <div>
-                  <p className="set-v2__report-range-label">Report period</p>
-                  <div className="set-v2__export-row">
-                    <label className="att-field">
-                      <span>From</span>
-                      <input
-                        type="date"
-                        value={exportFrom}
-                        onChange={(e) => setExportFrom(e.target.value)}
-                      />
-                    </label>
-                    <label className="att-field">
-                      <span>To</span>
-                      <input
-                        type="date"
-                        value={exportTo}
-                        onChange={(e) => setExportTo(e.target.value)}
-                      />
-                    </label>
-                  </div>
-                </div>
-              </div>
-
-              <div className="set-v2__report-grid">
-                {REPORTS.map((report) => (
-                  <button
-                    key={report.id}
-                    type="button"
-                    className="set-v2__report-card"
-                    disabled={exportingReport != null}
-                    onClick={() => void runReport(report.id)}
-                  >
-                    <span
-                      className={`set-v2__report-icon ${report.iconClass ?? ""}`.trim()}
-                      aria-hidden
-                    >
-                      <DashIcon name={report.icon} className="dash-icon--sm" />
-                    </span>
-                    <span className="set-v2__report-body">
-                      <strong className="set-v2__report-title">
-                        {exportingReport === report.id ? "Preparing…" : report.title}
-                      </strong>
-                      <span className="set-v2__report-desc">{report.desc}</span>
-                    </span>
-                    <span className={`set-v2__report-tag ${report.tagClass ?? ""}`.trim()}>
-                      {report.tag}
-                    </span>
-                  </button>
-                ))}
-              </div>
+              <Link href="/admin/reports" className="cfg-btn cfg-btn--primary">
+                Open Reports
+              </Link>
             </section>
           </div>
         ) : null}

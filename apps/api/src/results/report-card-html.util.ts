@@ -1,5 +1,7 @@
 ﻿import { buildCardScanPayload } from '../students/student-card.util';
 
+export type ReportCardMode = 'term' | 'annual';
+
 export type ReportCardSubjectGridRow = {
   subject: string;
   term1: number | null;
@@ -16,16 +18,27 @@ export type ReportCardSummaryColumn = {
   average: number | null;
 };
 
+export type ReportCardTermSubjectRow = {
+  subject: string;
+  average: number | null;
+  letter: string | null;
+};
+
+export type ReportCardPromotion = {
+  outcome: 'PROMOTED' | 'GRADUATED' | 'RETAINED' | 'PASSED';
+  label: string;
+  nextGradeLabel: string | null;
+};
+
 export type ReportCardPrintPayload = {
+  mode: ReportCardMode;
   school: {
     name: string;
     logoUrl: string | null;
     address: string | null;
     email: string | null;
     phone: string | null;
-    /** Per-school document title (defaults in renderer). */
     headerTitle: string | null;
-    /** Per-school motto / tagline under the school name. */
     headerTagline: string | null;
   };
   student: {
@@ -34,14 +47,16 @@ export type ReportCardPrintPayload = {
     sex: string | null;
     age: number | null;
     gradeLabel: string;
-    academicYearEc: string;
     academicYear: string;
     cardCode: string | null;
     photoUrl: string | null;
   };
   termName: string;
+  promotion: ReportCardPromotion | null;
+  /** @deprecated Prefer promotion.label — kept for callers that still read it. */
   promotionText: string | null;
   subjectGrid: ReportCardSubjectGridRow[];
+  termSubjects: ReportCardTermSubjectRow[];
   summary: {
     term1: ReportCardSummaryColumn;
     term2: ReportCardSummaryColumn;
@@ -54,8 +69,11 @@ export type ReportCardPrintPayload = {
     conduct: string | null;
     rank: number | null;
     classSize: number;
+    attendanceRate: number | null;
   };
   remarks: {
+    teacher: string | null;
+    principal: string | null;
     semester1: string | null;
     semester2: string | null;
     cumulative: string | null;
@@ -72,7 +90,7 @@ function escapeHtml(value: string): string {
 }
 
 function fmtScore(value: number | null | undefined): string {
-  if (value == null || Number.isNaN(value)) return 'â€”';
+  if (value == null || Number.isNaN(value)) return '—';
   return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
 
@@ -89,6 +107,7 @@ function sumNullable(values: Array<number | null | undefined>): number | null {
   return Math.round(nums.reduce((a, b) => a + b, 0) * 10) / 10;
 }
 
+/** @deprecated Prefer academic year name from the database. */
 export function ethiopianCalendarYear(date = new Date()): number {
   const month = date.getMonth() + 1;
   const year = date.getFullYear();
@@ -149,6 +168,7 @@ export function buildSummaryFromGrid(
   conduct: string | null,
   rank: number | null,
   classSize: number,
+  attendanceRate: number | null = null,
 ): ReportCardPrintPayload['summary'] {
   const col = (pick: (row: ReportCardSubjectGridRow) => number | null) => ({
     total: sumNullable(grid.map(pick)),
@@ -167,6 +187,7 @@ export function buildSummaryFromGrid(
     conduct,
     rank,
     classSize,
+    attendanceRate,
   };
 }
 
@@ -189,7 +210,9 @@ function scoreTone(score: number | null | undefined): string {
 }
 
 function fmtScoreCell(value: number | null | undefined, emphasize = false): string {
-  if (value == null || Number.isNaN(value)) return '<span class="rc-cell rc-cell--empty">â€”</span>';
+  if (value == null || Number.isNaN(value)) {
+    return '<span class="rc-cell rc-cell--empty">—</span>';
+  }
   const letter = letterGrade(value);
   const tone = scoreTone(value);
   const display = fmtScore(value);
@@ -212,196 +235,70 @@ function summaryTotalCells(summary: ReportCardSummaryColumn): string {
   return `<td>${fmtScoreCell(summary.total)}</td>`;
 }
 
-function scoreRingSvg(percent: number | null): string {
-  const value = percent != null && !Number.isNaN(percent) ? Math.min(100, Math.max(0, percent)) : 0;
-  const radius = 40;
-  const circumference = 2 * Math.PI * radius;
-  const offset = circumference - (value / 100) * circumference;
-  const display = percent != null ? fmtScore(percent) : 'â€”';
-  const letter = letterGrade(percent);
-  const stroke = ringStroke(percent);
-  return `
-    <svg class="rc-ring" viewBox="0 0 100 100" aria-hidden="true">
-      <circle class="rc-ring__track" cx="50" cy="50" r="${radius}" />
-      <circle class="rc-ring__fill" cx="50" cy="50" r="${radius}"
-        stroke="${stroke}"
-        stroke-dasharray="${circumference.toFixed(2)}"
-        stroke-dashoffset="${offset.toFixed(2)}" />
-    </svg>
-    <div class="rc-ring__label">
-      <strong>${display}</strong>
-      <span>%</span>
-      ${letter ? `<em>${letter}</em>` : ''}
-    </div>`;
-}
-
-function achievementLabel(avg: number | null | undefined): string {
-  if (avg == null || Number.isNaN(avg)) return 'Academic record in progress';
-  if (avg >= 90) return 'Outstanding performance';
-  if (avg >= 80) return 'Excellent standing';
-  if (avg >= 70) return 'Good academic progress';
-  if (avg >= 60) return 'Satisfactory progress';
-  return 'Needs focused support';
-}
-
-function ringStroke(percent: number | null | undefined): string {
-  if (percent == null || Number.isNaN(percent)) return '#94a3b8';
-  if (percent >= 85) return '#15803d';
-  if (percent >= 70) return '#1d4ed8';
-  if (percent >= 50) return '#b45309';
-  return '#b91c1c';
-}
-
-function subjectSnapshotHtml(grid: ReportCardSubjectGridRow[]): string {
-  if (grid.length === 0) return '';
-  return grid
-    .map((row) => {
-      const score = row.cumulative ?? row.semester1 ?? row.term1;
-      const pct = score != null && !Number.isNaN(score) ? Math.min(100, Math.max(0, score)) : 0;
-      const tone = scoreTone(score);
-      const letter = letterGrade(score);
-      return `
-        <article class="rc-snap ${tone}">
-          <div class="rc-snap__top">
-            <strong>${escapeHtml(row.subject)}</strong>
-            <span>${fmtScore(score)}${letter ? ` · ${letter}` : ''}</span>
-          </div>
-          <div class="rc-snap__bar" aria-hidden="true"><i style="width:${pct}%"></i></div>
-        </article>`;
-    })
-    .join('');
-}
-
-function remarkCard(label: string, text: string | null): string {
+function remarkBlock(label: string, text: string | null): string {
   return `
     <div class="rc-remark">
       <div class="rc-remark__head">${escapeHtml(label)}</div>
       <div class="rc-remark__body">
-        <p>${text ? escapeHtml(text) : '<span class="rc-remark__empty">No remark recorded.</span>'}</p>
+        <p>${text ? escapeHtml(text) : '<span class="rc-empty">No remark recorded.</span>'}</p>
       </div>
     </div>`;
 }
 
-export function buildEthiopianReportCardHtml(data: ReportCardPrintPayload): string {
-  const schoolName = escapeHtml(data.school.name);
-  const studentName = escapeHtml(data.student.name);
-  const studentNameUpper = escapeHtml(data.student.name.toUpperCase());
-  const headerTitle = escapeHtml(
-    data.school.headerTitle?.trim() || 'Student Report Card',
-  );
-  const headerTagline = data.school.headerTagline?.trim()
-    ? escapeHtml(data.school.headerTagline.trim())
-    : null;
-  const qrPayload = data.student.cardCode
-    ? buildCardScanPayload(data.student.cardCode)
-    : `CAMPUS1:STUDENT:${data.student.number ?? 'unknown'}`;
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&margin=4&data=${encodeURIComponent(qrPayload)}`;
-  const logo = data.school.logoUrl
-    ? `<img class="rc-logo" src="${escapeHtml(data.school.logoUrl)}" alt=""/>`
-    : `<div class="rc-logo rc-logo--fallback" aria-hidden="true">${schoolName.slice(0, 2).toUpperCase()}</div>`;
-  const avatar = data.student.photoUrl
-    ? `<img class="rc-avatar rc-avatar--photo" src="${escapeHtml(data.student.photoUrl)}" alt=""/>`
-    : `<div class="rc-avatar" aria-hidden="true">${escapeHtml(
-        data.student.name
-          .trim()
-          .split(/\s+/)
-          .map((p) => p[0])
-          .filter(Boolean)
-          .slice(0, 2)
-          .join('')
-          .toUpperCase() || '?',
-      )}</div>`;
+function promotionStampHtml(promotion: ReportCardPromotion): string {
+  const title =
+    promotion.outcome === 'PROMOTED'
+      ? 'PROMOTED'
+      : promotion.outcome === 'GRADUATED'
+        ? 'GRADUATED'
+        : promotion.outcome === 'RETAINED'
+          ? 'RETAINED'
+          : 'PASSED';
+  const sub =
+    promotion.outcome === 'PROMOTED' && promotion.nextGradeLabel
+      ? escapeHtml(promotion.nextGradeLabel)
+      : escapeHtml(promotion.label);
+  const tone =
+    promotion.outcome === 'RETAINED'
+      ? 'rc-stamp--retain'
+      : promotion.outcome === 'GRADUATED'
+        ? 'rc-stamp--grad'
+        : 'rc-stamp--promo';
 
-  const subjectRows = data.subjectGrid
-    .map(
-      (row, i) => `
-      <tr class="${i % 2 === 1 ? 'is-alt' : ''}">
-        <th scope="row">${escapeHtml(row.subject)}</th>
-        ${subjectRowCells(row)}
-      </tr>`,
-    )
-    .join('');
-
-  const contactBits = [
-    data.school.address ? escapeHtml(data.school.address) : '',
-    data.school.phone ? escapeHtml(data.school.phone) : '',
-    data.school.email ? escapeHtml(data.school.email) : '',
-  ].filter(Boolean);
-  const contactLine = contactBits.join(' · ');
-  const rankLabel =
-    data.summary.rank != null ? `${data.summary.rank} / ${data.summary.classSize}` : '—';
-  const documentRef = escapeHtml(
-    data.student.cardCode ?? data.student.number ?? 'DRAFT',
-  );
-  const avgNumeric = data.summary.cumulative.average;
-  const achievement = achievementLabel(avgNumeric);
-  const issuedDate = escapeHtml(
-    new Date(data.generatedAt).toLocaleDateString('en-GB', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-    }),
-  );
-  const yearLabel = `${escapeHtml(data.student.academicYear)} · ${escapeHtml(data.student.academicYearEc)} E.C.`;
-  const snap = subjectSnapshotHtml(data.subjectGrid);
-
-  const schoolHeader = `
-    <header class="rc-brand">
-      ${logo}
-      <div class="rc-brand__text">
-        <p class="rc-brand__doc">${headerTitle}</p>
-        <h1>${schoolName}</h1>
-        ${headerTagline ? `<p class="rc-brand__tag">${headerTagline}</p>` : ''}
-        <p class="rc-brand__meta">${yearLabel}${contactLine ? ` · ${contactLine}` : ''}</p>
+  return `
+    <aside class="rc-stamp ${tone}" aria-label="${escapeHtml(promotion.label)}">
+      <svg class="rc-stamp__ring" viewBox="0 0 120 120" aria-hidden="true">
+        <circle cx="60" cy="60" r="54" fill="none" stroke="currentColor" stroke-width="3" stroke-dasharray="4 3"/>
+        <circle cx="60" cy="60" r="46" fill="none" stroke="currentColor" stroke-width="1.5"/>
+      </svg>
+      <div class="rc-stamp__copy">
+        <strong>${title}</strong>
+        <span>${sub}</span>
       </div>
-      <div class="rc-brand__side">
-        <span class="rc-brand__badge">Official</span>
-        <span class="rc-brand__page">Page <strong>1</strong> · Front</span>
-      </div>
-    </header>`;
+    </aside>`;
+}
 
-  const schoolHeaderBack = `
-    <header class="rc-brand rc-brand--compact">
-      ${logo}
-      <div class="rc-brand__text">
-        <p class="rc-brand__doc">${headerTitle}</p>
-        <h1>${schoolName}</h1>
-        <p class="rc-brand__meta">${studentName} · ${escapeHtml(data.student.gradeLabel)} · ${yearLabel}</p>
-      </div>
-      <div class="rc-brand__side">
-        <span class="rc-brand__page">Page <strong>2</strong> · Back</span>
-      </div>
-    </header>`;
-
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8"/>
-  <title>${headerTitle} — ${studentNameUpper}</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com"/>
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&family=Noto+Sans+Ethiopic:wght@400;600;700&display=swap" rel="stylesheet"/>
-  <style>
+function sharedStyles(): string {
+  return `
     :root {
-      --ink: #122427;
-      --muted: #5b7274;
-      --line: #d5e3df;
+      --ink: #0f172a;
+      --muted: #64748b;
+      --line: #e2e8f0;
       --paper: #ffffff;
-      --soft: #f3faf7;
-      --teal: #0f766e;
-      --teal-dark: #115e59;
-      --navy: #1e3a5f;
-      --excellent-bg: #e7f8ef; --excellent-fg: #166534;
-      --good-bg: #e8f1ff; --good-fg: #1d4ed8;
-      --fair-bg: #fff7e6; --fair-fg: #b45309;
-      --low-bg: #feecec; --low-fg: #b91c1c;
+      --soft: #f8fafc;
+      --accent: #0f766e;
+      --accent-dark: #115e59;
+      --excellent-bg: #ecfdf5; --excellent-fg: #166534;
+      --good-bg: #eff6ff; --good-fg: #1d4ed8;
+      --fair-bg: #fffbeb; --fair-fg: #b45309;
+      --low-bg: #fef2f2; --low-fg: #b91c1c;
     }
     * { box-sizing: border-box; }
     body {
       margin: 0;
       font-family: "DM Sans", "Segoe UI", system-ui, sans-serif;
       color: var(--ink);
-      background: #e8eef0;
+      background: #eef2f7;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
     }
@@ -414,242 +311,165 @@ export function buildEthiopianReportCardHtml(data: ReportCardPrintPayload): stri
       overflow: hidden;
       page-break-after: always;
       page-break-inside: avoid;
-      box-shadow: 0 10px 28px rgba(18, 36, 39, 0.12);
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
     }
     .rc-page:last-child { page-break-after: auto; margin-bottom: 0; }
-    .rc-page__bar {
-      position: absolute; inset: 0 0 auto 0; height: 5mm;
-      background: linear-gradient(90deg, var(--teal-dark), var(--teal) 55%, #0d9488);
+    .rc-page__accent {
+      position: absolute; inset: 0 auto 0 0; width: 3.5mm;
+      background: var(--accent);
     }
     .rc-sheet {
       height: 100%;
-      padding: 9mm 10mm 7mm;
+      padding: 10mm 12mm 8mm 14mm;
       display: flex;
       flex-direction: column;
-      gap: 3.2mm;
+      gap: 4mm;
     }
     .rc-brand {
       display: grid;
       grid-template-columns: auto 1fr auto;
-      gap: 3.5mm;
+      gap: 4mm;
       align-items: center;
-      padding: 2.8mm 3.2mm;
-      border: 1px solid var(--line);
-      border-radius: 3mm;
-      background:
-        radial-gradient(circle at 0% 0%, rgba(15,118,110,.08), transparent 45%),
-        linear-gradient(180deg, #fff, var(--soft));
+      padding-bottom: 3mm;
+      border-bottom: 1px solid var(--line);
     }
-    .rc-brand--compact { padding: 2.2mm 3mm; }
     .rc-logo {
-      width: 16mm; height: 16mm; border-radius: 50%;
-      object-fit: cover; border: 2px solid #fff;
-      box-shadow: 0 0 0 1.5px rgba(15,118,110,.35);
-      flex-shrink: 0;
+      width: 16mm; height: 16mm; border-radius: 3mm;
+      object-fit: cover; border: 1px solid var(--line);
+      background: var(--soft);
     }
-    .rc-brand--compact .rc-logo { width: 12mm; height: 12mm; }
     .rc-logo--fallback {
       display: grid; place-items: center;
-      background: linear-gradient(145deg, var(--teal-dark), var(--navy));
-      color: #fff; font-weight: 800; font-size: 5mm; letter-spacing: .04em;
+      background: var(--accent);
+      color: #fff; font-weight: 800; font-size: 5mm;
     }
     .rc-brand__doc {
-      margin: 0; font-size: 2.1mm; font-weight: 800;
-      letter-spacing: .14em; text-transform: uppercase; color: var(--teal);
+      margin: 0; font-size: 2.2mm; font-weight: 700;
+      letter-spacing: .12em; text-transform: uppercase; color: var(--accent);
     }
     .rc-brand h1 {
-      margin: 0.6mm 0 0; font-size: 5.2mm; font-weight: 800;
-      letter-spacing: .02em; line-height: 1.1; color: var(--navy);
-      text-transform: uppercase;
+      margin: 0.8mm 0 0; font-size: 5.4mm; font-weight: 800;
+      letter-spacing: .01em; line-height: 1.1; color: var(--ink);
     }
-    .rc-brand--compact h1 { font-size: 4.2mm; }
     .rc-brand__tag {
-      margin: 0.8mm 0 0; font-size: 2.5mm; font-weight: 600;
-      color: var(--muted); font-style: italic;
+      margin: 0.8mm 0 0; font-size: 2.4mm; font-weight: 500; color: var(--muted);
     }
     .rc-brand__meta {
       margin: 1mm 0 0; font-size: 2.2mm; color: var(--muted); font-weight: 600;
     }
-    .rc-brand__side { text-align: right; display: grid; gap: 1.4mm; justify-items: end; }
-    .rc-brand__badge {
-      padding: 0.8mm 2.2mm; border-radius: 999px;
-      background: var(--teal); color: #fff;
-      font-size: 2mm; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
+    .rc-brand__side {
+      text-align: right; font-size: 2.2mm; color: var(--muted); font-weight: 600;
+      line-height: 1.45;
     }
-    .rc-brand__page {
-      font-size: 2.1mm; color: var(--muted); font-weight: 700; text-transform: uppercase;
-    }
-    .rc-brand__page strong { color: var(--teal-dark); }
+    .rc-brand__side strong { display: block; color: var(--ink); font-size: 2.6mm; }
 
-    .rc-front {
+    .rc-layout {
       flex: 1; min-height: 0;
       display: grid;
-      grid-template-columns: 1.15fr 0.85fr;
-      gap: 3.2mm;
+      grid-template-columns: 1.05fr 0.95fr;
+      gap: 4mm;
     }
-    .rc-card {
+    .rc-layout--term { grid-template-columns: 0.9fr 1.1fr; }
+    .rc-panel {
       border: 1px solid var(--line);
-      border-radius: 2.6mm;
+      border-radius: 2.5mm;
       background: #fff;
       display: flex; flex-direction: column; min-height: 0; overflow: hidden;
     }
-    .rc-card__h {
-      margin: 0; padding: 1.8mm 2.6mm;
-      font-size: 2.2mm; font-weight: 800; letter-spacing: .1em;
-      text-transform: uppercase; color: var(--teal-dark);
+    .rc-panel__h {
+      margin: 0; padding: 2mm 3mm;
+      font-size: 2.2mm; font-weight: 800; letter-spacing: .08em;
+      text-transform: uppercase; color: var(--accent-dark);
       background: var(--soft); border-bottom: 1px solid var(--line);
     }
-    .rc-card__b { padding: 2.6mm; flex: 1; min-height: 0; }
+    .rc-panel__b { padding: 3mm; flex: 1; min-height: 0; }
 
     .rc-id {
-      display: grid; grid-template-columns: 18mm 1fr; gap: 2.8mm; align-items: center;
-      margin-bottom: 2.4mm;
+      display: grid; grid-template-columns: 18mm 1fr; gap: 3mm; align-items: center;
+      margin-bottom: 3mm;
     }
     .rc-avatar {
-      width: 18mm; height: 18mm; border-radius: 50%;
+      width: 18mm; height: 18mm; border-radius: 3mm;
       display: grid; place-items: center;
-      background: linear-gradient(145deg, #ccfbf1, #99f6e4);
-      color: var(--teal-dark); font-weight: 800; font-size: 5mm;
-      border: 1.5px solid rgba(15,118,110,.25);
+      background: var(--soft);
+      color: var(--accent-dark); font-weight: 800; font-size: 5mm;
+      border: 1px solid var(--line);
     }
     .rc-avatar--photo { object-fit: cover; padding: 0; }
     .rc-id strong {
-      display: block; font-size: 4mm; letter-spacing: .03em;
-      text-transform: uppercase; line-height: 1.15;
+      display: block; font-size: 4mm; letter-spacing: .02em; line-height: 1.15;
     }
     .rc-id span { display: block; margin-top: 0.8mm; font-size: 2.3mm; color: var(--muted); font-weight: 600; }
 
     .rc-fields {
-      display: grid; grid-template-columns: 1fr 1fr; gap: 1.6mm;
+      display: grid; grid-template-columns: 1fr 1fr; gap: 2mm;
     }
     .rc-field {
       border: 1px solid var(--line); border-radius: 1.8mm;
-      padding: 1.4mm 1.8mm; background: #fbfdfe;
+      padding: 1.6mm 2mm; background: var(--soft);
     }
     .rc-field em {
       display: block; font-style: normal; font-size: 1.9mm;
-      color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+      color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
     }
     .rc-field strong {
       display: block; margin-top: 0.6mm; font-size: 2.7mm; font-weight: 700;
     }
 
-    .rc-perf { display: grid; gap: 2.4mm; }
-    .rc-ring-row {
-      display: grid; grid-template-columns: 28mm 1fr; gap: 2.4mm; align-items: center;
+    .rc-kpis {
+      display: grid; grid-template-columns: repeat(2, 1fr); gap: 2mm; margin-bottom: 3mm;
     }
-    .rc-ring-shell { position: relative; width: 28mm; height: 28mm; }
-    .rc-ring { width: 100%; height: 100%; transform: rotate(-90deg); }
-    .rc-ring__track { fill: none; stroke: #e2e8f0; stroke-width: 8; }
-    .rc-ring__fill { fill: none; stroke-width: 8; stroke-linecap: round; }
-    .rc-ring__label {
-      position: absolute; inset: 0; display: grid; place-items: center; text-align: center;
-    }
-    .rc-ring__label strong { font-size: 5mm; font-weight: 800; line-height: 1; }
-    .rc-ring__label span { font-size: 2mm; color: var(--muted); font-weight: 700; }
-    .rc-ring__label em { font-style: normal; font-size: 2.4mm; font-weight: 800; color: var(--teal); }
-    .rc-ring-meta h4 { margin: 0; font-size: 2.8mm; color: var(--navy); }
-    .rc-ring-meta p { margin: 1mm 0 0; font-size: 2.2mm; color: var(--muted); line-height: 1.35; }
-
-    .rc-stats {
-      display: grid; grid-template-columns: 1fr 1fr; gap: 1.6mm;
-    }
-    .rc-stat {
+    .rc-kpi {
       border: 1px solid var(--line); border-radius: 1.8mm;
-      padding: 1.6mm 1.8mm; background: var(--soft);
+      padding: 2mm 2.2mm; background: var(--soft);
     }
-    .rc-stat em {
+    .rc-kpi em {
       display: block; font-style: normal; font-size: 1.9mm;
-      text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 700;
+      text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 700;
     }
-    .rc-stat strong { display: block; margin-top: 0.6mm; font-size: 3.2mm; font-weight: 800; }
+    .rc-kpi strong { display: block; margin-top: 0.6mm; font-size: 3.4mm; font-weight: 800; }
 
-    .rc-verify {
-      display: grid; grid-template-columns: 22mm 1fr; gap: 2.2mm; align-items: center;
-      padding: 2mm; border: 1px dashed rgba(15,118,110,.35); border-radius: 2mm; background: #f0fdfa;
+    .rc-stamp {
+      position: relative;
+      width: 34mm; height: 34mm;
+      margin: 2mm auto 0;
+      color: var(--accent);
+      display: grid; place-items: center;
     }
-    .rc-verify img { width: 22mm; height: 22mm; border-radius: 1.5mm; background: #fff; }
-    .rc-verify strong { display: block; font-size: 2.3mm; color: var(--teal-dark); text-transform: uppercase; letter-spacing: .06em; }
-    .rc-verify p { margin: 0.8mm 0 0; font-size: 2.1mm; color: var(--muted); line-height: 1.35; }
-
-    .rc-ribbon {
-      display: flex; justify-content: space-between; align-items: center; gap: 3mm;
-      padding: 1.8mm 3mm; border-radius: 2mm;
-      background: linear-gradient(90deg, var(--navy), var(--teal-dark));
-      color: #fff;
+    .rc-stamp--promo { color: #0f766e; }
+    .rc-stamp--grad { color: #1d4ed8; }
+    .rc-stamp--retain { color: #b45309; }
+    .rc-stamp__ring { position: absolute; inset: 0; width: 100%; height: 100%; }
+    .rc-stamp__copy {
+      position: relative; z-index: 1; text-align: center; padding: 0 2mm;
+      transform: rotate(-12deg);
     }
-    .rc-ribbon strong { font-size: 2.5mm; letter-spacing: .04em; }
-    .rc-ribbon span { font-size: 2.1mm; opacity: .9; font-weight: 600; }
-
-    .rc-snap-grid {
-      display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1.5mm;
+    .rc-stamp__copy strong {
+      display: block; font-size: 3.2mm; letter-spacing: .08em; font-weight: 800;
     }
-    .rc-snap {
-      border: 1px solid var(--line); border-radius: 1.6mm; padding: 1.4mm 1.6mm; background: #fff;
+    .rc-stamp__copy span {
+      display: block; margin-top: 0.8mm; font-size: 2mm; font-weight: 700; line-height: 1.2;
     }
-    .rc-snap__top {
-      display: flex; justify-content: space-between; gap: 1mm; font-size: 2mm; font-weight: 700;
-    }
-    .rc-snap__top strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .rc-snap__bar {
-      margin-top: 1mm; height: 1.4mm; border-radius: 999px; background: #e2e8f0; overflow: hidden;
-    }
-    .rc-snap__bar i { display: block; height: 100%; background: linear-gradient(90deg, #14b8a6, var(--teal-dark)); }
-    .rc-score--excellent .rc-snap__bar i { background: linear-gradient(90deg, #22c55e, #15803d); }
-    .rc-score--good .rc-snap__bar i { background: linear-gradient(90deg, #60a5fa, #2563eb); }
-    .rc-score--fair .rc-snap__bar i { background: linear-gradient(90deg, #fbbf24, #d97706); }
-    .rc-score--low .rc-snap__bar i { background: linear-gradient(90deg, #f87171, #dc2626); }
-
-    .rc-promo {
-      padding: 1.6mm 2.4mm; border-radius: 1.8mm;
-      background: #ecfdf5; border: 1px solid #a7f3d0;
-      color: #065f46; font-size: 2.3mm; font-weight: 700;
-    }
-
-    .rc-signs {
-      display: grid; grid-template-columns: repeat(3, 1fr); gap: 4mm;
-      padding-top: 1.5mm; border-top: 1px solid var(--line);
-    }
-    .rc-sign { text-align: center; }
-    .rc-sign__line { height: 5mm; border-bottom: 1px solid #94a3b8; margin-bottom: 1mm; }
-    .rc-sign strong {
-      display: block; font-size: 2mm; text-transform: uppercase; letter-spacing: .05em; color: var(--muted);
-    }
-    .rc-sign span {
-      display: block; margin-top: 0.4mm;
-      font-family: "Noto Sans Ethiopic", "DM Sans", sans-serif;
-      font-size: 1.9mm; color: #7c9193;
-    }
-
-    .rc-foot {
-      display: grid; grid-template-columns: 1.4fr 1fr; gap: 3mm;
-      font-size: 1.95mm; color: var(--muted); line-height: 1.4;
-      border-top: 1px solid var(--line); padding-top: 1.5mm;
-    }
-    .rc-foot strong {
-      color: var(--ink); text-transform: uppercase; letter-spacing: .05em; font-size: 1.9mm;
-    }
-    .rc-foot__right { text-align: right; }
 
     .rc-table-wrap {
       flex: 1; min-height: 0; overflow: hidden;
       border: 1px solid var(--line); border-radius: 2mm;
     }
     table.rc-tbl {
-      width: 100%; border-collapse: collapse; font-size: 2.15mm;
+      width: 100%; border-collapse: collapse; font-size: 2.2mm;
     }
     .rc-tbl thead th {
-      padding: 1.5mm 1mm; background: var(--navy); color: #fff;
-      border: 1px solid rgba(255,255,255,.12);
-      font-size: 1.9mm; text-transform: uppercase; letter-spacing: .04em; font-weight: 700;
+      padding: 1.6mm 1.2mm; background: #0f172a; color: #fff;
+      border: 1px solid rgba(255,255,255,.08);
+      font-size: 1.95mm; text-transform: uppercase; letter-spacing: .04em; font-weight: 700;
     }
-    .rc-tbl thead th.rc-sem { background: var(--teal-dark); }
+    .rc-tbl thead th.rc-sem { background: var(--accent-dark); }
     .rc-tbl td, .rc-tbl tbody th {
-      border: 1px solid var(--line); padding: 1mm 0.8mm; text-align: center; background: #fff;
+      border: 1px solid var(--line); padding: 1.2mm 1mm; text-align: center; background: #fff;
     }
-    .rc-tbl tr.is-alt td, .rc-tbl tr.is-alt th { background: #f8fbfa; }
+    .rc-tbl tr.is-alt td, .rc-tbl tr.is-alt th { background: #f8fafc; }
     .rc-tbl tbody th {
-      text-align: left; padding-left: 2mm; font-weight: 700; white-space: nowrap; color: #243b3d;
+      text-align: left; padding-left: 2.2mm; font-weight: 700; white-space: nowrap; color: var(--ink);
     }
     .rc-cell {
       display: inline-flex; align-items: baseline; justify-content: center; gap: 0.6mm;
@@ -664,48 +484,193 @@ export function buildEthiopianReportCardHtml(data: ReportCardPrintPayload): stri
     .rc-score--fair { background: var(--fair-bg); color: var(--fair-fg); }
     .rc-score--low { background: var(--low-bg); color: var(--low-fg); }
     .rc-tbl__sum th {
-      text-align: left !important; padding-left: 2mm !important;
-      background: #eef7f4 !important; color: var(--teal-dark);
+      text-align: left !important; padding-left: 2.2mm !important;
+      background: #f1f5f9 !important; color: var(--ink);
       text-transform: uppercase; font-size: 1.95mm; letter-spacing: .04em;
     }
-    .rc-tbl__sum td { background: #f4faf8; }
-    .rc-tbl__sum--avg th { background: #eef2ff !important; color: var(--navy); }
-    .rc-tbl__sum--avg td { background: #f5f7ff; }
+    .rc-tbl__sum td { background: #f8fafc; }
 
     .rc-remarks {
-      display: grid; grid-template-columns: repeat(3, 1fr); gap: 2.2mm;
+      display: grid; grid-template-columns: 1fr 1fr; gap: 2.5mm;
     }
+    .rc-remarks--3 { grid-template-columns: repeat(3, 1fr); }
     .rc-remark {
-      border: 1px solid var(--line); border-radius: 2mm; min-height: 22mm; overflow: hidden;
-      background: repeating-linear-gradient(#fff 0 4.2mm, #f3faf7 4.2mm 4.4mm);
+      border: 1px solid var(--line); border-radius: 2mm; min-height: 18mm; overflow: hidden;
+      background: #fff;
     }
     .rc-remark__head {
       padding: 1.2mm 2mm; background: var(--soft); border-bottom: 1px solid var(--line);
-      font-size: 1.95mm; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--teal-dark);
+      font-size: 1.95mm; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; color: var(--accent-dark);
     }
     .rc-remark__body p {
-      margin: 0; padding: 1.4mm 2mm; font-size: 2.15mm; line-height: 1.4; color: #2f4545;
+      margin: 0; padding: 1.6mm 2mm; font-size: 2.15mm; line-height: 1.4; color: #334155;
     }
-    .rc-remark__empty { color: #94a3b8; font-style: italic; }
+    .rc-empty { color: #94a3b8; font-style: italic; }
+
+    .rc-signs {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 5mm;
+      padding-top: 2mm;
+    }
+    .rc-sign { text-align: center; }
+    .rc-sign__line { height: 6mm; border-bottom: 1px solid #94a3b8; margin-bottom: 1.2mm; }
+    .rc-sign strong {
+      display: block; font-size: 2mm; text-transform: uppercase; letter-spacing: .05em; color: var(--muted);
+    }
+
+    .rc-foot {
+      display: grid; grid-template-columns: 1fr auto auto; gap: 4mm; align-items: end;
+      font-size: 1.95mm; color: var(--muted); line-height: 1.4;
+      border-top: 1px solid var(--line); padding-top: 2mm;
+    }
+    .rc-foot strong {
+      color: var(--ink); text-transform: uppercase; letter-spacing: .05em; font-size: 1.9mm;
+    }
+    .rc-foot__qr {
+      display: flex; align-items: center; gap: 2mm;
+    }
+    .rc-foot__qr img {
+      width: 12mm; height: 12mm; border-radius: 1mm; border: 1px solid var(--line); background: #fff;
+    }
 
     @page { size: A4 landscape; margin: 0; }
     @media print {
       body { background: #fff; }
       .rc-page { margin: 0; box-shadow: none; width: 297mm; height: 210mm; }
     }
-  </style>
+  `;
+}
+
+function brandHeader(
+  data: ReportCardPrintPayload,
+  opts: { documentLabel: string; sideMeta: string },
+): string {
+  const schoolName = escapeHtml(data.school.name);
+  const headerTitle = escapeHtml(
+    data.school.headerTitle?.trim() || opts.documentLabel,
+  );
+  const headerTagline = data.school.headerTagline?.trim()
+    ? escapeHtml(data.school.headerTagline.trim())
+    : null;
+  const logo = data.school.logoUrl
+    ? `<img class="rc-logo" src="${escapeHtml(data.school.logoUrl)}" alt=""/>`
+    : `<div class="rc-logo rc-logo--fallback" aria-hidden="true">${schoolName.slice(0, 2).toUpperCase()}</div>`;
+  const contactBits = [
+    data.school.address ? escapeHtml(data.school.address) : '',
+    data.school.phone ? escapeHtml(data.school.phone) : '',
+    data.school.email ? escapeHtml(data.school.email) : '',
+  ].filter(Boolean);
+
+  return `
+    <header class="rc-brand">
+      ${logo}
+      <div>
+        <p class="rc-brand__doc">${headerTitle}</p>
+        <h1>${schoolName}</h1>
+        ${headerTagline ? `<p class="rc-brand__tag">${headerTagline}</p>` : ''}
+        <p class="rc-brand__meta">${escapeHtml(data.student.academicYear)}${contactBits.length ? ` · ${contactBits.join(' · ')}` : ''}</p>
+      </div>
+      <div class="rc-brand__side">
+        <strong>${escapeHtml(opts.documentLabel)}</strong>
+        ${opts.sideMeta}
+      </div>
+    </header>`;
+}
+
+function studentAvatar(data: ReportCardPrintPayload): string {
+  if (data.student.photoUrl) {
+    return `<img class="rc-avatar rc-avatar--photo" src="${escapeHtml(data.student.photoUrl)}" alt=""/>`;
+  }
+  const initials =
+    data.student.name
+      .trim()
+      .split(/\s+/)
+      .map((p) => p[0])
+      .filter(Boolean)
+      .slice(0, 2)
+      .join('')
+      .toUpperCase() || '?';
+  return `<div class="rc-avatar" aria-hidden="true">${escapeHtml(initials)}</div>`;
+}
+
+function footerHtml(data: ReportCardPrintPayload, documentRef: string, issuedDate: string): string {
+  const qrPayload = data.student.cardCode
+    ? buildCardScanPayload(data.student.cardCode)
+    : `CAMPUS1:STUDENT:${data.student.number ?? 'unknown'}`;
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=96x96&margin=4&data=${encodeURIComponent(qrPayload)}`;
+  const schoolName = escapeHtml(data.school.name);
+
+  return `
+    <div class="rc-foot">
+      <div>
+        <strong>Grading</strong><br/>
+        90–100 A · 80–89 B · 70–79 C · 60–69 D · 50–59 E · Below 50 F
+      </div>
+      <div>
+        <strong>Document</strong><br/>
+        ${documentRef} · ${issuedDate}<br/>
+        ${schoolName}
+      </div>
+      <div class="rc-foot__qr">
+        <img src="${qrUrl}" alt="Verification QR"/>
+        <span>Scan to verify<br/>in school registry</span>
+      </div>
+    </div>`;
+}
+
+function buildTermReportHtml(data: ReportCardPrintPayload): string {
+  const studentName = escapeHtml(data.student.name);
+  const studentNameUpper = escapeHtml(data.student.name.toUpperCase());
+  const documentRef = escapeHtml(
+    data.student.cardCode ?? data.student.number ?? 'DRAFT',
+  );
+  const issuedDate = escapeHtml(
+    new Date(data.generatedAt).toLocaleDateString('en-GB', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    }),
+  );
+  const rankLabel =
+    data.summary.rank != null
+      ? `${data.summary.rank} / ${data.summary.classSize}`
+      : '—';
+  const avg = data.summary.cumulative.average;
+  const avatar = studentAvatar(data);
+
+  const subjectRows = data.termSubjects
+    .map(
+      (row, i) => `
+      <tr class="${i % 2 === 1 ? 'is-alt' : ''}">
+        <th scope="row">${escapeHtml(row.subject)}</th>
+        <td>${fmtScoreCell(row.average, true)}</td>
+        <td><strong>${row.letter ? escapeHtml(row.letter) : '—'}</strong></td>
+      </tr>`,
+    )
+    .join('');
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <title>Term Report — ${studentNameUpper}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&display=swap" rel="stylesheet"/>
+  <style>${sharedStyles()}</style>
 </head>
 <body>
-  <!-- FRONT -->
   <section class="rc-page">
-    <div class="rc-page__bar" aria-hidden="true"></div>
+    <div class="rc-page__accent" aria-hidden="true"></div>
     <div class="rc-sheet">
-      ${schoolHeader}
+      ${brandHeader(data, {
+        documentLabel: 'Term report card',
+        sideMeta: `${escapeHtml(data.termName)}<br/>Issued ${issuedDate}`,
+      })}
 
-      <div class="rc-front">
-        <section class="rc-card">
-          <h2 class="rc-card__h">Student identification · የተማሪ መረጃ</h2>
-          <div class="rc-card__b">
+      <div class="rc-layout rc-layout--term">
+        <section class="rc-panel">
+          <h2 class="rc-panel__h">Student</h2>
+          <div class="rc-panel__b">
             <div class="rc-id">
               ${avatar}
               <div>
@@ -719,78 +684,165 @@ export function buildEthiopianReportCardHtml(data: ReportCardPrintPayload): stri
               <div class="rc-field"><em>Sex</em><strong>${data.student.sex ? escapeHtml(data.student.sex) : '—'}</strong></div>
               <div class="rc-field"><em>Age</em><strong>${data.student.age != null ? String(data.student.age) : '—'}</strong></div>
               <div class="rc-field"><em>Grade / section</em><strong>${escapeHtml(data.student.gradeLabel)}</strong></div>
-              <div class="rc-field"><em>Academic year</em><strong>${escapeHtml(data.student.academicYearEc)} E.C.</strong></div>
+              <div class="rc-field"><em>Academic year</em><strong>${escapeHtml(data.student.academicYear)}</strong></div>
+            </div>
+            <div class="rc-kpis" style="margin-top:3mm">
+              <div class="rc-kpi"><em>Term average</em><strong>${fmtScore(avg)}${data.summary.conduct ? ` · ${escapeHtml(data.summary.conduct)}` : ''}</strong></div>
+              <div class="rc-kpi"><em>Class rank</em><strong>${rankLabel}</strong></div>
+              <div class="rc-kpi"><em>Absent days</em><strong>${data.summary.absentDays != null ? String(data.summary.absentDays) : '—'}</strong></div>
+              <div class="rc-kpi"><em>Attendance</em><strong>${data.summary.attendanceRate != null ? `${data.summary.attendanceRate}%` : '—'}</strong></div>
             </div>
           </div>
         </section>
 
-        <div class="rc-perf">
-          <section class="rc-card">
-            <h2 class="rc-card__h">Performance overview · አጠቃላይ ውጤት</h2>
-            <div class="rc-card__b">
-              <div class="rc-ring-row">
-                <div class="rc-ring-shell">${scoreRingSvg(avgNumeric)}</div>
-                <div class="rc-ring-meta">
-                  <h4>Cumulative average</h4>
-                  <p>Year average across recorded terms. Letter grades follow this school’s scale.</p>
-                </div>
-              </div>
-              <div class="rc-stats" style="margin-top:2.2mm">
-                <div class="rc-stat"><em>Class rank</em><strong>${rankLabel}</strong></div>
-                <div class="rc-stat"><em>Conduct</em><strong>${data.summary.conduct ? escapeHtml(data.summary.conduct) : '—'}</strong></div>
-                <div class="rc-stat"><em>Absent days</em><strong>${data.summary.absentDays != null ? String(data.summary.absentDays) : '—'}</strong></div>
-                <div class="rc-stat"><em>Issued</em><strong>${issuedDate}</strong></div>
-              </div>
+        <section class="rc-panel">
+          <h2 class="rc-panel__h">Subject results — ${escapeHtml(data.termName)}</h2>
+          <div class="rc-panel__b" style="padding:0;display:flex;flex-direction:column">
+            <div class="rc-table-wrap" style="border:0;border-radius:0;flex:1">
+              <table class="rc-tbl">
+                <thead>
+                  <tr>
+                    <th>Subject</th>
+                    <th>Average</th>
+                    <th>Grade</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${subjectRows || '<tr><td colspan="3">No scores recorded yet.</td></tr>'}
+                </tbody>
+              </table>
             </div>
-          </section>
-          <section class="rc-verify">
-            <img src="${qrUrl}" alt="Verification QR"/>
-            <div>
-              <strong>Verification seal</strong>
-              <p>Scan to authenticate this report in the school registry. Ref ${documentRef}</p>
-            </div>
-          </section>
-        </div>
+          </div>
+        </section>
       </div>
 
-      <div class="rc-ribbon">
-        <strong>${escapeHtml(achievement)}</strong>
-        <span>${yearLabel}</span>
+      <div class="rc-remarks">
+        ${remarkBlock('Teacher comment', data.remarks.teacher)}
+        ${remarkBlock('Principal comment', data.remarks.principal)}
       </div>
-
-      ${
-        snap
-          ? `<section class="rc-card"><h2 class="rc-card__h">Subject snapshot</h2><div class="rc-card__b"><div class="rc-snap-grid">${snap}</div></div></section>`
-          : ''
-      }
-
-      ${data.promotionText ? `<div class="rc-promo">${escapeHtml(data.promotionText)}</div>` : ''}
 
       <div class="rc-signs">
-        <div class="rc-sign"><div class="rc-sign__line"></div><strong>Director</strong><span>Director signature</span></div>
-        <div class="rc-sign"><div class="rc-sign__line"></div><strong>Homeroom teacher</strong><span>Class teacher signature</span></div>
-        <div class="rc-sign"><div class="rc-sign__line"></div><strong>Parent / guardian</strong><span>Parent signature</span></div>
+        <div class="rc-sign"><div class="rc-sign__line"></div><strong>Director</strong></div>
+        <div class="rc-sign"><div class="rc-sign__line"></div><strong>Homeroom teacher</strong></div>
+        <div class="rc-sign"><div class="rc-sign__line"></div><strong>Parent / guardian</strong></div>
       </div>
 
-      <div class="rc-foot">
-        <div>
-          <strong>Grading legend</strong><br/>
-          90–100 A · 80–89 B · 70–79 C · 60–69 D · 50–59 E · Below 50 F
-        </div>
-        <div class="rc-foot__right">
-          <strong>Print</strong><br/>
-          A4 landscape · duplex (front / back)<br/>
-          ${contactLine || schoolName}
-        </div>
+      ${footerHtml(data, documentRef, issuedDate)}
+    </div>
+  </section>
+</body>
+</html>`;
+}
+
+function buildAnnualReportHtml(data: ReportCardPrintPayload): string {
+  const studentName = escapeHtml(data.student.name);
+  const studentNameUpper = escapeHtml(data.student.name.toUpperCase());
+  const documentRef = escapeHtml(
+    data.student.cardCode ?? data.student.number ?? 'DRAFT',
+  );
+  const issuedDate = escapeHtml(
+    new Date(data.generatedAt).toLocaleDateString('en-GB', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    }),
+  );
+  const rankLabel =
+    data.summary.rank != null
+      ? `${data.summary.rank} / ${data.summary.classSize}`
+      : '—';
+  const avg = data.summary.cumulative.average;
+  const avatar = studentAvatar(data);
+  const stamp = data.promotion ? promotionStampHtml(data.promotion) : '';
+
+  const subjectRows = data.subjectGrid
+    .map(
+      (row, i) => `
+      <tr class="${i % 2 === 1 ? 'is-alt' : ''}">
+        <th scope="row">${escapeHtml(row.subject)}</th>
+        ${subjectRowCells(row)}
+      </tr>`,
+    )
+    .join('');
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <title>Year-end Report — ${studentNameUpper}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&display=swap" rel="stylesheet"/>
+  <style>${sharedStyles()}</style>
+</head>
+<body>
+  <section class="rc-page">
+    <div class="rc-page__accent" aria-hidden="true"></div>
+    <div class="rc-sheet">
+      ${brandHeader(data, {
+        documentLabel: 'Year-end report card',
+        sideMeta: `${escapeHtml(data.student.academicYear)}<br/>Issued ${issuedDate}`,
+      })}
+
+      <div class="rc-layout">
+        <section class="rc-panel">
+          <h2 class="rc-panel__h">Student</h2>
+          <div class="rc-panel__b">
+            <div class="rc-id">
+              ${avatar}
+              <div>
+                <strong>${studentNameUpper}</strong>
+                <span>${escapeHtml(data.student.gradeLabel)} · ${escapeHtml(data.student.academicYear)}</span>
+              </div>
+            </div>
+            <div class="rc-fields">
+              <div class="rc-field"><em>Student ID</em><strong>${data.student.number ? escapeHtml(data.student.number) : '—'}</strong></div>
+              <div class="rc-field"><em>Document ref</em><strong>${documentRef}</strong></div>
+              <div class="rc-field"><em>Sex</em><strong>${data.student.sex ? escapeHtml(data.student.sex) : '—'}</strong></div>
+              <div class="rc-field"><em>Age</em><strong>${data.student.age != null ? String(data.student.age) : '—'}</strong></div>
+              <div class="rc-field"><em>Grade / section</em><strong>${escapeHtml(data.student.gradeLabel)}</strong></div>
+              <div class="rc-field"><em>Academic year</em><strong>${escapeHtml(data.student.academicYear)}</strong></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="rc-panel">
+          <h2 class="rc-panel__h">Year summary</h2>
+          <div class="rc-panel__b">
+            <div class="rc-kpis">
+              <div class="rc-kpi"><em>Year average</em><strong>${fmtScore(avg)}${data.summary.conduct ? ` · ${escapeHtml(data.summary.conduct)}` : ''}</strong></div>
+              <div class="rc-kpi"><em>Class rank</em><strong>${rankLabel}</strong></div>
+              <div class="rc-kpi"><em>Absent days</em><strong>${data.summary.absentDays != null ? String(data.summary.absentDays) : '—'}</strong></div>
+              <div class="rc-kpi"><em>Attendance</em><strong>${data.summary.attendanceRate != null ? `${data.summary.attendanceRate}%` : '—'}</strong></div>
+            </div>
+            ${stamp}
+          </div>
+        </section>
       </div>
+
+      <div class="rc-remarks rc-remarks--3">
+        ${remarkBlock('1st semester', data.remarks.semester1)}
+        ${remarkBlock('2nd semester', data.remarks.semester2)}
+        ${remarkBlock('Principal / year', data.remarks.cumulative)}
+      </div>
+
+      <div class="rc-signs">
+        <div class="rc-sign"><div class="rc-sign__line"></div><strong>Director</strong></div>
+        <div class="rc-sign"><div class="rc-sign__line"></div><strong>Homeroom teacher</strong></div>
+        <div class="rc-sign"><div class="rc-sign__line"></div><strong>Parent / guardian</strong></div>
+      </div>
+
+      ${footerHtml(data, documentRef, issuedDate)}
     </div>
   </section>
 
-  <!-- BACK -->
   <section class="rc-page">
-    <div class="rc-page__bar" aria-hidden="true"></div>
+    <div class="rc-page__accent" aria-hidden="true"></div>
     <div class="rc-sheet">
-      ${schoolHeaderBack}
+      ${brandHeader(data, {
+        documentLabel: 'Year-end results',
+        sideMeta: `${studentName}<br/>${escapeHtml(data.student.gradeLabel)}`,
+      })}
 
       <div class="rc-table-wrap">
         <table class="rc-tbl">
@@ -818,7 +870,7 @@ export function buildEthiopianReportCardHtml(data: ReportCardPrintPayload): stri
               ${summaryTotalCells(data.summary.semester2)}
               ${summaryTotalCells(data.summary.cumulative)}
             </tr>
-            <tr class="rc-tbl__sum rc-tbl__sum--avg">
+            <tr class="rc-tbl__sum">
               <th scope="row">Average</th>
               <td>${fmtScoreCell(data.summary.term1.average)}</td>
               <td>${fmtScoreCell(data.summary.term2.average)}</td>
@@ -828,45 +880,22 @@ export function buildEthiopianReportCardHtml(data: ReportCardPrintPayload): stri
               <td>${fmtScoreCell(data.summary.semester2.average, true)}</td>
               <td>${fmtScoreCell(data.summary.cumulative.average, true)}</td>
             </tr>
-            <tr class="rc-tbl__sum">
-              <th scope="row">Absent days</th>
-              <td colspan="6"></td>
-              <td>${data.summary.absentDays != null ? String(data.summary.absentDays) : '—'}</td>
-            </tr>
-            <tr class="rc-tbl__sum">
-              <th scope="row">Conduct</th>
-              <td colspan="6"></td>
-              <td>${data.summary.conduct ? escapeHtml(data.summary.conduct) : '—'}</td>
-            </tr>
-            <tr class="rc-tbl__sum">
-              <th scope="row">Rank</th>
-              <td colspan="6"></td>
-              <td>${rankLabel}</td>
-            </tr>
           </tbody>
         </table>
       </div>
 
-      <div class="rc-remarks">
-        ${remarkCard('1st semester remark', data.remarks.semester1)}
-        ${remarkCard('2nd semester remark', data.remarks.semester2)}
-        ${remarkCard('Principal / cumulative', data.remarks.cumulative)}
-      </div>
-
-      <div class="rc-foot">
-        <div>
-          <strong>${schoolName}</strong><br/>
-          ${headerTagline ? `${headerTagline}<br/>` : ''}
-          ${contactLine || 'Official academic record'}
-        </div>
-        <div class="rc-foot__right">
-          <strong>Document</strong><br/>
-          ${documentRef} · ${issuedDate}<br/>
-          Flip for student summary (front)
-        </div>
-      </div>
+      ${footerHtml(data, documentRef, issuedDate)}
     </div>
   </section>
 </body>
 </html>`;
+}
+
+export function buildReportCardHtml(data: ReportCardPrintPayload): string {
+  return data.mode === 'annual' ? buildAnnualReportHtml(data) : buildTermReportHtml(data);
+}
+
+/** @deprecated Use buildReportCardHtml */
+export function buildEthiopianReportCardHtml(data: ReportCardPrintPayload): string {
+  return buildReportCardHtml(data);
 }

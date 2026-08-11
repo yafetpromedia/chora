@@ -122,6 +122,12 @@ export const DASHBOARD_NAV: NavItem[] = [
     permission: Permission.RESULTS_READ,
   },
   {
+    href: "/admin/reports",
+    label: "Reports",
+    icon: "chart",
+    roles: ["admin", "staff"],
+  },
+  {
     href: "/admin/results/templates",
     label: "Assessment templates",
     icon: "templates",

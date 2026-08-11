@@ -397,6 +397,154 @@ export class ResultWorkflowService {
     }
   }
 
+  /**
+   * Admin shortcut: publish every scored class sheet for this student's
+   * grade/section/term so the family report card unlocks (DRAFT allowed).
+   */
+  async publishReportCardsForStudent(
+    schoolId: string,
+    userId: string,
+    studentProfileId: string,
+    termId: string,
+  ) {
+    const profile = await this.prisma.studentProfile.findFirst({
+      where: { id: studentProfileId, schoolId },
+    });
+    if (!profile) throw new NotFoundException('Student not found');
+
+    const term = await this.prisma.academicTerm.findFirst({
+      where: { id: termId, schoolId },
+    });
+    if (!term) throw new NotFoundException('Term not found');
+
+    const classSubjects = await this.prisma.classSubject.findMany({
+      where: {
+        schoolId,
+        gradeId: profile.gradeId,
+        academicYearId: term.academicYearId,
+        ...(profile.sectionId ? { sectionId: profile.sectionId } : {}),
+      },
+      include: { subject: { select: { name: true } } },
+      orderBy: { subject: { name: 'asc' } },
+    });
+
+    const now = new Date();
+    let published = 0;
+    let alreadyPublished = 0;
+    let skippedEmpty = 0;
+    const subjects: Array<{ name: string; status: string }> = [];
+
+    for (const cs of classSubjects) {
+      const sheet = await this.getOrCreateSheet(schoolId, termId, cs.id);
+      if (sheet.status === ResultWorkflowStatus.PUBLISHED) {
+        alreadyPublished += 1;
+        subjects.push({ name: cs.subject.name, status: 'PUBLISHED' });
+        continue;
+      }
+
+      const scoreCount = await this.countSheetScores(schoolId, termId, cs.id);
+      if (scoreCount === 0) {
+        skippedEmpty += 1;
+      }
+
+      await this.prisma.classSubjectTermSheet.update({
+        where: { id: sheet.id },
+        data: {
+          status: ResultWorkflowStatus.PUBLISHED,
+          publishedBy: userId,
+          publishedAt: now,
+          approvedBy: sheet.approvedAt ? undefined : userId,
+          approvedAt: sheet.approvedAt ?? now,
+          submittedBy: sheet.submittedAt ? undefined : userId,
+          submittedAt: sheet.submittedAt ?? now,
+        },
+      });
+      published += 1;
+      subjects.push({
+        name: cs.subject.name,
+        status: scoreCount === 0 ? 'PUBLISHED_EMPTY' : 'PUBLISHED',
+      });
+    }
+
+    const total = classSubjects.length;
+    return {
+      published,
+      alreadyPublished,
+      emptyPublished: skippedEmpty,
+      total,
+      familyVisible: total > 0 && alreadyPublished + published === total,
+      subjects,
+    };
+  }
+
+  async getReportCardPublishStatus(
+    schoolId: string,
+    studentProfileId: string,
+    termId: string,
+  ) {
+    const profile = await this.prisma.studentProfile.findFirst({
+      where: { id: studentProfileId, schoolId },
+    });
+    if (!profile) throw new NotFoundException('Student not found');
+
+    const term = await this.prisma.academicTerm.findFirst({
+      where: { id: termId, schoolId },
+    });
+    if (!term) throw new NotFoundException('Term not found');
+
+    const classSubjects = await this.prisma.classSubject.findMany({
+      where: {
+        schoolId,
+        gradeId: profile.gradeId,
+        academicYearId: term.academicYearId,
+        ...(profile.sectionId ? { sectionId: profile.sectionId } : {}),
+      },
+      include: { subject: { select: { name: true } } },
+      orderBy: { subject: { name: 'asc' } },
+    });
+
+    let publishedCount = 0;
+    let withScores = 0;
+    let unpublishedCount = 0;
+    const subjects: Array<{
+      name: string;
+      status: ResultWorkflowStatus | 'MISSING';
+      hasScores: boolean;
+    }> = [];
+
+    for (const cs of classSubjects) {
+      const sheet = await this.prisma.classSubjectTermSheet.findUnique({
+        where: {
+          termId_classSubjectId: { termId, classSubjectId: cs.id },
+        },
+      });
+      const scoreCount = await this.countSheetScores(schoolId, termId, cs.id);
+      const hasScores = scoreCount > 0;
+      if (hasScores) withScores += 1;
+      const status = sheet?.status ?? null;
+      if (status === ResultWorkflowStatus.PUBLISHED) {
+        publishedCount += 1;
+      } else {
+        unpublishedCount += 1;
+      }
+      subjects.push({
+        name: cs.subject.name,
+        status: status ?? 'MISSING',
+        hasScores,
+      });
+    }
+
+    return {
+      published: classSubjects.length > 0 && unpublishedCount === 0,
+      publishedCount,
+      total: classSubjects.length,
+      withScores,
+      unpublishedCount,
+      canPublish: unpublishedCount > 0,
+      subjects,
+    };
+  }
+
   private countSheetScores(
     schoolId: string,
     termId: string,

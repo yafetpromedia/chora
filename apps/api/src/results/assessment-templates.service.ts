@@ -998,10 +998,6 @@ export class AssessmentTemplatesService implements OnModuleInit {
 
       const averageItems = assessments
         .filter((a) => a.scores.length > 0)
-        .filter(
-          (a) =>
-            (role !== 'student' && role !== 'parent') || a.entryLocked,
-        )
         .map((a) => ({
           score: a.scores[0].score,
           maxScore: a.maxScore,
@@ -1044,12 +1040,7 @@ export class AssessmentTemplatesService implements OnModuleInit {
         return {
           columnKey: col.key,
           assessmentId: a.id,
-          score:
-            role === 'student' || role === 'parent'
-              ? a.entryLocked
-                ? (a.scores[0]?.score ?? null)
-                : null
-              : (a.scores[0]?.score ?? null),
+          score: a.scores[0]?.score ?? null,
           maxScore: a.maxScore,
           weightPercent: a.weightPercent,
           entryLocked: a.entryLocked,

@@ -4,9 +4,10 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AUTH_TOKEN_KEY } from "@/lib/auth";
 import { getApiBaseUrl } from "@/lib/api";
+import type { ReportCardPrintMode } from "@/lib/results";
 
-function myReportCardPrintUrl(termId: string) {
-  const q = new URLSearchParams({ termId });
+function myReportCardPrintUrl(termId: string, mode: ReportCardPrintMode) {
+  const q = new URLSearchParams({ termId, mode });
   return `${getApiBaseUrl()}/results/report-card/html?${q}`;
 }
 
@@ -15,6 +16,8 @@ export function StudentReportCardPrintInner() {
   const router = useRouter();
   const [html, setHtml] = useState("");
   const termId = searchParams.get("termId") ?? "";
+  const mode: ReportCardPrintMode =
+    searchParams.get("mode") === "annual" ? "annual" : "term";
 
   useEffect(() => {
     const token = localStorage.getItem(AUTH_TOKEN_KEY);
@@ -22,7 +25,7 @@ export function StudentReportCardPrintInner() {
       router.replace("/login");
       return;
     }
-    void fetch(myReportCardPrintUrl(termId), {
+    void fetch(myReportCardPrintUrl(termId, mode), {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => {
@@ -34,7 +37,7 @@ export function StudentReportCardPrintInner() {
         setTimeout(() => window.print(), 500);
       })
       .catch(() => router.replace("/student/report-card"));
-  }, [termId, router]);
+  }, [termId, mode, router]);
 
   if (!html) {
     return <p style={{ padding: "2rem" }}>Preparing report card…</p>;

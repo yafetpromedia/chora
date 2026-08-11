@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Header,
+  BadRequestException,
   Param,
   Patch,
   Post,
@@ -157,6 +158,37 @@ export class ResultsController {
       profileId,
       termId,
       user.role,
+    );
+  }
+
+  @Get('report-card/publish-status')
+  @Roles('admin', 'staff')
+  reportCardPublishStatus(
+    @CurrentUser() user: AuthUser,
+    @Query('studentProfileId') studentProfileId: string,
+    @Query('termId') termId: string,
+  ) {
+    return this.workflowService.getReportCardPublishStatus(
+      user.schoolId,
+      studentProfileId,
+      termId,
+    );
+  }
+
+  @Post('report-card/publish')
+  @Roles('admin', 'staff')
+  publishReportCards(
+    @CurrentUser() user: AuthUser,
+    @Body() body: { studentProfileId: string; termId: string },
+  ) {
+    if (!body?.studentProfileId || !body?.termId) {
+      throw new BadRequestException('studentProfileId and termId are required');
+    }
+    return this.workflowService.publishReportCardsForStudent(
+      user.schoolId,
+      user.id,
+      body.studentProfileId,
+      body.termId,
     );
   }
 
@@ -627,6 +659,31 @@ export class ResultsController {
     );
   }
 
+  @Get('export')
+  @Roles('admin', 'staff')
+  @Header('Content-Type', 'text/csv')
+  async exportResultsCsv(
+    @CurrentUser() user: AuthUser,
+    @Query('termId') termId: string,
+    @Query('gradeId') gradeId: string | undefined,
+    @Res() res: Response,
+  ) {
+    if (!termId) {
+      throw new BadRequestException('termId is required');
+    }
+    const csv = await this.academicsService.exportResultsCsv(
+      user.schoolId,
+      termId,
+      gradeId || undefined,
+    );
+    const stamp = new Date().toISOString().slice(0, 10);
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="results-${stamp}.csv"`,
+    );
+    res.send(csv);
+  }
+
   @Get('report-card')
   @Roles('admin', 'teacher', 'parent', 'student')
   async reportCard(
@@ -655,6 +712,7 @@ export class ResultsController {
     @CurrentUser() user: AuthUser,
     @Query('studentProfileId') studentProfileId: string | undefined,
     @Query('termId') termId: string,
+    @Query('mode') modeRaw: string | undefined,
     @Res() res: Response,
   ) {
     const profileId = await this.academicsService.resolveProfileId(
@@ -663,12 +721,14 @@ export class ResultsController {
       user.schoolId,
       studentProfileId,
     );
+    const mode = modeRaw === 'annual' ? 'annual' : 'term';
     res.send(
       await this.academicsService.buildReportCardHtmlDocument(
         user.schoolId,
         profileId,
         termId,
         user.role,
+        mode,
       ),
     );
   }

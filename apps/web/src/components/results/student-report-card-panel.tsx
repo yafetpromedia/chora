@@ -9,6 +9,7 @@ import {
   openMyReportCardPrint,
   type AcademicTerm,
   type ReportCard,
+  type ReportCardPrintMode,
 } from "@/lib/results";
 
 function LockIcon({ className }: { className?: string }) {
@@ -21,15 +22,23 @@ function LockIcon({ className }: { className?: string }) {
 }
 
 export function StudentReportCardPanel() {
+  const [hydrated, setHydrated] = useState(false);
   const [loading, setLoading] = useState(true);
   const [terms, setTerms] = useState<AcademicTerm[]>([]);
   const [termId, setTermId] = useState("");
+  const [printMode, setPrintMode] = useState<ReportCardPrintMode>("term");
   const [reportPublished, setReportPublished] = useState<boolean | null>(null);
   const [report, setReport] = useState<ReportCard | null>(null);
   const [reportLoading, setReportLoading] = useState(false);
   const [reportError, setReportError] = useState("");
 
   const currentTerm = terms.find((t) => t.id === termId);
+  const selectDisabled = !hydrated || loading || terms.length === 0;
+  const refreshDisabled = !hydrated || !termId || reportLoading;
+
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
 
   useEffect(() => {
     void listTerms()
@@ -63,9 +72,9 @@ export function StudentReportCardPanel() {
   }, [termId]);
 
   useEffect(() => {
-    if (loading || !termId) return;
+    if (!hydrated || loading || !termId) return;
     void loadReport();
-  }, [loading, termId, loadReport]);
+  }, [hydrated, loading, termId, loadReport]);
 
   return (
     <div className="stu-res stu-res--report-page">
@@ -73,10 +82,13 @@ export function StudentReportCardPanel() {
         <header className="stu-res__hero stu-res__hero--report">
           <div>
             <p className="stu-res__eyebrow">Official document</p>
-            <h2 className="stu-res__hero-title">Term report card</h2>
+            <h2 className="stu-res__hero-title">
+              {printMode === "annual" ? "Year-end report card" : "Term report card"}
+            </h2>
             <p className="stu-res__hero-sub">
-              Your final report is published once per term or year, after teachers submit
-              scores and the school approves them. This is your official academic summary.
+              {printMode === "annual"
+                ? "Full-year summary with all terms. After promotion is recorded, the printout includes a promotion stamp for the next grade."
+                : "Scores for the selected term. Your school publishes this after results are approved."}
             </p>
           </div>
           {reportPublished ? (
@@ -96,7 +108,7 @@ export function StudentReportCardPanel() {
               className="stu-res__select"
               value={termId}
               onChange={(e) => setTermId(e.target.value)}
-              disabled={loading || terms.length === 0}
+              disabled={selectDisabled}
             >
               {terms.length === 0 ? (
                 <option value="">No terms</option>
@@ -109,12 +121,33 @@ export function StudentReportCardPanel() {
               )}
             </select>
           </label>
+          <div className="stu-res__field" role="group" aria-label="Report type">
+            <span>Report type</span>
+            <div className="stu-res__mode-toggle">
+              <button
+                type="button"
+                className={`stu-res__mode-btn${printMode === "term" ? " is-active" : ""}`}
+                aria-pressed={printMode === "term"}
+                onClick={() => setPrintMode("term")}
+              >
+                Term
+              </button>
+              <button
+                type="button"
+                className={`stu-res__mode-btn${printMode === "annual" ? " is-active" : ""}`}
+                aria-pressed={printMode === "annual"}
+                onClick={() => setPrintMode("annual")}
+              >
+                Year-end
+              </button>
+            </div>
+          </div>
           <div className="stu-res__report-actions">
             <button
               type="button"
               className="stu-res__btn stu-res__btn--primary"
               onClick={() => void loadReport()}
-              disabled={!termId || reportLoading}
+              disabled={refreshDisabled}
             >
               {reportLoading ? "Loading…" : "Refresh report card"}
             </button>
@@ -122,7 +155,7 @@ export function StudentReportCardPanel() {
               <button
                 type="button"
                 className="stu-res__btn stu-res__btn--ghost"
-                onClick={() => openMyReportCardPrint(termId)}
+                onClick={() => openMyReportCardPrint(termId, printMode)}
               >
                 Print / PDF
               </button>

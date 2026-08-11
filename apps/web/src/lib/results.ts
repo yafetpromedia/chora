@@ -316,19 +316,92 @@ export async function getMyReportCardStatus(termId: string) {
   );
 }
 
-export function reportCardPrintUrl(studentProfileId: string, termId: string) {
+export type ReportCardPublishStatus = {
+  published: boolean;
+  publishedCount: number;
+  total: number;
+  withScores: number;
+  unpublishedCount: number;
+  canPublish: boolean;
+  subjects: Array<{
+    name: string;
+    status: string;
+    hasScores: boolean;
+  }>;
+};
+
+export async function getReportCardPublishStatus(
+  studentProfileId: string,
+  termId: string,
+) {
   const q = new URLSearchParams({ studentProfileId, termId });
+  return apiFetch<ReportCardPublishStatus>(
+    `/results/report-card/publish-status?${q}`,
+  );
+}
+
+export async function publishReportCardsForStudent(
+  studentProfileId: string,
+  termId: string,
+) {
+  return apiPost<{
+    published: number;
+    alreadyPublished: number;
+    emptyPublished: number;
+    total: number;
+    familyVisible: boolean;
+    subjects: Array<{ name: string; status: string }>;
+  }>("/results/report-card/publish", { studentProfileId, termId });
+}
+
+export type ReportCardPrintMode = "term" | "annual";
+
+export function reportCardPrintUrl(
+  studentProfileId: string,
+  termId: string,
+  mode: ReportCardPrintMode = "term",
+) {
+  const q = new URLSearchParams({ studentProfileId, termId, mode });
   return `${getApiBaseUrl()}/results/report-card/html?${q}`;
 }
 
-export function openReportCardPrint(studentProfileId: string, termId: string) {
-  const q = new URLSearchParams({ studentProfileId, termId });
+export function openReportCardPrint(
+  studentProfileId: string,
+  termId: string,
+  mode: ReportCardPrintMode = "term",
+) {
+  const q = new URLSearchParams({ studentProfileId, termId, mode });
   window.open(`/admin/results/print?${q}`, "_blank");
 }
 
-export function openMyReportCardPrint(termId: string) {
-  const q = new URLSearchParams({ termId });
+export function openMyReportCardPrint(
+  termId: string,
+  mode: ReportCardPrintMode = "term",
+) {
+  const q = new URLSearchParams({ termId, mode });
   window.open(`/student/report-card/print?${q}`, "_blank");
+}
+
+export function resultsExportUrl(termId: string, gradeId?: string) {
+  const q = new URLSearchParams({ termId });
+  if (gradeId) q.set("gradeId", gradeId);
+  return `${getApiBaseUrl()}/results/export?${q}`;
+}
+
+export async function downloadResultsExport(termId: string, gradeId?: string) {
+  const token = localStorage.getItem(AUTH_TOKEN_KEY);
+  if (!token) throw new Error("Not authenticated");
+  const res = await fetch(resultsExportUrl(termId, gradeId), {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error("Export failed");
+  const blob = await res.blob();
+  const stamp = new Date().toISOString().slice(0, 10);
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `results-${stamp}.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
 }
 
 export type AssessmentTemplate = {

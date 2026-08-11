@@ -255,10 +255,10 @@ export class SchoolsService implements OnModuleInit {
       data.attendanceMode = input.attendanceMode;
     }
     if (input.reportCardTitle !== undefined) {
-      data.reportCardTitle = input.reportCardTitle.trim() || null;
+      data.reportCardTitle = input.reportCardTitle?.trim() || null;
     }
     if (input.reportCardTagline !== undefined) {
-      data.reportCardTagline = input.reportCardTagline.trim() || null;
+      data.reportCardTagline = input.reportCardTagline?.trim() || null;
     }
 
     const school = await this.prisma.school.update({

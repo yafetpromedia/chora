@@ -523,14 +523,14 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
       if (lockScope === "all") {
         setSuccess(
           open
-            ? `${name} unlocked for all grades & subjects this term (${result.updatedCount}).`
-            : `${name} locked for all grades & subjects this term (${result.updatedCount}).`,
+            ? `${name} open for teacher entry on all grades & subjects this term (${result.updatedCount}).`
+            : `${name} locked for teacher entry on all grades & subjects this term (${result.updatedCount}). Students still see saved scores.`,
         );
       } else {
         setSuccess(
           open
-            ? `${name} unlocked for this class — teachers can enter scores.`
-            : `${name} locked for this class — score entry is closed.`,
+            ? `${name} open for this class — teachers can enter scores.`
+            : `${name} locked for this class — teacher entry closed. Students still see saved scores.`,
         );
       }
     } catch (err) {
@@ -1458,7 +1458,8 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
                   <div>
                     <h3 className="res-scores-components__title">Score components</h3>
                     <p className="res-scores-components__hint">
-                      Turn on a component to let teachers enter scores. Turn off to lock it.
+                      Open lets teachers enter scores; Locked closes teacher editing.
+                      Saved scores are already visible to students and parents.
                     </p>
                   </div>
                   <div
@@ -1516,7 +1517,7 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
                         <span className="res-scores-component-toggle__track" aria-hidden />
                       </span>
                       <span className="res-scores-component-toggle__state">
-                        {busy ? "…" : isOpen ? "Open" : "Locked"}
+                        {busy ? "…" : isOpen ? "Open for entry" : "Locked for entry"}
                       </span>
                     </label>
                   );
@@ -1529,18 +1530,22 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
             <p className="res-scores-components__teacher-note">
               {openComponents.length > 0 ? (
                 <>
-                  You can edit: <strong>{openComponents.join(", ")}</strong>. Locked components (
-                  {lockedComponents.join(", ")}) still show any scores you already saved below.
+                  You can edit: <strong>{openComponents.join(", ")}</strong>. Components locked for
+                  entry ({lockedComponents.join(", ")}) still show saved scores below — students and
+                  parents can see those too.
                 </>
               ) : filledScores > 0 ? (
                 <>
-                  All components are locked for editing. Your <strong>{filledScores} saved score
-                  {filledScores === 1 ? "" : "s"}</strong> are shown below — ask academic office to
-                  unlock to add or change more.
+                  All components are locked for teacher entry. Your{" "}
+                  <strong>
+                    {filledScores} saved score{filledScores === 1 ? "" : "s"}
+                  </strong>{" "}
+                  still show below (and to students). Ask academic office to unlock to change them.
                 </>
               ) : (
                 <>
-                  All components are locked. Ask academic office to unlock before entering scores.
+                  All components are locked for teacher entry. Ask academic office to unlock before
+                  entering scores.
                 </>
               )}
             </p>
