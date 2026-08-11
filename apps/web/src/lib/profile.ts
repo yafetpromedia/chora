@@ -21,6 +21,7 @@ export type UserProfile = {
     section: string | null;
     fan: string | null;
     dateOfBirth: Date | string | null;
+    parentsCanViewResults: boolean;
   } | null;
   teacher: {
     homeroomGrade: string | null;
@@ -35,6 +36,7 @@ export type UpdateProfilePayload = {
   lastName?: string;
   phone?: string;
   newPassword?: string;
+  parentsCanViewResults?: boolean;
 };
 
 export async function getMyProfile() {

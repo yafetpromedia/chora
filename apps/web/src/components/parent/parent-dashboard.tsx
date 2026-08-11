@@ -73,6 +73,22 @@ export function ParentDashboard() {
   const selectedChild: ParentDayChild | null =
     parentDay?.children.find((c) => c.profileId === selectedChildId) ?? null;
 
+  const resultAlerts = useMemo(
+    () =>
+      parentAlerts.filter(
+        (n) =>
+          /result/i.test(n.title) ||
+          /report card/i.test(n.title) ||
+          /published/i.test(n.title),
+      ),
+    [parentAlerts],
+  );
+
+  const publishedScores = useMemo(
+    () => scoreUpdates.filter((s) => s.published),
+    [scoreUpdates],
+  );
+
   useEffect(() => {
     const load = async () => {
       try {
@@ -179,11 +195,17 @@ export function ParentDashboard() {
             <article className="par-home__kpi">
               <span>Performance</span>
               <strong>
-                {selectedChild.overallAverage != null
-                  ? `${selectedChild.overallAverage}%`
-                  : "—"}
+                {selectedChild.parentsCanViewResults === false
+                  ? "Private"
+                  : selectedChild.overallAverage != null
+                    ? `${selectedChild.overallAverage}%`
+                    : "—"}
               </strong>
-              <small>{selectedChild.performanceLabel ?? "No average yet"}</small>
+              <small>
+                {selectedChild.parentsCanViewResults === false
+                  ? "Student hid results from parents"
+                  : (selectedChild.performanceLabel ?? "No average yet")}
+              </small>
             </article>
             <article className={`par-home__kpi${selectedChild.outstandingCents > 0 ? " par-home__kpi--warn" : ""}`}>
               <span>Fees due</span>
@@ -205,6 +227,19 @@ export function ParentDashboard() {
                 </small>
               </article>
             ) : null}
+          </section>
+        ) : null}
+
+        {resultAlerts.length > 0 && selectedChild?.parentsCanViewResults !== false ? (
+          <section className="par-home__publish-banner" aria-label="Published results">
+            <div>
+              <p className="par-home__publish-eyebrow">Official release</p>
+              <h2 className="par-home__publish-title">{resultAlerts[0].title}</h2>
+              <p className="par-home__publish-body">{resultAlerts[0].body}</p>
+            </div>
+            <Link href="/parent/results" className="par-home__btn par-home__btn--primary">
+              View published results
+            </Link>
           </section>
         ) : null}
 
@@ -253,26 +288,37 @@ export function ParentDashboard() {
 
           <article className="par-home__panel">
             <div className="par-home__panel-head">
-              <h2>Recent scores</h2>
+              <h2>Published scores</h2>
               <Link href="/parent/results" className="par-home__link">
                 All results
               </Link>
             </div>
-            {scoreUpdates.length === 0 ? (
+            {selectedChild?.parentsCanViewResults === false ? (
               <div className="par-home__empty-block">
-                <p>No published scores yet.</p>
+                <p>This student has turned off parent access to results.</p>
+                <p className="par-home__list-meta">
+                  They can re-enable it from their Profile → Results privacy.
+                </p>
+              </div>
+            ) : publishedScores.length === 0 ? (
+              <div className="par-home__empty-block">
+                <p>No officially published scores yet for this child.</p>
+                <p className="par-home__list-meta">
+                  You will get an alert when the school publishes results.
+                </p>
                 <Link href="/parent/report-card" className="par-home__link">
                   Check report card
                 </Link>
               </div>
             ) : (
               <ul className="par-home__list">
-                {scoreUpdates.map((row) => (
+                {publishedScores.slice(0, 6).map((row) => (
                   <li key={row.id}>
                     <div>
                       <p className="par-home__list-title">{row.subject}</p>
                       <p className="par-home__list-meta">
                         {row.assessmentName} · {row.termName}
+                        <span className="par-home__published-tag">Published</span>
                       </p>
                     </div>
                     <span className="par-home__score">{row.percentage}%</span>
@@ -305,14 +351,30 @@ export function ParentDashboard() {
               <span className="par-home__badge">{parentAlerts.length}</span>
             </div>
             <ul className="par-home__list">
-              {parentAlerts.slice(0, 5).map((n) => (
-                <li key={n.id} className="par-home__list-item--stack">
-                  <div>
-                    <p className="par-home__list-title">{n.title}</p>
-                    <p className="par-home__list-meta">{n.body}</p>
-                  </div>
-                </li>
-              ))}
+              {parentAlerts.slice(0, 6).map((n) => {
+                const isResults =
+                  /result/i.test(n.title) ||
+                  /report card/i.test(n.title) ||
+                  /published/i.test(n.title);
+                return (
+                  <li key={n.id} className="par-home__list-item--stack">
+                    <div>
+                      <p className="par-home__list-title">
+                        {n.title}
+                        {isResults ? (
+                          <span className="par-home__published-tag">Results</span>
+                        ) : null}
+                      </p>
+                      <p className="par-home__list-meta">{n.body}</p>
+                      {isResults ? (
+                        <Link href="/parent/results" className="par-home__link">
+                          Open results
+                        </Link>
+                      ) : null}
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           </article>
         ) : null}

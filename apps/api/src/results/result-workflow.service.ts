@@ -195,6 +195,13 @@ export class ResultWorkflowService {
         approver: { select: { firstName: true, lastName: true } },
       },
     });
+
+    await this.notifyParentsOfClassSubjectPublish(
+      schoolId,
+      termId,
+      classSubjectId,
+    );
+
     return this.formatSheet(updated);
   }
 
@@ -312,6 +319,8 @@ export class ResultWorkflowService {
         },
       }),
     ]);
+
+    await this.notifyParentsOfBulkPublish(schoolId, publishable);
 
     return {
       published: fromApproved.count + fromSubmitted.count,
@@ -467,12 +476,26 @@ export class ResultWorkflowService {
     }
 
     const total = classSubjects.length;
+    const familyVisible = total > 0 && alreadyPublished + published === total;
+
+    if (published > 0) {
+      await this.notifyParentsOfStudentResultsPublish(
+        schoolId,
+        studentProfileId,
+        term.name,
+        {
+          subjectCount: alreadyPublished + published,
+          reportCardReady: familyVisible,
+        },
+      );
+    }
+
     return {
       published,
       alreadyPublished,
       emptyPublished: skippedEmpty,
       total,
-      familyVisible: total > 0 && alreadyPublished + published === total,
+      familyVisible,
       subjects,
     };
   }
@@ -588,6 +611,234 @@ export class ResultWorkflowService {
       role,
       classSubjectId,
     );
+  }
+
+  /**
+   * Alert linked parents that a subject's results are now officially published.
+   */
+  private async notifyParentsOfClassSubjectPublish(
+    schoolId: string,
+    termId: string,
+    classSubjectId: string,
+  ) {
+    const [cs, term, scored] = await Promise.all([
+      this.prisma.classSubject.findFirst({
+        where: { id: classSubjectId, schoolId },
+        include: { subject: { select: { name: true } } },
+      }),
+      this.prisma.academicTerm.findFirst({
+        where: { id: termId, schoolId },
+        select: { name: true },
+      }),
+      this.prisma.studentAssessmentScore.findMany({
+        where: {
+          assessment: { schoolId, termId, classSubjectId },
+        },
+        select: { studentProfileId: true },
+        distinct: ['studentProfileId'],
+      }),
+    ]);
+    if (!cs || scored.length === 0) return;
+
+    const studentIds = scored.map((s) => s.studentProfileId);
+    const [students, links] = await Promise.all([
+      this.prisma.studentProfile.findMany({
+        where: {
+          id: { in: studentIds },
+          schoolId,
+          parentsCanViewResults: true,
+        },
+        include: { user: { select: { firstName: true, lastName: true } } },
+      }),
+      this.prisma.parentStudent.findMany({
+        where: { studentId: { in: studentIds } },
+        select: { parentId: true, studentId: true },
+      }),
+    ]);
+    if (students.length === 0 || links.length === 0) return;
+
+    const allowedIds = new Set(students.map((s) => s.id));
+    const nameById = new Map(
+      students.map((s) => [
+        s.id,
+        `${s.user.firstName} ${s.user.lastName}`.trim(),
+      ]),
+    );
+    const subjectName = cs.subject.name;
+    const termName = term?.name ?? 'this term';
+
+    await this.prisma.parentNotification.createMany({
+      data: links
+        .filter((link) => allowedIds.has(link.studentId))
+        .map((link) => {
+          const child = nameById.get(link.studentId) ?? 'your child';
+          return {
+            schoolId,
+            parentId: link.parentId,
+            studentProfileId: link.studentId,
+            title: `Results published — ${subjectName}`,
+            body: `${subjectName} results for ${child} are now published (${termName}). Open Results to review the scores.`,
+          };
+        }),
+    });
+  }
+
+  /**
+   * Bulk publish: one notification per student listing published subjects.
+   */
+  private async notifyParentsOfBulkPublish(
+    schoolId: string,
+    sheets: Array<{ termId: string; classSubjectId: string }>,
+  ) {
+    if (sheets.length === 0) return;
+
+    const classSubjectIds = [...new Set(sheets.map((s) => s.classSubjectId))];
+    const termIds = [...new Set(sheets.map((s) => s.termId))];
+
+    const [classSubjects, terms, scores] = await Promise.all([
+      this.prisma.classSubject.findMany({
+        where: { id: { in: classSubjectIds }, schoolId },
+        include: { subject: { select: { name: true } } },
+      }),
+      this.prisma.academicTerm.findMany({
+        where: { id: { in: termIds }, schoolId },
+        select: { id: true, name: true },
+      }),
+      this.prisma.studentAssessmentScore.findMany({
+        where: {
+          assessment: {
+            schoolId,
+            OR: sheets.map((s) => ({
+              termId: s.termId,
+              classSubjectId: s.classSubjectId,
+            })),
+          },
+        },
+        select: {
+          studentProfileId: true,
+          assessment: {
+            select: {
+              termId: true,
+              classSubjectId: true,
+            },
+          },
+        },
+      }),
+    ]);
+
+    if (scores.length === 0) return;
+
+    const subjectByCs = new Map(
+      classSubjects.map((cs) => [cs.id, cs.subject.name]),
+    );
+    const termById = new Map(terms.map((t) => [t.id, t.name]));
+
+    const byStudent = new Map<
+      string,
+      { subjects: Set<string>; termNames: Set<string> }
+    >();
+    for (const row of scores) {
+      const subject = subjectByCs.get(row.assessment.classSubjectId);
+      if (!subject) continue;
+      let bucket = byStudent.get(row.studentProfileId);
+      if (!bucket) {
+        bucket = { subjects: new Set(), termNames: new Set() };
+        byStudent.set(row.studentProfileId, bucket);
+      }
+      bucket.subjects.add(subject);
+      const termName = termById.get(row.assessment.termId);
+      if (termName) bucket.termNames.add(termName);
+    }
+
+    const studentIds = [...byStudent.keys()];
+    const [students, links] = await Promise.all([
+      this.prisma.studentProfile.findMany({
+        where: {
+          id: { in: studentIds },
+          schoolId,
+          parentsCanViewResults: true,
+        },
+        include: { user: { select: { firstName: true, lastName: true } } },
+      }),
+      this.prisma.parentStudent.findMany({
+        where: { studentId: { in: studentIds } },
+        select: { parentId: true, studentId: true },
+      }),
+    ]);
+    if (students.length === 0 || links.length === 0) return;
+
+    const allowedIds = new Set(students.map((s) => s.id));
+    const nameById = new Map(
+      students.map((s) => [
+        s.id,
+        `${s.user.firstName} ${s.user.lastName}`.trim(),
+      ]),
+    );
+
+    await this.prisma.parentNotification.createMany({
+      data: links
+        .filter((link) => allowedIds.has(link.studentId))
+        .map((link) => {
+          const info = byStudent.get(link.studentId);
+          const child = nameById.get(link.studentId) ?? 'your child';
+          const subjects = info ? [...info.subjects].sort() : [];
+          const termLabel = info
+            ? [...info.termNames].join(', ') || 'this term'
+            : 'this term';
+          const subjectLabel =
+            subjects.length <= 3
+              ? subjects.join(', ')
+              : `${subjects.slice(0, 3).join(', ')} +${subjects.length - 3} more`;
+          return {
+            schoolId,
+            parentId: link.parentId,
+            studentProfileId: link.studentId,
+            title: `Results published for ${child}`,
+            body: `${subjectLabel || 'Subject'} results are now published (${termLabel}). Open Results in the parent portal to review.`,
+          };
+        }),
+    });
+  }
+
+  private async notifyParentsOfStudentResultsPublish(
+    schoolId: string,
+    studentProfileId: string,
+    termName: string,
+    options: { subjectCount: number; reportCardReady: boolean },
+  ) {
+    const [student, links] = await Promise.all([
+      this.prisma.studentProfile.findFirst({
+        where: {
+          id: studentProfileId,
+          schoolId,
+          parentsCanViewResults: true,
+        },
+        include: { user: { select: { firstName: true, lastName: true } } },
+      }),
+      this.prisma.parentStudent.findMany({
+        where: { studentId: studentProfileId },
+        select: { parentId: true },
+      }),
+    ]);
+    if (!student || links.length === 0) return;
+
+    const child = `${student.user.firstName} ${student.user.lastName}`.trim();
+    const title = options.reportCardReady
+      ? `Report card ready — ${child}`
+      : `Results published — ${child}`;
+    const body = options.reportCardReady
+      ? `${termName} results for ${child} are published (${options.subjectCount} subjects). The official report card is now available.`
+      : `${termName} results for ${child} were published (${options.subjectCount} subjects). Open Results to review.`;
+
+    await this.prisma.parentNotification.createMany({
+      data: links.map((link) => ({
+        schoolId,
+        parentId: link.parentId,
+        studentProfileId,
+        title,
+        body,
+      })),
+    });
   }
 
   private formatSheet(sheet: {

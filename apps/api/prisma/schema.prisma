@@ -575,6 +575,8 @@ model StudentProfile {
   cardCode           String?
   /// Shown to admins while student has not changed their portal password.
   portalTempPassword String?
+  /// When false, linked parents cannot view results or report cards.
+  parentsCanViewResults Boolean @default(true)
   parents            ParentStudent[]
   admissionApplication AdmissionApplication?
   attendanceRecords  AttendanceRecord[]

@@ -174,8 +174,10 @@ export function StudentResultsPanel() {
                           </span>
                         </div>
                         <p className="stu-res__timeline-meta">
-                          {row.classLabel} · {row.termName} · Released{" "}
-                          {formatReleasedDate(row.releasedAt)}
+                          {row.classLabel} · {row.termName} ·{" "}
+                          {row.published
+                            ? `Published ${formatReleasedDate(row.publishedAt ?? row.releasedAt)}`
+                            : `Updated ${formatReleasedDate(row.releasedAt)} · awaiting official publish`}
                         </p>
                       </div>
                     </li>

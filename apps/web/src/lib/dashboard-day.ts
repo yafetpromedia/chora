@@ -47,6 +47,7 @@ export type ParentDayChild = {
   outstandingCents: number;
   overallAverage: number | null;
   performanceLabel: string | null;
+  parentsCanViewResults?: boolean;
 };
 
 export type ParentDayOverview = {

@@ -1,4 +1,4 @@
-import { IsOptional, IsString, MinLength } from 'class-validator';
+import { IsBoolean, IsOptional, IsString, MinLength } from 'class-validator';
 
 export class UpdateProfileDto {
   @IsOptional()
@@ -22,4 +22,9 @@ export class UpdateProfileDto {
   @IsString()
   @MinLength(8)
   newPassword?: string;
+
+  /** Student-only: whether linked parents can view results / report cards. */
+  @IsOptional()
+  @IsBoolean()
+  parentsCanViewResults?: boolean;
 }

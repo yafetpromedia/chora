@@ -350,6 +350,9 @@ export function StudentSubjectScoresPanel({
         (c) => c.assessmentId && getCellValue(s.classSubjectId, c.assessmentId) != null,
       ),
     ).length;
+    const publishedSubjects = matrix.subjects.filter(
+      (s) => s.workflowStatus === "PUBLISHED",
+    ).length;
     const average =
       subjectTotals.length > 0
         ? Math.round(
@@ -359,6 +362,7 @@ export function StudentSubjectScoresPanel({
     return {
       released: stats.filled,
       subjects: subjectsWithScores,
+      publishedSubjects,
       average,
     };
   }, [matrix, draft, getSavedScore, isPortalView, stats.filled]);
@@ -381,7 +385,9 @@ export function StudentSubjectScoresPanel({
           title={role === "parent" ? "Child results" : "My results"}
           subtitle={
             role === "parent"
-              ? "Scores released by teachers, organized by subject."
+              ? portalStats && portalStats.publishedSubjects > 0
+                ? `${portalStats.publishedSubjects} subject${portalStats.publishedSubjects === 1 ? "" : "s"} officially published. In-progress subjects are marked until the school publishes them.`
+                : "Scores appear as teachers enter them. Published subjects are marked when the school releases them officially."
               : "Scores released by your teachers, organized by subject."
           }
           icon="📊"
@@ -393,12 +399,15 @@ export function StudentSubjectScoresPanel({
                     label: "Average",
                   },
                   { value: portalStats.subjects, label: "Subjects" },
-                  { value: portalStats.released, label: "Released" },
+                  {
+                    value: portalStats.publishedSubjects,
+                    label: "Published",
+                  },
                 ]
               : [
                   { value: "—", label: "Average" },
                   { value: 0, label: "Subjects" },
-                  { value: 0, label: "Released" },
+                  { value: 0, label: "Published" },
                 ]
           }
         />
@@ -574,8 +583,8 @@ export function StudentSubjectScoresPanel({
                       <span>Subjects</span>
                     </div>
                     <div className="res-portal-stat">
-                      <strong>{portalStats.released}</strong>
-                      <span>Released</span>
+                      <strong>{portalStats.publishedSubjects}</strong>
+                      <span>Published</span>
                     </div>
                   </div>
                 ) : null}
@@ -648,10 +657,27 @@ export function StudentSubjectScoresPanel({
               <tbody>
                 {matrix.subjects.map((subject) => {
                   const total = subjectRowTotal(subject, draft, getSavedScore);
+                  const isPublished = subject.workflowStatus === "PUBLISHED";
                   return (
                     <tr key={subject.classSubjectId}>
                       <th scope="row" className="res-subject-table__subject">
-                        {subject.subject}
+                        <span className="res-subject-table__subject-name">
+                          {subject.subject}
+                        </span>
+                        {isPortalView ? (
+                          <span
+                            className={`res-scores-workflow-pill res-scores-workflow-pill--${
+                              isPublished ? "published" : "draft"
+                            }`}
+                            title={
+                              isPublished
+                                ? "Officially published for families"
+                                : "Saved scores — not officially published yet"
+                            }
+                          >
+                            {isPublished ? "Published" : "In progress"}
+                          </span>
+                        ) : null}
                       </th>
                       {subject.cells.map((cell) => {
                         if (!cell.assessmentId) {

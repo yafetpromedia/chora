@@ -218,7 +218,7 @@ export class SchoolDayDashboardService {
 
         let performanceLabel: string | null = null;
         let overallAverage: number | null = null;
-        if (term) {
+        if (term && profile.parentsCanViewResults) {
           const scores = await this.prisma.studentAssessmentScore.findMany({
             where: {
               studentProfileId: profile.id,
@@ -248,6 +248,7 @@ export class SchoolDayDashboardService {
           outstandingCents,
           overallAverage,
           performanceLabel,
+          parentsCanViewResults: profile.parentsCanViewResults,
         };
       }),
     );

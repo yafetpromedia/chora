@@ -404,6 +404,69 @@
   color: color-mix(in srgb, var(--brand-ink) 58%, transparent);
 }
 
+.par-home__publish-banner {
+  display: grid;
+  gap: 1rem;
+  padding: 1.1rem 1.15rem;
+  border-radius: 1rem;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--brand-teal) 16%, #fff) 0%,
+    #fff 70%
+  );
+  border: 1px solid color-mix(in srgb, var(--brand-teal) 28%, transparent);
+}
+
+@media (min-width: 768px) {
+  .par-home__publish-banner {
+    grid-template-columns: 1fr auto;
+    align-items: center;
+  }
+}
+
+.par-home__publish-eyebrow {
+  margin: 0 0 0.25rem;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--brand-teal-dark);
+}
+
+.par-home__publish-title {
+  margin: 0 0 0.35rem;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--brand-ink);
+}
+
+.par-home__publish-body {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.4;
+  color: color-mix(in srgb, var(--brand-ink) 68%, transparent);
+  white-space: pre-line;
+}
+
+.par-home__publish-banner .par-home__btn--primary {
+  background: var(--brand-teal-dark);
+  color: #fff;
+}
+
+.par-home__published-tag {
+  display: inline-flex;
+  margin-left: 0.4rem;
+  padding: 0.12rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #0f766e;
+  background: color-mix(in srgb, #14b8a6 16%, #fff);
+  vertical-align: middle;
+}
+
 /* Fees — reuse student fees visual language */
 .par-fees {
   display: flex;

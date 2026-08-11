@@ -1,12 +1,13 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
   OnModuleInit,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
-import { AttendanceStatus } from '@prisma/client';
+import { AttendanceStatus, ResultWorkflowStatus } from '@prisma/client';
 import { TeacherScopeService } from '../teachers/teacher-scope.service';
 import { ResultWorkflowService } from './result-workflow.service';
 import {
@@ -1297,9 +1298,42 @@ export class AcademicsService implements OnModuleInit {
       orderBy: { updatedAt: 'desc' },
     });
 
+    const sheetKeys = [
+      ...new Set(
+        rows.map(
+          (row) => `${row.assessment.termId}:${row.assessment.classSubjectId}`,
+        ),
+      ),
+    ];
+    const sheets =
+      sheetKeys.length === 0
+        ? []
+        : await this.prisma.classSubjectTermSheet.findMany({
+            where: {
+              schoolId,
+              OR: sheetKeys.map((key) => {
+                const [tId, csId] = key.split(':');
+                return { termId: tId, classSubjectId: csId };
+              }),
+            },
+            select: {
+              termId: true,
+              classSubjectId: true,
+              status: true,
+              publishedAt: true,
+            },
+          });
+    const sheetMap = new Map(
+      sheets.map((s) => [`${s.termId}:${s.classSubjectId}`, s]),
+    );
+
     return rows.map((row) => {
       const cs = row.assessment.classSubject;
       const section = cs.section?.name ? ` ${cs.section.name}` : '';
+      const sheet = sheetMap.get(
+        `${row.assessment.termId}:${row.assessment.classSubjectId}`,
+      );
+      const published = sheet?.status === ResultWorkflowStatus.PUBLISHED;
       return {
         id: row.id,
         assessmentId: row.assessmentId,
@@ -1314,6 +1348,8 @@ export class AcademicsService implements OnModuleInit {
         termName: row.assessment.term.name,
         academicYear: row.assessment.term.academicYear.name,
         releasedAt: row.updatedAt.toISOString(),
+        published,
+        publishedAt: sheet?.publishedAt?.toISOString() ?? null,
       };
     });
   }
@@ -1364,6 +1400,7 @@ export class AcademicsService implements OnModuleInit {
       if (!link) {
         throw new NotFoundException('No linked student found for this parent');
       }
+      await this.assertCanViewStudent(role, userId, schoolId, link.studentId);
       return link.studentId;
     }
     if (!requested) {
@@ -1414,6 +1451,17 @@ export class AcademicsService implements OnModuleInit {
         },
       });
       if (!link) throw new NotFoundException('Not allowed');
+
+      const profile = await this.prisma.studentProfile.findFirst({
+        where: { id: studentProfileId, schoolId },
+        select: { parentsCanViewResults: true },
+      });
+      if (!profile) throw new NotFoundException('Student not found');
+      if (!profile.parentsCanViewResults) {
+        throw new ForbiddenException(
+          'This student has turned off parent access to results',
+        );
+      }
       return;
     }
     throw new NotFoundException('Not allowed');

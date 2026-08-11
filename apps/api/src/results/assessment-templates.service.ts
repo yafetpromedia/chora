@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
   OnModuleInit,
@@ -880,6 +881,11 @@ export class AssessmentTemplatesService implements OnModuleInit {
       });
       if (!link) {
         throw new NotFoundException('Not allowed');
+      }
+      if (!profile.parentsCanViewResults) {
+        throw new ForbiddenException(
+          'This student has turned off parent access to results',
+        );
       }
     }
 

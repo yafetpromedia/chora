@@ -351,6 +351,38 @@
   background: var(--brand-surface);
 }
 
+.profile-privacy-toggle {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  padding: 0.85rem 0.15rem 0.25rem;
+  cursor: pointer;
+}
+
+.profile-privacy-toggle input {
+  margin-top: 0.2rem;
+  width: 1.1rem;
+  height: 1.1rem;
+  accent-color: var(--brand-teal-dark);
+}
+
+.profile-privacy-toggle span {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.profile-privacy-toggle strong {
+  font-size: 0.95rem;
+  color: var(--brand-ink);
+}
+
+.profile-privacy-toggle small {
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: color-mix(in srgb, var(--brand-ink) 58%, transparent);
+}
+
 /* Children list */
 .profile-children {
   list-style: none;

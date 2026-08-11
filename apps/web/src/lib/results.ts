@@ -303,6 +303,8 @@ export type StudentScoreUpdate = {
   termName: string;
   academicYear: string;
   releasedAt: string;
+  published?: boolean;
+  publishedAt?: string | null;
 };
 
 export async function listMyScoreUpdates(termId?: string, studentProfileId?: string) {

@@ -3446,6 +3446,18 @@
   font-size: 0.9rem;
 }
 
+.res-subject-table__subject-name {
+  display: block;
+  margin-bottom: 0.28rem;
+}
+
+.res-subject-sheet--portal .res-subject-table__subject .res-scores-workflow-pill {
+  display: inline-flex;
+  margin-top: 0.1rem;
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+}
+
 .res-subject-pill--pending {
   background: #f8fafc;
   color: #cbd5e1;

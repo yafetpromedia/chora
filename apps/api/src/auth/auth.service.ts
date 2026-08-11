@@ -110,6 +110,7 @@ export class AuthService {
             section: user.studentProfile.section?.name ?? null,
             fan: user.studentProfile.fan,
             dateOfBirth: user.studentProfile.dateOfBirth,
+            parentsCanViewResults: user.studentProfile.parentsCanViewResults,
           }
         : null,
       teacher:
@@ -159,19 +160,32 @@ export class AuthService {
       data.passwordHash = hashSync(dto.newPassword, 10);
     }
 
-    if (Object.keys(data).length === 0) {
+    const hasUserUpdates = Object.keys(data).length > 0;
+    const hasPrivacyUpdate =
+      actor.role === 'student' && dto.parentsCanViewResults !== undefined;
+
+    if (!hasUserUpdates && !hasPrivacyUpdate) {
       return this.getProfile(actor);
     }
 
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data,
-    });
+    if (hasUserUpdates) {
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data,
+      });
+    }
 
     if (dto.newPassword && user.role === 'student') {
       await this.prisma.studentProfile.updateMany({
         where: { userId: user.id },
         data: { portalTempPassword: null },
+      });
+    }
+
+    if (hasPrivacyUpdate) {
+      await this.prisma.studentProfile.updateMany({
+        where: { userId: user.id, schoolId: actor.schoolId },
+        data: { parentsCanViewResults: dto.parentsCanViewResults },
       });
     }
 
