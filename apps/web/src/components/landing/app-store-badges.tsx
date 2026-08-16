@@ -1,7 +1,10 @@
-import type { ReactNode } from "react";
-import { APP_STORE_URL, PLAY_STORE_URL } from "@/lib/app-links";
+"use client";
+
+import { useEffect, useId, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 
 type Variant = "light" | "dark";
+type StoreKind = "play" | "apple";
 
 function PlayIcon() {
   return (
@@ -26,32 +29,109 @@ function AppleIcon() {
 }
 
 function StoreButton({
-  href,
   label,
   title,
   icon,
   variant,
+  onClick,
 }: {
-  href: string;
   label: string;
   title: string;
   icon: ReactNode;
   variant: Variant;
+  onClick: () => void;
 }) {
   return (
-    <a
-      href={href}
+    <button
+      type="button"
       className={`lp3-store lp3-store--${variant}`}
-      target="_blank"
-      rel="noopener noreferrer"
-      aria-label={label}
+      onClick={onClick}
+      aria-label={`${label} ${title}`}
     >
       <span className="lp3-store__icon">{icon}</span>
       <span className="lp3-store__text">
         <small>{label}</small>
         <strong>{title}</strong>
       </span>
-    </a>
+    </button>
+  );
+}
+
+function ComingSoonDialog({
+  open,
+  store,
+  onClose,
+}: {
+  open: boolean;
+  store: StoreKind | null;
+  onClose: () => void;
+}) {
+  const titleId = useId();
+  const descId = useId();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [open, onClose]);
+
+  if (!mounted || !open || !store) return null;
+
+  const storeName = store === "play" ? "Google Play" : "App Store";
+
+  return createPortal(
+    <div className="lp3-soon" role="presentation">
+      <button
+        type="button"
+        className="lp3-soon__backdrop"
+        aria-label="Close"
+        onClick={onClose}
+      />
+      <div
+        className="lp3-soon__dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={descId}
+      >
+        <div className="lp3-soon__mark" aria-hidden>
+          {store === "play" ? <PlayIcon /> : <AppleIcon />}
+        </div>
+        <p className="lp3-soon__eyebrow">CampusOne mobile</p>
+        <h2 id={titleId} className="lp3-soon__title">
+          Coming soon
+        </h2>
+        <p id={descId} className="lp3-soon__body">
+          The CampusOne app for {storeName} is almost ready. Families and staff can
+          keep using the web portal with the same school code and login until
+          launch.
+        </p>
+        <ul className="lp3-soon__list">
+          <li>Attendance, results, and fees on the go</li>
+          <li>Same account as the school web portal</li>
+          <li>Free for families linked to your school</li>
+        </ul>
+        <div className="lp3-soon__actions">
+          <button type="button" className="lp3-soon__btn" onClick={onClose}>
+            Got it
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -64,26 +144,35 @@ export function AppStoreBadges({
   className?: string;
   layout?: "row" | "stack";
 }) {
+  const [store, setStore] = useState<StoreKind | null>(null);
+
   return (
-    <div
-      className={`lp3-stores${layout === "stack" ? " lp3-stores--stack" : ""}${
-        className ? ` ${className}` : ""
-      }`}
-    >
-      <StoreButton
-        href={PLAY_STORE_URL}
-        label="Get it on"
-        title="Google Play"
-        icon={<PlayIcon />}
-        variant={variant}
+    <>
+      <div
+        className={`lp3-stores${layout === "stack" ? " lp3-stores--stack" : ""}${
+          className ? ` ${className}` : ""
+        }`}
+      >
+        <StoreButton
+          label="Get it on"
+          title="Google Play"
+          icon={<PlayIcon />}
+          variant={variant}
+          onClick={() => setStore("play")}
+        />
+        <StoreButton
+          label="Download on the"
+          title="App Store"
+          icon={<AppleIcon />}
+          variant={variant}
+          onClick={() => setStore("apple")}
+        />
+      </div>
+      <ComingSoonDialog
+        open={store !== null}
+        store={store}
+        onClose={() => setStore(null)}
       />
-      <StoreButton
-        href={APP_STORE_URL}
-        label="Download on the"
-        title="App Store"
-        icon={<AppleIcon />}
-        variant={variant}
-      />
-    </div>
+    </>
   );
 }

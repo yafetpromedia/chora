@@ -70,6 +70,9 @@ export type SchoolInfo = {
   setupComplete?: boolean;
   schoolType?: SchoolType | null;
   logoUrl?: string | null;
+  primaryColor?: string | null;
+  accentColor?: string | null;
+  accentDeep?: string | null;
   address?: string | null;
   email?: string | null;
   country?: string | null;
@@ -398,7 +401,14 @@ async function authPost(path: string, body: unknown): Promise<LoginResponse> {
 
 export async function validateSchoolCode(
   schoolCode: string,
-): Promise<{ name: string; joinCode: string }> {
+): Promise<{
+  name: string;
+  joinCode: string;
+  logoUrl?: string | null;
+  primaryColor?: string | null;
+  accentColor?: string | null;
+  accentDeep?: string | null;
+}> {
   const code = schoolCode.trim().toUpperCase();
   const response = await fetch(
     `${getApiBaseUrl()}/auth/school-code/${encodeURIComponent(code)}`,
@@ -637,6 +647,10 @@ export async function apiPost<T>(path: string, body: unknown): Promise<T> {
 
 export async function apiPatch<T>(path: string, body: unknown): Promise<T> {
   return authedFetch<T>(path, { method: "PATCH", body: JSON.stringify(body) });
+}
+
+export async function apiPut<T>(path: string, body: unknown): Promise<T> {
+  return authedFetch<T>(path, { method: "PUT", body: JSON.stringify(body) });
 }
 
 export async function apiDelete<T>(path: string): Promise<T> {

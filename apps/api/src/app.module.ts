@@ -23,6 +23,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { ResultsModule } from './results/results.module';
 import { ClassworkModule } from './classwork/classwork.module';
 import { TimetableModule } from './timetable/timetable.module';
+import { ExamSchedulesModule } from './exam-schedules/exam-schedules.module';
 import { LibraryModule } from './library/library.module';
 import { ProvisioningModule } from './provisioning/provisioning.module';
 import { InvitesModule } from './invites/invites.module';
@@ -54,6 +55,7 @@ import { SupportModule } from './support/support.module';
     AttendanceModule,
     ResultsModule,
     TimetableModule,
+    ExamSchedulesModule,
     ClassworkModule,
     LibraryModule,
     ProvisioningModule,

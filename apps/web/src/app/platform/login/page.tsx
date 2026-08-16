@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { motion, useReducedMotion } from "framer-motion";
 import { AuthInput } from "@/components/auth/auth-input";
 import { AuthSubmitButton } from "@/components/auth/auth-submit-button";
+import { useLandingHeroImage } from "@/hooks/use-landing-hero-image";
 import { platformLogin, persistPlatformSession } from "@/lib/platform-auth";
 
 export default function PlatformLoginPage() {
@@ -15,6 +16,7 @@ export default function PlatformLoginPage() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const reduce = useReducedMotion();
+  const heroSrc = useLandingHeroImage();
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -128,7 +130,7 @@ export default function PlatformLoginPage() {
           <div className="reg-visual reg-visual--photo">
             <div className="reg-visual__bg" aria-hidden>
               <img
-                src="/images/login-classroom.png"
+                src={heroSrc}
                 alt=""
                 className="reg-visual__photo"
               />

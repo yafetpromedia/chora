@@ -22,6 +22,7 @@ export type PlatformSettings = {
   maintenanceMode: boolean;
   maintenanceMessage: string | null;
   sessionTimeoutMinutes: number;
+  landingHeroImageUrl: string | null;
   updatedAt: string;
 };
 
@@ -45,6 +46,7 @@ export type UpdatePlatformSettingsInput = Partial<{
   maintenanceMode: boolean;
   maintenanceMessage: string;
   sessionTimeoutMinutes: number;
+  landingHeroImageUrl: string;
 }>;
 
 export function getPlatformSettings() {

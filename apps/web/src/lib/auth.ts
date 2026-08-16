@@ -16,6 +16,9 @@ export const AUTH_USER_ID_KEY = "edu_os_user_id";
 export const AUTH_SCHOOL_JOIN_CODE_KEY = "edu_os_school_join_code";
 export const AUTH_SCHOOL_NAME_KEY = "edu_os_school_name";
 export const AUTH_SCHOOL_LOGO_KEY = "edu_os_school_logo";
+export const AUTH_SCHOOL_PRIMARY_KEY = "edu_os_school_primary";
+export const AUTH_SCHOOL_ACCENT_KEY = "edu_os_school_accent";
+export const AUTH_SCHOOL_DEEP_KEY = "edu_os_school_deep";
 
 /** Current signed-in school user id (from session or JWT). */
 export function getCurrentUserId(): string | null {
@@ -53,4 +56,25 @@ export function clearSessionStorage() {
   localStorage.removeItem(AUTH_SCHOOL_JOIN_CODE_KEY);
   localStorage.removeItem(AUTH_SCHOOL_NAME_KEY);
   localStorage.removeItem(AUTH_SCHOOL_LOGO_KEY);
+  localStorage.removeItem(AUTH_SCHOOL_PRIMARY_KEY);
+  localStorage.removeItem(AUTH_SCHOOL_ACCENT_KEY);
+  localStorage.removeItem(AUTH_SCHOOL_DEEP_KEY);
+  if (typeof document !== "undefined") {
+    const root = document.documentElement;
+    for (const prop of [
+      "--brand-teal",
+      "--brand-teal-dark",
+      "--brand-cyan",
+      "--brand-cyan-light",
+      "--brand-accent-deep",
+      "--brand-ink",
+      "--brand-muted",
+      "--brand-faint",
+      "--brand-border",
+      "--brand-surface",
+      "--brand-surface-2",
+    ]) {
+      root.style.removeProperty(prop);
+    }
+  }
 }

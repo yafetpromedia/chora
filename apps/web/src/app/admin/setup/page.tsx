@@ -21,6 +21,7 @@ import {
 } from "@/lib/attendance";
 import type { GradePresetKey, GradeWithSections } from "@/lib/api";
 import { AUTH_ROLE_KEY, AUTH_TOKEN_KEY } from "@/lib/auth";
+import { AppConfirmDialog } from "@/components/ui/app-confirm-dialog";
 
 const STEPS = [
   { num: 1 as const, label: "Grades" },
@@ -173,7 +174,14 @@ export default function SchoolSetupPage() {
   const [loading, setLoading] = useState(false);
   const [bootstrapping, setBootstrapping] = useState(true);
   const [gradesReady, setGradesReady] = useState(false);
+  const [revisiting, setRevisiting] = useState(false);
   const [error, setError] = useState("");
+  const [removeSectionTarget, setRemoveSectionTarget] = useState<{
+    gradeId: string;
+    sectionId: string;
+    sectionName: string;
+  } | null>(null);
+  const [replaceStructureOpen, setReplaceStructureOpen] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -197,9 +205,9 @@ export default function SchoolSetupPage() {
         setPresets(presetsList);
         setAttendanceMode(settings.mode);
 
+        // Allow editing grades/sections after initial setup is done
         if (status.setupComplete) {
-          router.replace("/admin");
-          return;
+          setRevisiting(true);
         }
 
         if (existingGrades.length > 0) {
@@ -214,10 +222,14 @@ export default function SchoolSetupPage() {
           }
           setGrades(gradesList);
           setGradesReady(true);
-          setMaxStep(2);
+          setMaxStep(status.setupComplete ? 4 : 2);
           if (status.gradePreset) {
             setSelected(status.gradePreset);
             setActivePreset(status.gradePreset);
+          }
+          // When revisiting from Settings, land on sections (most common edit)
+          if (status.setupComplete) {
+            setStep(2);
           }
         }
       } catch {
@@ -246,14 +258,16 @@ export default function SchoolSetupPage() {
       return;
     }
 
-    if (
-      gradesReady &&
-      !window.confirm(
-        "Replace your grade structure? All sections will be cleared. Remove enrolled students first.",
-      )
-    ) {
+    if (gradesReady) {
+      setReplaceStructureOpen(true);
       return;
     }
+
+    await applyGradeStructure();
+  }
+
+  async function applyGradeStructure() {
+    if (!selected) return;
 
     setLoading(true);
     setError("");
@@ -283,6 +297,7 @@ export default function SchoolSetupPage() {
       setError(message);
     } finally {
       setLoading(false);
+      setReplaceStructureOpen(false);
     }
   }
 
@@ -333,13 +348,19 @@ export default function SchoolSetupPage() {
 
   const upperGrades = upperSecondaryGrades(grades);
 
-  async function onRemoveSection(gradeId: string, sectionId: string, sectionName: string) {
-    if (!window.confirm(`Remove section "${sectionName}"?`)) return;
+  function requestRemoveSection(gradeId: string, sectionId: string, sectionName: string) {
+    setRemoveSectionTarget({ gradeId, sectionId, sectionName });
+  }
+
+  async function confirmRemoveSection() {
+    if (!removeSectionTarget) return;
+    const { gradeId, sectionId } = removeSectionTarget;
     setSectionBusy(true);
     setError("");
     try {
       await removeSection(gradeId, sectionId);
       await refreshGrades();
+      setRemoveSectionTarget(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not remove section");
     } finally {
@@ -361,8 +382,10 @@ export default function SchoolSetupPage() {
     setLoading(true);
     setError("");
     try {
-      await completeSchoolSetup();
-      router.replace("/admin");
+      if (!revisiting) {
+        await completeSchoolSetup();
+      }
+      router.replace(revisiting ? "/admin/settings" : "/admin");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not finish setup");
     } finally {
@@ -386,6 +409,34 @@ export default function SchoolSetupPage() {
 
   return (
     <div className="sw">
+      <AppConfirmDialog
+        open={Boolean(removeSectionTarget)}
+        tone="danger"
+        title={`Remove section “${removeSectionTarget?.sectionName ?? ""}”?`}
+        message="This section will be removed from the grade. Students still assigned to it may need to be moved first."
+        confirmLabel="Remove section"
+        cancelLabel="Keep section"
+        busy={sectionBusy}
+        onCancel={() => {
+          if (sectionBusy) return;
+          setRemoveSectionTarget(null);
+        }}
+        onConfirm={() => void confirmRemoveSection()}
+      />
+      <AppConfirmDialog
+        open={replaceStructureOpen}
+        tone="warning"
+        title="Replace grade structure?"
+        message="All sections will be cleared. Remove enrolled students first if you already have classes set up."
+        confirmLabel="Replace structure"
+        cancelLabel="Cancel"
+        busy={loading}
+        onCancel={() => {
+          if (loading) return;
+          setReplaceStructureOpen(false);
+        }}
+        onConfirm={() => void applyGradeStructure()}
+      />
       <div className="sw__frame">
         <header className="sw__header">
           <span className="sw__header-mark" aria-hidden>
@@ -393,8 +444,15 @@ export default function SchoolSetupPage() {
           </span>
           <div className="sw__header-text">
             <span className="sw__header-title">CampusOne</span>
-            <span className="sw__header-sub">School setup</span>
+            <span className="sw__header-sub">
+              {revisiting ? "Edit grades & sections" : "School setup"}
+            </span>
           </div>
+          {revisiting ? (
+            <Link href="/admin/settings" className="sw__header-back">
+              ← Settings
+            </Link>
+          ) : null}
         </header>
 
         <div className="sw__card">
@@ -524,7 +582,7 @@ export default function SchoolSetupPage() {
                                 className="sw__tag"
                                 disabled={sectionBusy}
                                 title={`Remove ${s.name}`}
-                                onClick={() => void onRemoveSection(g.id, s.id, s.name)}
+                                onClick={() => requestRemoveSection(g.id, s.id, s.name)}
                               >
                                 {s.name} ×
                               </button>
@@ -687,9 +745,19 @@ export default function SchoolSetupPage() {
                 ) : null}
 
                 {step === 2 ? (
-                  <button type="button" className="sw__btn" onClick={() => goToStep(3)}>
-                    Continue
-                  </button>
+                  revisiting ? (
+                    <button
+                      type="button"
+                      className="sw__btn"
+                      onClick={() => router.replace("/admin/settings")}
+                    >
+                      Done
+                    </button>
+                  ) : (
+                    <button type="button" className="sw__btn" onClick={() => goToStep(3)}>
+                      Continue
+                    </button>
+                  )
                 ) : null}
 
                 {step === 3 ? (

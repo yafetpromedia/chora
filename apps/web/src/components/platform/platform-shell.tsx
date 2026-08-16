@@ -9,6 +9,7 @@ import {
   clearPlatformSession,
   type PlatformUser,
 } from "@/lib/platform-auth";
+import { hasPlatformPermission } from "@/lib/platform-access";
 import {
   SECTION_META,
   type PlatformSection,
@@ -33,6 +34,16 @@ const NAV: { id: PlatformSection; label: string; icon: DashIconName }[] = [
   { id: "profile", label: "Profile", icon: "profile" },
   { id: "settings", label: "Settings", icon: "settings" },
 ];
+
+function canAccessSection(user: PlatformUser | null, id: PlatformSection) {
+  if (id === "support") {
+    return hasPlatformPermission(user, "platform.support.manage");
+  }
+  if (id === "permissions" || id === "settings") {
+    return user?.role === "OWNER";
+  }
+  return true;
+}
 
 const PLATFORM_MOBILE_TABS: PlatformSection[] = [
   "overview",
@@ -75,11 +86,18 @@ export function PlatformShell({
   const displayName = user
     ? `${user.firstName} ${user.lastName}`.trim() || user.email
     : "Platform operator";
+  const visibleNav = NAV.filter((item) => canAccessSection(user, item.id));
   const mobileTabs = PLATFORM_MOBILE_TABS.flatMap((id) => {
-    const item = NAV.find((entry) => entry.id === id);
+    const item = visibleNav.find((entry) => entry.id === id);
     return item ? [item] : [];
   });
   const moreActive = !PLATFORM_MOBILE_TABS.includes(section);
+
+  useEffect(() => {
+    if (!ready) return;
+    if (canAccessSection(user, section)) return;
+    onSectionChange("overview");
+  }, [ready, user, section, onSectionChange]);
 
   return (
     <div
@@ -107,7 +125,7 @@ export function PlatformShell({
                   className="dash-nav-item dash-nav-item--pro dash-nav-item--skeleton"
                 />
               ))
-            : NAV.map((item) => {
+            : visibleNav.map((item) => {
                 const active = section === item.id;
                 return (
                   <button

@@ -12,6 +12,7 @@ import {
   type UserRole,
 } from "@/lib/auth";
 import {
+  applySchoolTheme,
   persistSchoolBrand,
   readSchoolBrand,
   SCHOOL_BRAND_UPDATED_EVENT,
@@ -87,6 +88,7 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
     const brand = readSchoolBrand();
     setSchoolName(brand.name);
     setSchoolLogoUrl(brand.logoUrl);
+    applySchoolTheme(brand);
 
     void apiFetch<{ school: SchoolInfo | null }>("/schools/me")
       .then((res) => {
@@ -94,6 +96,9 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
         persistSchoolBrand({
           name: res.school.name,
           logoUrl: res.school.logoUrl ?? null,
+          primaryColor: res.school.primaryColor ?? null,
+          accentColor: res.school.accentColor ?? null,
+          accentDeep: res.school.accentDeep ?? null,
         });
         setSchoolName(res.school.name);
         setSchoolLogoUrl(res.school.logoUrl ?? null);
@@ -145,6 +150,7 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
       const brand = readSchoolBrand();
       setSchoolName(brand.name);
       setSchoolLogoUrl(brand.logoUrl);
+      applySchoolTheme(brand);
     }
     window.addEventListener(SCHOOL_BRAND_UPDATED_EVENT, onBrandUpdate);
     return () => window.removeEventListener(SCHOOL_BRAND_UPDATED_EVENT, onBrandUpdate);

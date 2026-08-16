@@ -211,6 +211,188 @@ export class TimetableService {
     };
   }
 
+  async getSchoolOverview(schoolId: string, academicYearId: string) {
+    const tt = await this.ensureTimetable(schoolId, academicYearId);
+
+    const [periods, grades, grouped, saturdayCount] = await Promise.all([
+      this.prisma.timetablePeriod.findMany({
+        where: { timetableId: tt.id },
+        orderBy: { sortOrder: 'asc' },
+      }),
+      this.prisma.grade.findMany({
+        where: { schoolId },
+        orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+        include: {
+          sections: {
+            orderBy: { name: 'asc' },
+            select: { id: true, name: true },
+          },
+        },
+      }),
+      this.prisma.timetableEntry.groupBy({
+        by: ['gradeId', 'sectionId'],
+        where: { timetableId: tt.id },
+        _count: { _all: true },
+      }),
+      this.prisma.timetableEntry.count({
+        where: { timetableId: tt.id, weekday: Weekday.SATURDAY },
+      }),
+    ]);
+
+    const weekdays = WEEKDAYS_ORDER.filter((d) => {
+      if (d === Weekday.SUNDAY) return false;
+      if (d === Weekday.SATURDAY) return saturdayCount > 0;
+      return true;
+    });
+
+    const totalSlots = periods.length * weekdays.length;
+    const countMap = new Map<string, number>();
+    for (const row of grouped) {
+      countMap.set(`${row.gradeId}:${row.sectionId ?? ''}`, row._count._all);
+    }
+
+    const classes: Array<{
+      gradeId: string;
+      sectionId: string | null;
+      gradeName: string;
+      sectionName: string | null;
+      scheduled: number;
+      totalSlots: number;
+    }> = [];
+
+    for (const grade of grades) {
+      if (grade.sections.length === 0) {
+        classes.push({
+          gradeId: grade.id,
+          sectionId: null,
+          gradeName: grade.name,
+          sectionName: null,
+          scheduled: countMap.get(`${grade.id}:`) ?? 0,
+          totalSlots,
+        });
+        continue;
+      }
+      for (const section of grade.sections) {
+        classes.push({
+          gradeId: grade.id,
+          sectionId: section.id,
+          gradeName: grade.name,
+          sectionName: section.name,
+          scheduled: countMap.get(`${grade.id}:${section.id}`) ?? 0,
+          totalSlots,
+        });
+      }
+    }
+
+    return {
+      periodsCount: periods.length,
+      weekdays,
+      weekdayLabels: WEEKDAY_LABELS,
+      totalSlots,
+      classes,
+    };
+  }
+
+  async getSchoolStack(
+    schoolId: string,
+    academicYearId: string,
+    gradeId?: string,
+    sectionId?: string,
+  ) {
+    const tt = await this.ensureTimetable(schoolId, academicYearId);
+
+    const [periods, grades, entries, saturdayCount] = await Promise.all([
+      this.prisma.timetablePeriod.findMany({
+        where: { timetableId: tt.id },
+        orderBy: { sortOrder: 'asc' },
+      }),
+      this.prisma.grade.findMany({
+        where: gradeId ? { schoolId, id: gradeId } : { schoolId },
+        orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+        include: {
+          sections: {
+            orderBy: { name: 'asc' },
+            select: { id: true, name: true },
+          },
+        },
+      }),
+      this.prisma.timetableEntry.findMany({
+        where: {
+          timetableId: tt.id,
+          ...(gradeId ? { gradeId } : {}),
+          ...(sectionId ? { sectionId } : {}),
+        },
+        include: this.entryInclude(),
+      }),
+      this.prisma.timetableEntry.count({
+        where: { timetableId: tt.id, weekday: Weekday.SATURDAY },
+      }),
+    ]);
+
+    const weekdays = WEEKDAYS_ORDER.filter((d) => {
+      if (d === Weekday.SUNDAY) return false;
+      if (d === Weekday.SATURDAY) return saturdayCount > 0;
+      return true;
+    });
+
+    const periodRows = periods.map((p) => ({
+      id: p.id,
+      number: p.number,
+      label: p.label,
+      startTime: p.startTime,
+      endTime: p.endTime,
+    }));
+
+    const entriesByClass = new Map<string, EntryRow[]>();
+    for (const entry of entries) {
+      const key = `${entry.gradeId}:${entry.sectionId ?? ''}`;
+      const list = entriesByClass.get(key) ?? [];
+      list.push(this.formatEntry(entry));
+      entriesByClass.set(key, list);
+    }
+
+    const classes: Array<{
+      gradeId: string;
+      sectionId: string | null;
+      gradeName: string;
+      sectionName: string | null;
+      entries: EntryRow[];
+    }> = [];
+
+    for (const grade of grades) {
+      if (grade.sections.length === 0) {
+        if (sectionId) continue;
+        const key = `${grade.id}:`;
+        classes.push({
+          gradeId: grade.id,
+          sectionId: null,
+          gradeName: grade.name,
+          sectionName: null,
+          entries: entriesByClass.get(key) ?? [],
+        });
+        continue;
+      }
+      for (const section of grade.sections) {
+        if (sectionId && section.id !== sectionId) continue;
+        const key = `${grade.id}:${section.id}`;
+        classes.push({
+          gradeId: grade.id,
+          sectionId: section.id,
+          gradeName: grade.name,
+          sectionName: section.name,
+          entries: entriesByClass.get(key) ?? [],
+        });
+      }
+    }
+
+    return {
+      weekdays,
+      weekdayLabels: WEEKDAY_LABELS,
+      periods: periodRows,
+      classes,
+    };
+  }
+
   async saveClassEntries(schoolId: string, dto: SaveTimetableEntriesDto) {
     const tt = await this.ensureTimetable(schoolId, dto.academicYearId);
     const periods = await this.prisma.timetablePeriod.findMany({
@@ -316,7 +498,15 @@ export class TimetableService {
 
   async autoGenerate(schoolId: string, dto: GenerateTimetableDto) {
     const tt = await this.ensureTimetable(schoolId, dto.academicYearId);
-    const weekdays = WEEKDAYS_ORDER.filter((d) => d !== Weekday.SUNDAY);
+    const saturdayCount = await this.prisma.timetableEntry.count({
+      where: { timetableId: tt.id, weekday: Weekday.SATURDAY },
+    });
+    const weekdays = WEEKDAYS_ORDER.filter((d) => {
+      if (d === Weekday.SUNDAY) return false;
+      // Default Mon–Fri; include Saturday only once the school already uses it
+      if (d === Weekday.SATURDAY) return saturdayCount > 0;
+      return true;
+    });
     const periods = await this.prisma.timetablePeriod.findMany({
       where: { timetableId: tt.id },
       orderBy: { sortOrder: 'asc' },

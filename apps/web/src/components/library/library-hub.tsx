@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import type { UserRole } from "@/lib/auth";
 import { listGrades } from "@/lib/school-setup";
@@ -22,7 +23,6 @@ import {
   updateLibraryProgress,
   uploadLibraryFile,
   fetchLibraryAssetObjectUrl,
-  openLibraryAsset,
   type LibraryHub,
   type LibraryAudience,
   type LibraryResource,
@@ -160,6 +160,11 @@ export function LibraryHubView({
   const [error, setError] = useState("");
   const [saved, setSaved] = useState("");
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [viewer, setViewer] = useState<{
+    resource: LibraryResource;
+    objectUrl: string;
+  } | null>(null);
+  const [viewerLoading, setViewerLoading] = useState(false);
   const [grades, setGrades] = useState<GradeWithSections[]>([]);
   const [busy, setBusy] = useState(false);
 
@@ -243,6 +248,20 @@ export function LibraryHubView({
     }
   }
 
+  function closeViewer() {
+    if (viewer?.objectUrl) URL.revokeObjectURL(viewer.objectUrl);
+    setViewer(null);
+  }
+
+  useEffect(() => {
+    if (!viewer && !viewerLoading) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [viewer, viewerLoading]);
+
   async function handleOpen(resource: LibraryResource) {
     setError("");
     try {
@@ -256,8 +275,17 @@ export function LibraryHubView({
       }
 
       if (resource.fileUrl) {
-        await openLibraryAsset(resource.fileUrl);
-        void recordLibraryDownload(resource.id).catch(() => undefined);
+        setViewerLoading(true);
+        try {
+          const objectUrl = await fetchLibraryAssetObjectUrl(resource.fileUrl);
+          setViewer((prev) => {
+            if (prev?.objectUrl) URL.revokeObjectURL(prev.objectUrl);
+            return { resource, objectUrl };
+          });
+          void recordLibraryDownload(resource.id).catch(() => undefined);
+        } finally {
+          setViewerLoading(false);
+        }
         return;
       }
 
@@ -266,6 +294,7 @@ export function LibraryHubView({
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not open resource");
+      setViewerLoading(false);
     }
   }
 
@@ -857,6 +886,74 @@ export function LibraryHubView({
       {showAi ? (
         <LibraryAiAssistant resources={aiResources} focus={useSectionNav} hideHead={useSectionNav} />
       ) : null}
+
+      {typeof document !== "undefined" && viewerLoading
+        ? createPortal(
+            <div className="lib-viewer-loading" role="status">
+              <span className="lib-viewer-loading__spinner" aria-hidden />
+              <p>Opening…</p>
+            </div>,
+            document.body,
+          )
+        : null}
+
+      {typeof document !== "undefined" && viewer
+        ? createPortal(
+            <div
+              className="lib-viewer"
+              role="dialog"
+              aria-modal="true"
+              aria-label={viewer.resource.title}
+            >
+              <header className="lib-viewer__bar">
+                <div className="lib-viewer__meta">
+                  <h2 className="lib-viewer__title">{viewer.resource.title}</h2>
+                  <p className="lib-viewer__sub">
+                    {[viewer.resource.subject, viewer.resource.grade?.name]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </p>
+                </div>
+                <div className="lib-viewer__actions">
+                  <a className="lib-btn lib-btn--ghost" href={viewer.objectUrl} download>
+                    Download
+                  </a>
+                  <button
+                    type="button"
+                    className="lib-btn lib-btn--primary"
+                    onClick={closeViewer}
+                  >
+                    Close
+                  </button>
+                </div>
+              </header>
+              <div className="lib-viewer__body">
+                {viewer.resource.resourceType === "VIDEO" ? (
+                  <video
+                    className="lib-viewer__media"
+                    src={viewer.objectUrl}
+                    controls
+                    autoPlay
+                  />
+                ) : viewer.resource.resourceType === "AUDIO" ? (
+                  <audio
+                    className="lib-viewer__media lib-viewer__media--audio"
+                    src={viewer.objectUrl}
+                    controls
+                    autoPlay
+                  />
+                ) : (
+                  <iframe
+                    className="lib-viewer__frame"
+                    title={viewer.resource.title}
+                    src={`${viewer.objectUrl}#view=FitH`}
+                  />
+                )}
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
 
       {uploadOpen ? (
         <div

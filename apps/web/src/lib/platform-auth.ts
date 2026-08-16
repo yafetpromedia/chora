@@ -10,6 +10,7 @@ export type PlatformUser = {
   lastName: string;
   role: "OWNER" | "SUPPORT" | "SALES";
   scope: "platform";
+  permissions?: string[];
 };
 
 export type PlatformLoginResponse = {

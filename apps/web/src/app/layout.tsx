@@ -15,6 +15,7 @@ import "../styles/settings-admin.css";
 import "../styles/student-cards.css";
 import "../styles/classwork.css";
 import "../styles/timetable.css";
+import "../styles/exams.css";
 import "../styles/teachers.css";
 import "../styles/teacher-dashboard.css";
 import "../styles/results.css";
@@ -36,6 +37,7 @@ import "../styles/parent-portal.css";
 import "../styles/admissions-admin.css";
 import "../styles/support-admin.css";
 import "../styles/toast.css";
+import "../styles/confirm-dialog.css";
 
 const figtree = Figtree({
   subsets: ["latin"],

@@ -10,6 +10,7 @@ import {
   MaxLength,
   Min,
   MinLength,
+  ValidateIf,
 } from 'class-validator';
 
 export class UpdatePlatformSettingsDto {
@@ -19,10 +20,11 @@ export class UpdatePlatformSettingsDto {
   @MaxLength(120)
   platformName?: string;
 
-  @IsOptional()
+  @ValidateIf((_, v) => v !== null && v !== undefined && String(v).trim() !== '')
   @IsEmail()
   @MaxLength(200)
-  supportEmail?: string;
+  @IsOptional()
+  supportEmail?: string | null;
 
   @IsOptional()
   @IsString()
@@ -83,10 +85,11 @@ export class UpdatePlatformSettingsDto {
   @MaxLength(120)
   emailFromName?: string;
 
-  @IsOptional()
+  @ValidateIf((_, v) => v !== null && v !== undefined && String(v).trim() !== '')
   @IsEmail()
   @MaxLength(200)
-  emailReplyTo?: string;
+  @IsOptional()
+  emailReplyTo?: string | null;
 
   @IsOptional()
   @IsString()
@@ -107,4 +110,9 @@ export class UpdatePlatformSettingsDto {
   @Min(15)
   @Max(480)
   sessionTimeoutMinutes?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(4_000_000)
+  landingHeroImageUrl?: string;
 }

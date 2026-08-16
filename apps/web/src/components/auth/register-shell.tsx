@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
 import { RegisterVisualPanel } from "@/components/auth/register-visual-panel";
+import { useLandingHeroImage } from "@/hooks/use-landing-hero-image";
 
 const STEPS = ["School", "Admin"] as const;
 
@@ -22,6 +23,7 @@ export function RegisterShell({
 }: RegisterShellProps) {
   const reduce = useReducedMotion();
   const progress = ((activeStep + 1) / STEPS.length) * 100;
+  const heroSrc = useLandingHeroImage();
 
   return (
     <div className="reg-scene">
@@ -40,7 +42,7 @@ export function RegisterShell({
           </header>
 
           <div className="reg-mobile-banner" aria-hidden>
-            <img src="/images/hero-campus.png" alt="" />
+            <img src={heroSrc} alt="" />
             <div className="reg-mobile-banner__tint" />
             <p>Free 14-day trial</p>
           </div>

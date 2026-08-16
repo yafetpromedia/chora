@@ -65,6 +65,18 @@
   letter-spacing: 0.06em;
 }
 
+.sw__header-back {
+  margin-left: auto;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--brand-teal-dark);
+  text-decoration: none;
+}
+
+.sw__header-back:hover {
+  text-decoration: underline;
+}
+
 .sw__card {
   flex: 1;
   min-height: 0;

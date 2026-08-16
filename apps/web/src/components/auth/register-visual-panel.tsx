@@ -1,6 +1,7 @@
 "use client";
 
 import { motion, useReducedMotion } from "framer-motion";
+import { useLandingHeroImage } from "@/hooks/use-landing-hero-image";
 
 const STEP_COPY = [
   {
@@ -22,12 +23,13 @@ type Props = {
 export function RegisterVisualPanel({ activeStep }: Props) {
   const reduce = useReducedMotion();
   const copy = STEP_COPY[activeStep] ?? STEP_COPY[0];
+  const heroSrc = useLandingHeroImage();
 
   return (
     <div className="reg-visual reg-visual--photo">
       <div className="reg-visual__bg" aria-hidden>
         <img
-          src="/images/hero-campus.png"
+          src={heroSrc}
           alt=""
           className="reg-visual__photo"
         />

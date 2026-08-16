@@ -22,6 +22,9 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentPlatformUser } from '../common/decorators/current-platform-user.decorator';
 import type { PlatformAuthUser } from '../common/auth.types';
 import { PlatformGuard } from '../common/guards/platform.guard';
+import { PlatformPermissionsGuard } from '../common/guards/platform-permissions.guard';
+import { RequirePlatformPermissions } from '../common/decorators/require-platform-permissions.decorator';
+import { PlatformPermission } from '../common/permissions/platform-permissions';
 import { CreateTenantSchoolDto } from './dto/create-tenant-school.dto';
 import { PlatformLoginDto } from './dto/platform-login.dto';
 import { UpdateSchoolStatusDto } from './dto/update-school-status.dto';
@@ -70,7 +73,13 @@ import { PlatformCurriculumAdminService } from './platform-curriculum-admin.serv
 import { UpdatePlatformSettingsDto } from './dto/update-platform-settings.dto';
 import { PlatformSettingsService } from './platform-settings.service';
 import { PlatformSubjectsService } from './platform-subjects.service';
+import { PlatformAccessService } from './platform-access.service';
 import { SupportService } from '../support/support.service';
+import {
+  UpdatePlatformOperatorRoleDto,
+  UpdatePlatformRoleGrantsDto,
+  CreatePlatformOperatorDto,
+} from './dto/platform-access.dto';
 
 @Controller('platform')
 export class PlatformController {
@@ -83,6 +92,7 @@ export class PlatformController {
     private readonly curriculumAdmin: PlatformCurriculumAdminService,
     private readonly platformContent: PlatformContentService,
     private readonly platformSettings: PlatformSettingsService,
+    private readonly platformAccess: PlatformAccessService,
     private readonly supportService: SupportService,
   ) {}
 
@@ -125,6 +135,40 @@ export class PlatformController {
     @Body() dto: UpdatePlatformSettingsDto,
   ) {
     return this.platformSettings.updateSettings(dto, user.role);
+  }
+
+  @Get('access-control')
+  @UseGuards(JwtAuthGuard, PlatformGuard)
+  getAccessControl() {
+    return this.platformAccess.getAccessControl();
+  }
+
+  @Patch('access-control/roles')
+  @UseGuards(JwtAuthGuard, PlatformGuard)
+  updateAccessRoles(
+    @CurrentPlatformUser() user: PlatformAuthUser,
+    @Body() dto: UpdatePlatformRoleGrantsDto,
+  ) {
+    return this.platformAccess.updateRoleGrants(user.role, dto);
+  }
+
+  @Patch('access-control/operators/:id/role')
+  @UseGuards(JwtAuthGuard, PlatformGuard)
+  updateOperatorRole(
+    @CurrentPlatformUser() user: PlatformAuthUser,
+    @Param('id') id: string,
+    @Body() dto: UpdatePlatformOperatorRoleDto,
+  ) {
+    return this.platformAccess.updateOperatorRole(user, id, dto.role);
+  }
+
+  @Post('access-control/operators')
+  @UseGuards(JwtAuthGuard, PlatformGuard)
+  createOperator(
+    @CurrentPlatformUser() user: PlatformAuthUser,
+    @Body() dto: CreatePlatformOperatorDto,
+  ) {
+    return this.platformAccess.createOperator(user.role, dto);
   }
 
   @Get('dashboard')
@@ -587,7 +631,8 @@ export class PlatformController {
   }
 
   @Get('support-tickets')
-  @UseGuards(JwtAuthGuard, PlatformGuard)
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformPermissions(PlatformPermission.SUPPORT_MANAGE)
   listSupportTickets(
     @Query('schoolId') schoolId?: string,
     @Query('status') status?: SupportTicketStatus,
@@ -596,13 +641,15 @@ export class PlatformController {
   }
 
   @Get('support-tickets/:id')
-  @UseGuards(JwtAuthGuard, PlatformGuard)
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformPermissions(PlatformPermission.SUPPORT_MANAGE)
   getSupportTicket(@Param('id') id: string) {
     return this.supportService.getForPlatform(id);
   }
 
   @Patch('support-tickets/:id')
-  @UseGuards(JwtAuthGuard, PlatformGuard)
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformPermissions(PlatformPermission.SUPPORT_MANAGE)
   updateSupportTicket(
     @Param('id') id: string,
     @Body() dto: UpdateSupportTicketDto,

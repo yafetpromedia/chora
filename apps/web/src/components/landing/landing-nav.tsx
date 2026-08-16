@@ -82,16 +82,16 @@ export function LandingNav() {
 
           <nav className="lp3-nav__links" aria-label="Main">
             {LINKS.map((l) => {
-              const isActive =
-                !l.external && l.href === `#${active}`;
+              const isActive = l.href === `#${active}`;
               const className = `lp3-nav__link${isActive ? " lp3-nav__link--active" : ""}`;
 
-              return l.external ? (
-                <Link key={l.href} href={l.href} className={className}>
-                  {l.label}
-                </Link>
-              ) : (
-                <a key={l.href} href={l.href} className={className} aria-current={isActive ? "page" : undefined}>
+              return (
+                <a
+                  key={l.href}
+                  href={l.href}
+                  className={className}
+                  aria-current={isActive ? "page" : undefined}
+                >
                   {l.label}
                 </a>
               );
@@ -131,7 +131,7 @@ export function LandingNav() {
           <div className="lp3-nav__mobile" role="dialog" aria-label="Menu">
             <div className="lp3-nav__mobile-links">
               {LINKS.map((l) => {
-                const isActive = !l.external && l.href === `#${active}`;
+                const isActive = l.href === `#${active}`;
                 return (
                   <a
                     key={l.href}

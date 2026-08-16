@@ -429,6 +429,28 @@ export class AcademicsService implements OnModuleInit {
     });
   }
 
+  async deleteClassSubject(schoolId: string, classSubjectId: string) {
+    const cs = await this.prisma.classSubject.findFirst({
+      where: { id: classSubjectId, schoolId },
+    });
+    if (!cs) throw new NotFoundException('Class subject not found');
+
+    const published = await this.prisma.classSubjectTermSheet.count({
+      where: {
+        classSubjectId,
+        status: ResultWorkflowStatus.PUBLISHED,
+      },
+    });
+    if (published > 0) {
+      throw new BadRequestException(
+        'This subject has published results for this class. Unpublish them before removing the subject.',
+      );
+    }
+
+    await this.prisma.classSubject.delete({ where: { id: classSubjectId } });
+    return { deleted: true, id: classSubjectId };
+  }
+
   async listClassSubjectsByGrade(schoolId: string, gradeId: string, sectionId?: string) {
     const year = await this.prisma.academicYear.findFirst({
       where: { schoolId, isCurrent: true },

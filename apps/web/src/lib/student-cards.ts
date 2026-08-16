@@ -26,6 +26,9 @@ export type StudentIdCard = {
   schoolPhone: string | null;
   schoolAddress: string | null;
   schoolEmail: string | null;
+  schoolPrimaryColor?: string | null;
+  schoolAccentColor?: string | null;
+  schoolAccentDeep?: string | null;
   validThrough: string;
   academicYear: string;
   issuedAt: string;

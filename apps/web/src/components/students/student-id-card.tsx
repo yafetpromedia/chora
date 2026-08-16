@@ -1,9 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import QRCode from "qrcode";
 import { StudentCardBarcode } from "@/components/students/student-card-barcode";
 import type { StudentIdCard } from "@/lib/student-cards";
+import {
+  DEFAULT_SCHOOL_THEME,
+  readSchoolBrand,
+} from "@/lib/school-brand";
 
 export type StudentIdCardVariant = "standard" | "compact" | "mini";
 
@@ -16,6 +20,36 @@ function CardWatermark() {
       <img src={CAMPUSONE_WATERMARK} alt="" className="sid__watermark-img" />
     </div>
   );
+}
+
+function normalizeHex(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  return /^#[0-9A-Fa-f]{6}$/.test(trimmed) ? trimmed.toLowerCase() : null;
+}
+
+function cardThemeStyle(card: StudentIdCard): CSSProperties {
+  const brand = typeof window !== "undefined" ? readSchoolBrand() : null;
+  const deep =
+    normalizeHex(card.schoolAccentDeep) ??
+    normalizeHex(brand?.accentDeep) ??
+    DEFAULT_SCHOOL_THEME.accentDeep;
+  const bright =
+    normalizeHex(card.schoolPrimaryColor) ??
+    normalizeHex(brand?.primaryColor) ??
+    DEFAULT_SCHOOL_THEME.primaryColor;
+  const light =
+    normalizeHex(card.schoolAccentColor) ??
+    normalizeHex(brand?.accentColor) ??
+    DEFAULT_SCHOOL_THEME.accentColor;
+  const mid = deep;
+
+  return {
+    ["--sid-deep" as string]: deep,
+    ["--sid-mid" as string]: mid,
+    ["--sid-bright" as string]: bright,
+    ["--sid-light" as string]: light,
+  };
 }
 
 type Props = {
@@ -82,20 +116,31 @@ export function StudentIdCardView({
 
   useEffect(() => {
     if (qrDataUrlProp) return;
+    const dark =
+      normalizeHex(card.schoolAccentDeep) ??
+      normalizeHex(card.schoolPrimaryColor) ??
+      DEFAULT_SCHOOL_THEME.accentDeep;
     void QRCode.toDataURL(card.scanPayload, {
       width: backQrSize,
       margin: 1,
       errorCorrectionLevel: "M",
-      color: { dark: "#0a3d42", light: "#ffffff" },
+      color: { dark, light: "#ffffff" },
     }).then(setQrGenerated);
-  }, [card.scanPayload, backQrSize, qrDataUrlProp]);
+  }, [
+    card.scanPayload,
+    card.schoolAccentDeep,
+    card.schoolPrimaryColor,
+    backQrSize,
+    qrDataUrlProp,
+  ]);
 
   const initial = card.name.trim().slice(0, 1).toUpperCase() || "?";
   const gradeLine = card.section ? `${card.grade} · ${card.section}` : card.grade;
   const vClass = variantClass(variant);
+  const themeStyle = cardThemeStyle(card);
 
   const front = (
-    <article className={`sid${vClass}`}>
+    <article className={`sid${vClass}`} style={themeStyle}>
       <header className="sid__head">
         <div className="sid__school">
           <div className="sid__logo-wrap">
@@ -200,7 +245,7 @@ export function StudentIdCardView({
   );
 
   const back = (
-    <article className={`sid sid--back${vClass}`}>
+    <article className={`sid sid--back${vClass}`} style={themeStyle}>
       <div className="sid__stripe sid__stripe--back" aria-hidden />
       <header className="sid__back-head">
         <strong>{card.schoolName}</strong>

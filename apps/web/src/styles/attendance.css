@@ -1769,9 +1769,11 @@
 }
 
 .att-manual__footer {
-  position: sticky;
-  bottom: 0.5rem;
-  z-index: 20;
+  position: fixed;
+  left: max(0.75rem, env(safe-area-inset-left, 0px));
+  right: max(0.75rem, env(safe-area-inset-right, 0px));
+  bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+  z-index: 108;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -1781,8 +1783,34 @@
   border-radius: 1rem;
   background: rgba(255, 255, 255, 0.97);
   backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border: 1px solid var(--brand-border);
-  box-shadow: 0 8px 32px rgba(30, 74, 74, 0.12);
+  box-shadow: 0 8px 32px rgba(30, 74, 74, 0.16);
+}
+
+@media (min-width: 1024px) {
+  .att-manual__footer {
+    left: calc(260px + 1.5rem);
+    right: 1.5rem;
+    bottom: 1.25rem;
+  }
+}
+
+@media (max-width: 1023px) {
+  .dash-shell--tabs .att-manual__footer {
+    bottom: calc(4.35rem + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* Keep last roster rows clear of the fixed save bar */
+.att-v4__workspace:has(.att-manual__footer) {
+  padding-bottom: 5.75rem;
+}
+
+@media (max-width: 1023px) {
+  .dash-shell--tabs .att-v4__workspace:has(.att-manual__footer) {
+    padding-bottom: 6.5rem;
+  }
 }
 
 .att-manual__footer-info {

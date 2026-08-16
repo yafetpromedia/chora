@@ -1,0 +1,4 @@
+-- AlterTable
+ALTER TABLE "School" ADD COLUMN IF NOT EXISTS "primaryColor" TEXT;
+ALTER TABLE "School" ADD COLUMN IF NOT EXISTS "accentColor" TEXT;
+ALTER TABLE "School" ADD COLUMN IF NOT EXISTS "accentDeep" TEXT;

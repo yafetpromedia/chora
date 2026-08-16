@@ -207,6 +207,12 @@ model School {
   slug          String         @unique
   joinCode      String         @unique
   logoUrl       String?
+  /// Main brand color (hex, e.g. #3d9b9b). Null = CampusOne default.
+  primaryColor  String?
+  /// Accent / highlight color (hex). Null = CampusOne default.
+  accentColor   String?
+  /// Darker brand accent for text and buttons (hex). Null = CampusOne default.
+  accentDeep    String?
   schoolType    SchoolType?
   address       String?
   email         String?
@@ -235,6 +241,7 @@ model School {
   gradingScales         GradingScale[]
   assessmentTemplates   AssessmentTemplate[]
   timetables            Timetable[]
+  examSchedules         ExamSchedule[]
   libraryCategories     LibraryCategory[]
   libraryResources      LibraryResource[]
   departments           SchoolDepartment[]
@@ -426,6 +433,7 @@ model Grade {
   admissionTargetGrades      AdmissionApplication[]    @relation("ApplicationTargetGrade")
   admissionPlacedGrades      AdmissionApplication[]    @relation("ApplicationPlacedGrade")
   admissionPlacementRules      AdmissionPlacementRule[]
+  examScheduleSlots            ExamScheduleSlot[]
 
   @@unique([schoolId, name])
   @@index([schoolId, sortOrder])
@@ -594,6 +602,7 @@ model StudentProfile {
   certificates        StudentCertificate[]
   classworkSubmissions ClassworkSubmission[]
   attendancePermissionRequests AttendancePermissionRequest[]
+  examSeatingAssignments ExamSeatingAssignment[]
 
   @@unique([schoolId, fan])
   @@unique([schoolId, fcn])
@@ -700,6 +709,7 @@ model AcademicTerm {
   assessments    Assessment[]
   resultSheets        ClassSubjectTermSheet[]
   studentTermReports  StudentTermReport[]
+  examSchedules       ExamSchedule[]
 
   @@unique([academicYearId, name])
   @@index([schoolId, isCurrent])
@@ -719,6 +729,7 @@ model Subject {
   teacherAssignments         TeacherAssignment[]
   assessmentTemplateGrades   AssessmentTemplateGrade[]
   timetableEntries           TimetableEntry[]
+  examScheduleSlots          ExamScheduleSlot[]
 
   @@unique([schoolId, code])
   @@index([platformSubjectId])
@@ -945,6 +956,10 @@ model PlatformSettings {
   maintenanceMode       Boolean          @default(false)
   maintenanceMessage    String?          @db.Text
   sessionTimeoutMinutes Int              @default(60)
+  /// Public marketing / register hero background (URL or data URL).
+  landingHeroImageUrl   String?          @db.Text
+  /// Editable platform role → permission keys (SUPPORT/SALES). OWNER always has all.
+  rolePermissions       Json?
   createdAt             DateTime         @default(now())
   updatedAt             DateTime         @updatedAt
 }
@@ -964,6 +979,7 @@ model AcademicYear {
   teacherAssignments  TeacherAssignment[]
   studentEnrollments  StudentEnrollment[]
   timetable             Timetable?
+  examSchedules         ExamSchedule[]
   admissionCycles       AdmissionCycle[]
 
   @@unique([schoolId, name])
@@ -1037,6 +1053,126 @@ model TimetableEntry {
   @@unique([timetableId, weekday, periodId, gradeId, sectionId])
   @@index([schoolId, teacherUserId, weekday])
   @@index([timetableId, gradeId, sectionId])
+}
+
+enum ExamScheduleStatus {
+  DRAFT
+  PUBLISHED
+}
+
+/// Mid / final exam calendar (date × grade × subjects), separate from weekly timetable.
+model ExamSchedule {
+  id             String             @id @default(cuid())
+  schoolId       String
+  school         School             @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  academicYearId String
+  academicYear   AcademicYear       @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+  academicTermId String?
+  academicTerm   AcademicTerm?      @relation(fields: [academicTermId], references: [id], onDelete: SetNull)
+  title          String
+  shiftLabel     String?
+  notes          String?
+  status         ExamScheduleStatus @default(DRAFT)
+  days           ExamScheduleDay[]
+  seatingPlans   ExamSeatingPlan[]
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  @@index([schoolId, academicYearId])
+  @@index([schoolId, status])
+}
+
+model ExamScheduleDay {
+  id               String            @id @default(cuid())
+  scheduleId       String
+  schedule         ExamSchedule      @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  schoolId         String
+  examDate         DateTime          @db.Date
+  isStudyDay       Boolean           @default(false)
+  studyNote        String?
+  defaultStartTime String?
+  defaultEndTime   String?
+  sortOrder        Int               @default(0)
+  slots            ExamScheduleSlot[]
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  @@index([scheduleId, sortOrder])
+  @@index([schoolId, examDate])
+}
+
+model ExamScheduleSlot {
+  id           String          @id @default(cuid())
+  dayId        String
+  day          ExamScheduleDay @relation(fields: [dayId], references: [id], onDelete: Cascade)
+  schoolId     String
+  gradeId      String
+  grade        Grade           @relation(fields: [gradeId], references: [id], onDelete: Cascade)
+  subjectId    String?
+  subject      Subject?        @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+  subjectLabel String
+  startTime    String?
+  endTime      String?
+  sortOrder    Int             @default(0)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  @@index([dayId, gradeId, sortOrder])
+  @@index([schoolId])
+}
+
+/// Temporary exam-hall room lists (does not change permanent class placement).
+model ExamSeatingPlan {
+  id             String                 @id @default(cuid())
+  scheduleId     String
+  schedule       ExamSchedule           @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  schoolId       String
+  title          String
+  notes          String?
+  /// Grade IDs used when generating this plan (for re-distribute).
+  sourceGradeIds String[]               @default([])
+  rooms          ExamSeatingRoom[]
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+
+  @@index([scheduleId])
+  @@index([schoolId])
+}
+
+model ExamSeatingRoom {
+  id         String                  @id @default(cuid())
+  planId     String
+  plan       ExamSeatingPlan         @relation(fields: [planId], references: [id], onDelete: Cascade)
+  schoolId   String
+  name       String
+  roomRef    String?
+  capacity   Int                     @default(33)
+  sortOrder  Int                     @default(0)
+  assignments ExamSeatingAssignment[]
+  createdAt  DateTime                @default(now())
+  updatedAt  DateTime                @updatedAt
+
+  @@index([planId, sortOrder])
+  @@index([schoolId])
+}
+
+model ExamSeatingAssignment {
+  id               String         @id @default(cuid())
+  roomId           String
+  room             ExamSeatingRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  schoolId         String
+  studentProfileId String
+  studentProfile   StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+  seatNo           Int
+  /// Snapshots at generation time (stable reprints).
+  studentName      String
+  gradeLabel       String
+  sectionLabel     String?
+  createdAt        DateTime       @default(now())
+
+  @@unique([roomId, seatNo])
+  @@index([roomId])
+  @@index([schoolId, studentProfileId])
 }
 
 model TeacherProfile {

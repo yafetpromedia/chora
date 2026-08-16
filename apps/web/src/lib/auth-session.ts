@@ -36,6 +36,9 @@ export function persistAuthSession(response: LoginResponse) {
     persistSchoolBrand({
       name: response.school.name,
       logoUrl: response.school.logoUrl ?? null,
+      primaryColor: response.school.primaryColor ?? null,
+      accentColor: response.school.accentColor ?? null,
+      accentDeep: response.school.accentDeep ?? null,
     });
   }
 }
@@ -45,5 +48,8 @@ export function saveSchoolInfo(school: SchoolInfo) {
   persistSchoolBrand({
     name: school.name,
     logoUrl: school.logoUrl ?? null,
+    primaryColor: school.primaryColor ?? null,
+    accentColor: school.accentColor ?? null,
+    accentDeep: school.accentDeep ?? null,
   });
 }

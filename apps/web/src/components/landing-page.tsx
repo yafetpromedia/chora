@@ -19,6 +19,7 @@ import {
   IconSecurity,
   IconTimetable,
 } from "@/components/feature-icons";
+import { useLandingHeroImage } from "@/hooks/use-landing-hero-image";
 import type { ReactNode } from "react";
 
 const STEPS = [
@@ -146,6 +147,8 @@ const PORTALS = [
 ];
 
 export function LandingPage() {
+  const heroSrc = useLandingHeroImage();
+
   return (
     <div className="lp3">
       <LandingNav />
@@ -153,7 +156,7 @@ export function LandingPage() {
       <main>
         <section id="hero" className="lp3-hero lp3-hero--simple">
           <div className="lp3-hero__photo" aria-hidden>
-            <img src="/images/hero-campus.png" alt="" />
+            <img src={heroSrc} alt="" />
           </div>
           <div className="lp3-hero__overlay" aria-hidden />
           <div className="lp3-container lp3-hero__grid">
@@ -174,42 +177,6 @@ export function LandingPage() {
                   Sign in
                 </Link>
               </div>
-            </div>
-          </div>
-
-          <div className="lp3-strip lp3-strip--hero" aria-label="Platform capabilities">
-            <div className="lp3-strip__track">
-              {[
-                "Attendance",
-                "Report cards",
-                "Fee collection",
-                "Parent portal",
-                "Campus ID",
-                "Timetable",
-                "eLibrary",
-                "AI study assistant",
-                "Announcements",
-                "USD & ETB billing",
-                "Staff roles",
-              ]
-                .concat([
-                  "Attendance",
-                  "Report cards",
-                  "Fee collection",
-                  "Parent portal",
-                  "Campus ID",
-                  "Timetable",
-                  "eLibrary",
-                  "AI study assistant",
-                  "Announcements",
-                  "USD & ETB billing",
-                  "Staff roles",
-                ])
-                .map((item, i) => (
-                  <span key={`${item}-${i}`} className="lp3-strip__pill">
-                    {item}
-                  </span>
-                ))}
             </div>
           </div>
         </section>

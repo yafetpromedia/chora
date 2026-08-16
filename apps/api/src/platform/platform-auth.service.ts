@@ -3,8 +3,8 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { hashSync, compare } from 'bcrypt';
 import { PlatformAuthUser } from '../common/auth.types';
-import { resolvePlatformPermissions } from '../common/permissions/platform-permissions';
 import { PrismaService } from '../prisma/prisma.service';
+import { PlatformAccessService } from './platform-access.service';
 
 @Injectable()
 export class PlatformAuthService implements OnModuleInit {
@@ -12,6 +12,7 @@ export class PlatformAuthService implements OnModuleInit {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly platformAccess: PlatformAccessService,
   ) {}
 
   async onModuleInit() {
@@ -68,7 +69,7 @@ export class PlatformAuthService implements OnModuleInit {
         firstName: row.firstName,
         lastName: row.lastName,
         role: row.role,
-        permissions: resolvePlatformPermissions(row.role),
+        permissions: this.platformAccess.resolveForRole(row.role),
         createdAt: row.createdAt,
       },
     };
@@ -119,7 +120,7 @@ export class PlatformAuthService implements OnModuleInit {
       firstName: user.firstName,
       lastName: user.lastName,
       role: user.role,
-      permissions: resolvePlatformPermissions(user.role),
+      permissions: this.platformAccess.resolveForRole(user.role),
       scope: 'platform',
     };
   }

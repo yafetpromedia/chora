@@ -16,6 +16,7 @@ import {
 import type { BillingCurrency } from "@/lib/platform-billing";
 import type { PlatformSection } from "./platform-types";
 import { AppToast } from "@/components/ui/app-toast";
+import { LandingHeroUpload } from "@/components/platform/landing-hero-upload";
 
 type Props = {
   user: PlatformUser | null;
@@ -85,6 +86,7 @@ function applySettings(s: SettingsRow) {
     maintenanceMode: s.maintenanceMode,
     maintenanceMessage: s.maintenanceMessage ?? "",
     sessionTimeoutMinutes: String(s.sessionTimeoutMinutes),
+    landingHeroImageUrl: s.landingHeroImageUrl ?? "",
   };
 }
 
@@ -163,6 +165,7 @@ export function PlatformSettings({ user, onOpenProfile, onNavigate }: Props) {
         maintenanceMode: draft.maintenanceMode,
         maintenanceMessage: draft.maintenanceMessage.trim(),
         sessionTimeoutMinutes: Number(draft.sessionTimeoutMinutes) || 60,
+        landingHeroImageUrl: draft.landingHeroImageUrl.trim(),
       });
       setSettings(updated);
       setDraft(applySettings(updated));
@@ -298,6 +301,11 @@ export function PlatformSettings({ user, onOpenProfile, onNavigate }: Props) {
                   required
                 />
               </div>
+              <LandingHeroUpload
+                value={draft.landingHeroImageUrl}
+                onChange={(url) => patch("landingHeroImageUrl", url)}
+                disabled={!isOwner}
+              />
               <div className="cfg-form-row">
                 <div className="cfg-field">
                   <label htmlFor="ps-email">Support email</label>
@@ -688,10 +696,12 @@ export function PlatformSettings({ user, onOpenProfile, onNavigate }: Props) {
           <div className="plat-settings-v2__save-bar">
             <p className="plat-settings-v2__save-hint">
               Last saved{" "}
-              {new Date(settings.updatedAt).toLocaleString(undefined, {
-                dateStyle: "medium",
-                timeStyle: "short",
-              })}
+              {settings
+                ? new Date(settings.updatedAt).toLocaleString(undefined, {
+                    dateStyle: "medium",
+                    timeStyle: "short",
+                  })
+                : "—"}
             </p>
             <button type="submit" className="plat-v2__btn plat-v2__btn--primary" disabled={saving}>
               {saving ? "Saving…" : "Save settings"}

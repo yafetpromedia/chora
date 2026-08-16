@@ -495,6 +495,12 @@ export class ResultsController {
     return this.academicsService.updateClassSubject(user.schoolId, id, dto);
   }
 
+  @Delete('class-subjects/:id')
+  @Roles('admin')
+  deleteClassSubject(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.academicsService.deleteClassSubject(user.schoolId, id);
+  }
+
   @Get('workflow/pending')
   @Roles('admin', 'staff')
   listPendingWorkflow(

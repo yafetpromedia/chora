@@ -8,6 +8,7 @@ import { LoginShell } from "@/components/auth/login-shell";
 import { login, validateSchoolCode } from "@/lib/api";
 import { persistAuthSession } from "@/lib/auth-session";
 import { getRolePath } from "@/lib/auth";
+import { persistSchoolBrand } from "@/lib/school-brand";
 
 const REMEMBER_SCHOOL_KEY = "campusone_remember_school";
 const REMEMBER_USER_KEY = "campusone_remember_username";
@@ -54,6 +55,13 @@ export default function LoginPage() {
       const school = await validateSchoolCode(code);
       setSchoolCode(school.joinCode);
       setSchoolName(school.name);
+      persistSchoolBrand({
+        name: school.name,
+        logoUrl: school.logoUrl ?? null,
+        primaryColor: school.primaryColor ?? null,
+        accentColor: school.accentColor ?? null,
+        accentDeep: school.accentDeep ?? null,
+      });
       setStep("credentials");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Invalid school code");

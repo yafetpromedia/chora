@@ -87,6 +87,13 @@ export const DASHBOARD_NAV: NavItem[] = [
     permission: Permission.TIMETABLE_READ,
   },
   {
+    href: "/admin/exams",
+    label: "Exam schedules",
+    icon: "results",
+    roles: ["admin", "staff"],
+    permission: Permission.TIMETABLE_READ,
+  },
+  {
     href: "/admin/library",
     label: "eLibrary",
     icon: "library",
@@ -203,6 +210,7 @@ export const DASHBOARD_NAV: NavItem[] = [
   { href: "/teacher/classwork", label: "Assignments", icon: "library", roles: ["teacher"] },
   { href: "/teacher/worksheets", label: "Worksheets", icon: "results", roles: ["teacher"] },
   { href: "/teacher/timetable", label: "Timetable", icon: "calendar", roles: ["teacher"] },
+  { href: "/teacher/exams", label: "Exam schedules", icon: "calendar", roles: ["teacher"] },
   {
     href: "/teacher/library",
     label: "eLibrary",
@@ -221,6 +229,7 @@ export const DASHBOARD_NAV: NavItem[] = [
   { href: "/parent/report-card", label: "Report card", icon: "report-card", roles: ["parent"] },
   { href: "/parent/fees", label: "Fees", icon: "fees", roles: ["parent"] },
   { href: "/parent/timetable", label: "Timetable", icon: "calendar", roles: ["parent"] },
+  { href: "/parent/exams", label: "Exam schedules", icon: "calendar", roles: ["parent"] },
   { href: "/parent/profile", label: "Profile", icon: "profile", roles: ["parent"] },
   { href: "/student", label: "Overview", icon: "overview", roles: ["student"] },
   { href: "/student/id-card", label: "Campus ID", icon: "students", roles: ["student"] },
@@ -231,6 +240,7 @@ export const DASHBOARD_NAV: NavItem[] = [
   { href: "/student/worksheets", label: "Worksheets", icon: "results", roles: ["student"] },
   { href: "/student/fees", label: "Fees", icon: "fees", roles: ["student"] },
   { href: "/student/timetable", label: "Timetable", icon: "calendar", roles: ["student"] },
+  { href: "/student/exams", label: "Exam schedules", icon: "calendar", roles: ["student"] },
   {
     href: "/student/library",
     label: "eLibrary",
@@ -336,7 +346,7 @@ const MOBILE_TAB_PREFERENCE: Record<UserRole, string[]> = {
   ],
   teacher: ["/teacher", "/teacher/results", "/teacher/classwork", "/teacher/timetable"],
   parent: ["/parent", "/parent/results", "/parent/fees", "/parent/timetable"],
-  student: ["/student", "/student/results", "/student/classwork", "/student/timetable"],
+  student: ["/student", "/student/results", "/student/classwork", "/student/timetable", "/student/exams"],
 };
 
 /**

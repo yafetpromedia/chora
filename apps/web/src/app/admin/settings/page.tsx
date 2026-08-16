@@ -22,7 +22,7 @@ import {
   AUTH_TOKEN_KEY,
   isSchoolWorkspaceRole,
 } from "@/lib/auth";
-import { persistSchoolBrand } from "@/lib/school-brand";
+import { DEFAULT_SCHOOL_THEME, persistSchoolBrand } from "@/lib/school-brand";
 import {
   getSchoolSettings,
   updateSchoolSettings,
@@ -83,6 +83,9 @@ export default function AdminSettingsPage() {
   const [phone, setPhone] = useState("");
   const [country, setCountry] = useState("Ethiopia");
   const [logoUrl, setLogoUrl] = useState("");
+  const [primaryColor, setPrimaryColor] = useState(DEFAULT_SCHOOL_THEME.primaryColor);
+  const [accentColor, setAccentColor] = useState(DEFAULT_SCHOOL_THEME.accentColor);
+  const [accentDeep, setAccentDeep] = useState(DEFAULT_SCHOOL_THEME.accentDeep);
   const [bankName, setBankName] = useState("");
   const [bankAccountHolder, setBankAccountHolder] = useState("");
   const [bankAccountNumber, setBankAccountNumber] = useState("");
@@ -100,6 +103,9 @@ export default function AdminSettingsPage() {
     setPhone(s.phone ?? "");
     setCountry(s.country ?? "Ethiopia");
     setLogoUrl(s.logoUrl ?? "");
+    setPrimaryColor(s.primaryColor ?? DEFAULT_SCHOOL_THEME.primaryColor);
+    setAccentColor(s.accentColor ?? DEFAULT_SCHOOL_THEME.accentColor);
+    setAccentDeep(s.accentDeep ?? DEFAULT_SCHOOL_THEME.accentDeep);
     setBankName(s.bankName ?? "");
     setBankAccountHolder(s.bankAccountHolder ?? "");
     setBankAccountNumber(s.bankAccountNumber ?? "");
@@ -147,6 +153,9 @@ export default function AdminSettingsPage() {
         phone: phone.trim(),
         country: country.trim(),
         logoUrl: logoUrl.trim(),
+        primaryColor: primaryColor.trim() || null,
+        accentColor: accentColor.trim() || null,
+        accentDeep: accentDeep.trim() || null,
         bankName: bankName.trim(),
         bankAccountHolder: bankAccountHolder.trim(),
         bankAccountNumber: bankAccountNumber.trim(),
@@ -158,6 +167,9 @@ export default function AdminSettingsPage() {
       persistSchoolBrand({
         name: updated.name,
         logoUrl: updated.logoUrl ?? null,
+        primaryColor: updated.primaryColor ?? null,
+        accentColor: updated.accentColor ?? null,
+        accentDeep: updated.accentDeep ?? null,
       });
       setToast("School profile saved.");
     } catch (err) {
@@ -188,6 +200,16 @@ export default function AdminSettingsPage() {
   }
 
   const planShortLabel = subscription?.planLabel?.split(" ")[0] ?? "Plan";
+
+  const safePrimary = /^#[0-9A-Fa-f]{6}$/i.test(primaryColor)
+    ? primaryColor
+    : DEFAULT_SCHOOL_THEME.primaryColor;
+  const safeAccent = /^#[0-9A-Fa-f]{6}$/i.test(accentColor)
+    ? accentColor
+    : DEFAULT_SCHOOL_THEME.accentColor;
+  const safeDeep = /^#[0-9A-Fa-f]{6}$/i.test(accentDeep)
+    ? accentDeep
+    : DEFAULT_SCHOOL_THEME.accentDeep;
 
   return (
     <DashboardPage role="admin" title="Settings">
@@ -260,7 +282,7 @@ export default function AdminSettingsPage() {
               <div>
                 <h2 className="set-v2__panel-title">School profile</h2>
                 <p className="set-v2__panel-sub">
-                  This name appears on your admin dashboard, reports, and parent communications.
+                  Name, logo, theme colors, and report details — each school can look different.
                 </p>
               </div>
             </div>
@@ -392,6 +414,91 @@ export default function AdminSettingsPage() {
                   placeholder="Excellence · Integrity · Service"
                 />
               </div>
+
+              <div className="cfg-theme">
+                <div className="cfg-theme__head">
+                  <h3 className="cfg-theme__title">School theme</h3>
+                  <p className="cfg-theme__sub">
+                    Colors apply across your school portals. Each school can look different.
+                  </p>
+                </div>
+                <div className="cfg-theme__swatches">
+                  <label className="cfg-theme__swatch">
+                    <span>Primary</span>
+                    <span className="cfg-theme__controls">
+                      <input
+                        type="color"
+                        value={safePrimary}
+                        onChange={(e) => setPrimaryColor(e.target.value)}
+                        aria-label="Primary color"
+                      />
+                      <input
+                        type="text"
+                        value={primaryColor}
+                        onChange={(e) => setPrimaryColor(e.target.value)}
+                        pattern="^#[0-9A-Fa-f]{6}$"
+                        maxLength={7}
+                        spellCheck={false}
+                      />
+                    </span>
+                  </label>
+                  <label className="cfg-theme__swatch">
+                    <span>Accent</span>
+                    <span className="cfg-theme__controls">
+                      <input
+                        type="color"
+                        value={safeAccent}
+                        onChange={(e) => setAccentColor(e.target.value)}
+                        aria-label="Accent color"
+                      />
+                      <input
+                        type="text"
+                        value={accentColor}
+                        onChange={(e) => setAccentColor(e.target.value)}
+                        pattern="^#[0-9A-Fa-f]{6}$"
+                        maxLength={7}
+                        spellCheck={false}
+                      />
+                    </span>
+                  </label>
+                  <label className="cfg-theme__swatch">
+                    <span>Deep</span>
+                    <span className="cfg-theme__controls">
+                      <input
+                        type="color"
+                        value={safeDeep}
+                        onChange={(e) => setAccentDeep(e.target.value)}
+                        aria-label="Deep accent color"
+                      />
+                      <input
+                        type="text"
+                        value={accentDeep}
+                        onChange={(e) => setAccentDeep(e.target.value)}
+                        pattern="^#[0-9A-Fa-f]{6}$"
+                        maxLength={7}
+                        spellCheck={false}
+                      />
+                    </span>
+                  </label>
+                </div>
+                <div className="cfg-theme__preview" aria-hidden>
+                  <span style={{ background: safePrimary }} />
+                  <span style={{ background: safeAccent }} />
+                  <span style={{ background: safeDeep }} />
+                  <button
+                    type="button"
+                    className="cfg-btn cfg-btn--ghost"
+                    onClick={() => {
+                      setPrimaryColor(DEFAULT_SCHOOL_THEME.primaryColor);
+                      setAccentColor(DEFAULT_SCHOOL_THEME.accentColor);
+                      setAccentDeep(DEFAULT_SCHOOL_THEME.accentDeep);
+                    }}
+                  >
+                    Reset defaults
+                  </button>
+                </div>
+              </div>
+
               <SchoolLogoUpload
                 schoolName={name.trim() || school?.name || "Your school"}
                 value={logoUrl}

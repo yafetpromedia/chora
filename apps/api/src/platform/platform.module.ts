@@ -10,6 +10,7 @@ import { SupportModule } from '../support/support.module';
 import { UsersModule } from '../users/users.module';
 import { ResultsModule } from '../results/results.module';
 import { PlatformAuthService } from './platform-auth.service';
+import { PlatformAccessService } from './platform-access.service';
 import { PlatformController } from './platform.controller';
 import { PlatformBillingService } from './platform-billing.service';
 import { PlatformContentSyncService } from './platform-content-sync.service';
@@ -46,6 +47,7 @@ import { PlatformService } from './platform.service';
   controllers: [PlatformController],
   providers: [
     PlatformAuthService,
+    PlatformAccessService,
     PlatformService,
     PlatformBillingService,
     PlatformSubjectsService,
@@ -56,6 +58,7 @@ import { PlatformService } from './platform.service';
   ],
   exports: [
     PlatformAuthService,
+    PlatformAccessService,
     PlatformSubjectsService,
     PlatformContentService,
     PlatformContentSyncService,

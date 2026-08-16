@@ -1374,6 +1374,9 @@ export class StudentsService {
           phone: true,
           address: true,
           email: true,
+          primaryColor: true,
+          accentColor: true,
+          accentDeep: true,
         },
       }),
       this.enrollment.getCurrentYear(schoolId),
@@ -1386,6 +1389,9 @@ export class StudentsService {
       phone: school?.phone ?? null,
       address: school?.address ?? null,
       email: school?.email ?? null,
+      primaryColor: school?.primaryColor ?? null,
+      accentColor: school?.accentColor ?? null,
+      accentDeep: school?.accentDeep ?? null,
       academicYearName: currentYear?.name ?? String(year),
     };
   }
@@ -1450,6 +1456,9 @@ export class StudentsService {
       phone: string | null;
       address: string | null;
       email: string | null;
+      primaryColor: string | null;
+      accentColor: string | null;
+      accentDeep: string | null;
       academicYearName: string;
     },
   ) {
@@ -1511,6 +1520,9 @@ export class StudentsService {
       schoolPhone: school.phone,
       schoolAddress: school.address,
       schoolEmail: school.email,
+      schoolPrimaryColor: school.primaryColor,
+      schoolAccentColor: school.accentColor,
+      schoolAccentDeep: school.accentDeep,
       validThrough: `${year}–${year + 1}`,
       academicYear: school.academicYearName,
       issuedAt: new Date().toISOString(),

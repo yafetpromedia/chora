@@ -2,8 +2,13 @@
 
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { useId } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { LoginVisualPanel } from "@/components/auth/login-visual-panel";
+
+/** Shared seam curve (objectBoundingBox). Soft 3-wave graph down the middle. */
+const SEAM =
+  "M0.485,0 C0.545,0.14 0.430,0.30 0.500,0.46 C0.570,0.62 0.435,0.78 0.505,0.92 C0.530,0.97 0.490,0.99 0.495,1";
 
 type LoginShellProps = {
   children: ReactNode;
@@ -12,11 +17,34 @@ type LoginShellProps = {
 
 export function LoginShell({ children, error }: LoginShellProps) {
   const reduce = useReducedMotion();
+  const uid = useId().replace(/:/g, "");
+  const leftClipId = `login-split-left-${uid}`;
+  const rightClipId = `login-split-right-${uid}`;
+
+  const leftPath = `M0,0 L0.485,0 C0.545,0.14 0.430,0.30 0.500,0.46 C0.570,0.62 0.435,0.78 0.505,0.92 C0.530,0.97 0.490,0.99 0.495,1 L0,1 Z`;
+  const rightPath = `${SEAM} L1,1 L1,0 Z`;
 
   return (
     <div className="reg-scene reg-scene--login">
-      <div className="reg-layout reg-layout--login">
-        <section className="reg-panel">
+      <div className="login-split">
+        <svg className="login-split__defs" width="0" height="0" aria-hidden>
+          <defs>
+            <clipPath id={leftClipId} clipPathUnits="objectBoundingBox">
+              <path d={leftPath} />
+            </clipPath>
+            <clipPath id={rightClipId} clipPathUnits="objectBoundingBox">
+              <path d={rightPath} />
+            </clipPath>
+          </defs>
+        </svg>
+
+        <section
+          className="reg-panel login-split__panel"
+          style={{
+            clipPath: `url(#${leftClipId})`,
+            WebkitClipPath: `url(#${leftClipId})`,
+          }}
+        >
           <div className="reg-panel__mesh" aria-hidden />
 
           <header className="reg-top">
@@ -63,9 +91,29 @@ export function LoginShell({ children, error }: LoginShellProps) {
           </motion.main>
         </section>
 
-        <section className="reg-visual-col reg-visual-col--login" aria-hidden={false}>
+        <section
+          className="login-split__visual"
+          style={{
+            clipPath: `url(#${rightClipId})`,
+            WebkitClipPath: `url(#${rightClipId})`,
+          }}
+          aria-hidden={false}
+        >
           <LoginVisualPanel />
         </section>
+
+        <div className="login-split__seam" aria-hidden>
+          <svg viewBox="0 0 100 1000" preserveAspectRatio="none">
+            <path
+              d="M48.5 0 C54.5 140 43 300 50 460 C57 620 43.5 780 50.5 920 C53 970 49 990 49.5 1000"
+              fill="none"
+              stroke="rgba(255,255,255,0.9)"
+              strokeWidth="2"
+              strokeLinecap="round"
+              vectorEffect="non-scaling-stroke"
+            />
+          </svg>
+        </div>
       </div>
     </div>
   );

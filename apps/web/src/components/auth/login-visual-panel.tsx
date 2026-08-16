@@ -1,6 +1,7 @@
 "use client";
 
 import { motion, useReducedMotion } from "framer-motion";
+import { useLandingHeroImage } from "@/hooks/use-landing-hero-image";
 
 const FEATURES = [
   {
@@ -60,31 +61,68 @@ const FEATURES = [
 ] as const;
 
 const FLOATS = [
-  { label: "Schools live", value: "120+", top: "18%", left: "8%" },
-  { label: "Avg. setup", value: "8 min", top: "62%", left: "6%" },
+  { label: "Schools live", value: "120+", top: "18%", left: "58%" },
+  { label: "Avg. setup", value: "8 min", top: "62%", left: "56%" },
   { label: "Uptime", value: "99.9%", top: "24%", right: "7%" },
 ] as const;
 
+function FeatureGraphDivider({ delay = 0 }: { delay?: number }) {
+  const gradId = `login-graph-fill-${String(delay).replace(".", "")}`;
+
+  return (
+    <span
+      className="login-visual__feature-graph"
+      aria-hidden
+      style={{ animationDelay: `${delay}s` }}
+    >
+      <svg viewBox="0 0 24 100" preserveAspectRatio="none">
+        <defs>
+          <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="rgba(255,255,255,0.28)" />
+            <stop offset="100%" stopColor="rgba(255,255,255,0)" />
+          </linearGradient>
+        </defs>
+        <path
+          className="login-visual__feature-graph-area"
+          d="M12 4 C16 14 8 24 12 34 C16 44 8 54 12 64 C16 74 9 84 12 96 L12 96 L12 4 Z"
+          fill={`url(#${gradId})`}
+        />
+        <path
+          className="login-visual__feature-graph-line"
+          d="M12 4 C16 14 8 24 12 34 C16 44 8 54 12 64 C16 74 9 84 12 96"
+          fill="none"
+          stroke="rgba(255,255,255,0.88)"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+          vectorEffect="non-scaling-stroke"
+        />
+        <circle
+          className="login-visual__feature-graph-dot"
+          cx="12"
+          cy="34"
+          r="2.2"
+          fill="#fff"
+        />
+        <circle
+          className="login-visual__feature-graph-dot login-visual__feature-graph-dot--b"
+          cx="12"
+          cy="64"
+          r="1.8"
+          fill="#b8e8eb"
+        />
+      </svg>
+    </span>
+  );
+}
+
 export function LoginVisualPanel() {
   const reduce = useReducedMotion();
+  const heroSrc = useLandingHeroImage();
 
   return (
     <div className="login-visual">
-      <div className="login-visual__wave" aria-hidden>
-        <svg viewBox="0 0 80 1000" preserveAspectRatio="none">
-          <path
-            d="M0 0 L0 1000 L54 1000 C40 820 30 660 44 500 C28 340 38 180 54 0 Z"
-            fill="currentColor"
-          />
-        </svg>
-      </div>
-
       <div className="login-visual__bg" aria-hidden>
-        <img
-          src="/images/login-classroom.png"
-          alt=""
-          className="login-visual__photo"
-        />
+        <img src={heroSrc} alt="" className="login-visual__photo" />
         <div className="login-visual__tint" />
         <div className="login-visual__mesh" />
         <div className="login-visual__glow login-visual__glow--1" />
@@ -176,9 +214,7 @@ export function LoginVisualPanel() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 + index * 0.08, duration: 0.4 }}
               >
-                {index > 0 ? (
-                  <span className="login-visual__feature-divider" aria-hidden />
-                ) : null}
+                {index > 0 ? <FeatureGraphDivider delay={index * 0.55} /> : null}
                 <span className="login-visual__feature-icon">{feature.icon}</span>
                 <strong>{feature.title}</strong>
                 <span>{feature.desc}</span>

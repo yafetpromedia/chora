@@ -78,6 +78,53 @@ export async function saveTimetablePeriods(body: {
   return apiPatch<TimetablePeriod[]>("/schools/timetable/periods", body);
 }
 
+export type TimetableOverviewClass = {
+  gradeId: string;
+  sectionId: string | null;
+  gradeName: string;
+  sectionName: string | null;
+  scheduled: number;
+  totalSlots: number;
+};
+
+export type TimetableOverview = {
+  periodsCount: number;
+  weekdays: Weekday[];
+  weekdayLabels: Record<Weekday, string>;
+  totalSlots: number;
+  classes: TimetableOverviewClass[];
+};
+
+export async function getTimetableOverview(academicYearId: string) {
+  const q = new URLSearchParams({ academicYearId });
+  return apiFetch<TimetableOverview>(`/schools/timetable/overview?${q}`);
+}
+
+export type TimetableStackClass = {
+  gradeId: string;
+  sectionId: string | null;
+  gradeName: string;
+  sectionName: string | null;
+  entries: TimetableSlot[];
+};
+
+export type TimetableStack = {
+  weekdays: Weekday[];
+  weekdayLabels: Record<Weekday, string>;
+  periods: TimetablePeriod[];
+  classes: TimetableStackClass[];
+};
+
+export async function getTimetableStack(
+  academicYearId: string,
+  opts?: { gradeId?: string; sectionId?: string },
+) {
+  const q = new URLSearchParams({ academicYearId });
+  if (opts?.gradeId) q.set("gradeId", opts.gradeId);
+  if (opts?.sectionId) q.set("sectionId", opts.sectionId);
+  return apiFetch<TimetableStack>(`/schools/timetable/stack?${q}`);
+}
+
 export async function getTimetableGrid(
   academicYearId: string,
   gradeId: string,

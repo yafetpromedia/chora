@@ -75,6 +75,36 @@ export class TimetableController {
     return this.timetableService.createRoom(user.schoolId, dto);
   }
 
+  @Get('overview')
+  @Roles('admin', 'staff')
+  @RequirePermissions(SchoolPermission.TIMETABLE_READ)
+  overview(
+    @CurrentUser() user: AuthUser,
+    @Query('academicYearId') academicYearId: string,
+  ) {
+    return this.timetableService.getSchoolOverview(
+      user.schoolId,
+      academicYearId,
+    );
+  }
+
+  @Get('stack')
+  @Roles('admin', 'staff')
+  @RequirePermissions(SchoolPermission.TIMETABLE_READ)
+  stack(
+    @CurrentUser() user: AuthUser,
+    @Query('academicYearId') academicYearId: string,
+    @Query('gradeId') gradeId?: string,
+    @Query('sectionId') sectionId?: string,
+  ) {
+    return this.timetableService.getSchoolStack(
+      user.schoolId,
+      academicYearId,
+      gradeId,
+      sectionId,
+    );
+  }
+
   @Get('grid')
   @Roles('admin', 'staff')
   @RequirePermissions(SchoolPermission.TIMETABLE_READ)

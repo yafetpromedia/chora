@@ -14,6 +14,9 @@ export type SchoolRecord = {
   slug: string;
   joinCode: string;
   logoUrl: string | null;
+  primaryColor: string | null;
+  accentColor: string | null;
+  accentDeep: string | null;
   schoolType: string | null;
   address: string | null;
   email: string | null;
@@ -214,6 +217,9 @@ export class SchoolsService implements OnModuleInit {
       phone?: string;
       country?: string;
       logoUrl?: string | null;
+      primaryColor?: string | null;
+      accentColor?: string | null;
+      accentDeep?: string | null;
       attendanceMode?: AttendanceMode;
       bankName?: string | null;
       bankAccountHolder?: string | null;
@@ -251,8 +257,29 @@ export class SchoolsService implements OnModuleInit {
     if (input.logoUrl !== undefined) {
       data.logoUrl = input.logoUrl?.trim() || null;
     }
+    if (input.primaryColor !== undefined) {
+      data.primaryColor = normalizeHexColor(input.primaryColor);
+    }
+    if (input.accentColor !== undefined) {
+      data.accentColor = normalizeHexColor(input.accentColor);
+    }
+    if (input.accentDeep !== undefined) {
+      data.accentDeep = normalizeHexColor(input.accentDeep);
+    }
     if (input.attendanceMode !== undefined) {
       data.attendanceMode = input.attendanceMode;
+    }
+    if (input.bankName !== undefined) {
+      data.bankName = input.bankName?.trim() || null;
+    }
+    if (input.bankAccountHolder !== undefined) {
+      data.bankAccountHolder = input.bankAccountHolder?.trim() || null;
+    }
+    if (input.bankAccountNumber !== undefined) {
+      data.bankAccountNumber = input.bankAccountNumber?.trim() || null;
+    }
+    if (input.paymentInstructions !== undefined) {
+      data.paymentInstructions = input.paymentInstructions?.trim() || null;
     }
     if (input.reportCardTitle !== undefined) {
       data.reportCardTitle = input.reportCardTitle?.trim() || null;
@@ -312,6 +339,9 @@ export class SchoolsService implements OnModuleInit {
     slug: string;
     joinCode: string;
     logoUrl: string | null;
+    primaryColor?: string | null;
+    accentColor?: string | null;
+    accentDeep?: string | null;
     schoolType: string | null;
     address: string | null;
     email: string | null;
@@ -335,6 +365,9 @@ export class SchoolsService implements OnModuleInit {
       slug: school.slug,
       joinCode: school.joinCode,
       logoUrl: school.logoUrl,
+      primaryColor: school.primaryColor ?? null,
+      accentColor: school.accentColor ?? null,
+      accentDeep: school.accentDeep ?? null,
       schoolType: school.schoolType,
       address: school.address,
       email: school.email,
@@ -353,4 +386,11 @@ export class SchoolsService implements OnModuleInit {
       reportCardTagline: school.reportCardTagline ?? null,
     };
   }
+}
+
+function normalizeHexColor(value: string | null | undefined): string | null {
+  if (value == null) return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  return trimmed.toLowerCase();
 }

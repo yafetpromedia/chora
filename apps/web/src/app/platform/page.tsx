@@ -32,6 +32,8 @@ import {
   platformFetch,
   type PlatformUser,
 } from "@/lib/platform-auth";
+import { hasPlatformPermission } from "@/lib/platform-access";
+import { getPlatformProfile } from "@/lib/platform-profile";
 
 export default function PlatformDashboardPage() {
   const router = useRouter();
@@ -59,15 +61,31 @@ export default function PlatformDashboardPage() {
     const raw = localStorage.getItem(PLATFORM_USER_KEY);
     if (raw) setUser(JSON.parse(raw) as PlatformUser);
 
-    void loadData()
-      .catch((err) => {
+    void (async () => {
+      try {
+        const profile = await getPlatformProfile();
+        const nextUser: PlatformUser = {
+          id: profile.user.id,
+          email: profile.user.email,
+          firstName: profile.user.firstName,
+          lastName: profile.user.lastName,
+          role: profile.user.role,
+          scope: "platform",
+          permissions: profile.user.permissions,
+        };
+        setUser(nextUser);
+        localStorage.setItem(PLATFORM_USER_KEY, JSON.stringify(nextUser));
+        await loadData();
+      } catch (err) {
         if (isPlatformAuthError(err)) {
           router.replace("/platform/login");
           return;
         }
         setError(err instanceof Error ? err.message : "Load failed");
-      })
-      .finally(() => setLoading(false));
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, [router, loadData]);
 
   async function setStatus(
@@ -143,7 +161,10 @@ export default function PlatformDashboardPage() {
           {section === "subjects" ? <PlatformSubjects /> : null}
           {section === "library" ? <PlatformLibraryRepo /> : null}
           {section === "messages" ? <PlatformMessages /> : null}
-          {section === "support" ? <PlatformSupportInbox /> : null}
+          {section === "support" &&
+          hasPlatformPermission(user, "platform.support.manage") ? (
+            <PlatformSupportInbox />
+          ) : null}
           {section === "structures" ? <PlatformStructures /> : null}
           {section === "provisioning" ? <PlatformProvisioning /> : null}
           {section === "assessments" ? <PlatformAssessments schools={schools} /> : null}
@@ -157,11 +178,11 @@ export default function PlatformDashboardPage() {
           {section === "invoices" ? <PlatformInvoices schools={schools} /> : null}
           {section === "usage" ? <PlatformUsage /> : null}
           {section === "plans" ? <PlatformPlans /> : null}
-          {section === "permissions" ? (
+          {section === "permissions" && user?.role === "OWNER" ? (
             <PlatformPermissions user={user} />
           ) : null}
           {section === "profile" ? <PlatformProfilePanel /> : null}
-          {section === "settings" ? (
+          {section === "settings" && user?.role === "OWNER" ? (
             <PlatformSettings
               user={user}
               onOpenProfile={() => setSection("profile")}

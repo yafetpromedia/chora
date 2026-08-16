@@ -1,239 +1,578 @@
 "use client";
 
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { DashIcon } from "@/components/dashboard/dash-icons";
+import { AppToast } from "@/components/ui/app-toast";
 import type { PlatformUser } from "@/lib/platform-auth";
+import {
+  createPlatformOperator,
+  getPlatformAccessControl,
+  updatePlatformOperatorRole,
+  updatePlatformRoleGrants,
+  type PlatformAccessControl,
+  type PlatformPermissionKey,
+} from "@/lib/platform-access";
 
-const PERMISSIONS = [
-  {
-    key: "platform.schools.view",
-    label: "View schools & dashboard",
-    desc: "Read tenant list, usage, and platform KPIs",
-  },
-  {
-    key: "platform.schools.create",
-    label: "Create tenant schools",
-    desc: "Onboard new schools with admin accounts",
-  },
-  {
-    key: "platform.schools.suspend",
-    label: "Suspend / activate schools",
-    desc: "Control tenant access immediately",
-  },
-  {
-    key: "platform.schools.delete",
-    label: "Delete tenants",
-    desc: "Permanently remove tenant workspaces and data",
-    desc: "Reserved for future lifecycle (not exposed in UI)",
-  },
-] as const;
-
-const ROLES: {
-  id: PlatformUser["role"] | "SALES";
-  title: string;
-  description: string;
-  icon: "settings" | "users" | "finance" | "students";
-  tone: "owner" | "support" | "sales";
-  grants: (typeof PERMISSIONS)[number]["key"][];
-}[] = [
-  {
-    id: "OWNER",
-    title: "Owner",
-    description: "Full platform control — billing, tenants, and policy.",
-    icon: "settings",
-    tone: "owner",
-    grants: PERMISSIONS.map((p) => p.key),
-  },
-  {
-    id: "SUPPORT",
-    title: "Support",
-    description: "Day-to-day school assistance; view and suspend access.",
-    icon: "users",
-    tone: "support",
-    grants: ["platform.schools.view", "platform.schools.suspend"],
-  },
-  {
-    id: "SALES",
-    title: "Sales",
-    description: "Onboard new schools and monitor the tenant pipeline.",
-    icon: "finance",
-    tone: "sales",
-    grants: ["platform.schools.view", "platform.schools.create"],
-  },
-];
+const ROLE_META: Record<
+  PlatformUser["role"],
+  { icon: "settings" | "users" | "finance"; tone: "owner" | "support" | "sales" }
+> = {
+  OWNER: { icon: "settings", tone: "owner" },
+  SUPPORT: { icon: "users", tone: "support" },
+  SALES: { icon: "finance", tone: "sales" },
+};
 
 type Props = {
   user: PlatformUser | null;
 };
 
+type Draft = {
+  SUPPORT: PlatformPermissionKey[];
+  SALES: PlatformPermissionKey[];
+};
+
+function sameGrants(a: PlatformPermissionKey[], b: PlatformPermissionKey[]) {
+  if (a.length !== b.length) return false;
+  const set = new Set(a);
+  return b.every((k) => set.has(k));
+}
+
 export function PlatformPermissions({ user }: Props) {
-  const yourGrants = ROLES.find((r) => r.id === user?.role)?.grants ?? [];
+  const isOwner = user?.role === "OWNER";
+  const [data, setData] = useState<PlatformAccessControl | null>(null);
+  const [draft, setDraft] = useState<Draft | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [busyUserId, setBusyUserId] = useState<string | null>(null);
+  const [error, setError] = useState("");
+  const [toast, setToast] = useState<string | null>(null);
+  const [selectedRole, setSelectedRole] = useState<PlatformUser["role"]>("OWNER");
+  const [showCreate, setShowCreate] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [newOp, setNewOp] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    password: "",
+    role: "SUPPORT" as PlatformUser["role"],
+  });
+
+  function applyPayload(payload: PlatformAccessControl) {
+    setData(payload);
+    setDraft({
+      SUPPORT: [...(payload.roles.find((r) => r.id === "SUPPORT")?.grants ?? [])],
+      SALES: [...(payload.roles.find((r) => r.id === "SALES")?.grants ?? [])],
+    });
+  }
+
+  useEffect(() => {
+    setLoading(true);
+    void getPlatformAccessControl()
+      .then(applyPayload)
+      .catch((err) =>
+        setError(err instanceof Error ? err.message : "Could not load access control"),
+      )
+      .finally(() => setLoading(false));
+  }, []);
+
+  const dirty = useMemo(() => {
+    if (!data || !draft) return false;
+    const support = data.roles.find((r) => r.id === "SUPPORT")?.grants ?? [];
+    const sales = data.roles.find((r) => r.id === "SALES")?.grants ?? [];
+    return (
+      !sameGrants(draft.SUPPORT, support) || !sameGrants(draft.SALES, sales)
+    );
+  }, [data, draft]);
+
+  const yourGrants = useMemo(() => {
+    if (!user || !data) return [] as PlatformPermissionKey[];
+    return (
+      data.roles.find((r) => r.id === user.role)?.grants ??
+      (user.permissions as PlatformPermissionKey[] | undefined) ??
+      []
+    );
+  }, [user, data]);
+
+  function grantsFor(roleId: PlatformUser["role"]): PlatformPermissionKey[] {
+    if (roleId === "OWNER") {
+      return data?.catalog.map((c) => c.key) ?? [];
+    }
+    return draft?.[roleId] ?? [];
+  }
+
+  function toggleGrant(roleId: "SUPPORT" | "SALES", key: PlatformPermissionKey) {
+    if (!isOwner || !draft) return;
+    if (key === "platform.schools.view") return;
+    if (roleId === "SUPPORT" && key === "platform.support.manage") return;
+    setDraft((prev) => {
+      if (!prev) return prev;
+      const current = prev[roleId];
+      const on = current.includes(key);
+      return {
+        ...prev,
+        [roleId]: on ? current.filter((k) => k !== key) : [...current, key],
+      };
+    });
+  }
+
+  async function onSave() {
+    if (!draft || !isOwner) return;
+    setSaving(true);
+    setError("");
+    setToast(null);
+    try {
+      const updated = await updatePlatformRoleGrants({
+        SUPPORT: draft.SUPPORT,
+        SALES: draft.SALES,
+      });
+      applyPayload(updated);
+      setToast("Role permissions saved.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save permissions");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function onReset() {
+    if (!data) return;
+    setDraft({
+      SUPPORT: [...(data.roles.find((r) => r.id === "SUPPORT")?.grants ?? [])],
+      SALES: [...(data.roles.find((r) => r.id === "SALES")?.grants ?? [])],
+    });
+  }
+
+  async function onChangeOperatorRole(userId: string, role: PlatformUser["role"]) {
+    if (!isOwner) return;
+    setBusyUserId(userId);
+    setError("");
+    setToast(null);
+    try {
+      const updated = await updatePlatformOperatorRole(userId, role);
+      applyPayload(updated);
+      setToast("Operator role updated.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not update role");
+    } finally {
+      setBusyUserId(null);
+    }
+  }
+
+  async function onCreateOperator(e: FormEvent) {
+    e.preventDefault();
+    if (!isOwner) return;
+    setCreating(true);
+    setError("");
+    setToast(null);
+    try {
+      const updated = await createPlatformOperator({
+        firstName: newOp.firstName.trim(),
+        lastName: newOp.lastName.trim(),
+        email: newOp.email.trim(),
+        password: newOp.password,
+        role: newOp.role,
+      });
+      applyPayload(updated);
+      setNewOp({
+        firstName: "",
+        lastName: "",
+        email: "",
+        password: "",
+        role: "SUPPORT",
+      });
+      setShowCreate(false);
+      setToast(`${newOp.role === "SALES" ? "Sales" : newOp.role === "SUPPORT" ? "Support" : "Owner"} operator created.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not create operator");
+    } finally {
+      setCreating(false);
+    }
+  }
 
   return (
-    <div className="plat-subjects-v2 dash-admin dash-admin--modern plat-permissions">
-      <header className="plat-subjects-v2__hero">
-        <div className="plat-subjects-v2__hero-main">
-          <span className="plat-subjects-v2__hero-icon" aria-hidden>
-            <DashIcon name="settings" className="dash-icon--md" />
+    <div className="plat-access dash-admin dash-admin--modern">
+      <header className="plat-access__hero">
+        <div className="plat-access__hero-main">
+          <span className="plat-access__hero-icon" aria-hidden>
+            <DashIcon name="users" className="dash-icon--md" />
           </span>
           <div>
-            <p className="plat-subjects-v2__eyebrow">Access control</p>
-            <h2 className="plat-subjects-v2__title">Platform permissions</h2>
-            <p className="plat-subjects-v2__sub">
-              Roles define what operators can do in this console. Enforcement is
-              on the API for every request.
+            <p className="plat-access__eyebrow">Access control</p>
+            <h2 className="plat-access__title">Platform permissions</h2>
+            <p className="plat-access__sub">
+              Edit what Support and Sales can do. Owner always keeps full control.
             </p>
           </div>
         </div>
-        <div className="plat-subjects-v2__hero-stats">
-          <div className="plat-subjects-v2__stat">
-            <strong>{ROLES.length}</strong>
+        <div className="plat-access__hero-stats">
+          <div className="plat-access__stat">
+            <strong>{data?.roles.length ?? "—"}</strong>
             <span>Roles</span>
           </div>
-          <div className="plat-subjects-v2__stat">
-            <strong>{PERMISSIONS.length}</strong>
+          <div className="plat-access__stat">
+            <strong>{data?.catalog.length ?? "—"}</strong>
             <span>Capabilities</span>
           </div>
-          <div className="plat-subjects-v2__stat">
-            <strong>{yourGrants.length}</strong>
-            <span>Your grants</span>
+          <div className="plat-access__stat">
+            <strong>{data?.operators.length ?? "—"}</strong>
+            <span>Operators</span>
           </div>
         </div>
       </header>
 
-      {user ? (
-        <section className="plat-access-summary">
-          <div className="plat-access-summary__avatar" aria-hidden>
+      <AppToast message={error} tone="error" onDismiss={() => setError("")} />
+      <AppToast message={toast} tone="success" onDismiss={() => setToast(null)} />
+
+      {loading ? (
+        <div className="plat-access__loading" aria-busy="true">
+          <span className="plat-access__spinner" aria-hidden />
+          <p>Loading access control…</p>
+        </div>
+      ) : null}
+
+      {!loading && user ? (
+        <section className="plat-access-you">
+          <div className="plat-access-you__avatar" aria-hidden>
             {user.firstName.slice(0, 1)}
             {user.lastName.slice(0, 1)}
           </div>
-          <div className="plat-access-summary__main">
-            <p className="plat-access-summary__eyebrow">Your access</p>
-            <h3 className="plat-access-summary__name">
+          <div className="plat-access-you__main">
+            <p className="plat-access-you__eyebrow">Signed in as</p>
+            <h3>
               {user.firstName} {user.lastName}
             </h3>
-            <p className="plat-access-summary__email">{user.email}</p>
-            <div className="plat-access-summary__chips">
+            <p>{user.email}</p>
+            <div className="plat-access-you__chips">
               <span className={`plat-role-badge plat-role-badge--${user.role.toLowerCase()}`}>
                 {user.role}
               </span>
-              <span className="plat-access-summary__count">
-                {yourGrants.length} of {PERMISSIONS.length} capabilities
+              <span>
+                {yourGrants.length} of {data?.catalog.length ?? 0} capabilities
               </span>
             </div>
           </div>
-          <ul className="plat-access-summary__perms">
-            {PERMISSIONS.map((p) => {
-              const on = yourGrants.includes(p.key);
-              return (
-                <li key={p.key} className={on ? "plat-access-summary__perm--on" : ""}>
-                  <DashIcon
-                    name={on ? "attendance" : "alert"}
-                    className={`dash-icon--xs${on ? "" : " plat-access-summary__perm-off"}`}
-                  />
-                  {p.label}
-                </li>
-              );
-            })}
-          </ul>
+          {!isOwner ? (
+            <p className="plat-access-you__note">
+              Only owners can edit the permission matrix and operator roles.
+            </p>
+          ) : null}
         </section>
       ) : null}
 
-      <section className="plat-panel">
-        <h3 className="plat-panel__title">Permission matrix</h3>
-        <p className="plat-panel__hint plat-panel__hint--below">
-          Quick reference for support and sales teams.
-        </p>
-        <div className="plat-matrix-wrap">
-          <table className="plat-matrix">
-            <thead>
-              <tr>
-                <th>Capability</th>
-                {ROLES.map((r) => (
-                  <th key={r.id}>
-                    {r.title}
-                    {user?.role === r.id ? <span className="plat-matrix-you">You</span> : null}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {PERMISSIONS.map((perm) => (
-                <tr key={perm.key}>
-                  <td>
-                    <strong>{perm.label}</strong>
-                    <span className="plat-matrix-desc">{perm.desc}</span>
-                  </td>
-                  {ROLES.map((role) => {
-                    const on = role.grants.includes(perm.key);
-                    return (
-                      <td key={role.id} className="plat-matrix-cell">
-                        <span
-                          className={`plat-matrix-check${on ? " plat-matrix-check--on" : ""}`}
-                          aria-label={on ? "Allowed" : "Denied"}
-                        >
-                          {on ? "✓" : "—"}
-                        </span>
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <div className="plat-role-grid plat-role-grid--modern">
-        {ROLES.map((role) => {
-          const isYou = user?.role === role.id;
-          return (
-            <article
-              key={role.id}
-              className={`plat-role-card-v2 plat-role-card-v2--${role.tone}${isYou ? " plat-role-card-v2--you" : ""}`}
-            >
-              <header className="plat-role-card-v2__head">
-                <span className={`plat-role-card-v2__icon plat-role-card-v2__icon--${role.tone}`}>
-                  <DashIcon name={role.icon} />
-                </span>
-                <div>
-                  <h4>{role.title}</h4>
-                  {isYou ? <span className="plat-you-pill">Your role</span> : null}
+      {!loading && data && draft ? (
+        <>
+          <section className="plat-access-panel">
+            <div className="plat-access-panel__head">
+              <div>
+                <h3>Permission matrix</h3>
+                <p>
+                  Toggle capabilities for Support and Sales. View access stays on for every
+                  operator role.
+                </p>
+              </div>
+              {isOwner ? (
+                <div className="plat-access-panel__actions">
+                  <button
+                    type="button"
+                    className="plat-v2__btn plat-v2__btn--ghost"
+                    disabled={!dirty || saving}
+                    onClick={onReset}
+                  >
+                    Reset
+                  </button>
+                  <button
+                    type="button"
+                    className="plat-v2__btn plat-v2__btn--primary"
+                    disabled={!dirty || saving}
+                    onClick={() => void onSave()}
+                  >
+                    {saving ? "Saving…" : "Save changes"}
+                  </button>
                 </div>
-              </header>
-              <p className="plat-role-card-v2__desc">{role.description}</p>
-              <p className="plat-role-card-v2__stat">
-                <strong>{role.grants.length}</strong> permissions granted
-              </p>
-              <ul className="plat-perm-list plat-perm-list--compact">
-                {PERMISSIONS.map((perm) => {
-                  const on = role.grants.includes(perm.key);
-                  return (
-                    <li
-                      key={perm.key}
-                      className={on ? "plat-perm-list__on" : "plat-perm-list__off"}
-                    >
-                      <span className="plat-perm-dot" aria-hidden />
-                      {perm.label}
-                    </li>
-                  );
-                })}
-              </ul>
-            </article>
-          );
-        })}
-      </div>
+              ) : null}
+            </div>
 
-      <section className="plat-info-card">
-        <DashIcon name="students" className="dash-icon--sm" />
-        <div>
-          <h3>School-level permissions (separate)</h3>
-          <p>
-            Each tenant manages staff from <strong>Admin → Teachers → Permissions</strong>.
-            School admins assign module access (students, finance, results) without a platform
-            login. A school admin cannot edit their own permissions — only other staff.
-          </p>
-        </div>
-      </section>
+            <div className="plat-access-matrix-wrap">
+              <table className="plat-access-matrix">
+                <thead>
+                  <tr>
+                    <th>Capability</th>
+                    {data.roles.map((role) => (
+                      <th key={role.id}>
+                        <button
+                          type="button"
+                          className={`plat-access-matrix__role${selectedRole === role.id ? " is-active" : ""}`}
+                          onClick={() => setSelectedRole(role.id)}
+                        >
+                          {role.title}
+                          {user?.role === role.id ? <span>You</span> : null}
+                          {!role.editable ? <em>Locked</em> : null}
+                        </button>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.catalog.map((perm) => (
+                    <tr key={perm.key}>
+                      <td>
+                        <strong>{perm.label}</strong>
+                        <span>{perm.description}</span>
+                      </td>
+                      {data.roles.map((role) => {
+                        const on = grantsFor(role.id).includes(perm.key);
+                        const editable =
+                          isOwner &&
+                          role.editable &&
+                          perm.key !== "platform.schools.view" &&
+                          !(
+                            role.id === "SUPPORT" &&
+                            perm.key === "platform.support.manage"
+                          );
+                        return (
+                          <td key={role.id}>
+                            {editable ? (
+                              <label className="plat-access-switch">
+                                <input
+                                  type="checkbox"
+                                  role="switch"
+                                  checked={on}
+                                  onChange={() =>
+                                    toggleGrant(
+                                      role.id as "SUPPORT" | "SALES",
+                                      perm.key,
+                                    )
+                                  }
+                                  aria-label={`${perm.label} for ${role.title}`}
+                                />
+                                <span aria-hidden />
+                              </label>
+                            ) : (
+                              <span
+                                className={`plat-access-pill${on ? " is-on" : ""}`}
+                                aria-label={on ? "Allowed" : "Denied"}
+                              >
+                                {on ? "On" : "Off"}
+                              </span>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <div className="plat-access-roles">
+            {data.roles.map((role) => {
+              const meta = ROLE_META[role.id];
+              const grants = grantsFor(role.id);
+              const isYou = user?.role === role.id;
+              return (
+                <article
+                  key={role.id}
+                  className={`plat-access-role plat-access-role--${meta.tone}${isYou ? " is-you" : ""}${selectedRole === role.id ? " is-selected" : ""}`}
+                  onClick={() => setSelectedRole(role.id)}
+                >
+                  <header>
+                    <span className={`plat-access-role__icon plat-access-role__icon--${meta.tone}`}>
+                      <DashIcon name={meta.icon} />
+                    </span>
+                    <div>
+                      <h4>{role.title}</h4>
+                      {isYou ? <span className="plat-you-pill">Your role</span> : null}
+                    </div>
+                  </header>
+                  <p>{role.description}</p>
+                  <p className="plat-access-role__stat">
+                    <strong>{grants.length}</strong> permissions granted
+                  </p>
+                  <ul>
+                    {data.catalog.map((perm) => {
+                      const on = grants.includes(perm.key);
+                      return (
+                        <li key={perm.key} className={on ? "is-on" : "is-off"}>
+                          <span aria-hidden />
+                          {perm.label}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </article>
+              );
+            })}
+          </div>
+
+          <section className="plat-access-panel">
+            <div className="plat-access-panel__head">
+              <div>
+                <h3>Operators</h3>
+                <p>Create Support or Sales accounts, then assign roles as needed.</p>
+              </div>
+              {isOwner ? (
+                <button
+                  type="button"
+                  className="plat-v2__btn plat-v2__btn--primary"
+                  onClick={() => setShowCreate((v) => !v)}
+                >
+                  {showCreate ? "Cancel" : "Add operator"}
+                </button>
+              ) : null}
+            </div>
+
+            {isOwner && showCreate ? (
+              <form className="plat-access-create" onSubmit={(e) => void onCreateOperator(e)}>
+                <div className="plat-access-create__grid">
+                  <label>
+                    <span>First name</span>
+                    <input
+                      value={newOp.firstName}
+                      onChange={(e) => setNewOp((p) => ({ ...p, firstName: e.target.value }))}
+                      required
+                      autoComplete="off"
+                    />
+                  </label>
+                  <label>
+                    <span>Last name</span>
+                    <input
+                      value={newOp.lastName}
+                      onChange={(e) => setNewOp((p) => ({ ...p, lastName: e.target.value }))}
+                      required
+                      autoComplete="off"
+                    />
+                  </label>
+                  <label>
+                    <span>Email</span>
+                    <input
+                      type="email"
+                      value={newOp.email}
+                      onChange={(e) => setNewOp((p) => ({ ...p, email: e.target.value }))}
+                      required
+                      placeholder="support@yourorg.com"
+                      autoComplete="off"
+                    />
+                  </label>
+                  <label>
+                    <span>Temporary password</span>
+                    <input
+                      type="text"
+                      value={newOp.password}
+                      onChange={(e) => setNewOp((p) => ({ ...p, password: e.target.value }))}
+                      required
+                      minLength={8}
+                      placeholder="At least 8 characters"
+                      autoComplete="new-password"
+                    />
+                  </label>
+                  <label>
+                    <span>Role</span>
+                    <select
+                      value={newOp.role}
+                      onChange={(e) =>
+                        setNewOp((p) => ({
+                          ...p,
+                          role: e.target.value as PlatformUser["role"],
+                        }))
+                      }
+                    >
+                      <option value="SUPPORT">Support</option>
+                      <option value="SALES">Sales</option>
+                      <option value="OWNER">Owner</option>
+                    </select>
+                  </label>
+                </div>
+                <div className="plat-access-create__actions">
+                  <button
+                    type="submit"
+                    className="plat-v2__btn plat-v2__btn--primary"
+                    disabled={creating}
+                  >
+                    {creating ? "Creating…" : "Create operator"}
+                  </button>
+                </div>
+              </form>
+            ) : null}
+
+            <div className="plat-access-ops">
+              {data.operators.map((op) => {
+                const initials = `${op.firstName.slice(0, 1)}${op.lastName.slice(0, 1)}`;
+                return (
+                  <div key={op.id} className="plat-access-op">
+                    <div className="plat-access-op__avatar" aria-hidden>
+                      {initials}
+                    </div>
+                    <div className="plat-access-op__main">
+                      <strong>
+                        {op.firstName} {op.lastName}
+                      </strong>
+                      <span>{op.email}</span>
+                    </div>
+                    {isOwner ? (
+                      <select
+                        className="plat-access-op__select"
+                        value={op.role}
+                        disabled={busyUserId === op.id}
+                        onChange={(e) =>
+                          void onChangeOperatorRole(
+                            op.id,
+                            e.target.value as PlatformUser["role"],
+                          )
+                        }
+                        aria-label={`Role for ${op.firstName} ${op.lastName}`}
+                      >
+                        <option value="OWNER">Owner</option>
+                        <option value="SUPPORT">Support</option>
+                        <option value="SALES">Sales</option>
+                      </select>
+                    ) : (
+                      <span className={`plat-role-badge plat-role-badge--${op.role.toLowerCase()}`}>
+                        {op.role}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+
+          <section className="plat-info-card">
+            <DashIcon name="students" className="dash-icon--sm" />
+            <div>
+              <h3>School-level permissions (separate)</h3>
+              <p>
+                Each tenant manages staff from <strong>Admin → Teachers → Permissions</strong>.
+                School admins assign module access without a platform login.
+              </p>
+            </div>
+          </section>
+
+          {isOwner && dirty ? (
+            <div className="plat-access__save-bar">
+              <p>Unsaved permission changes</p>
+              <div>
+                <button
+                  type="button"
+                  className="plat-v2__btn plat-v2__btn--ghost"
+                  disabled={saving}
+                  onClick={onReset}
+                >
+                  Discard
+                </button>
+                <button
+                  type="button"
+                  className="plat-v2__btn plat-v2__btn--primary"
+                  disabled={saving}
+                  onClick={() => void onSave()}
+                >
+                  {saving ? "Saving…" : "Save changes"}
+                </button>
+              </div>
+            </div>
+          ) : null}
+        </>
+      ) : null}
     </div>
   );
 }

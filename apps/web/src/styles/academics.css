@@ -2622,7 +2622,7 @@
 
 .sub-assign__table-head {
   display: none;
-  grid-template-columns: minmax(10rem, 1.2fr) minmax(14rem, 1.8fr) 6.5rem;
+  grid-template-columns: minmax(10rem, 1.2fr) minmax(14rem, 1.8fr) 6.5rem 5.5rem;
   gap: 1rem;
   padding: 0.7rem 1.25rem;
   font-size: 0.66rem;
@@ -2671,7 +2671,7 @@
 
 @media (min-width: 900px) {
   .sub-assign__row {
-    grid-template-columns: minmax(10rem, 1.2fr) minmax(14rem, 1.8fr) 6.5rem;
+    grid-template-columns: minmax(10rem, 1.2fr) minmax(14rem, 1.8fr) 6.5rem 5.5rem;
     align-items: center;
     gap: 1rem;
     padding: 0.75rem 1.25rem;
@@ -2752,6 +2752,42 @@
 }
 
 .sub-assign__clear:disabled {
+  opacity: 0.45;
+  cursor: wait;
+}
+
+.sub-assign__remove-cell {
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-start;
+}
+
+@media (min-width: 900px) {
+  .sub-assign__remove-cell {
+    align-items: center;
+    justify-content: flex-end;
+  }
+}
+
+.sub-assign__remove {
+  flex-shrink: 0;
+  padding: 0.45rem 0.75rem;
+  border: 1px solid rgba(185, 28, 28, 0.2);
+  border-radius: 0.6rem;
+  background: #fff;
+  color: #b91c1c;
+  font-size: 0.78rem;
+  font-weight: 650;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.sub-assign__remove:hover:not(:disabled) {
+  border-color: rgba(185, 28, 28, 0.35);
+  background: #fef2f2;
+}
+
+.sub-assign__remove:disabled {
   opacity: 0.45;
   cursor: wait;
 }

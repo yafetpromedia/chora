@@ -204,6 +204,7 @@ export class AuthService {
       supportPhone: settings.supportPhone,
       defaultCountry: settings.defaultCountry,
       defaultTrialDays: settings.defaultTrialDays,
+      landingHeroImageUrl: settings.landingHeroImageUrl,
     };
   }
 
@@ -255,6 +256,10 @@ export class AuthService {
         slug: school.slug,
         joinCode: school.joinCode,
         setupComplete: school.setupComplete,
+        logoUrl: school.logoUrl,
+        primaryColor: school.primaryColor,
+        accentColor: school.accentColor,
+        accentDeep: school.accentDeep,
       },
     };
   }
@@ -297,6 +302,10 @@ export class AuthService {
         id: school.id,
         name: school.name,
         joinCode: school.joinCode,
+        logoUrl: school.logoUrl,
+        primaryColor: school.primaryColor,
+        accentColor: school.accentColor,
+        accentDeep: school.accentDeep,
       },
     };
   }
@@ -444,6 +453,10 @@ export class AuthService {
     return {
       name: school.name,
       joinCode: school.joinCode,
+      logoUrl: school.logoUrl,
+      primaryColor: school.primaryColor,
+      accentColor: school.accentColor,
+      accentDeep: school.accentDeep,
     };
   }
 
@@ -523,6 +536,9 @@ export class AuthService {
         joinCode: true,
         setupComplete: true,
         logoUrl: true,
+        primaryColor: true,
+        accentColor: true,
+        accentDeep: true,
       },
     });
 
@@ -541,6 +557,9 @@ export class AuthService {
             joinCode: school.joinCode,
             setupComplete: school.setupComplete,
             logoUrl: school.logoUrl,
+            primaryColor: school.primaryColor,
+            accentColor: school.accentColor,
+            accentDeep: school.accentDeep,
           }
         : undefined,
     };

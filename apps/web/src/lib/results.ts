@@ -242,6 +242,12 @@ export async function updateClassSubject(
   );
 }
 
+export async function deleteClassSubject(classSubjectId: string) {
+  return apiDelete<{ deleted: boolean; id: string }>(
+    `/results/class-subjects/${classSubjectId}`,
+  );
+}
+
 export async function listAssessments(termId: string, classSubjectId?: string) {
   const params = new URLSearchParams({ termId });
   if (classSubjectId) params.set("classSubjectId", classSubjectId);

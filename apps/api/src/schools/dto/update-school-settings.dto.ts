@@ -1,5 +1,15 @@
 import { AttendanceMode, SchoolType } from '@prisma/client';
-import { IsEmail, IsEnum, IsOptional, IsString, MinLength } from 'class-validator';
+import {
+  IsEmail,
+  IsEnum,
+  IsOptional,
+  IsString,
+  Matches,
+  MinLength,
+  ValidateIf,
+} from 'class-validator';
+
+const HEX_COLOR = /^#[0-9A-Fa-f]{6}$/;
 
 export class UpdateSchoolSettingsDto {
   @IsString()
@@ -30,6 +40,21 @@ export class UpdateSchoolSettingsDto {
   @IsString()
   @IsOptional()
   logoUrl?: string;
+
+  @ValidateIf((_, v) => v !== null && v !== undefined && v !== '')
+  @Matches(HEX_COLOR, { message: 'primaryColor must be a hex color like #3d9b9b' })
+  @IsOptional()
+  primaryColor?: string | null;
+
+  @ValidateIf((_, v) => v !== null && v !== undefined && v !== '')
+  @Matches(HEX_COLOR, { message: 'accentColor must be a hex color like #5ec9cf' })
+  @IsOptional()
+  accentColor?: string | null;
+
+  @ValidateIf((_, v) => v !== null && v !== undefined && v !== '')
+  @Matches(HEX_COLOR, { message: 'accentDeep must be a hex color like #0f766e' })
+  @IsOptional()
+  accentDeep?: string | null;
 
   @IsEnum(AttendanceMode)
   @IsOptional()

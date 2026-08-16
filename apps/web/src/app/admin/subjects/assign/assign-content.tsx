@@ -7,11 +7,13 @@ import { DashboardPage } from "@/components/dashboard/dashboard-page";
 import { DashIcon } from "@/components/dashboard/dash-icons";
 import { AcademicsEmpty } from "@/components/academics/academics-ui";
 import { AppToast } from "@/components/ui/app-toast";
+import { AppConfirmDialog } from "@/components/ui/app-confirm-dialog";
 import { listGrades } from "@/lib/school-setup";
 import type { GradeWithSections } from "@/lib/api";
 import { listTeachers, type TeacherRecord } from "@/lib/teachers";
 import {
   createClassSubject,
+  deleteClassSubject,
   getOrEnsureCurrentAcademicYear,
   listClassSubjects,
   listClassSubjectsByGrade,
@@ -55,6 +57,11 @@ export function SubjectAssignmentContent() {
   const [highlightTeacherId, setHighlightTeacherId] = useState("");
   const [academicYearId, setAcademicYearId] = useState("");
   const [addSubjectId, setAddSubjectId] = useState("");
+  const [removeTarget, setRemoveTarget] = useState<{
+    id: string;
+    subjectName: string;
+    classLabel: string;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState("");
   const [error, setError] = useState("");
@@ -166,6 +173,40 @@ export function SubjectAssignmentContent() {
     }
   }
 
+  function openRemoveDialog(classSubjectId: string, subjectName: string) {
+    const gradeLabel = selectedGrade?.name ?? "this class";
+    const sectionLabel = sectionId
+      ? selectedGrade?.sections.find((s) => s.id === sectionId)?.name
+      : null;
+    const classLabel = sectionLabel
+      ? `${gradeLabel} · ${sectionLabel}`
+      : gradeLabel;
+
+    setRemoveTarget({ id: classSubjectId, subjectName, classLabel });
+  }
+
+  async function confirmRemoveFromClass() {
+    if (!removeTarget) return;
+
+    setError("");
+    setSaved("");
+    setBusyId(removeTarget.id);
+    try {
+      await deleteClassSubject(removeTarget.id);
+      setSaved(`${removeTarget.subjectName} removed from class.`);
+      setRemoveTarget(null);
+      await loadAssignments();
+      if (academicYearId) {
+        const all = await listClassSubjects(academicYearId);
+        setAllClassSubjects(all);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Remove failed");
+    } finally {
+      setBusyId("");
+    }
+  }
+
   async function onWeeklySessionsChange(classSubjectId: string, weeklySessions: number) {
     setError("");
     setSaved("");
@@ -259,6 +300,24 @@ export function SubjectAssignmentContent() {
       <div className="acad-page acad-page--assign sub-assign">
         <AppToast message={error} tone="error" onDismiss={() => setError("")} />
         <AppToast message={saved} tone="success" onDismiss={() => setSaved("")} />
+        <AppConfirmDialog
+          open={Boolean(removeTarget)}
+          tone="danger"
+          title={`Remove ${removeTarget?.subjectName ?? "subject"} from class?`}
+          message={
+            removeTarget
+              ? `This will unlink ${removeTarget.subjectName} from ${removeTarget.classLabel}. Draft scores and assessments for this class will also be deleted.`
+              : ""
+          }
+          confirmLabel="Remove subject"
+          cancelLabel="Keep subject"
+          busy={Boolean(removeTarget && busyId === removeTarget.id)}
+          onCancel={() => {
+            if (busyId) return;
+            setRemoveTarget(null);
+          }}
+          onConfirm={() => void confirmRemoveFromClass()}
+        />
 
         {subjects.length === 0 ? (
           <div className="sub-assign__notice">
@@ -506,7 +565,7 @@ export function SubjectAssignmentContent() {
                   <span>Subject</span>
                   <span>Teacher</span>
                   <span>Per week</span>
-                  <span />
+                  <span>Remove</span>
                 </div>
                 <ul className="sub-assign__list">
                   {assignments.map((row) => {
@@ -586,6 +645,21 @@ export function SubjectAssignmentContent() {
                             <option value="2">2×</option>
                           </select>
                         </label>
+
+                        <div className="sub-assign__remove-cell">
+                          <button
+                            type="button"
+                            className="sub-assign__remove"
+                            disabled={busyId === row.id}
+                            title={`Remove ${row.subject.name} from class`}
+                            aria-label={`Remove ${row.subject.name} from class`}
+                            onClick={() =>
+                              openRemoveDialog(row.id, row.subject.name)
+                            }
+                          >
+                            Remove
+                          </button>
+                        </div>
                       </li>
                     );
                   })}

@@ -6,39 +6,74 @@ import { BillingCurrency, Plan, PlatformRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdatePlatformSettingsDto } from './dto/update-platform-settings.dto';
 
-const DEFAULTS = {
+const DEFAULTS: {
+  id: string;
+  platformName: string;
+  supportEmail: string | null;
+  supportPhone: string | null;
+  defaultCountry: string;
+  defaultTimezone: string;
+  allowSelfRegistration: boolean;
+  requireAdminApproval: boolean;
+  defaultTrialDays: number;
+  welcomeMessage: string | null;
+  defaultBillingCurrency: BillingCurrency;
+  invoicePrefix: string;
+  invoiceGraceDays: number;
+  autoSuspendOverdue: boolean;
+  emailFromName: string | null;
+  emailReplyTo: string | null;
+  smsSenderName: string | null;
+  maintenanceMode: boolean;
+  maintenanceMessage: string | null;
+  sessionTimeoutMinutes: number;
+  landingHeroImageUrl: string | null;
+} = {
   id: 'default',
   platformName: 'CampusOne',
-  supportEmail: null as string | null,
-  supportPhone: null as string | null,
+  supportEmail: null,
+  supportPhone: null,
   defaultCountry: 'Ethiopia',
   defaultTimezone: 'Africa/Addis_Ababa',
   allowSelfRegistration: true,
   requireAdminApproval: false,
   defaultTrialDays: 14,
-  welcomeMessage: null as string | null,
+  welcomeMessage: null,
   defaultBillingCurrency: BillingCurrency.USD,
   invoicePrefix: 'INV',
   invoiceGraceDays: 14,
   autoSuspendOverdue: false,
-  emailFromName: null as string | null,
-  emailReplyTo: null as string | null,
-  smsSenderName: null as string | null,
+  emailFromName: null,
+  emailReplyTo: null,
+  smsSenderName: null,
   maintenanceMode: false,
-  maintenanceMessage: null as string | null,
+  maintenanceMessage: null,
   sessionTimeoutMinutes: 60,
+  landingHeroImageUrl: null,
+};
+
+export type PlatformSettingsRecord = typeof DEFAULTS & {
+  createdAt?: Date;
+  updatedAt?: Date;
 };
 
 @Injectable()
 export class PlatformSettingsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getSettings() {
-    return this.prisma.platformSettings.upsert({
+  async getSettings(): Promise<PlatformSettingsRecord> {
+    const row = await this.prisma.platformSettings.upsert({
       where: { id: 'default' },
       create: DEFAULTS,
       update: {},
     });
+    return {
+      ...DEFAULTS,
+      ...row,
+      landingHeroImageUrl:
+        (row as { landingHeroImageUrl?: string | null }).landingHeroImageUrl ??
+        null,
+    };
   }
 
   async updateSettings(dto: UpdatePlatformSettingsDto, role: PlatformRole) {
@@ -53,7 +88,7 @@ export class PlatformSettingsService {
         ? { platformName: dto.platformName.trim() }
         : {}),
       ...(dto.supportEmail !== undefined
-        ? { supportEmail: dto.supportEmail.trim() || null }
+        ? { supportEmail: dto.supportEmail?.trim() || null }
         : {}),
       ...(dto.supportPhone !== undefined
         ? { supportPhone: dto.supportPhone.trim() || null }
@@ -92,7 +127,7 @@ export class PlatformSettingsService {
         ? { emailFromName: dto.emailFromName.trim() || null }
         : {}),
       ...(dto.emailReplyTo !== undefined
-        ? { emailReplyTo: dto.emailReplyTo.trim() || null }
+        ? { emailReplyTo: dto.emailReplyTo?.trim() || null }
         : {}),
       ...(dto.smsSenderName !== undefined
         ? { smsSenderName: dto.smsSenderName.trim() || null }
@@ -105,6 +140,11 @@ export class PlatformSettingsService {
         : {}),
       ...(dto.sessionTimeoutMinutes !== undefined
         ? { sessionTimeoutMinutes: dto.sessionTimeoutMinutes }
+        : {}),
+      ...(dto.landingHeroImageUrl !== undefined
+        ? {
+            landingHeroImageUrl: dto.landingHeroImageUrl.trim() || null,
+          }
         : {}),
     };
 

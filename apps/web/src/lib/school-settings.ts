@@ -7,6 +7,9 @@ export type SchoolSettings = {
   slug: string;
   joinCode: string;
   logoUrl: string | null;
+  primaryColor: string | null;
+  accentColor: string | null;
+  accentDeep: string | null;
   schoolType: SchoolType | null;
   address: string | null;
   email: string | null;
@@ -40,6 +43,9 @@ export type UpdateSchoolSettingsPayload = {
   phone?: string;
   country?: string;
   logoUrl?: string;
+  primaryColor?: string | null;
+  accentColor?: string | null;
+  accentDeep?: string | null;
   attendanceMode?: AttendanceMode;
   bankName?: string;
   bankAccountHolder?: string;
