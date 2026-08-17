@@ -3,14 +3,12 @@
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import {
-  createBehavior,
   executeGraduation,
   getEnrollmentHistory,
   getHealth,
   getStudentRecordsSummary,
   getTranscript,
   issueCertificate,
-  listBehavior,
   listCertificates,
   listDocuments,
   openTranscriptPrint,
@@ -30,7 +28,6 @@ type Tab =
   | "attendance"
   | "results"
   | "fees"
-  | "discipline"
   | "documents"
   | "transcript"
   | "certificates"
@@ -44,16 +41,6 @@ const DOC_TYPES = [
   "RECOMMENDATION_LETTER",
   "MEDICAL",
   "PHOTO",
-  "OTHER",
-] as const;
-
-const BEHAVIOR_TYPES = [
-  "LATE_ARRIVAL",
-  "ABSENT_WITHOUT_REASON",
-  "DISRUPTIVE",
-  "EXCELLENT_CONDUCT",
-  "WARNING",
-  "SUSPENSION",
   "OTHER",
 ] as const;
 
@@ -73,24 +60,12 @@ export function StudentAcademicRecord({ profileId }: { profileId: string }) {
   const [documents, setDocuments] = useState<
     Array<{ id: string; type: string; title: string | null; fileUrl: string; uploadedAt: string }>
   >([]);
-  const [behavior, setBehavior] = useState<
-    Array<{
-      id: string;
-      date: string;
-      type: string;
-      note: string | null;
-      recordedBy: { firstName: string; lastName: string };
-    }>
-  >([]);
   const [certificates, setCertificates] = useState<
     Array<{ id: string; type: string; certificateNumber: string; issuedAt: string }>
   >([]);
   const [health, setHealth] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [behaviorDate, setBehaviorDate] = useState("");
-  const [behaviorType, setBehaviorType] = useState<string>("LATE_ARRIVAL");
-  const [behaviorNote, setBehaviorNote] = useState("");
   const [docType, setDocType] = useState<string>("BIRTH_CERTIFICATE");
   const [gradPreview, setGradPreview] = useState<{
     ready: boolean;
@@ -126,9 +101,6 @@ export function StudentAcademicRecord({ profileId }: { profileId: string }) {
     if (tab === "documents") {
       void listDocuments(profileId).then(setDocuments).catch(() => {});
     }
-    if (tab === "discipline") {
-      void listBehavior(profileId).then(setBehavior).catch(() => {});
-    }
     if (tab === "certificates") {
       void listCertificates(profileId).then(setCertificates).catch(() => {});
     }
@@ -155,17 +127,6 @@ export function StudentAcademicRecord({ profileId }: { profileId: string }) {
     e.preventDefault();
     await updateHealth(profileId, health);
     setError("");
-  }
-
-  async function onAddBehavior(e: FormEvent) {
-    e.preventDefault();
-    await createBehavior(profileId, {
-      date: behaviorDate,
-      type: behaviorType,
-      note: behaviorNote || undefined,
-    });
-    setBehaviorNote("");
-    setBehavior(await listBehavior(profileId));
   }
 
   async function onUploadDoc(e: FormEvent<HTMLFormElement>) {
@@ -195,7 +156,6 @@ export function StudentAcademicRecord({ profileId }: { profileId: string }) {
     { id: "attendance", label: "Attendance" },
     { id: "results", label: "Results" },
     { id: "fees", label: "Fees" },
-    { id: "discipline", label: "Discipline" },
     { id: "documents", label: "Documents" },
     { id: "transcript", label: "Transcript" },
     { id: "certificates", label: "Certificates" },
@@ -357,33 +317,6 @@ export function StudentAcademicRecord({ profileId }: { profileId: string }) {
             <Link href="/admin/finance" className="plat-btn plat-btn--ghost plat-btn--xs">
               Open finance module
             </Link>
-          </div>
-        ) : null}
-
-        {tab === "discipline" ? (
-          <div>
-            <form className="stu-rec-form" onSubmit={(e) => void onAddBehavior(e)}>
-              <input type="date" value={behaviorDate} onChange={(e) => setBehaviorDate(e.target.value)} required />
-              <select value={behaviorType} onChange={(e) => setBehaviorType(e.target.value)}>
-                {BEHAVIOR_TYPES.map((t) => (
-                  <option key={t} value={t}>
-                    {t.replace(/_/g, " ")}
-                  </option>
-                ))}
-              </select>
-              <input placeholder="Note" value={behaviorNote} onChange={(e) => setBehaviorNote(e.target.value)} />
-              <button type="submit" className="plat-btn plat-btn--primary plat-btn--xs">
-                Add record
-              </button>
-            </form>
-            <ul className="stu-rec-list">
-              {behavior.map((b) => (
-                <li key={b.id}>
-                  <strong>{new Date(b.date).toLocaleDateString()}</strong> — {b.type.replace(/_/g, " ")}
-                  {b.note ? `: ${b.note}` : ""}
-                </li>
-              ))}
-            </ul>
           </div>
         ) : null}
 

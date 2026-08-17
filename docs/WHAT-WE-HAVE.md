@@ -125,10 +125,9 @@ Schools are not limited to one shared “Admin” login. Each person gets a **ro
 | Feature | Location |
 |---------|----------|
 | List, search, grade filter | `/admin/students` |
-| **Academic record center** | `/admin/students/[id]/history` — tabs: Overview, Attendance, Results, Fees, Discipline, Documents, Transcript, Certificates, Health |
+| **Academic record center** | `/admin/students/[id]/history` — tabs: Overview, Attendance, Results, Fees, Documents, Transcript, Certificates, Health |
 | Transcript (full academic history vs term report cards) | History → Transcript tab; print at `…/history/print` |
 | Student documents (birth cert, ID, transfer letter, etc.) | History → Documents |
-| Behavior / discipline records | History → Discipline |
 | Health record (blood type, allergies, emergency contact) | History → Health |
 | Certificates (enrollment, completion, graduation, conduct) | History → Certificates; print `…/history/certificate/[id]` |
 | Graduation workflow (requirements → graduate → certificate) | API `POST …/records/graduation` |

@@ -169,6 +169,19 @@ Telebirr + Chapa: parent pays → webhook confirms → balance + receipt.
 
 ---
 
+## Out of scope (for now)
+
+These are **not** current product priorities for Chora:
+
+| Area | Notes |
+|------|--------|
+| **Student discipline / behavior management** | No dedicated workflow, dashboards, or parent-facing behavior tracking. Attendance exceptions (late, absent, excused) cover day-to-day needs. Legacy API tables may exist but are not exposed in the admin UI. |
+| Full LMS / course authoring | Classwork worksheets only — not a full learning management system |
+
+Communication for serious incidents can route through **Chora Connect** (planned) or school announcements — not a separate discipline module.
+
+---
+
 ## Suggested sprint order
 
 | Sprint | Focus | Status |
