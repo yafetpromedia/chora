@@ -36,7 +36,7 @@ export class DashboardsService {
 
 
 
-    const [announcements, userCounts, todayRecords, unreadNotifications] =
+    const [announcements, userCounts, todayRecords, unreadNotifications, totalStudents] =
 
       await Promise.all([
 
@@ -66,6 +66,8 @@ export class DashboardsService {
 
           : Promise.resolve(0),
 
+        this.prisma.studentProfile.count({ where: { schoolId } }),
+
       ]);
 
 
@@ -93,8 +95,9 @@ export class DashboardsService {
     ).length;
 
     const todayRate =
-
-      marked > 0 ? Math.round((presentToday / marked) * 100) : null;
+      marked > 0 && totalStudents > 0
+        ? Math.round((presentToday / totalStudents) * 100)
+        : null;
 
 
 

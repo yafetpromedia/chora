@@ -33,7 +33,7 @@ export function buildStudentPortalEmail(
 ): string {
   const school = joinCode.toLowerCase().replace(/[^a-z0-9]/g, '');
   const id = schoolStudentId.toLowerCase().replace(/[^a-z0-9-]/g, '');
-  return `${id}.${school}@students.campusone.app`;
+  return `${id}.${school}@students.chora.app`;
 }
 
 export function isSchoolStudentIdLogin(input: string): boolean {

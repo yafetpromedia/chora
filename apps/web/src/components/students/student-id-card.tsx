@@ -8,6 +8,7 @@ import {
   DEFAULT_SCHOOL_THEME,
   readSchoolBrand,
 } from "@/lib/school-brand";
+import { BRAND_NAME } from "@/lib/brand";
 
 export type StudentIdCardVariant = "standard" | "compact" | "mini";
 
@@ -250,7 +251,7 @@ export function StudentIdCardView({
       <header className="sid__back-head">
         <strong>{card.schoolName}</strong>
         <span>
-          Powered by CampusOne · {card.schoolJoinCode}
+          Powered by {BRAND_NAME} · {card.schoolJoinCode}
           {card.schoolPhone ? ` · ${card.schoolPhone}` : ""}
         </span>
       </header>
@@ -269,8 +270,19 @@ export function StudentIdCardView({
           </div>
 
           <div className="sid__body-signature">
-            <div className="sid__body-signature-line" aria-hidden />
-            <span className="sid__body-signature-label">Authorized signature</span>
+            {card.schoolSignatureUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                className="sid__body-signature-img"
+                src={card.schoolSignatureUrl}
+                alt=""
+              />
+            ) : (
+              <div className="sid__body-signature-line" aria-hidden />
+            )}
+            <span className="sid__body-signature-label">
+              {card.schoolSignatureLabel?.trim() || "Authorized signature"}
+            </span>
           </div>
         </div>
 

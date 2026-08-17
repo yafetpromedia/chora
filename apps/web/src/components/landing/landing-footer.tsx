@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AppStoreBadges } from "@/components/landing/app-store-badges";
+import { BRAND_MARK, BRAND_NAME, BRAND_TAGLINE } from "@/lib/brand";
 
 const PRODUCT_LINKS = [
   { href: "#features", label: "Product" },
@@ -99,14 +100,14 @@ export function LandingFooter() {
         <div className="lp3-footer__top">
           <div className="lp3-footer__brand">
             <Link href="/" className="lp3-footer__logo">
-              <span className="lp3-nav__mark">C1</span>
-              <span>CampusOne</span>
+              <span className="lp3-nav__mark">{BRAND_MARK}</span>
+              <span>{BRAND_NAME}</span>
             </Link>
             <p>
-              School management for Ethiopian and international campuses — admins, teachers,
-              students &amp; parents.
+              {BRAND_TAGLINE}. School management for Ethiopian and international campuses —
+              admins, teachers, students &amp; parents.
             </p>
-            <div className="lp3-footer__social" aria-label="CampusOne social media">
+            <div className="lp3-footer__social" aria-label={`${BRAND_NAME} social media`}>
               {SOCIAL_LINKS.map((item) => (
                 <a
                   key={item.label}
@@ -114,7 +115,7 @@ export function LandingFooter() {
                   className="lp3-footer__social-link"
                   target="_blank"
                   rel="noopener noreferrer"
-                  aria-label={`CampusOne on ${item.label}`}
+                  aria-label={`${BRAND_NAME} on ${item.label}`}
                 >
                   {item.icon}
                 </a>
@@ -146,14 +147,14 @@ export function LandingFooter() {
 
           <div className="lp3-footer__col lp3-footer__col--apps">
             <h3>Download</h3>
-            <p>CampusOne for families on iOS &amp; Android.</p>
+            <p>{BRAND_NAME} for families on iOS &amp; Android.</p>
             <AppStoreBadges variant="dark" layout="stack" />
           </div>
         </div>
 
         <div className="lp3-footer__bottom">
           <p className="lp3-footer__copy">
-            © {year} CampusOne. All rights reserved.
+            © {year} {BRAND_NAME}. All rights reserved.
           </p>
           <p className="lp3-footer__credit">
             Created by{" "}

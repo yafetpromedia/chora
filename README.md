@@ -12,7 +12,7 @@ Multi-tenant school platform — register your school, invite teachers/students/
 | `apps/api` | NestJS API + Prisma |
 | `packages/*` | Shared UI and types |
 | `infra` | Docker Compose for local services |
-| `docs` | Architecture notes |
+| `docs` | Architecture, user guides, API reference — **[docs/README.md](./docs/README.md)** |
 
 ## First-time setup
 
@@ -89,17 +89,25 @@ NEXT_PUBLIC_GOOGLE_CLIENT_ID=your-google-oauth-client-id
 
 School join code for `/join`: **`BRIGHT1`**
 
-**Documentation:**
+**Documentation:** Start at **[docs/README.md](./docs/README.md)** — full index for users, developers, and platform team.
 
 | Doc | Topic |
 |-----|--------|
+| [docs/README.md](./docs/README.md) | **Documentation hub** (start here) |
+| [docs/USER-GUIDE.md](./docs/USER-GUIDE.md) | Admin, teacher, parent, student how-to |
+| [docs/DEVELOPER-GUIDE.md](./docs/DEVELOPER-GUIDE.md) | Monorepo setup, conventions, testing |
+| [docs/TROUBLESHOOTING.md](./docs/TROUBLESHOOTING.md) | Login errors, ports, database |
 | [docs/WHAT-WE-HAVE.md](./docs/WHAT-WE-HAVE.md) | Full feature inventory |
+| [docs/API-REFERENCE.md](./docs/API-REFERENCE.md) | REST endpoint overview |
 | [docs/ACADEMIC-ENGINE.md](./docs/ACADEMIC-ENGINE.md) | Results workflow & report cards |
-| [docs/ASSESSMENT-TEMPLATES.md](./docs/ASSESSMENT-TEMPLATES.md) | Weighted grading per grade |
-| [docs/ELIBRARY.md](./docs/ELIBRARY.md) | Digital learning hub |
-| [docs/CONTENT-CURRICULUM-ENGINE.md](./docs/CONTENT-CURRICULUM-ENGINE.md) | Platform content layer (roadmap) |
-| [docs/CURRICULUM-PRESETS.md](./docs/CURRICULUM-PRESETS.md) | School provisioning (v1) |
+| [docs/SCORE-CORRECTIONS.md](./docs/SCORE-CORRECTIONS.md) | Report & fix published scores |
+| [docs/STUDENT-PARENT-PORTAL.md](./docs/STUDENT-PARENT-PORTAL.md) | Student & parent dashboards, results |
+| [docs/PERMISSIONS.md](./docs/PERMISSIONS.md) | RBAC & role templates |
+| [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) | System architecture |
+| [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md) | Production deployment |
+| [CONTRIBUTING.md](./CONTRIBUTING.md) | How to contribute |
 | [SETUP-WINDOWS.md](./SETUP-WINDOWS.md) | Windows / port / phone access |
+| [SETUP-POSTGRES.md](./SETUP-POSTGRES.md) | PostgreSQL setup |
 
 ## Scripts
 

@@ -17,6 +17,7 @@ import {
   type SupportTicket,
   type SupportTicketCategory,
 } from "@/lib/support-tickets";
+import { BRAND_NAME } from "@/lib/brand";
 
 function formatDate(iso: string) {
   try {
@@ -97,7 +98,7 @@ export default function AdminSupportPage() {
       setSubject("");
       setBody("");
       setCategory("TECHNICAL");
-      setSuccess("Issue sent to CampusOne control center.");
+      setSuccess(`Issue sent to ${BRAND_NAME} control center.`);
       setSelectedId(created.id);
       await refresh();
     } catch (err) {
@@ -112,7 +113,7 @@ export default function AdminSupportPage() {
       <div className="sup-v2">
         <AcademicsHero
           title="Report an issue"
-          subtitle="Send billing, technical, or account problems to the CampusOne tenant control center. Track replies and status here."
+          subtitle={`Send billing, technical, or account problems to the ${BRAND_NAME} tenant control center. Track replies and status here.`}
           stats={[
             { label: "Reports", value: loading ? "—" : stats.total },
             { label: "Open", value: loading ? "—" : stats.open },
@@ -215,7 +216,7 @@ export default function AdminSupportPage() {
               <div>
                 <h2 className="sup-v2__card-title">Your reports</h2>
                 <p className="sup-v2__card-sub">
-                  Status updates and notes from CampusOne support.
+                  Status updates and notes from {BRAND_NAME} support.
                 </p>
               </div>
               <span className="sup-v2__card-count">

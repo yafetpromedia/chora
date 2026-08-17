@@ -9,6 +9,7 @@ import { SchoolBillingShell } from "@/components/school-billing/school-billing-s
 import { UsageMeters } from "@/components/school-billing/usage-meters";
 import { AUTH_ROLE_KEY, AUTH_TOKEN_KEY } from "@/lib/auth";
 import { getSchoolBillingOverview, type SchoolBillingOverview } from "@/lib/school-billing";
+import { BRAND_NAME } from "@/lib/brand";
 
 function formatDate(iso: string | null) {
   if (!iso) return "—";
@@ -65,11 +66,11 @@ export default function SchoolBillingPage() {
   return (
     <DashboardPage role="admin" title="Billing">
       <SchoolBillingShell
-        title="CampusOne billing"
+        title={`${BRAND_NAME} billing`}
         subtitle={
           sub
             ? `${sub.planLabel} plan · ${planStatusLabel(sub).toLowerCase()} subscription for your school workspace`
-            : "Manage your CampusOne subscription, invoices, and seat usage."
+            : `Manage your ${BRAND_NAME} subscription, invoices, and seat usage.`
         }
         stats={
           sub

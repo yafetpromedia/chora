@@ -11,6 +11,7 @@ import {
   type SchoolInvoice,
   type SchoolInvoiceStatus,
 } from "@/lib/school-billing";
+import { BRAND_NAME } from "@/lib/brand";
 
 function formatDate(iso: string) {
   try {
@@ -68,7 +69,7 @@ export default function SchoolInvoicesPage() {
     <DashboardPage role="admin" title="Invoices">
       <SchoolBillingShell
         title="Subscription invoices"
-        subtitle="Invoices issued by CampusOne for your school plan. Pay by the due date shown on each invoice."
+        subtitle={`Invoices issued by ${BRAND_NAME} for your school plan. Pay by the due date shown on each invoice.`}
         stats={[
           { label: "Total", value: stats.total },
           { label: "Open", value: stats.open, accent: stats.open > 0 },
@@ -115,7 +116,7 @@ export default function SchoolInvoicesPage() {
                 {filtered.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="sb-v2__table-empty">
-                      No invoices yet. CampusOne will issue one when you move to a paid plan.
+                      No invoices yet. {BRAND_NAME} will issue one when you move to a paid plan.
                     </td>
                   </tr>
                 ) : (
@@ -150,7 +151,7 @@ export default function SchoolInvoicesPage() {
           </div>
 
           <p className="sb-v2__muted" style={{ marginTop: "0.85rem" }}>
-            Questions about an invoice? Contact CampusOne support with your invoice number.
+            Questions about an invoice? Contact {BRAND_NAME} support with your invoice number.
           </p>
         </div>
       </SchoolBillingShell>

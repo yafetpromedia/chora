@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import { Reveal } from "@/components/motion/reveal";
 import { AppStoreBadges } from "@/components/landing/app-store-badges";
+import { BRAND_MARK, BRAND_NAME } from "@/lib/brand";
 
 const PERKS = [
   "Real-time attendance alerts for parents",
@@ -55,7 +56,7 @@ export function LandingAppSection() {
           <div className="lp3-app__panel">
             <div className="lp3-app__copy">
               <span className="lp3-eyebrow">Mobile app</span>
-              <h2 className="lp3-heading">CampusOne on iOS &amp; Android</h2>
+              <h2 className="lp3-heading">{BRAND_NAME} on iOS &amp; Android</h2>
               <p className="lp3-lead">
                 Parents and students stay connected between school and home. Download from Google
                 Play or the App Store — free for every family linked to your school.
@@ -78,7 +79,7 @@ export function LandingAppSection() {
               <PhoneFrame variant="back">
                 <div className="lp3-phone__screen-body lp3-phone__screen-body--id">
                   <header className="lp3-phone__app-head">
-                    <span>C1</span>
+                    <span>{BRAND_MARK}</span>
                     <div>
                       <strong>Campus ID</strong>
                       <em>Everest Youth Academy</em>
@@ -109,7 +110,7 @@ export function LandingAppSection() {
               <PhoneFrame variant="front">
                 <div className="lp3-phone__screen-body lp3-phone__screen-body--parent">
                   <header className="lp3-phone__app-head lp3-phone__app-head--row">
-                    <span>C1</span>
+                    <span>{BRAND_MARK}</span>
                     <div>
                       <strong>Parent</strong>
                       <em>Everest Youth Academy</em>

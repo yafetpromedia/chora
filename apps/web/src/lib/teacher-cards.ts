@@ -17,6 +17,8 @@ export type TeacherIdCard = {
   homeroom: string | null;
   schoolName: string;
   schoolLogoUrl: string | null;
+  schoolSignatureUrl: string | null;
+  schoolSignatureLabel: string | null;
   schoolJoinCode: string;
   schoolPhone: string | null;
   schoolAddress: string | null;

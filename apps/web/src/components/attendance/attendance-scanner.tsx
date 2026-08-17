@@ -34,7 +34,7 @@ function AttendanceScannerInner() {
   const [manualCode, setManualCode] = useState("");
   const [cameraOn, setCameraOn] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [flash, setFlash] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+  const [flash, setFlash] = useState<{ type: "ok" | "dup" | "err"; text: string } | null>(null);
   const [scanned, setScanned] = useState<ScanAttendanceResult[]>([]);
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const processingRef = useRef(false);
@@ -86,9 +86,14 @@ function AttendanceScannerInner() {
           const without = prev.filter((p) => p.studentProfileId !== result.studentProfileId);
           return [result, ...without];
         });
-        setFlash({ type: "ok", text: `✓ ${result.name} — marked present` });
+        setFlash({
+          type: result.alreadyMarked ? "dup" : "ok",
+          text: result.alreadyMarked
+            ? `✓ ${result.name} — already marked present`
+            : `✓ ${result.name} — marked present`,
+        });
         if (typeof navigator !== "undefined" && navigator.vibrate) {
-          navigator.vibrate(80);
+          navigator.vibrate(result.alreadyMarked ? [40, 30, 40] : 80);
         }
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Scan failed";
@@ -200,6 +205,11 @@ function AttendanceScannerInner() {
       <AppToast
         message={flash?.type === "ok" ? flash.text : ""}
         tone="success"
+        onDismiss={() => setFlash(null)}
+      />
+      <AppToast
+        message={flash?.type === "dup" ? flash.text : ""}
+        tone="warn"
         onDismiss={() => setFlash(null)}
       />
       <AppToast

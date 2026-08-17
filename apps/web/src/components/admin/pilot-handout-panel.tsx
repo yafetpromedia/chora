@@ -13,7 +13,7 @@ export function PilotHandoutPanel({ schoolName, joinCode, loginUrl }: Props) {
   const [copied, setCopied] = useState<"parent" | "student" | null>(null);
   const baseUrl =
     loginUrl ??
-    (typeof window !== "undefined" ? `${window.location.origin}/login` : "https://your-school.campusone.app/login");
+    (typeof window !== "undefined" ? `${window.location.origin}/login` : "https://your-school.chora.app/login");
 
   const parentText = useMemo(
     () =>

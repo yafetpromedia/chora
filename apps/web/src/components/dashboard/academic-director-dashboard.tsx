@@ -20,6 +20,7 @@ import { loadStaffDashboardBase } from "@/components/dashboard/staff-dashboard-d
 import { DashIcon } from "@/components/dashboard/dash-icons";
 import { getStaffWorkspaceLabel, getStaffWorkspaceSubtitle } from "@/lib/staff-workspace";
 import { hasPermission, Permission } from "@/lib/permissions";
+import { BRAND_NAME } from "@/lib/brand";
 
 type Props = {
   error: string;
@@ -27,7 +28,7 @@ type Props = {
 
 export function AcademicDirectorDashboard({ error }: Props) {
   const [loading, setLoading] = useState(true);
-  const [schoolName, setSchoolName] = useState("CampusOne");
+  const [schoolName, setSchoolName] = useState(BRAND_NAME);
   const [adminDay, setAdminDay] = useState<AdminDayOverview | null>(null);
   const [students, setStudents] = useState<Awaited<ReturnType<typeof listStudents>>>([]);
   const [teachers, setTeachers] = useState<TeacherRecord[]>([]);
@@ -178,11 +179,11 @@ export function AcademicDirectorDashboard({ error }: Props) {
           </article>
 
           {canAttendanceAnalytics && analytics ? (
-            <article className="da-card da-card--span2">
+            <article className="da-card">
               <header className="da-card__head">
                 <div>
                   <h2 className="da-card__title">Attendance by grade</h2>
-                  <p className="da-card__sub">Today&apos;s rates — read-only</p>
+                  <p className="da-card__sub">Tap a grade for section detail</p>
                 </div>
               </header>
               <GradeAttendanceBars grades={analytics.gradeAttendance} />

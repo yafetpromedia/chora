@@ -1,4 +1,4 @@
-/* CampusOne — Register school (clear split layout) */
+/* Chora — Register school (clear split layout) */
 
 .reg-scene {
   min-height: 100dvh;
@@ -99,6 +99,7 @@
   margin: 0.85rem 1.1rem 0;
   border-radius: 1rem;
   overflow: hidden;
+  background: linear-gradient(155deg, #0b2424 0%, #0f4f4a 42%, #0f766e 100%);
 }
 
 .reg-mobile-banner img {
@@ -1119,6 +1120,37 @@
   background: #fafcfc;
 }
 
+/* Phone/tablet: full-width form — desktop seam clip applies only from 1024px */
+@media (max-width: 1023px) {
+  .login-split__panel .reg-top,
+  .login-split__panel .reg-main--login {
+    width: 100%;
+    max-width: 28rem;
+    margin-inline: auto;
+    box-sizing: border-box;
+    padding-inline: 1.1rem;
+  }
+
+  .login-split__panel .reg-top {
+    padding-inline: 1.1rem;
+  }
+
+  .login-split__panel .reg-main--login {
+    padding-bottom: calc(1.25rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .reg-scene--login .reg-hero__title,
+  .reg-scene--login .reg-hero__sub,
+  .reg-scene--login .reg-footer__line {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .reg-scene--login .reg-form__next {
+    white-space: nowrap;
+  }
+}
+
 .login-split__visual {
   display: none;
 }
@@ -1136,6 +1168,8 @@
     display: flex;
     flex-direction: column;
     box-sizing: border-box;
+    clip-path: var(--login-clip-left);
+    -webkit-clip-path: var(--login-clip-left);
   }
 
   .login-split__panel .reg-top,
@@ -1157,6 +1191,8 @@
     inset: 0;
     z-index: 2;
     pointer-events: none;
+    clip-path: var(--login-clip-right);
+    -webkit-clip-path: var(--login-clip-right);
   }
 
   .login-split__seam {
@@ -1194,6 +1230,9 @@
 .login-visual__bg {
   position: absolute;
   inset: 0;
+  background:
+    radial-gradient(ellipse 70% 55% at 72% 18%, rgba(45, 212, 191, 0.22), transparent 55%),
+    linear-gradient(155deg, #0b2424 0%, #0f4f4a 42%, #0f766e 100%);
 }
 
 .login-visual__photo {

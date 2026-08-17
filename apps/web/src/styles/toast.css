@@ -1,4 +1,4 @@
-/* Shared floating toast (CampusOne) */
+/* Shared floating toast (Chora) */
 
 .app-toast {
   position: fixed;
@@ -27,6 +27,10 @@
   background: #7f1d1d;
 }
 
+.app-toast--warn .app-toast__card {
+  background: #92400e;
+}
+
 .app-toast__dot {
   width: 0.55rem;
   height: 0.55rem;
@@ -38,6 +42,10 @@
 
 .app-toast--error .app-toast__dot {
   background: #fca5a5;
+}
+
+.app-toast--warn .app-toast__dot {
+  background: #fbbf24;
 }
 
 .app-toast__card p {

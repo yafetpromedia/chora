@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { formatEtb } from "@/lib/finance";
 import type { AdminAnalyticsOverview } from "@/lib/dashboard-analytics";
+import { GradeAttendanceBars } from "@/components/dashboard/staff-dashboard-shared";
 import { DashIcon } from "./dash-icons";
 
 function AttendanceTrendChart({
@@ -126,25 +127,6 @@ function EnrollmentChart({
   );
 }
 
-function GradeBars({ grades }: { grades: AdminAnalyticsOverview["gradeAttendance"] }) {
-  if (grades.length === 0) {
-    return <p className="da-chart__empty">No grade attendance marked today.</p>;
-  }
-  return (
-    <ul className="da-grades">
-      {grades.map((g) => (
-        <li key={g.grade}>
-          <span className="da-grades__name">{g.grade}</span>
-          <div className="da-grades__track">
-            <div className="da-grades__fill" style={{ width: `${g.rate}%` }} />
-          </div>
-          <span className="da-grades__pct">{g.rate}%</span>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
 type Props = {
   analytics: AdminAnalyticsOverview;
   canViewFinance: boolean;
@@ -243,10 +225,10 @@ export function AdminAnalyticsSection({ analytics, canViewFinance }: Props) {
           <header className="da-card__head">
             <div>
               <h2 className="da-card__title">By grade today</h2>
-              <p className="da-card__sub">Attendance rate per grade</p>
+              <p className="da-card__sub">Tap a grade for section detail</p>
             </div>
           </header>
-          <GradeBars grades={analytics.gradeAttendance} />
+          <GradeAttendanceBars grades={analytics.gradeAttendance} />
           {analytics.insights.mostAbsentGrade ? (
             <p className="da-insight da-insight--warn">
               Needs attention: <strong>{analytics.insights.mostAbsentGrade.label}</strong> (

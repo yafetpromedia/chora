@@ -7,18 +7,24 @@ import {
 
 const API_PORT = process.env.NEXT_PUBLIC_API_PORT?.trim() || "3001";
 
-/** API origin: matches the page host in local dev (localhost vs LAN IP). */
+function isLocalDevHost(hostname: string): boolean {
+  return (
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    hostname === "[::1]" ||
+    hostname === "::1" ||
+    hostname.startsWith("192.168.") ||
+    hostname.startsWith("10.") ||
+    /^172\.(1[6-9]|2\d|3[01])\./.test(hostname)
+  );
+}
+
+/** API origin: same-origin proxy in local dev, configured URL in production. */
 export function getApiBaseUrl(): string {
   if (typeof window !== "undefined") {
-    const { hostname, protocol } = window.location;
-    const isLocalDevHost =
-      hostname === "localhost" ||
-      hostname === "127.0.0.1" ||
-      hostname.startsWith("192.168.") ||
-      hostname.startsWith("10.") ||
-      /^172\.(1[6-9]|2\d|3[01])\./.test(hostname);
-    if (isLocalDevHost && process.env.NODE_ENV !== "production") {
-      return `${protocol}//${hostname}:${API_PORT}`;
+    const { hostname, origin } = window.location;
+    if (isLocalDevHost(hostname) && process.env.NODE_ENV !== "production") {
+      return `${origin}/backend`;
     }
   }
   const configured = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
@@ -410,9 +416,16 @@ export async function validateSchoolCode(
   accentDeep?: string | null;
 }> {
   const code = schoolCode.trim().toUpperCase();
-  const response = await fetch(
-    `${getApiBaseUrl()}/auth/school-code/${encodeURIComponent(code)}`,
-  );
+  let response: Response;
+  try {
+    response = await fetchWithRetry(
+      `${getApiBaseUrl()}/auth/school-code/${encodeURIComponent(code)}`,
+    );
+  } catch (err) {
+    throw new Error(
+      err instanceof TypeError ? networkErrorMessage(getApiBaseUrl()) : "API is unavailable",
+    );
+  }
   if (!response.ok) {
     const data = (await response.json().catch(() => null)) as {
       message?: string | string[];

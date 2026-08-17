@@ -25,7 +25,7 @@ export class PlatformAuthService implements OnModuleInit {
         data: {
           email,
           passwordHash: hashSync('Passw0rd!', 10),
-          firstName: 'CampusOne',
+          firstName: 'Chora',
           lastName: 'Platform',
           role: 'OWNER',
         },

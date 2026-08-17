@@ -8,6 +8,7 @@ import { AuthSubmitButton } from "@/components/auth/auth-submit-button";
 import { fetchInvitePreview, joinInvite, type InvitePreview } from "@/lib/api";
 import { persistAuthSession } from "@/lib/auth-session";
 import { getRolePath } from "@/lib/auth";
+import { BRAND_MARK, BRAND_NAME } from "@/lib/brand";
 
 export default function InvitePage() {
   const params = useParams();
@@ -62,8 +63,8 @@ export default function InvitePage() {
     <div className="auth-scene">
       <header className="auth-topbar">
         <Link href="/" className="auth-logo no-underline">
-          <span className="logo-mark">C1</span>
-          <span>CampusOne</span>
+          <span className="logo-mark">{BRAND_MARK}</span>
+          <span>{BRAND_NAME}</span>
         </Link>
         <Link href="/login" className="auth-topbar-link">
           Login

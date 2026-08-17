@@ -46,8 +46,14 @@ function avatarTone(index: number) {
 }
 
 function shortClassLabel(label: string) {
-  const part = label.split(" — ").pop()?.trim() || label;
-  return part.length > 18 ? `${part.slice(0, 16)}…` : part;
+  const cleaned = label.replace(/\s*[·—-]\s*/g, " · ").trim();
+  const parts = cleaned.split(" · ").map((p) => p.trim()).filter(Boolean);
+  if (parts.length >= 2) {
+    const subject = parts[parts.length - 1]!;
+    const klass = parts.slice(0, -1).join(" · ");
+    return { primary: klass, subject };
+  }
+  return { primary: cleaned, subject: null as string | null };
 }
 
 function GradingDonut({ pct }: { pct: number }) {
@@ -123,11 +129,15 @@ function ClassAvgBars({
     <ul className="tch-chart__hbar-list">
       {rows.map((item) => {
         const pct = item.averageScore ?? 0;
+        const { primary, subject } = shortClassLabel(item.label);
         return (
           <li key={item.classSubjectId} className="tch-chart__hbar-row">
-            <span className="tch-chart__hbar-name" title={item.label}>
-              {shortClassLabel(item.label)}
-            </span>
+            <div className="tch-chart__hbar-name" title={item.label}>
+              <span className="tch-chart__hbar-class">{primary}</span>
+              {subject ? (
+                <span className="tch-chart__hbar-subject">{subject}</span>
+              ) : null}
+            </div>
             <div className="tch-chart__hbar-track">
               <span
                 className="tch-chart__hbar-fill"

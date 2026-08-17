@@ -14,6 +14,8 @@ export type SchoolRecord = {
   slug: string;
   joinCode: string;
   logoUrl: string | null;
+  authorizedSignatureUrl: string | null;
+  authorizedSignatureLabel: string | null;
   primaryColor: string | null;
   accentColor: string | null;
   accentDeep: string | null;
@@ -217,6 +219,8 @@ export class SchoolsService implements OnModuleInit {
       phone?: string;
       country?: string;
       logoUrl?: string | null;
+      authorizedSignatureUrl?: string | null;
+      authorizedSignatureLabel?: string | null;
       primaryColor?: string | null;
       accentColor?: string | null;
       accentDeep?: string | null;
@@ -256,6 +260,13 @@ export class SchoolsService implements OnModuleInit {
     }
     if (input.logoUrl !== undefined) {
       data.logoUrl = input.logoUrl?.trim() || null;
+    }
+    if (input.authorizedSignatureUrl !== undefined) {
+      data.authorizedSignatureUrl = input.authorizedSignatureUrl?.trim() || null;
+    }
+    if (input.authorizedSignatureLabel !== undefined) {
+      data.authorizedSignatureLabel =
+        input.authorizedSignatureLabel?.trim() || null;
     }
     if (input.primaryColor !== undefined) {
       data.primaryColor = normalizeHexColor(input.primaryColor);
@@ -339,6 +350,8 @@ export class SchoolsService implements OnModuleInit {
     slug: string;
     joinCode: string;
     logoUrl: string | null;
+    authorizedSignatureUrl?: string | null;
+    authorizedSignatureLabel?: string | null;
     primaryColor?: string | null;
     accentColor?: string | null;
     accentDeep?: string | null;
@@ -365,6 +378,8 @@ export class SchoolsService implements OnModuleInit {
       slug: school.slug,
       joinCode: school.joinCode,
       logoUrl: school.logoUrl,
+      authorizedSignatureUrl: school.authorizedSignatureUrl ?? null,
+      authorizedSignatureLabel: school.authorizedSignatureLabel ?? null,
       primaryColor: school.primaryColor ?? null,
       accentColor: school.accentColor ?? null,
       accentDeep: school.accentDeep ?? null,

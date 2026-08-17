@@ -9,6 +9,7 @@ import { LandingAppSection } from "@/components/landing/landing-app-section";
 import { LandingNav } from "@/components/landing/landing-nav";
 import { LandingPricing } from "@/components/landing/landing-pricing";
 import { Reveal, Stagger, StaggerItem } from "@/components/motion/reveal";
+import { BRAND_NAME } from "@/lib/brand";
 import {
   IconAdmin,
   IconAnnouncements,
@@ -156,7 +157,7 @@ export function LandingPage() {
       <main>
         <section id="hero" className="lp3-hero lp3-hero--simple">
           <div className="lp3-hero__photo" aria-hidden>
-            <img src={heroSrc} alt="" />
+            {heroSrc ? <img src={heroSrc} alt="" /> : null}
           </div>
           <div className="lp3-hero__overlay" aria-hidden />
           <div className="lp3-container lp3-hero__grid">
@@ -330,7 +331,7 @@ export function LandingPage() {
                   </div>
                 </div>
                 <div className="lp3-cta__app">
-                  <p>Download CampusOne</p>
+                  <p>Download {BRAND_NAME}</p>
                   <AppStoreBadges variant="dark" layout="stack" />
                 </div>
               </div>

@@ -7,6 +7,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import { AuthInput } from "@/components/auth/auth-input";
 import { AuthSubmitButton } from "@/components/auth/auth-submit-button";
 import { useLandingHeroImage } from "@/hooks/use-landing-hero-image";
+import { BRAND_MARK, BRAND_NAME } from "@/lib/brand";
 import { platformLogin, persistPlatformSession } from "@/lib/platform-auth";
 
 export default function PlatformLoginPage() {
@@ -41,8 +42,8 @@ export default function PlatformLoginPage() {
 
           <header className="reg-top">
             <Link href="/" className="reg-top__brand no-underline">
-              <span className="logo-mark reg-top__logo">C1</span>
-              <span>CampusOne</span>
+              <span className="logo-mark reg-top__logo">{BRAND_MARK}</span>
+              <span>{BRAND_NAME}</span>
             </Link>
             <Link href="/login" className="reg-top__link">
               School sign in
@@ -61,7 +62,7 @@ export default function PlatformLoginPage() {
                 Platform <span>admin</span>
               </h1>
               <p className="reg-hero__sub">
-                Manage schools, trials, billing, and curriculum for CampusOne.
+                Manage schools, trials, billing, and curriculum for {BRAND_NAME}.
               </p>
             </div>
 
@@ -82,7 +83,7 @@ export default function PlatformLoginPage() {
                       icon="email"
                       variant="login"
                       autoComplete="email"
-                      placeholder="you@campusone.app"
+                      placeholder="you@chora.app"
                       value={email}
                       onChange={setEmail}
                       required
@@ -129,16 +130,14 @@ export default function PlatformLoginPage() {
         <section className="reg-visual-col" aria-hidden={false}>
           <div className="reg-visual reg-visual--photo">
             <div className="reg-visual__bg" aria-hidden>
-              <img
-                src={heroSrc}
-                alt=""
-                className="reg-visual__photo"
-              />
+              {heroSrc ? (
+                <img src={heroSrc} alt="" className="reg-visual__photo" />
+              ) : null}
               <div className="reg-visual__tint" />
             </div>
             <div className="reg-visual__content reg-visual__content--photo">
               <div className="reg-visual__copy">
-                <p className="reg-visual__eyebrow">CampusOne platform</p>
+                <p className="reg-visual__eyebrow">{BRAND_NAME} platform</p>
                 <h2 className="reg-visual__title">One console for every school</h2>
                 <p className="reg-visual__body">
                   Provision workspaces, manage plans, and keep curriculum packs

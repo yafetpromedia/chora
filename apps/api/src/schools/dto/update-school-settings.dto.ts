@@ -41,6 +41,14 @@ export class UpdateSchoolSettingsDto {
   @IsOptional()
   logoUrl?: string;
 
+  @IsString()
+  @IsOptional()
+  authorizedSignatureUrl?: string;
+
+  @IsString()
+  @IsOptional()
+  authorizedSignatureLabel?: string;
+
   @ValidateIf((_, v) => v !== null && v !== undefined && v !== '')
   @Matches(HEX_COLOR, { message: 'primaryColor must be a hex color like #3d9b9b' })
   @IsOptional()

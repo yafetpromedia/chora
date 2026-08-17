@@ -1,4 +1,4 @@
-﻿import { buildCardScanPayload } from '../students/student-card.util';
+import { buildCardScanPayload } from '../students/student-card.util';
 
 export type ReportCardMode = 'term' | 'annual';
 
@@ -35,6 +35,8 @@ export type ReportCardPrintPayload = {
   school: {
     name: string;
     logoUrl: string | null;
+    authorizedSignatureUrl: string | null;
+    authorizedSignatureLabel: string | null;
     address: string | null;
     email: string | null;
     phone: string | null;
@@ -513,6 +515,10 @@ function sharedStyles(): string {
     }
     .rc-sign { text-align: center; }
     .rc-sign__line { height: 6mm; border-bottom: 1px solid #94a3b8; margin-bottom: 1.2mm; }
+    .rc-sign__img {
+      display: block; height: 10mm; max-width: 100%; margin: 0 auto 1mm;
+      object-fit: contain; object-position: center bottom;
+    }
     .rc-sign strong {
       display: block; font-size: 2mm; text-transform: uppercase; letter-spacing: .05em; color: var(--muted);
     }
@@ -590,6 +596,16 @@ function studentAvatar(data: ReportCardPrintPayload): string {
       .join('')
       .toUpperCase() || '?';
   return `<div class="rc-avatar" aria-hidden="true">${escapeHtml(initials)}</div>`;
+}
+
+function directorSignHtml(data: ReportCardPrintPayload): string {
+  const label = escapeHtml(
+    data.school.authorizedSignatureLabel?.trim() || 'Director',
+  );
+  if (data.school.authorizedSignatureUrl) {
+    return `<div class="rc-sign"><img class="rc-sign__img" src="${escapeHtml(data.school.authorizedSignatureUrl)}" alt=""/><strong>${label}</strong></div>`;
+  }
+  return `<div class="rc-sign"><div class="rc-sign__line"></div><strong>${label}</strong></div>`;
 }
 
 function footerHtml(data: ReportCardPrintPayload, documentRef: string, issuedDate: string): string {
@@ -722,7 +738,7 @@ function buildTermReportHtml(data: ReportCardPrintPayload): string {
       </div>
 
       <div class="rc-signs">
-        <div class="rc-sign"><div class="rc-sign__line"></div><strong>Director</strong></div>
+        ${directorSignHtml(data)}
         <div class="rc-sign"><div class="rc-sign__line"></div><strong>Homeroom teacher</strong></div>
         <div class="rc-sign"><div class="rc-sign__line"></div><strong>Parent / guardian</strong></div>
       </div>
@@ -827,7 +843,7 @@ function buildAnnualReportHtml(data: ReportCardPrintPayload): string {
       </div>
 
       <div class="rc-signs">
-        <div class="rc-sign"><div class="rc-sign__line"></div><strong>Director</strong></div>
+        ${directorSignHtml(data)}
         <div class="rc-sign"><div class="rc-sign__line"></div><strong>Homeroom teacher</strong></div>
         <div class="rc-sign"><div class="rc-sign__line"></div><strong>Parent / guardian</strong></div>
       </div>

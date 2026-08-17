@@ -9,7 +9,13 @@ cd apps\web
 npm run dev   # port 3000
 ```
 
-Set `NEXT_PUBLIC_API_BASE_URL=http://localhost:3001` in `.env.local`.
+Set env from template:
+
+```powershell
+copy .env.example .env.local
+```
+
+In **development**, API calls go through `/backend/*` on the web server (no extra config needed). For production, set `NEXT_PUBLIC_API_BASE_URL`.
 
 From repo root: `npm run dev:clean` starts web + API.
 
@@ -30,4 +36,4 @@ From repo root: `npm run dev:clean` starts web + API.
 - Teacher score entry: `/teacher/results`
 - Student published results: `/student/results`
 
-**Docs:** [../../docs/WHAT-WE-HAVE.md](../../docs/WHAT-WE-HAVE.md) · [../../SETUP-WINDOWS.md](../../SETUP-WINDOWS.md)
+**Docs:** [../../docs/README.md](../../docs/README.md) · [../../docs/USER-GUIDE.md](../../docs/USER-GUIDE.md) · [../../docs/STUDENT-PARENT-PORTAL.md](../../docs/STUDENT-PARENT-PORTAL.md)

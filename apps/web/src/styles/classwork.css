@@ -1,4 +1,4 @@
-/* CampusOne — classwork (assignments & worksheets) */
+/* Chora — classwork (assignments & worksheets) */
 
 .cw-page {
   display: flex;
@@ -900,7 +900,7 @@
   color: #94a3b8;
 }
 
-/* ── Mode identity (CampusOne palette, distinct vibes) ── */
+/* ── Mode identity (Chora palette, distinct vibes) ── */
 
 .cw-mode-chip {
   display: inline-flex;
@@ -970,6 +970,29 @@
   grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
 }
 
+@media (max-width: 960px) {
+  .cw-page--assignment .cw-grid,
+  .cw-page--worksheet .cw-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .cw-page--assignment .cw-card,
+  .cw-page--worksheet .cw-card {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .cw-page--assignment .cw-field input,
+  .cw-page--assignment .cw-field textarea,
+  .cw-page--worksheet .cw-field input,
+  .cw-page--worksheet .cw-field textarea,
+  .cw-page--assignment .cw-file__drop,
+  .cw-page--worksheet .cw-file__drop {
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+}
+
 .cw-page--assignment .cw-card--compose,
 .cw-page--worksheet .cw-card--compose {
   border-left: 3px solid var(--brand-teal);
@@ -995,6 +1018,13 @@
 .cw-page--assignment .cw-layout,
 .cw-page--worksheet .cw-layout {
   grid-template-columns: minmax(0, 320px) minmax(0, 1fr);
+}
+
+@media (max-width: 900px) {
+  .cw-page--assignment .cw-layout,
+  .cw-page--worksheet .cw-layout {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* Modern detail + submission desk */

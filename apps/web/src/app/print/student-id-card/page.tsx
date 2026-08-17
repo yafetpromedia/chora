@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { StudentIdCardView } from "@/components/students/student-id-card";
 import { AUTH_TOKEN_KEY } from "@/lib/auth";
 import { getStudentIdCard, type StudentIdCard } from "@/lib/student-cards";
+import { BRAND_NAME } from "@/lib/brand";
 
 function PrintStudentIdCardInner() {
   const router = useRouter();
@@ -71,7 +72,7 @@ function PrintStudentIdCardInner() {
             <img src={card.schoolLogoUrl} alt="" className="sid-print-meta__logo" />
           ) : null}
           <div className="sid-print-meta__copy">
-            <p className="sid-print-meta__brand">CampusOne · Student ID</p>
+            <p className="sid-print-meta__brand">{BRAND_NAME} · Student ID</p>
             <h1 className="sid-print-meta__title">{card.name}</h1>
             <p className="sid-print-meta__sub">
               {card.schoolName}

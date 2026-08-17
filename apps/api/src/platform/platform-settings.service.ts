@@ -30,7 +30,7 @@ const DEFAULTS: {
   landingHeroImageUrl: string | null;
 } = {
   id: 'default',
-  platformName: 'CampusOne',
+  platformName: 'Chora',
   supportEmail: null,
   supportPhone: null,
   defaultCountry: 'Ethiopia',
@@ -43,9 +43,9 @@ const DEFAULTS: {
   invoicePrefix: 'INV',
   invoiceGraceDays: 14,
   autoSuspendOverdue: false,
-  emailFromName: null,
+  emailFromName: 'Chora',
   emailReplyTo: null,
-  smsSenderName: null,
+  smsSenderName: 'Chora',
   maintenanceMode: false,
   maintenanceMessage: null,
   sessionTimeoutMinutes: 60,

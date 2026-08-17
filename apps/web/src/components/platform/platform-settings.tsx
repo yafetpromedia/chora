@@ -17,6 +17,7 @@ import type { BillingCurrency } from "@/lib/platform-billing";
 import type { PlatformSection } from "./platform-types";
 import { AppToast } from "@/components/ui/app-toast";
 import { LandingHeroUpload } from "@/components/platform/landing-hero-upload";
+import { BRAND_NAME } from "@/lib/brand";
 
 type Props = {
   user: PlatformUser | null;
@@ -315,7 +316,7 @@ export function PlatformSettings({ user, onOpenProfile, onNavigate }: Props) {
                     value={draft.supportEmail}
                     onChange={(e) => patch("supportEmail", e.target.value)}
                     disabled={!isOwner}
-                    placeholder="support@campusone.et"
+                    placeholder="support@chora.et"
                   />
                 </div>
                 <div className="cfg-field">
@@ -529,7 +530,7 @@ export function PlatformSettings({ user, onOpenProfile, onNavigate }: Props) {
                   value={draft.emailFromName}
                   onChange={(e) => patch("emailFromName", e.target.value)}
                   disabled={!isOwner}
-                  placeholder="CampusOne"
+                  placeholder={BRAND_NAME}
                 />
               </div>
               <div className="cfg-field">
@@ -540,7 +541,7 @@ export function PlatformSettings({ user, onOpenProfile, onNavigate }: Props) {
                   value={draft.emailReplyTo}
                   onChange={(e) => patch("emailReplyTo", e.target.value)}
                   disabled={!isOwner}
-                  placeholder="support@campusone.et"
+                  placeholder="support@chora.et"
                 />
               </div>
               <div className="cfg-field">
@@ -550,7 +551,7 @@ export function PlatformSettings({ user, onOpenProfile, onNavigate }: Props) {
                   value={draft.smsSenderName}
                   onChange={(e) => patch("smsSenderName", e.target.value)}
                   disabled={!isOwner}
-                  placeholder="CampusOne"
+                  placeholder={BRAND_NAME}
                   maxLength={32}
                 />
               </div>

@@ -142,7 +142,8 @@ export function PlatformSupportInbox() {
             <h2 className="plat-subjects-v2__title">School issue inbox</h2>
             <p className="plat-subjects-v2__sub">
               Reports from school admins across all tenants. Update status and
-              leave a control-center note they can see in their Support page.
+              leave a control-center note — the reporter gets an in-app
+              notification when you resolve or reply.
             </p>
           </div>
         </div>

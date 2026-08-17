@@ -8,6 +8,7 @@ import {
 } from "@/lib/student-cards";
 import type { StudentIdCardVariant } from "@/components/students/student-id-card";
 import { printStudentIdCard } from "@/lib/student-card-print";
+import { BRAND_NAME } from "@/lib/brand";
 
 type Props = {
   studentProfileId: string | null;
@@ -104,7 +105,7 @@ export function StudentIdCardModal({
           ) : card ? (
             <>
               <header className="sid-print-meta">
-                <p className="sid-print-meta__brand">CampusOne</p>
+                <p className="sid-print-meta__brand">{BRAND_NAME}</p>
                 <h1 className="sid-print-meta__title">{card.name}</h1>
                 <p className="sid-print-meta__sub">
                   {card.schoolName}

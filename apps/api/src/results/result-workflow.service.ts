@@ -49,22 +49,13 @@ export class ResultWorkflowService {
     return this.formatSheet(created);
   }
 
+  /** @deprecated Prefer assertCanSaveScores — only PUBLISHED freezes editing. */
   async assertEditable(
     schoolId: string,
     termId: string,
     classSubjectId: string,
   ) {
-    const sheet = await this.getOrCreateSheet(schoolId, termId, classSubjectId);
-    if (
-      sheet.status === ResultWorkflowStatus.SUBMITTED ||
-      sheet.status === ResultWorkflowStatus.APPROVED ||
-      sheet.status === ResultWorkflowStatus.PUBLISHED
-    ) {
-      throw new BadRequestException(
-        `Scores are locked while status is ${sheet.status}. Request unlock from academic office.`,
-      );
-    }
-    return sheet;
+    return this.assertCanSaveScores(schoolId, termId, classSubjectId);
   }
 
   /** Teachers edit unlocked components until admin locks them; only published is fully frozen. */
@@ -169,13 +160,8 @@ export class ResultWorkflowService {
     userId: string,
   ) {
     const sheet = await this.getOrCreateSheet(schoolId, termId, classSubjectId);
-    if (
-      sheet.status !== ResultWorkflowStatus.APPROVED &&
-      sheet.status !== ResultWorkflowStatus.SUBMITTED
-    ) {
-      throw new BadRequestException(
-        'Sheet must be approved (or submitted) before publishing',
-      );
+    if (sheet.status === ResultWorkflowStatus.PUBLISHED) {
+      throw new BadRequestException('Sheet is already published');
     }
 
     await this.assertSheetHasScores(schoolId, termId, classSubjectId);
@@ -186,8 +172,12 @@ export class ResultWorkflowService {
         status: ResultWorkflowStatus.PUBLISHED,
         publishedBy: userId,
         publishedAt: new Date(),
-        ...(sheet.status === ResultWorkflowStatus.SUBMITTED
+        ...(sheet.status === ResultWorkflowStatus.DRAFT ||
+        sheet.status === ResultWorkflowStatus.SUBMITTED
           ? { approvedBy: userId, approvedAt: new Date() }
+          : {}),
+        ...(sheet.status === ResultWorkflowStatus.DRAFT
+          ? { submittedBy: userId, submittedAt: new Date() }
           : {}),
       },
       include: {
@@ -263,6 +253,7 @@ export class ResultWorkflowService {
         schoolId,
         status: {
           in: [
+            ResultWorkflowStatus.DRAFT,
             ResultWorkflowStatus.APPROVED,
             ResultWorkflowStatus.SUBMITTED,
           ],
@@ -293,7 +284,7 @@ export class ResultWorkflowService {
     const now = new Date();
     const publishableIds = publishable.map((s) => s.id);
 
-    const [fromApproved, fromSubmitted] = await this.prisma.$transaction([
+    const [fromApproved, fromSubmitted, fromDraft] = await this.prisma.$transaction([
       this.prisma.classSubjectTermSheet.updateMany({
         where: {
           id: { in: publishableIds },
@@ -318,12 +309,27 @@ export class ResultWorkflowService {
           approvedAt: now,
         },
       }),
+      this.prisma.classSubjectTermSheet.updateMany({
+        where: {
+          id: { in: publishableIds },
+          status: ResultWorkflowStatus.DRAFT,
+        },
+        data: {
+          status: ResultWorkflowStatus.PUBLISHED,
+          publishedBy: userId,
+          publishedAt: now,
+          submittedBy: userId,
+          submittedAt: now,
+          approvedBy: userId,
+          approvedAt: now,
+        },
+      }),
     ]);
 
     await this.notifyParentsOfBulkPublish(schoolId, publishable);
 
     return {
-      published: fromApproved.count + fromSubmitted.count,
+      published: fromApproved.count + fromSubmitted.count + fromDraft.count,
       skipped: candidates.length - publishable.length,
     };
   }

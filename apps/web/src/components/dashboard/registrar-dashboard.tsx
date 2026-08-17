@@ -18,6 +18,7 @@ import { DashIcon } from "@/components/dashboard/dash-icons";
 import { readSchoolBrand } from "@/lib/school-brand";
 import { getStaffWorkspaceSubtitle } from "@/lib/staff-workspace";
 import { hasPermission, Permission } from "@/lib/permissions";
+import { BRAND_NAME } from "@/lib/brand";
 
 type Props = {
   error: string;
@@ -35,7 +36,7 @@ function todayLabel() {
 
 export function RegistrarDashboard({ error }: Props) {
   const [loading, setLoading] = useState(true);
-  const [schoolName, setSchoolName] = useState(readSchoolBrand().name ?? "CampusOne");
+  const [schoolName, setSchoolName] = useState(readSchoolBrand().name ?? BRAND_NAME);
   const [adminDay, setAdminDay] = useState<AdminDayOverview | null>(null);
   const [students, setStudents] = useState<StudentRecord[]>([]);
   const [parents, setParents] = useState<ParentRecord[]>([]);

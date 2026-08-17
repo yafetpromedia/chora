@@ -373,7 +373,7 @@
   .marquee-track, .badge-dot-pulse { animation: none; }
 }
 
-/* —— CampusOne landing v3 —— */
+/* —— Chora landing v3 —— */
 
 .lp3 {
   min-height: 100vh;
@@ -901,6 +901,10 @@
   position: absolute;
   inset: 0;
   z-index: 0;
+  background:
+    radial-gradient(ellipse 70% 55% at 72% 18%, rgba(45, 212, 191, 0.28), transparent 55%),
+    radial-gradient(ellipse 55% 45% at 12% 88%, rgba(15, 118, 110, 0.55), transparent 60%),
+    linear-gradient(155deg, #0b2424 0%, #0f4f4a 42%, #0f766e 100%);
 }
 
 .lp3-hero--simple .lp3-hero__photo img {

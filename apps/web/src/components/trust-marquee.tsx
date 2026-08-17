@@ -1,5 +1,7 @@
 "use client";
 
+import { BRAND_NAME } from "@/lib/brand";
+
 const CAPABILITIES = [
   "Daily attendance",
   "Period attendance",
@@ -21,7 +23,7 @@ export function TrustMarquee() {
 
   return (
     <section className="marquee-wrap lp-marquee" aria-label="Platform capabilities">
-      <p className="lp-marquee__label">What you can run on CampusOne</p>
+      <p className="lp-marquee__label">What you can run on {BRAND_NAME}</p>
       <div className="relative overflow-hidden">
         <div className="marquee-fade-left" aria-hidden />
         <div className="marquee-fade-right" aria-hidden />

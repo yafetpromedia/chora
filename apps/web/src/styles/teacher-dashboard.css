@@ -4138,21 +4138,41 @@ a.tch-ov__hero-stat:hover {
 
 .tch-chart__hbar-row {
   display: grid;
-  grid-template-columns: minmax(0, 5.5rem) minmax(0, 1fr) 2.4rem;
+  grid-template-columns: minmax(0, 1fr) 2.6rem;
+  grid-template-areas:
+    "name val"
+    "track track";
   align-items: center;
-  gap: 0.45rem;
+  column-gap: 0.45rem;
+  row-gap: 0.35rem;
 }
 
 .tch-chart__hbar-name {
+  grid-area: name;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
   font-size: 0.72rem;
   font-weight: 650;
   color: #475569;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+}
+
+.tch-chart__hbar-class {
+  overflow-wrap: anywhere;
+  line-height: 1.25;
+}
+
+.tch-chart__hbar-subject {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #0f172a;
+  overflow-wrap: anywhere;
+  line-height: 1.25;
 }
 
 .tch-chart__hbar-track {
+  grid-area: track;
   height: 0.55rem;
   border-radius: 999px;
   background: #eef2f4;
@@ -4168,11 +4188,20 @@ a.tch-ov__hero-stat:hover {
 }
 
 .tch-chart__hbar-val {
+  grid-area: val;
   font-size: 0.74rem;
   font-weight: 800;
   text-align: right;
   color: var(--brand-teal-dark);
   font-variant-numeric: tabular-nums;
+}
+
+@media (min-width: 520px) {
+  .tch-chart__hbar-row {
+    grid-template-columns: minmax(7rem, 0.9fr) minmax(0, 1.2fr) 2.6rem;
+    grid-template-areas: "name track val";
+    row-gap: 0;
+  }
 }
 
 .tch-chart__empty {

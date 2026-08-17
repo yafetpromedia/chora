@@ -22,6 +22,8 @@ export type StudentIdCard = {
   phone: string | null;
   schoolName: string;
   schoolLogoUrl: string | null;
+  schoolSignatureUrl: string | null;
+  schoolSignatureLabel: string | null;
   schoolJoinCode: string;
   schoolPhone: string | null;
   schoolAddress: string | null;
@@ -47,6 +49,7 @@ export type ScanAttendanceResult = {
   section: string | null;
   cardCode: string | null;
   status: AttendanceStatus;
+  alreadyMarked?: boolean;
   scannedAt: string;
 };
 

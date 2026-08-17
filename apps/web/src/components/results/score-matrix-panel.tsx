@@ -8,7 +8,6 @@ import { AppToast } from "@/components/ui/app-toast";
 import type { GradeWithSections } from "@/lib/api";
 import { listGrades } from "@/lib/school-setup";
 import {
-  approveResultWorkflow,
   getScoreMatrix,
   listClassSubjects,
   listTerms,
@@ -16,7 +15,6 @@ import {
   reopenResultWorkflow,
   saveScoreMatrix,
   setAssessmentEntryLock,
-  submitResultWorkflow,
   type AcademicTerm,
   type ClassSubject,
   type ResultWorkflowStatus,
@@ -30,12 +28,15 @@ type Props = {
 
 const ALL = "__all__";
 
-const WORKFLOW_LABELS: Record<ResultWorkflowStatus, string> = {
-  DRAFT: "Draft",
-  SUBMITTED: "Submitted",
-  APPROVED: "Approved",
-  PUBLISHED: "Published",
-};
+function workflowDisplay(status: ResultWorkflowStatus): {
+  label: string;
+  pill: "working" | "published";
+} {
+  if (status === "PUBLISHED") {
+    return { label: "Published", pill: "published" };
+  }
+  return { label: "Working", pill: "working" };
+}
 
 function heroTitle(
   cs: ClassSubject | undefined,
@@ -95,58 +96,37 @@ function StudentFace({
   );
 }
 
-function formatWhen(iso: string | null) {
-  if (!iso) return null;
-  try {
-    return new Date(iso).toLocaleString(undefined, {
-      month: "short",
-      day: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-    });
-  } catch {
-    return null;
-  }
-}
-
 function statusMessage(
   status: ResultWorkflowStatus,
-  workflow: ScoreMatrix["workflow"] | undefined,
   role: Props["role"],
+  hasOpenComponents: boolean,
 ) {
-  const when = formatWhen(workflow?.submittedAt ?? null);
-  const by = workflow?.submittedByName;
-  switch (status) {
-    case "SUBMITTED":
-      return {
-        title: "Waiting for academic office",
-        body:
-          role === "teacher"
-            ? `Submitted${by ? ` by ${by}` : ""}${when ? ` on ${when}` : ""}. You can still edit unlocked components until academic office locks them.`
-            : `Submitted${by ? ` by ${by}` : ""}${when ? ` on ${when}` : ""}. Approve or reopen to continue.`,
-        tone: "info" as const,
-      };
-    case "APPROVED":
-      return {
-        title: "Approved — ready to publish",
-        body:
-          role === "teacher"
-            ? "Approved for publishing. Unlocked components can still be edited until academic office locks them."
-            : "Scores are locked. Academic office can publish to parents.",
-        tone: "info" as const,
-      };
-    case "PUBLISHED":
-      return {
-        title: "Published to parents",
-        body:
-          role === "teacher"
-            ? "This score sheet is final. Scores below are read-only and visible on report cards."
-            : "This score sheet is final and visible on report cards.",
-        tone: "success" as const,
-      };
-    default:
-      return null;
+  if (status === "PUBLISHED") {
+    return {
+      title: "Published to parents",
+      body:
+        role === "teacher"
+          ? "This score sheet is final. Scores below are read-only and visible on report cards."
+          : "This score sheet is final and visible on report cards. Reopen to allow edits again.",
+      tone: "success" as const,
+    };
   }
+
+  if (role === "teacher") {
+    return {
+      title: hasOpenComponents ? "Open for scoring" : "Components locked",
+      body: hasOpenComponents
+        ? "Enter and save scores anytime. Academic office publishes when ready — no submit or approval needed."
+        : "Ask academic office to open components before entering scores.",
+      tone: "info" as const,
+    };
+  }
+
+  return {
+    title: "Working sheet",
+    body: "Teachers can enter scores on open components. Publish when the sheet is ready for families and report cards.",
+    tone: "info" as const,
+  };
 }
 
 /** Raw sum of component scores (not weighted %). */
@@ -542,35 +522,36 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
 
   function setCell(studentProfileId: string, assessmentId: string, value: string) {
     if (isCellLocked(assessmentId)) return;
+    const maxScore =
+      matrix?.assessments.find((a) => a.id === assessmentId)?.maxScore ?? null;
     const num = value === "" ? NaN : Number(value);
     setDraft((prev) => {
       const row = { ...(prev[studentProfileId] ?? {}) };
-      if (Number.isNaN(num)) delete row[assessmentId];
-      else row[assessmentId] = num;
+      if (Number.isNaN(num)) {
+        delete row[assessmentId];
+      } else if (num < 0) {
+        row[assessmentId] = 0;
+      } else if (maxScore != null && num > maxScore) {
+        row[assessmentId] = maxScore;
+      } else {
+        row[assessmentId] = num;
+      }
       return { ...prev, [studentProfileId]: row };
     });
     setSuccess("");
   }
 
-  async function onWorkflowAction(action: "submit" | "approve" | "publish" | "reopen") {
+  async function onWorkflowAction(action: "publish" | "reopen") {
     if (!termId || !classSubjectId) return;
     setWorkflowBusy(true);
     setError("");
     setSuccess("");
     try {
-      if (action === "submit") await submitResultWorkflow(termId, classSubjectId);
-      else if (action === "approve") await approveResultWorkflow(termId, classSubjectId);
-      else if (action === "publish") await publishResultWorkflow(termId, classSubjectId);
+      if (action === "publish") await publishResultWorkflow(termId, classSubjectId);
       else await reopenResultWorkflow(termId, classSubjectId);
       await loadMatrix();
       setSuccess(
-        action === "submit"
-          ? "Score sheet submitted."
-          : action === "approve"
-            ? "Score sheet approved."
-            : action === "publish"
-              ? "Results published."
-              : "Score sheet reopened.",
+        action === "publish" ? "Results published." : "Score sheet reopened.",
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Workflow action failed");
@@ -631,11 +612,6 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
         (s) => s.matrix.assessments.length > 0 && s.matrix.students.length > 0,
       )
     : !!(matrix && matrix.assessments.length > 0 && matrix.students.length > 0);
-
-  const canSubmit =
-    canEditScores &&
-    workflowStatus === "DRAFT" &&
-    (role === "teacher" || role === "admin" || role === "staff");
 
   const hasEditableCells =
     matrix?.assessments.some((a) => !isCellLocked(a.id)) ?? false;
@@ -902,7 +878,12 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
     for (const m of sources) {
       total += m.students.length * m.assessments.length;
       for (const st of m.students) {
-        filled += st.scores.filter((sc) => sc.score != null).length;
+        for (const a of m.assessments) {
+          const fromDraft = draft[st.studentProfileId]?.[a.id];
+          const hasDraft = fromDraft != null && !Number.isNaN(fromDraft);
+          const saved = st.scores.find((sc) => sc.assessmentId === a.id)?.score;
+          if (hasDraft || saved != null) filled += 1;
+        }
       }
     }
     return {
@@ -910,16 +891,27 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
       totalCells: total,
       completionPct: total > 0 ? Math.round((filled / total) * 100) : 0,
     };
-  }, [isAggregated, aggregatedSheets, matrix]);
-
-  const statusInfo = workflowStatus
-    ? statusMessage(workflowStatus, matrix?.workflow, role)
-    : null;
+  }, [isAggregated, aggregatedSheets, matrix, draft]);
 
   const lockedComponents =
     matrix?.assessments.filter((a) => a.entryLocked).map((a) => a.name) ?? [];
   const openComponents =
     matrix?.assessments.filter((a) => !a.entryLocked).map((a) => a.name) ?? [];
+
+  const statusInfo = workflowStatus
+    ? statusMessage(workflowStatus, role, openComponents.length > 0)
+    : null;
+
+  const canPublish =
+    (role === "admin" || role === "staff") &&
+    !!workflowStatus &&
+    workflowStatus !== "PUBLISHED" &&
+    filledScores > 0;
+
+  const canReopen =
+    (role === "admin" || role === "staff") && workflowStatus === "PUBLISHED";
+
+  const workflowUi = workflowStatus ? workflowDisplay(workflowStatus) : null;
 
   const statsSheet = statsTarget
     ? isAggregated
@@ -1259,11 +1251,11 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
                 )}
                 {!canEditScores && selectedCs ? " (view)" : ""}
               </h2>
-              {workflowStatus && !isAggregated ? (
+              {workflowUi && !isAggregated ? (
                 <span
-                  className={`res-scores-workflow-pill res-scores-workflow-pill--${workflowStatus.toLowerCase()}`}
+                  className={`res-scores-workflow-pill res-scores-workflow-pill--${workflowUi.pill}`}
                 >
-                  {WORKFLOW_LABELS[workflowStatus]}
+                  {workflowUi.label}
                 </span>
               ) : null}
             </div>
@@ -1435,7 +1427,7 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
                       <p className="res-scores-sheet__meta">
                         {sheetFilled} of {sheetTotal} entered
                         {sheet.workflow?.status ? (
-                          <> · {WORKFLOW_LABELS[sheet.workflow.status as ResultWorkflowStatus]}</>
+                          <> · {workflowDisplay(sheet.workflow.status as ResultWorkflowStatus).label}</>
                         ) : null}
                       </p>
                     </div>
@@ -1459,7 +1451,7 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
                     <h3 className="res-scores-components__title">Score components</h3>
                     <p className="res-scores-components__hint">
                       Open lets teachers enter scores; Locked closes teacher editing.
-                      Saved scores are already visible to students and parents.
+                      Publish when the sheet is ready for families — no submit step.
                     </p>
                   </div>
                   <div
@@ -1530,22 +1522,21 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
             <p className="res-scores-components__teacher-note">
               {openComponents.length > 0 ? (
                 <>
-                  You can edit: <strong>{openComponents.join(", ")}</strong>. Components locked for
-                  entry ({lockedComponents.join(", ")}) still show saved scores below — students and
-                  parents can see those too.
+                  You can edit: <strong>{openComponents.join(", ")}</strong>. Locked components
+                  ({lockedComponents.join(", ")}) still show saved scores.
                 </>
               ) : filledScores > 0 ? (
                 <>
-                  All components are locked for teacher entry. Your{" "}
+                  All components are locked. Your{" "}
                   <strong>
                     {filledScores} saved score{filledScores === 1 ? "" : "s"}
                   </strong>{" "}
-                  still show below (and to students). Ask academic office to unlock to change them.
+                  still show below. Ask academic office to open components to change them.
                 </>
               ) : (
                 <>
-                  All components are locked for teacher entry. Ask academic office to unlock before
-                  entering scores.
+                  All components are locked. Ask academic office to open them before entering
+                  scores.
                 </>
               )}
             </p>
@@ -1574,47 +1565,17 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
                   {saving ? "Saving…" : "Save"}
                 </button>
               ) : null}
-              {canSubmit ? (
-                <button
-                  type="button"
-                  className="res-scores-btn res-scores-btn--primary"
-                  disabled={workflowBusy || completionPct === 0}
-                  onClick={() => void onWorkflowAction("submit")}
-                >
-                  {workflowBusy ? "…" : "Submit"}
-                </button>
-              ) : null}
-              {workflowStatus === "SUBMITTED" && (role === "admin" || role === "staff") ? (
-                <>
-                  <button
-                    type="button"
-                    className="res-scores-btn res-scores-btn--primary"
-                    disabled={workflowBusy}
-                    onClick={() => void onWorkflowAction("approve")}
-                  >
-                    Approve
-                  </button>
-                  <button
-                    type="button"
-                    className="res-scores-btn res-scores-btn--ghost"
-                    disabled={workflowBusy}
-                    onClick={() => void onWorkflowAction("publish")}
-                  >
-                    Publish
-                  </button>
-                </>
-              ) : null}
-              {workflowStatus === "APPROVED" && (role === "admin" || role === "staff") ? (
+              {canPublish ? (
                 <button
                   type="button"
                   className="res-scores-btn res-scores-btn--primary"
                   disabled={workflowBusy}
                   onClick={() => void onWorkflowAction("publish")}
                 >
-                  Publish
+                  {workflowBusy ? "…" : "Publish"}
                 </button>
               ) : null}
-              {workflowStatus && workflowStatus !== "DRAFT" && (role === "admin" || role === "staff") ? (
+              {canReopen ? (
                 <button
                   type="button"
                   className="res-scores-btn res-scores-btn--ghost"

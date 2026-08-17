@@ -422,6 +422,7 @@ export class AssessmentTemplatesService implements OnModuleInit {
           maxScore: comp.maxScore,
           weightPercent: comp.weightPercent,
           sortOrder: comp.sortOrder,
+          entryLocked: false,
         },
       });
       synced += 1;

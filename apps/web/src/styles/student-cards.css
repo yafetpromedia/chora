@@ -1,4 +1,4 @@
-/* CampusOne — modern student ID cards (reusable .sid component) */
+/* Chora — modern student ID cards (reusable .sid component) */
 
 .sid-wrap {
   display: inline-flex;
@@ -62,16 +62,16 @@
   align-items: center;
   justify-content: center;
   pointer-events: none;
-  z-index: 5;
+  z-index: 0;
   overflow: hidden;
 }
 
 .sid__watermark-img {
-  width: 74%;
-  max-width: 74%;
+  width: 58%;
+  max-width: 58%;
   height: auto;
   object-fit: contain;
-  opacity: 0.2;
+  opacity: 0.12;
   transform: rotate(-11deg);
   user-select: none;
   -webkit-user-drag: none;
@@ -294,6 +294,13 @@
   background:
     radial-gradient(ellipse 120% 80% at 0% 50%, rgba(13, 92, 99, 0.04) 0%, transparent 55%),
     #fff;
+  position: relative;
+}
+
+.sid__main--front > .sid__photo-block,
+.sid__main--front > .sid__details {
+  position: relative;
+  z-index: 1;
 }
 
 .sid__photo-block {
@@ -869,20 +876,23 @@
 }
 
 .sid__body-contact-name {
-  display: block;
   font-size: calc(var(--sid-u) * 3);
   font-weight: 700;
   color: #0f172a;
-  line-height: 1.14;
-  white-space: nowrap;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .sid__back-info .sid__body-contact-name {
-  font-size: calc(var(--sid-u) * 3.7);
+  font-size: calc(var(--sid-u) * 3.35);
   color: var(--sid-mid);
-  line-height: 1.12;
+  line-height: 1.15;
 }
 
 .sid__body-contact-phone {
@@ -892,6 +902,8 @@
   color: var(--sid-bright);
   line-height: 1.12;
   font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+  word-break: break-all;
 }
 
 .sid__back-info .sid__body-contact-phone {
@@ -931,6 +943,15 @@
   height: calc(var(--sid-u) * 3);
   border-bottom: 1px solid rgba(148, 163, 184, 0.6);
   margin-bottom: calc(var(--sid-u) * 0.3);
+}
+
+.sid__body-signature-img {
+  display: block;
+  height: calc(var(--sid-u) * 8);
+  max-width: 100%;
+  margin: 0 auto calc(var(--sid-u) * 0.3);
+  object-fit: contain;
+  object-position: center bottom;
 }
 
 .sid__body-signature-label {
@@ -1196,6 +1217,30 @@
 .sid-modal__body .sid.sid--back {
   --sid-w: 400px;
   --sid-h: calc(var(--sid-w) / 1.585773);
+}
+
+@media (max-width: 640px) {
+  .sid-manage-preview,
+  .sid-modal__body {
+    justify-content: flex-start;
+    padding-inline: 0.35rem;
+  }
+
+  .sid-manage-preview .sid,
+  .sid-manage-preview .sid.sid--back,
+  .sid-my-panel__card .sid,
+  .sid-my-panel__card .sid.sid--back,
+  .sid-modal__body .sid,
+  .sid-modal__body .sid.sid--back {
+    --sid-w: 300px;
+    --sid-h: calc(300px / 1.585773);
+    max-width: 100%;
+  }
+
+  .sid-modal {
+    width: min(100vw - 0.75rem, 28rem);
+    max-height: min(92dvh, 52rem);
+  }
 }
 
 /* Print grid (cards page) */
@@ -2899,8 +2944,22 @@
     width: 100%;
   }
 
+  .tid-preview-stage {
+    padding: 1.1rem 0.75rem;
+    justify-content: flex-start;
+  }
+
   .tid-preview-stage .sid,
   .tid-preview-stage .sid.sid--back {
-    --sid-w: min(100%, 340px);
+    --sid-w: 300px;
+    --sid-h: calc(300px / 1.585773);
+    max-width: 100%;
+  }
+
+  .tid-preview-stage .sid-wrap,
+  .tid-preview-stage .sid-wrap--duplex,
+  .tid-preview-stage .sid-wrap--print-duplex {
+    width: 100%;
+    max-width: 100%;
   }
 }

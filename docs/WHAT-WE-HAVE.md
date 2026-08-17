@@ -3,7 +3,7 @@
 Living reference for the `edu-os` monorepo: what exists today, where it lives, and what is planned next.
 
 **Brand:** CampusOne  
-**Folder:** `c:\xampp\htdocs\school\edu-os`  
+**Repo:** `CampusOne` monorepo (npm workspaces)  
 **Stack:** Next.js 16 + NestJS + PostgreSQL (Prisma)
 
 ---
@@ -211,7 +211,15 @@ Full pipeline: **Academic Year → Terms → Subjects → Assessment Templates �
 | Parent/student visibility | Report cards only when all class subjects are **PUBLISHED** |
 | Template editor (components, weights, reorder) | `/admin/results/templates` — weights must total **100%** |
 | Platform superadmin templates | `/platform` → **Assessments** — create/edit/delete per school |
-| Student published results | `/student/results` — term report card when published; print at `/student/results/print` |
+| Student published results | `/student/results` — term scores; **Report** + **My score reports** history |
+| Parent published results | `/parent/results` — same for selected child |
+| **Score corrections** | Student/parent report → teacher propose → admin approve — [SCORE-CORRECTIONS.md](./SCORE-CORRECTIONS.md) |
+| Teacher score reports queue | `/teacher/results/score-reports` |
+| Admin correction approvals | `/admin/results` → Approvals tab |
+| **Modern student dashboard** | `/student` — KPI cards, attendance ring, subject chart |
+| **Modern parent dashboard** | `/parent` — child overview, charts, alerts |
+| **School authorized signature** | Admin Settings → appears on ID cards & report cards |
+| **Dev API proxy** | Web `/backend/*` → API `:3001` (local dev) |
 
 **Teacher entry:** Sidebar → **Results** (`/teacher/results`) — score matrix, save, **Submit for approval**.  
 **Admin publish:** `/admin/results` — pending queue or matrix panel → Approve → Publish.

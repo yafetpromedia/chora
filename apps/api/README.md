@@ -19,7 +19,7 @@ From repo root: `npm run dev:clean` starts API + web together.
 | `auth` | `/auth` | Login, register, JWT |
 | `schools` | `/schools` | Tenant profile, settings |
 | `students` | `/schools/students` | CRUD, import, portal |
-| `results` | `/results` | Academics, templates, score matrix, workflow |
+| `results` | `/results` | Academics, templates, score matrix, workflow, **score corrections** |
 | `library` | `/schools/library` | eLibrary hub & resources |
 | `attendance` | `/schools/attendance` | Roster, scan, analytics |
 | `announcements` | `/announcements` | Posts + read tracking |
@@ -35,4 +35,4 @@ npm run prisma:migrate:dev
 
 Runtime uploads: `uploads/library/` (gitignored).
 
-**Docs:** [../../docs/WHAT-WE-HAVE.md](../../docs/WHAT-WE-HAVE.md) · [../../SETUP-POSTGRES.md](../../SETUP-POSTGRES.md)
+**Docs:** [../../docs/README.md](../../docs/README.md) · [../../docs/API-REFERENCE.md](../../docs/API-REFERENCE.md) · [../../docs/DEVELOPER-GUIDE.md](../../docs/DEVELOPER-GUIDE.md)

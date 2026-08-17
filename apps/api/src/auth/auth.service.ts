@@ -218,7 +218,7 @@ export class AuthService {
     }
     if (!settings.allowSelfRegistration) {
       throw new ForbiddenException(
-        'Self-service school registration is disabled. Contact CampusOne support.',
+        'Self-service school registration is disabled. Contact Chora support.',
       );
     }
 

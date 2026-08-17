@@ -1,8 +1,12 @@
 "use client";
 
-import type { ReactNode } from "react";
+import Link from "next/link";
+import { useEffect, useState, type ReactNode } from "react";
 import type { AdminDayOverview } from "@/lib/dashboard-day";
-import type { AdminAnalyticsOverview } from "@/lib/dashboard-analytics";
+import type {
+  AdminAnalyticsOverview,
+  GradeAttendanceRow,
+} from "@/lib/dashboard-analytics";
 import { DashIcon } from "./dash-icons";
 
 export function todayLabel() {
@@ -287,22 +291,133 @@ export function GradeAttendanceBars({
 }: {
   grades: AdminAnalyticsOverview["gradeAttendance"];
 }) {
+  const [selected, setSelected] = useState<GradeAttendanceRow | null>(null);
+
+  useEffect(() => {
+    if (!selected) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setSelected(null);
+    };
+    window.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [selected]);
+
   if (grades.length === 0) {
     return <p className="da-chart__empty">No grade attendance marked today.</p>;
   }
 
   return (
-    <ul className="da-grades">
-      {grades.map((g) => (
-        <li key={g.grade}>
-          <span className="da-grades__name">{g.grade}</span>
-          <div className="da-grades__track">
-            <div className="da-grades__fill" style={{ width: `${g.rate}%` }} />
+    <>
+      <ul className="da-grades">
+        {grades.map((g) => (
+          <li key={g.grade}>
+            <button
+              type="button"
+              className="da-grades__row"
+              onClick={() => setSelected(g)}
+            >
+              <span className="da-grades__name">{g.grade}</span>
+              <div className="da-grades__track">
+                <div className="da-grades__fill" style={{ width: `${g.rate}%` }} />
+              </div>
+              <span className="da-grades__pct">{g.rate}%</span>
+              <span className="da-grades__chev" aria-hidden>
+                <DashIcon name="chevron" className="dash-icon--xs" />
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+
+      {selected ? (
+        <div
+          className="da-grade-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="da-grade-modal-title"
+          onClick={() => setSelected(null)}
+        >
+          <div
+            className="da-grade-modal__panel"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <header className="da-grade-modal__head">
+              <div>
+                <h3 id="da-grade-modal-title" className="da-grade-modal__title">
+                  {selected.grade}
+                </h3>
+                <p className="da-grade-modal__sub">
+                  Today · {selected.rate}% present · {selected.marked}/{selected.enrolled} marked
+                </p>
+              </div>
+              <button
+                type="button"
+                className="da-grade-modal__close"
+                aria-label="Close"
+                onClick={() => setSelected(null)}
+              >
+                ×
+              </button>
+            </header>
+
+            <dl className="da-grades__stats">
+              <div>
+                <dt>Present</dt>
+                <dd>{selected.present}</dd>
+              </div>
+              <div>
+                <dt>Absent</dt>
+                <dd>{selected.absent}</dd>
+              </div>
+              <div>
+                <dt>Marked</dt>
+                <dd>
+                  {selected.marked}/{selected.enrolled}
+                </dd>
+              </div>
+            </dl>
+
+            {selected.sections.length > 0 ? (
+              <ul className="da-grades__sections">
+                {selected.sections.map((s) => (
+                  <li key={s.label}>
+                    <div className="da-grades__sec-head">
+                      <span className="da-grades__sec-name">
+                        {s.section ? `Section ${s.section}` : "No section"}
+                      </span>
+                      <span className="da-grades__sec-meta">
+                        {s.present} present · {s.absent} absent · {s.marked}/{s.enrolled}{" "}
+                        marked
+                      </span>
+                      <span className="da-grades__pct">{s.rate}%</span>
+                    </div>
+                    <div className="da-grades__track">
+                      <div
+                        className="da-grades__fill"
+                        style={{ width: `${s.rate}%` }}
+                      />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="da-grades__empty-sec">No section breakdown for this grade.</p>
+            )}
+
+            <div className="da-grade-modal__foot">
+              <Link href="/admin/attendance" className="da-card__link">
+                Open attendance <DashIcon name="chevron" className="dash-icon--xs" />
+              </Link>
+            </div>
           </div>
-          <span className="da-grades__pct">{g.rate}%</span>
-        </li>
-      ))}
-    </ul>
+        </div>
+      ) : null}
+    </>
   );
 }
 

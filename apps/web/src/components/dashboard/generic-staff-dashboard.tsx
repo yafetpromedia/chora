@@ -11,6 +11,7 @@ import {
   getStaffWorkspaceSubtitle,
   staffQuickLinks,
 } from "@/lib/staff-workspace";
+import { BRAND_NAME } from "@/lib/brand";
 
 type Props = {
   error: string;
@@ -18,7 +19,7 @@ type Props = {
 
 export function GenericStaffDashboard({ error }: Props) {
   const [loading, setLoading] = useState(true);
-  const [schoolName, setSchoolName] = useState("CampusOne");
+  const [schoolName, setSchoolName] = useState(BRAND_NAME);
   const [adminDay, setAdminDay] = useState<AdminDayOverview | null>(null);
   const links = staffQuickLinks();
 

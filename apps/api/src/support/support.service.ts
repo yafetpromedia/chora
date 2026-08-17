@@ -93,7 +93,14 @@ export class SupportService {
   async updateForPlatform(id: string, dto: UpdateSupportTicketDto) {
     const existing = await this.prisma.supportTicket.findUnique({
       where: { id },
-      select: { id: true, status: true },
+      select: {
+        id: true,
+        status: true,
+        subject: true,
+        schoolId: true,
+        createdById: true,
+        platformNote: true,
+      },
     });
     if (!existing) throw new NotFoundException('Support ticket not found');
 
@@ -101,18 +108,50 @@ export class SupportService {
     const resolved =
       nextStatus === SupportTicketStatus.RESOLVED ||
       nextStatus === SupportTicketStatus.CLOSED;
+    const nextNote =
+      dto.platformNote !== undefined
+        ? dto.platformNote.trim() || null
+        : existing.platformNote;
+    const becameResolved =
+      resolved &&
+      existing.status !== SupportTicketStatus.RESOLVED &&
+      existing.status !== SupportTicketStatus.CLOSED;
+    const noteChanged =
+      dto.platformNote !== undefined && nextNote !== existing.platformNote;
+    const shouldNotify = becameResolved || noteChanged;
 
     const ticket = await this.prisma.supportTicket.update({
       where: { id },
       data: {
         ...(dto.status ? { status: dto.status } : {}),
         ...(dto.platformNote !== undefined
-          ? { platformNote: dto.platformNote.trim() || null }
+          ? { platformNote: nextNote }
           : {}),
         resolvedAt: resolved ? new Date() : null,
       },
       include: this.ticketInclude,
     });
+
+    if (shouldNotify) {
+      const title = resolved
+        ? `Support resolved: ${ticket.subject}`
+        : `Support update: ${ticket.subject}`;
+      const body =
+        nextNote?.trim() ||
+        (resolved
+          ? 'Your support report was marked resolved. Open Support to review.'
+          : 'Your support report was updated. Open Support to review.');
+      await this.prisma.announcement.create({
+        data: {
+          schoolId: ticket.schoolId,
+          title,
+          body,
+          createdBy: ticket.createdById,
+          recipientUserId: ticket.createdById,
+        },
+      });
+    }
+
     return this.serialize(ticket);
   }
 

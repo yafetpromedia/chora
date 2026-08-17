@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { BRAND_NAME } from "@/lib/brand";
 
 type Variant = "light" | "dark";
 type StoreKind = "play" | "apple";
@@ -110,12 +111,12 @@ function ComingSoonDialog({
         <div className="lp3-soon__mark" aria-hidden>
           {store === "play" ? <PlayIcon /> : <AppleIcon />}
         </div>
-        <p className="lp3-soon__eyebrow">CampusOne mobile</p>
+        <p className="lp3-soon__eyebrow">{BRAND_NAME} mobile</p>
         <h2 id={titleId} className="lp3-soon__title">
           Coming soon
         </h2>
         <p id={descId} className="lp3-soon__body">
-          The CampusOne app for {storeName} is almost ready. Families and staff can
+          The {BRAND_NAME} app for {storeName} is almost ready. Families and staff can
           keep using the web portal with the same school code and login until
           launch.
         </p>

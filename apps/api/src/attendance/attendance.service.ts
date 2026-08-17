@@ -322,30 +322,51 @@ export class AttendanceService {
     }
 
     const periodNumber = dto.periodNumber ?? 0;
-    const bulkDto: BulkAttendanceDto = {
-      gradeId: dto.gradeId,
-      sectionId: dto.sectionId,
-      date: dto.date,
-      periodNumber,
-      records: [
-        {
-          studentProfileId: student.id,
-          status: 'present',
-        },
-      ],
-    };
-
-    await this.bulkMark(bulkDto, schoolId, recordedBy, role);
-
     const day = parseDateOnly(dto.date);
-    const record = await this.prisma.attendanceRecord.findFirst({
+
+    const existing = await this.prisma.attendanceRecord.findFirst({
       where: {
         schoolId,
         studentProfileId: student.id,
         date: day,
         periodNumber,
       },
+      select: { status: true },
     });
+
+    const alreadyPresent =
+      existing != null &&
+      (existing.status === AttendanceStatus.present ||
+        existing.status === AttendanceStatus.late ||
+        existing.status === AttendanceStatus.excused);
+
+    if (!alreadyPresent) {
+      const bulkDto: BulkAttendanceDto = {
+        gradeId: dto.gradeId,
+        sectionId: dto.sectionId,
+        date: dto.date,
+        periodNumber,
+        records: [
+          {
+            studentProfileId: student.id,
+            status: 'present',
+          },
+        ],
+      };
+      await this.bulkMark(bulkDto, schoolId, recordedBy, role);
+    }
+
+    const record = alreadyPresent
+      ? existing
+      : await this.prisma.attendanceRecord.findFirst({
+          where: {
+            schoolId,
+            studentProfileId: student.id,
+            date: day,
+            periodNumber,
+          },
+          select: { status: true },
+        });
 
     return {
       studentProfileId: student.id,
@@ -354,6 +375,7 @@ export class AttendanceService {
       section: student.section?.name ?? null,
       cardCode: student.cardCode,
       status: record?.status ?? AttendanceStatus.present,
+      alreadyMarked: alreadyPresent,
       scannedAt: new Date().toISOString(),
     };
   }
@@ -497,60 +519,79 @@ export class AttendanceService {
   async getAnalytics(schoolId: string, date?: string) {
     const day = parseDateOnly(date ?? new Date().toISOString().slice(0, 10));
 
-    const [records, totalStudents] = await Promise.all([
+    const [records, students] = await Promise.all([
       this.prisma.attendanceRecord.findMany({
         where: { schoolId, date: day, periodNumber: 0 },
-        include: {
-          studentProfile: {
-            include: {
-              grade: true,
-              section: true,
-            },
-          },
+        select: { studentProfileId: true, status: true },
+      }),
+      this.prisma.studentProfile.findMany({
+        where: { schoolId },
+        select: {
+          id: true,
+          grade: { select: { name: true } },
+          section: { select: { name: true } },
         },
       }),
-      this.prisma.studentProfile.count({ where: { schoolId } }),
     ]);
 
-    const present = records.filter(
-      (r) =>
-        r.status === AttendanceStatus.present ||
-        r.status === AttendanceStatus.late ||
-        r.status === AttendanceStatus.excused,
-    ).length;
+    const statusByStudent = new Map(
+      records.map((r) => [r.studentProfileId, r.status] as const),
+    );
+    const totalStudents = students.length;
+    const present = students.filter((s) => {
+      const status = statusByStudent.get(s.id);
+      return (
+        status === AttendanceStatus.present ||
+        status === AttendanceStatus.late ||
+        status === AttendanceStatus.excused
+      );
+    }).length;
     const marked = records.length;
+    // Unmarked students count as not present (same as absent for rate).
     const todayRate =
-      marked > 0 ? Math.round((present / marked) * 100) : null;
+      marked > 0 && totalStudents > 0
+        ? Math.round((present / totalStudents) * 100)
+        : null;
 
     const byGradeSection = new Map<
       string,
-      { label: string; present: number; total: number }
+      { label: string; present: number; enrolled: number; marked: number }
     >();
 
-    for (const r of records) {
-      const g = r.studentProfile.grade.name;
-      const s = r.studentProfile.section?.name ?? '';
-      const key = `${g}|${s}`;
-      const label = s ? `${g}-${s}` : g;
-      const bucket = byGradeSection.get(key) ?? { label, present: 0, total: 0 };
-      bucket.total += 1;
-      if (
-        r.status === AttendanceStatus.present ||
-        r.status === AttendanceStatus.late ||
-        r.status === AttendanceStatus.excused
-      ) {
-        bucket.present += 1;
+    for (const s of students) {
+      const g = s.grade.name;
+      const sec = s.section?.name ?? '';
+      const key = `${g}|${sec}`;
+      const label = sec ? `${g}-${sec}` : g;
+      const bucket = byGradeSection.get(key) ?? {
+        label,
+        present: 0,
+        enrolled: 0,
+        marked: 0,
+      };
+      bucket.enrolled += 1;
+      const status = statusByStudent.get(s.id);
+      if (status !== undefined) {
+        bucket.marked += 1;
+        if (
+          status === AttendanceStatus.present ||
+          status === AttendanceStatus.late ||
+          status === AttendanceStatus.excused
+        ) {
+          bucket.present += 1;
+        }
       }
       byGradeSection.set(key, bucket);
     }
 
     const gradeStats = [...byGradeSection.values()]
+      .filter((b) => b.marked > 0)
       .map((b) => ({
         label: b.label,
-        rate: b.total > 0 ? Math.round((b.present / b.total) * 100) : 0,
-        marked: b.total,
-      }))
-      .filter((b) => b.marked > 0);
+        rate:
+          b.enrolled > 0 ? Math.round((b.present / b.enrolled) * 100) : 0,
+        marked: b.marked,
+      }));
 
     const sorted = [...gradeStats].sort((a, b) => a.rate - b.rate);
     const mostAbsent = sorted[0] ?? null;
@@ -562,8 +603,7 @@ export class AttendanceService {
       markedToday: marked,
       todayRate,
       presentToday: present,
-      absentToday: records.filter((r) => r.status === AttendanceStatus.absent)
-        .length,
+      absentToday: Math.max(0, totalStudents - present),
       mostAbsentGrade: mostAbsent,
       mostPunctualGrade: mostPunctual,
     };

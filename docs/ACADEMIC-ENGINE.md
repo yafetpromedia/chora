@@ -97,6 +97,7 @@ All school portals show a **bell** in the dashboard header. It lists school-wide
 |-----|--------|
 | [WHAT-WE-HAVE.md](./WHAT-WE-HAVE.md) | Full feature inventory |
 | [ASSESSMENT-TEMPLATES.md](./ASSESSMENT-TEMPLATES.md) | Weighted components per grade |
-| [TEACHER-SCOPING.md](./TEACHER-SCOPING.md) | Teacher-only classes |
+| [SCORE-CORRECTIONS.md](./SCORE-CORRECTIONS.md) | Report & fix published scores after publish |
+| [STUDENT-PARENT-PORTAL.md](./STUDENT-PARENT-PORTAL.md) | Student/parent results UI |
 | [PRODUCT-ROADMAP.md](./PRODUCT-ROADMAP.md) | What’s next |
 | [INTEGRATIONS.md](./INTEGRATIONS.md) | Fayda, SMS, payments |

@@ -205,6 +205,11 @@ export const DASHBOARD_NAV: NavItem[] = [
         label: "By student",
         description: "Subject rows per learner",
       },
+      {
+        href: "/teacher/results/score-reports",
+        label: "Score reports",
+        description: "Propose fixes after publish",
+      },
     ],
   },
   { href: "/teacher/classwork", label: "Assignments", icon: "library", roles: ["teacher"] },

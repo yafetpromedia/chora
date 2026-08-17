@@ -73,7 +73,7 @@ export default function LoginPage() {
   async function onSignIn(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const trimmedUser = username.trim();
-    if (trimmedUser.includes("platform@") || trimmedUser.endsWith("@campusone.local")) {
+    if (trimmedUser.includes("platform@") || trimmedUser.endsWith("@campusone.local") || trimmedUser.endsWith("@chora.local")) {
       router.push("/platform/login");
       return;
     }

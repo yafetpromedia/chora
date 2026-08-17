@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { AttendanceStatus, PaymentStatus, ResultWorkflowStatus } from '@prisma/client';
+import { AttendanceStatus, PaymentStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { FinanceService } from '../finance/finance.service';
 import { TeacherDashboardService } from '../teachers/teacher-dashboard.service';
@@ -31,7 +31,6 @@ export class SchoolDayDashboardService {
       totalStudents,
       todayRecords,
       pendingPayments,
-      pendingResults,
       teachersTotal,
       classSubjects,
     ] = await Promise.all([
@@ -46,9 +45,6 @@ export class SchoolDayDashboardService {
       }),
       this.prisma.payment.count({
         where: { schoolId, status: PaymentStatus.PENDING },
-      }),
-      this.prisma.classSubjectTermSheet.count({
-        where: { schoolId, status: ResultWorkflowStatus.SUBMITTED },
       }),
       this.prisma.user.count({ where: { schoolId, role: 'teacher' } }),
       this.prisma.classSubject.findMany({
@@ -69,12 +65,11 @@ export class SchoolDayDashboardService {
         r.status === AttendanceStatus.late ||
         r.status === AttendanceStatus.excused,
     ).length;
-    const absentToday = todayRecords.filter(
-      (r) => r.status === AttendanceStatus.absent,
-    ).length;
+    // Unmarked students count as not present for the school-day rate.
+    const absentToday = Math.max(0, totalStudents - presentToday);
     const attendanceRate =
-      todayRecords.length > 0
-        ? Math.round((presentToday / todayRecords.length) * 100)
+      todayRecords.length > 0 && totalStudents > 0
+        ? Math.round((presentToday / totalStudents) * 100)
         : null;
 
     const classBuckets = new Map<string, { gradeId: string; sectionId: string | null }>();
@@ -125,14 +120,6 @@ export class SchoolDayDashboardService {
         href: '/admin/finance',
       });
     }
-    if (pendingResults > 0) {
-      alerts.push({
-        type: 'results',
-        label: 'Result sheets awaiting approval',
-        count: pendingResults,
-        href: '/admin/results',
-      });
-    }
     if (totalStudents > markedStudentIds.size) {
       alerts.push({
         type: 'attendance',
@@ -159,7 +146,7 @@ export class SchoolDayDashboardService {
         ...financeSummary,
       },
       academics: {
-        pendingResultApprovals: pendingResults,
+        pendingResultApprovals: 0,
         currentTerm,
       },
       staff: {

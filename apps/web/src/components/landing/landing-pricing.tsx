@@ -134,7 +134,7 @@ export function LandingPricing() {
               </ul>
               {plan === "ENTERPRISE" ? (
                 <a
-                  href="mailto:hello@campusone.local?subject=Enterprise%20plan"
+                  href="mailto:hello@chora.local?subject=Enterprise%20plan"
                   className={featured ? "btn-brand lp-price-card__cta" : "btn-ghost lp-price-card__cta"}
                 >
                   Contact sales

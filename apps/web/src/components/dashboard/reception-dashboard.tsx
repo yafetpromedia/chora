@@ -18,6 +18,7 @@ import { loadStaffDashboardBase } from "@/components/dashboard/staff-dashboard-d
 import { DashIcon } from "@/components/dashboard/dash-icons";
 import { getStaffWorkspaceLabel, getStaffWorkspaceSubtitle } from "@/lib/staff-workspace";
 import { hasPermission, Permission } from "@/lib/permissions";
+import { BRAND_NAME } from "@/lib/brand";
 
 type Props = {
   error: string;
@@ -39,7 +40,7 @@ function formatDate(iso: string) {
 
 export function ReceptionDashboard({ error, announcements }: Props) {
   const [loading, setLoading] = useState(true);
-  const [schoolName, setSchoolName] = useState("CampusOne");
+  const [schoolName, setSchoolName] = useState(BRAND_NAME);
   const [adminDay, setAdminDay] = useState<AdminDayOverview | null>(null);
   const [students, setStudents] = useState<StudentRecord[]>([]);
   const [parents, setParents] = useState<ParentRecord[]>([]);

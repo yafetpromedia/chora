@@ -1,5 +1,5 @@
 /**
- * Canonical permission keys for CampusOne.
+ * Canonical permission keys for Chora.
  * Role templates reference these keys or wildcards (e.g. finance.*).
  */
 

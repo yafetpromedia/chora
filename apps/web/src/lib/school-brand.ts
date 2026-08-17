@@ -65,14 +65,14 @@ function mix(hex: string, withRgb: { r: number; g: number; b: number }, amount: 
 export function readSchoolBrand(): SchoolBrand {
   if (typeof window === "undefined") {
     return {
-      name: "CampusOne",
+      name: "Chora",
       logoUrl: null,
       primaryColor: null,
       accentColor: null,
       accentDeep: null,
     };
   }
-  const name = localStorage.getItem(AUTH_SCHOOL_NAME_KEY) || "CampusOne";
+  const name = localStorage.getItem(AUTH_SCHOOL_NAME_KEY) || "Chora";
   const logoUrl = localStorage.getItem(AUTH_SCHOOL_LOGO_KEY);
   return {
     name,

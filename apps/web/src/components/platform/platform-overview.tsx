@@ -2,6 +2,7 @@
 
 import { DashIcon } from "@/components/dashboard/dash-icons";
 import { PlatformAnalytics } from "@/components/platform/platform-analytics";
+import { BRAND_NAME } from "@/lib/brand";
 import type { PlatformDashboard, PlatformSchoolRow, PlatformSection } from "./platform-types";
 
 type Props = {
@@ -47,7 +48,7 @@ export function PlatformOverview({ dashboard, schools, onNavigate }: Props) {
             <p className="plat-subjects-v2__eyebrow">{todayLabel()}</p>
             <h2 className="plat-subjects-v2__title">Tenant control center</h2>
             <p className="plat-subjects-v2__sub">
-              Monitor every tenant on CampusOne — enrollment, trials, billing,
+              Monitor every tenant on {BRAND_NAME} — enrollment, trials, billing,
               and access from one console.
             </p>
           </div>

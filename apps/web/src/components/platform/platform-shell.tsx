@@ -10,6 +10,7 @@ import {
   type PlatformUser,
 } from "@/lib/platform-auth";
 import { hasPlatformPermission } from "@/lib/platform-access";
+import { BRAND_MARK, BRAND_NAME } from "@/lib/brand";
 import {
   SECTION_META,
   type PlatformSection,
@@ -109,10 +110,10 @@ export function PlatformShell({
       >
         <div className="dash-sidebar-brand dash-sidebar-brand--pro plat-sidebar-brand">
           <span className="logo-mark logo-mark--sidebar-pro plat-logo" aria-hidden>
-            C1
+            {BRAND_MARK}
           </span>
           <div>
-            <span className="dash-sidebar-title">CampusOne</span>
+            <span className="dash-sidebar-title">{BRAND_NAME}</span>
             <span className="dash-sidebar-role">Platform console</span>
           </div>
         </div>

@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { SchoolBrandLockup } from "@/components/dashboard/school-brand-lockup";
 import { fileToPhotoDataUrl } from "@/lib/student-photo";
 import { AppToast } from "@/components/ui/app-toast";
+import { BRAND_NAME } from "@/lib/brand";
 
 type Props = {
   schoolName: string;
@@ -32,7 +33,7 @@ export function SchoolLogoUpload({ schoolName, value, onChange }: Props) {
     <div className="cfg-logo-upload">
       <p className="cfg-logo-upload__label">School logo</p>
       <p className="cfg-section__lead" style={{ marginTop: 0 }}>
-        Shown beside the CampusOne mark in the sidebar for all staff, teachers, students, and
+        Shown beside the {BRAND_NAME} mark in the sidebar for all staff, teachers, students, and
         parents at your school.
       </p>
 

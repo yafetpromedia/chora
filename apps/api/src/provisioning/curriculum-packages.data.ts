@@ -164,7 +164,7 @@ Rubric criteria:
 
 const STARTER_LIBRARY: PackageLibraryDef[] = [
   {
-    title: 'CampusOne Primary Mathematics Guide',
+    title: 'Chora Primary Mathematics Guide',
     description: 'Starter reference for Grades 1–8 mathematics.',
     resourceType: LibraryResourceType.BOOK_PDF,
     categorySlug: 'books',

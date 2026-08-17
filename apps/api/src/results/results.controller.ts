@@ -12,7 +12,7 @@ import {
   Res,
   UseGuards,
 } from '@nestjs/common';
-import { ResultWorkflowStatus } from '@prisma/client';
+import { ResultWorkflowStatus, ScoreCorrectionStatus } from '@prisma/client';
 import type { Response } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import type { AuthUser } from '../common/auth.types';
@@ -45,7 +45,11 @@ import { ExecutePromotionDto } from './dto/execute-promotion.dto';
 import { BulkWorkflowDto } from './dto/bulk-workflow.dto';
 import { SetAssessmentEntryLockDto } from './dto/set-assessment-entry-lock.dto';
 import { WorkflowNotesDto } from './dto/workflow-notes.dto';
+import { CreateScoreCorrectionDto } from './dto/create-score-correction.dto';
+import { ProposeScoreCorrectionDto } from './dto/propose-score-correction.dto';
+import { ReviewScoreCorrectionDto } from './dto/review-score-correction.dto';
 import { ResultsService } from './results.service';
+import { ScoreCorrectionsService } from './score-corrections.service';
 
 @Controller('results')
 @UseGuards(JwtAuthGuard, SchoolTenantGuard, RolesGuard)
@@ -58,6 +62,7 @@ export class ResultsController {
     private readonly workflowService: ResultWorkflowService,
     private readonly promotionService: AcademicPromotionService,
     private readonly enrollmentService: AcademicEnrollmentService,
+    private readonly scoreCorrectionsService: ScoreCorrectionsService,
   ) {}
 
   @Get('promotion/preview')
@@ -93,6 +98,83 @@ export class ResultsController {
     return this.enrollmentService.listEnrollmentsForStudent(
       user.schoolId,
       studentProfileId,
+    );
+  }
+
+  @Post('score-corrections')
+  @Roles('student', 'parent')
+  createScoreCorrection(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: CreateScoreCorrectionDto,
+  ) {
+    return this.scoreCorrectionsService.create(
+      user.schoolId,
+      user.id,
+      user.role,
+      dto,
+    );
+  }
+
+  @Get('score-corrections')
+  @Roles('admin', 'staff', 'teacher', 'student', 'parent')
+  listScoreCorrections(
+    @CurrentUser() user: AuthUser,
+    @Query('status') status?: ScoreCorrectionStatus,
+    @Query('termId') termId?: string,
+  ) {
+    return this.scoreCorrectionsService.list(
+      user.schoolId,
+      user.id,
+      user.role,
+      { status, termId },
+    );
+  }
+
+  @Patch('score-corrections/:id/propose')
+  @Roles('teacher', 'admin', 'staff')
+  proposeScoreCorrection(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: ProposeScoreCorrectionDto,
+  ) {
+    return this.scoreCorrectionsService.propose(
+      user.schoolId,
+      user.id,
+      user.role,
+      id,
+      dto,
+    );
+  }
+
+  @Post('score-corrections/:id/approve')
+  @Roles('admin', 'staff')
+  approveScoreCorrection(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: ReviewScoreCorrectionDto,
+  ) {
+    return this.scoreCorrectionsService.approve(
+      user.schoolId,
+      user.id,
+      user.role,
+      id,
+      dto,
+    );
+  }
+
+  @Post('score-corrections/:id/reject')
+  @Roles('admin', 'staff')
+  rejectScoreCorrection(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: ReviewScoreCorrectionDto,
+  ) {
+    return this.scoreCorrectionsService.reject(
+      user.schoolId,
+      user.id,
+      user.role,
+      id,
+      dto,
     );
   }
 

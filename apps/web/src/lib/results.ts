@@ -691,3 +691,85 @@ export async function reopenResultWorkflow(termId: string, classSubjectId: strin
     {},
   );
 }
+
+export type ScoreCorrectionStatus = "OPEN" | "PROPOSED" | "APPROVED" | "REJECTED";
+
+export type ScoreCorrectionRequest = {
+  id: string;
+  schoolId: string;
+  termId: string;
+  termName: string;
+  classSubjectId: string;
+  assessmentId: string;
+  assessmentName: string;
+  maxScore: number;
+  subjectName: string;
+  classLabel: string;
+  studentProfileId: string;
+  studentName: string;
+  studentExternalRef: string | null;
+  reportedById: string;
+  reportedByName: string;
+  reportedByRole: string;
+  teacherId: string | null;
+  teacherName: string | null;
+  message: string;
+  currentScore: number | null;
+  proposedScore: number | null;
+  status: ScoreCorrectionStatus;
+  reviewedById: string | null;
+  reviewedByName: string | null;
+  reviewedAt: string | null;
+  reviewNote: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export async function listScoreCorrections(params?: {
+  status?: ScoreCorrectionStatus;
+  termId?: string;
+}) {
+  const q = new URLSearchParams();
+  if (params?.status) q.set("status", params.status);
+  if (params?.termId) q.set("termId", params.termId);
+  const suffix = q.toString() ? `?${q}` : "";
+  return apiFetch<ScoreCorrectionRequest[]>(`/results/score-corrections${suffix}`);
+}
+
+export async function createScoreCorrection(body: {
+  assessmentId: string;
+  studentProfileId?: string;
+  message: string;
+}) {
+  return apiPost<ScoreCorrectionRequest>("/results/score-corrections", body);
+}
+
+export async function proposeScoreCorrection(
+  id: string,
+  body: { proposedScore: number; replyNote?: string },
+) {
+  return apiPatch<ScoreCorrectionRequest>(
+    `/results/score-corrections/${id}/propose`,
+    body,
+  );
+}
+
+export async function approveScoreCorrection(
+  id: string,
+  body?: { reviewNote?: string },
+) {
+  return apiPost<ScoreCorrectionRequest>(
+    `/results/score-corrections/${id}/approve`,
+    body ?? {},
+  );
+}
+
+export async function rejectScoreCorrection(
+  id: string,
+  body?: { reviewNote?: string },
+) {
+  return apiPost<ScoreCorrectionRequest>(
+    `/results/score-corrections/${id}/reject`,
+    body ?? {},
+  );
+}

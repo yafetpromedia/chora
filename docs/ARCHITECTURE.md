@@ -9,7 +9,7 @@
 | Students & setup | Grades, sections, import, Fayeda hook |
 | Attendance | Manual, bulk, QR scan, analytics |
 | Teachers | Profiles, assignments, scoped dashboards |
-| **Academic engine** | Years, terms, subjects, templates, scores, workflow, report cards |
+| **Academic engine** | Years, terms, subjects, templates, scores, workflow, report cards, score corrections |
 | Finance | Fees, schedules, manual payment verification |
 | eLibrary | Resources, upload, audience, favorites, reading progress |
 | Announcements & notifications | School posts + bell on all portals; parent fee/attendance inbox |

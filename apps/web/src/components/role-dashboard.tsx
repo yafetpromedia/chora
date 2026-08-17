@@ -31,6 +31,7 @@ import { hasPermission, Permission } from "@/lib/permissions";
 import { getStaffWorkspaceTitle } from "@/lib/staff-workspace";
 import { listLibraryResources, type LibraryResource } from "@/lib/library";
 import { readSchoolBrand } from "@/lib/school-brand";
+import { BRAND_NAME } from "@/lib/brand";
 
 type Props = {
   role: UserRole;
@@ -203,7 +204,7 @@ export function RoleDashboard({ role }: Props) {
     );
   }
 
-  const schoolName = schoolInfo?.name ?? readSchoolBrand().name ?? "CampusOne";
+  const schoolName = schoolInfo?.name ?? readSchoolBrand().name ?? BRAND_NAME;
 
   if (canViewAdminDashboard) {
     return (

@@ -14,6 +14,7 @@ import {
 import { loadStaffDashboardBase } from "@/components/dashboard/staff-dashboard-data";
 import { DashIcon } from "@/components/dashboard/dash-icons";
 import { getStaffWorkspaceLabel, getStaffWorkspaceSubtitle } from "@/lib/staff-workspace";
+import { BRAND_NAME } from "@/lib/brand";
 
 type Props = {
   error: string;
@@ -21,7 +22,7 @@ type Props = {
 
 export function FinanceOfficerDashboard({ error }: Props) {
   const [loading, setLoading] = useState(true);
-  const [schoolName, setSchoolName] = useState("CampusOne");
+  const [schoolName, setSchoolName] = useState(BRAND_NAME);
   const [adminDay, setAdminDay] = useState<AdminDayOverview | null>(null);
   const [finance, setFinance] = useState<FinanceAnalytics | null>(null);
   const [studentCount, setStudentCount] = useState(0);

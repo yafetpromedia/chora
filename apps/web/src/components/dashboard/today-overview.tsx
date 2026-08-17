@@ -37,8 +37,8 @@ export function AdminTodayOverview({ day }: { day: AdminDayOverview }) {
           <span className="dash-admin-today__label">Classes marked</span>
         </div>
         <div className="dash-admin-today__stat">
-          <span className="dash-admin-today__value">{day.academics.pendingResultApprovals}</span>
-          <span className="dash-admin-today__label">Results to approve</span>
+          <span className="dash-admin-today__value">{day.staff.teachersTotal}</span>
+          <span className="dash-admin-today__label">Teachers</span>
         </div>
       </div>
 

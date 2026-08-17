@@ -1,5 +1,23 @@
 import { apiFetch } from "@/lib/api";
 
+export type GradeAttendanceRow = {
+  grade: string;
+  rate: number;
+  marked: number;
+  enrolled: number;
+  present: number;
+  absent: number;
+  sections: {
+    section: string | null;
+    label: string;
+    rate: number;
+    marked: number;
+    enrolled: number;
+    present: number;
+    absent: number;
+  }[];
+};
+
 export type AdminAnalyticsOverview = {
   attendanceToday: {
     rate: number | null;
@@ -16,7 +34,7 @@ export type AdminAnalyticsOverview = {
     present: number;
     absent: number;
   }[];
-  gradeAttendance: { grade: string; rate: number; marked: number }[];
+  gradeAttendance: GradeAttendanceRow[];
   enrollment: {
     students: number;
     teachers: number;

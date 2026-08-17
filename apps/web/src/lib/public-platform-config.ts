@@ -1,7 +1,5 @@
 import { getApiBaseUrl } from "@/lib/api";
 
-export const DEFAULT_LANDING_HERO = "/images/hero-campus.png";
-
 export type PublicPlatformConfig = {
   platformName: string;
   allowSelfRegistration: boolean;
@@ -25,7 +23,8 @@ export async function getPublicPlatformConfig(): Promise<PublicPlatformConfig> {
   return res.json() as Promise<PublicPlatformConfig>;
 }
 
+/** Custom upload/URL when set; otherwise null (UI uses branded gradient). */
 export function resolveLandingHeroUrl(url: string | null | undefined) {
   const trimmed = url?.trim();
-  return trimmed || DEFAULT_LANDING_HERO;
+  return trimmed || null;
 }

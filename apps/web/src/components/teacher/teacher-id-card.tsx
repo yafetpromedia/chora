@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import QRCode from "qrcode";
 import { StudentCardBarcode } from "@/components/students/student-card-barcode";
 import type { TeacherIdCard } from "@/lib/teacher-cards";
+import { BRAND_NAME } from "@/lib/brand";
 
 export type TeacherIdCardVariant = "standard" | "compact" | "mini";
 
@@ -185,7 +186,7 @@ export function TeacherIdCardView({
       <header className="sid__back-head">
         <strong>{card.schoolName}</strong>
         <span>
-          Powered by CampusOne · {card.schoolJoinCode}
+          Powered by {BRAND_NAME} · {card.schoolJoinCode}
           {card.schoolPhone ? ` · ${card.schoolPhone}` : ""}
         </span>
       </header>
@@ -204,8 +205,19 @@ export function TeacherIdCardView({
           </div>
 
           <div className="sid__body-signature">
-            <div className="sid__body-signature-line" aria-hidden />
-            <span className="sid__body-signature-label">Authorized signature</span>
+            {card.schoolSignatureUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                className="sid__body-signature-img"
+                src={card.schoolSignatureUrl}
+                alt=""
+              />
+            ) : (
+              <div className="sid__body-signature-line" aria-hidden />
+            )}
+            <span className="sid__body-signature-label">
+              {card.schoolSignatureLabel?.trim() || "Authorized signature"}
+            </span>
           </div>
         </div>
 

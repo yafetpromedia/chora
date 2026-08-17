@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { TeacherIdCardView } from "@/components/teacher/teacher-id-card";
 import { AUTH_TOKEN_KEY } from "@/lib/auth";
 import { listTeacherIdCards, type TeacherIdCard } from "@/lib/teacher-cards";
+import { BRAND_NAME } from "@/lib/brand";
 
 export default function PrintTeacherIdCardsPage() {
   const router = useRouter();
@@ -58,7 +59,7 @@ export default function PrintTeacherIdCardsPage() {
   return (
     <div className="sid-print-page sid-print-page--bulk">
       <header className="sid-print-meta sid-print-meta--page no-print">
-        <p className="sid-print-meta__brand">CampusOne · Faculty ID bulk print</p>
+        <p className="sid-print-meta__brand">{BRAND_NAME} · Faculty ID bulk print</p>
         <p className="sid-print-meta__sub">
           {cards.length} card{cards.length === 1 ? "" : "s"} · Enable background graphics ·
           Double-sided long edge

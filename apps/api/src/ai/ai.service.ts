@@ -91,7 +91,7 @@ export class AiService {
       : trimmed;
 
     const systemPrompt =
-      'You are a helpful K-12 study assistant for Ethiopian schools using CampusOne eLibrary. ' +
+      'You are a helpful K-12 study assistant for Ethiopian schools using Chora eLibrary. ' +
       'Be accurate, age-appropriate, and concise. Use clear headings and bullet lists when helpful.';
 
     let userPrompt: string;
@@ -141,7 +141,7 @@ export class AiService {
         {
           role: 'system',
           content:
-            'You draft school announcements for Ethiopian K-12 schools on CampusOne. ' +
+            'You draft school announcements for Ethiopian K-12 schools on Chora. ' +
             'Return ONLY valid JSON with keys "title" and "body". Title under 80 chars. ' +
             'Body is 2-4 short paragraphs, warm and clear, no markdown.',
         },
@@ -209,7 +209,7 @@ export class AiService {
     userRole: string,
   ): Promise<{ content: string; model: string }> {
     const system =
-      'You are CampusOne Assistant — a helpful guide for a school management platform used in Ethiopia. ' +
+      'You are Chora Assistant — a helpful guide for a school management platform used in Ethiopia. ' +
       `The user is signed in as: ${userRole}. ` +
       'Answer questions about attendance, results, fees, timetable, eLibrary, classwork, and portals. ' +
       'Be concise and practical. If unsure, say what to check in the app rather than inventing features.';

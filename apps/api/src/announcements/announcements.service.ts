@@ -28,9 +28,15 @@ export class AnnouncementsService {
   }
 
   async list(schoolId: string, userId?: string) {
+    const visibility = userId
+      ? {
+          OR: [{ recipientUserId: null }, { recipientUserId: userId }],
+        }
+      : { recipientUserId: null };
+
     if (!userId) {
       const rows = await this.prisma.announcement.findMany({
-        where: { schoolId },
+        where: { schoolId, ...visibility },
         orderBy: { createdAt: 'desc' },
       });
       return rows.map((row) => ({
@@ -44,7 +50,7 @@ export class AnnouncementsService {
     }
 
     const rows = await this.prisma.announcement.findMany({
-      where: { schoolId },
+      where: { schoolId, ...visibility },
       orderBy: { createdAt: 'desc' },
       include: {
         reads: {
@@ -88,6 +94,7 @@ export class AnnouncementsService {
     const count = await this.prisma.announcement.count({
       where: {
         schoolId,
+        OR: [{ recipientUserId: null }, { recipientUserId: userId }],
         reads: {
           none: { userId },
         },
@@ -100,6 +107,7 @@ export class AnnouncementsService {
     const unread = await this.prisma.announcement.findMany({
       where: {
         schoolId,
+        OR: [{ recipientUserId: null }, { recipientUserId: userId }],
         reads: { none: { userId } },
       },
       select: { id: true },

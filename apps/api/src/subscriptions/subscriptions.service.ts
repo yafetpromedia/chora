@@ -137,7 +137,7 @@ export class SubscriptionsService {
     const status = await this.getStatus(schoolId);
     if (!status.isActive || status.expired) {
       throw new ForbiddenException(
-        'Your CampusOne trial has ended. Upgrade to continue managing your school.',
+        'Your Chora trial has ended. Upgrade to continue managing your school.',
       );
     }
     return status;
@@ -293,7 +293,7 @@ export class SubscriptionsService {
         paymentReference: txRef,
         billingInterval: interval,
         initiatedBy: adminId,
-        notes: `CampusOne ${planRow.label} plan (${interval}ly)`,
+        notes: `Chora ${planRow.label} plan (${interval}ly)`,
       },
     });
 
@@ -314,7 +314,7 @@ export class SubscriptionsService {
         callback_url: `${apiUrl}/payments/chapa/callback`,
         return_url: `${webAppUrl}/admin/billing/plans?chapa_return=1&tx_ref=${encodeURIComponent(txRef)}`,
         customization: {
-          title: `${school?.name ?? 'CampusOne'} — ${planRow.label}`,
+          title: `${school?.name ?? 'Chora'} — ${planRow.label}`,
           description: `${intervalLabel} subscription`,
         },
       });

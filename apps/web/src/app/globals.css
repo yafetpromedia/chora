@@ -4,7 +4,7 @@
   --font-sans: var(--font-figtree), "Figtree", system-ui, sans-serif;
 }
 
-/* CampusOne design tokens — available on every page */
+/* Chora design tokens — available on every page */
 :root {
   --brand-teal: #3d9b9b;
   --brand-teal-dark: #2a6f6f;

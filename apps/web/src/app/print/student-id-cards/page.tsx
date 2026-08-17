@@ -12,6 +12,7 @@ import {
   type IdCardPrintStyle,
 } from "@/lib/student-card-print";
 import { countStudentIdCards, listStudentIdCards, type StudentIdCard } from "@/lib/student-cards";
+import { BRAND_NAME } from "@/lib/brand";
 
 function parseFilters(params: URLSearchParams) {
   const gradeId = params.get("gradeId") ?? undefined;
@@ -177,7 +178,7 @@ function BulkPrintPageInner() {
     return (
       <div className="sid-print-page">
         <div className="sid-print-progress">
-          <p className="sid-print-progress__brand">CampusOne · Bulk ID cards</p>
+          <p className="sid-print-progress__brand">{BRAND_NAME} · Bulk ID cards</p>
           <h1>Preparing print job</h1>
           <p className="sid-print-progress__label">{progress.label || "Starting…"}</p>
           <div className="sid-print-progress__bar" aria-hidden>
@@ -212,7 +213,7 @@ function BulkPrintPageInner() {
             <img src={cards[0].schoolLogoUrl} alt="" className="sid-print-meta__logo" />
           ) : null}
           <div className="sid-print-meta__copy">
-            <p className="sid-print-meta__brand">CampusOne · Bulk student IDs</p>
+            <p className="sid-print-meta__brand">{BRAND_NAME} · Bulk student IDs</p>
             <h1 className="sid-print-meta__title">{schoolName}</h1>
             <p className="sid-print-meta__sub">
               {cards.length.toLocaleString()} of {total.toLocaleString()} students · {filterLabel}

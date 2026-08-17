@@ -1,4 +1,4 @@
-/* CampusOne AI — chat widget, report comments, announcement drafts */
+/* Chora AI — chat widget, report comments, announcement drafts */
 
 .ai-inline-btn {
   border: none;
@@ -261,6 +261,13 @@
 
   .ai-chat {
     right: 0.75rem;
-    bottom: 0.75rem;
+    bottom: calc(4.75rem + env(safe-area-inset-bottom, 0px));
   }
+}
+
+/* Keep the AI FAB from covering manage/ID dialog footers */
+body:has(.stu-manage-drawer) .ai-chat,
+body:has(.sid-modal) .ai-chat,
+body:has(.sid-print-dialog) .ai-chat {
+  display: none;
 }

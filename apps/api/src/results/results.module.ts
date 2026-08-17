@@ -8,6 +8,7 @@ import { AssessmentTemplatesService } from './assessment-templates.service';
 import { ResultWorkflowService } from './result-workflow.service';
 import { ResultsController } from './results.controller';
 import { ResultsService } from './results.service';
+import { ScoreCorrectionsService } from './score-corrections.service';
 
 @Module({
   imports: [TeachersModule],
@@ -20,6 +21,7 @@ import { ResultsService } from './results.service';
     ResultWorkflowService,
     AcademicEnrollmentService,
     AcademicPromotionService,
+    ScoreCorrectionsService,
   ],
   exports: [
     AcademicsService,
@@ -28,6 +30,7 @@ import { ResultsService } from './results.service';
     ResultWorkflowService,
     AcademicEnrollmentService,
     AcademicPromotionService,
+    ScoreCorrectionsService,
   ],
 })
 export class ResultsModule {}

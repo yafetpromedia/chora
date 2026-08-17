@@ -7,6 +7,8 @@ export type SchoolSettings = {
   slug: string;
   joinCode: string;
   logoUrl: string | null;
+  authorizedSignatureUrl: string | null;
+  authorizedSignatureLabel: string | null;
   primaryColor: string | null;
   accentColor: string | null;
   accentDeep: string | null;
@@ -43,6 +45,8 @@ export type UpdateSchoolSettingsPayload = {
   phone?: string;
   country?: string;
   logoUrl?: string;
+  authorizedSignatureUrl?: string;
+  authorizedSignatureLabel?: string;
   primaryColor?: string | null;
   accentColor?: string | null;
   accentDeep?: string | null;

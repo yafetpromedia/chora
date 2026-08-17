@@ -2,7 +2,6 @@
 
 import { useRef, useState } from "react";
 import { fileToHeroDataUrl } from "@/lib/student-photo";
-import { DEFAULT_LANDING_HERO } from "@/lib/public-platform-config";
 import { AppToast } from "@/components/ui/app-toast";
 
 type Props = {
@@ -26,15 +25,15 @@ export function LandingHeroUpload({ value, onChange, disabled }: Props) {
     }
   }
 
-  const preview = value.trim() || DEFAULT_LANDING_HERO;
-  const isCustom = Boolean(value.trim());
+  const preview = value.trim();
+  const isCustom = Boolean(preview);
 
   return (
     <div className="cfg-logo-upload">
       <p className="cfg-logo-upload__label">Landing hero image</p>
       <p className="cfg-section__lead" style={{ marginTop: 0 }}>
-        Shown on the public homepage and school registration screens. Leave empty to use the
-        default CampusOne campus photo.
+        Shown on the public homepage and school registration screens. Leave empty
+        for the branded gradient background.
       </p>
 
       <div
@@ -43,15 +42,18 @@ export function LandingHeroUpload({ value, onChange, disabled }: Props) {
           borderRadius: "0.85rem",
           overflow: "hidden",
           aspectRatio: "16 / 9",
-          background: "#0f172a",
+          background:
+            "linear-gradient(155deg, #0f2d2d 0%, #0f766e 40%, #14b8a6 100%)",
         }}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={preview}
-          alt=""
-          style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-        />
+        {isCustom ? (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img
+            src={preview}
+            alt=""
+            style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+          />
+        ) : null}
       </div>
 
       <div className="cfg-logo-upload__row" style={{ marginTop: "0.85rem" }}>
@@ -71,7 +73,7 @@ export function LandingHeroUpload({ value, onChange, disabled }: Props) {
               disabled={disabled}
               onClick={() => onChange("")}
             >
-              Use default
+              Remove image
             </button>
           ) : null}
           <input

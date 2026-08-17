@@ -15,6 +15,7 @@ import {
 import { loadStaffDashboardBase } from "@/components/dashboard/staff-dashboard-data";
 import { DashIcon } from "@/components/dashboard/dash-icons";
 import { getStaffWorkspaceLabel, getStaffWorkspaceSubtitle } from "@/lib/staff-workspace";
+import { BRAND_NAME } from "@/lib/brand";
 
 type Props = {
   error: string;
@@ -22,7 +23,7 @@ type Props = {
 
 export function AttendanceOfficerDashboard({ error }: Props) {
   const [loading, setLoading] = useState(true);
-  const [schoolName, setSchoolName] = useState("CampusOne");
+  const [schoolName, setSchoolName] = useState(BRAND_NAME);
   const [adminDay, setAdminDay] = useState<AdminDayOverview | null>(null);
   const [analytics, setAnalytics] = useState<AdminAnalyticsOverview | null>(null);
   const [studentCount, setStudentCount] = useState(0);
@@ -144,11 +145,11 @@ export function AttendanceOfficerDashboard({ error }: Props) {
                 <AttendanceTodayRing today={today} />
               </article>
 
-              <article className="da-card da-card--span2">
+              <article className="da-card">
                 <header className="da-card__head">
                   <div>
                     <h2 className="da-card__title">By grade today</h2>
-                    <p className="da-card__sub">Attendance rate per class</p>
+                    <p className="da-card__sub">Tap a grade for section detail</p>
                   </div>
                 </header>
                 <GradeAttendanceBars grades={analytics.gradeAttendance} />

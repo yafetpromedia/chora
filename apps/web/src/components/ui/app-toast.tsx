@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 
-export type AppToastTone = "success" | "error";
+export type AppToastTone = "success" | "error" | "warn";
 
 type Props = {
   message: string | null | undefined;

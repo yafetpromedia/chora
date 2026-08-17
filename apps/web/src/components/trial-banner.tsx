@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import type { SubscriptionStatus } from "@/lib/api";
+import { BRAND_NAME } from "@/lib/brand";
 
 type TrialBannerProps = {
   subscription: SubscriptionStatus;
@@ -30,7 +31,7 @@ export function TrialBanner({ subscription }: TrialBannerProps) {
     return (
       <section className="trial-banner trial-banner--expired" role="alert">
         <div className="trial-banner-body">
-          <h2 className="trial-banner-title">Your CampusOne trial has ended</h2>
+          <h2 className="trial-banner-title">Your {BRAND_NAME} trial has ended</h2>
           <p className="trial-banner-text">
             Upgrade to continue managing attendance, results, and announcements for your school.
           </p>
@@ -64,7 +65,7 @@ export function TrialBanner({ subscription }: TrialBannerProps) {
               : "Free trial active"}
         </p>
         <h2 className="trial-banner-title">
-          {daysLeft} day{daysLeft === 1 ? "" : "s"} remaining on CampusOne
+          {daysLeft} day{daysLeft === 1 ? "" : "s"} remaining on {BRAND_NAME}
         </h2>
         <p className="trial-banner-text">
           {subscription.usage.students} / {studentLimit} students ·{" "}

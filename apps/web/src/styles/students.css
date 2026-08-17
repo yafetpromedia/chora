@@ -1,4 +1,4 @@
-/* CampusOne — students management */
+/* Chora — students management */
 
 .stu-page {
   display: flex;
@@ -865,6 +865,40 @@
 .stu-manage-foot {
   justify-content: space-between;
   background: #fff;
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 640px) {
+  .stu-manage-hero__title {
+    font-size: clamp(1.15rem, 5.5vw, 1.55rem);
+    line-height: 1.15;
+    overflow-wrap: anywhere;
+  }
+
+  .stu-manage-tabs {
+    gap: 0.35rem;
+    padding-bottom: 0.15rem;
+  }
+
+  .stu-manage-tab {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  .stu-manage-foot .stu-drawer__foot-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .stu-manage-foot .stu-drawer__foot-actions > * {
+    flex: 1 1 auto;
+    min-width: 5.5rem;
+  }
 }
 
 .stu-btn--ghost-danger {

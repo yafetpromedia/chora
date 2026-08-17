@@ -2,6 +2,7 @@
 
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useState } from "react";
+import { BRAND_NAME } from "@/lib/brand";
 
 const FAQS = [
   {
@@ -10,11 +11,11 @@ const FAQS = [
   },
   {
     q: "Can we pay in Ethiopian birr?",
-    a: "Yes. Plans are listed in USD and ETB. When you are on a paid plan, CampusOne can invoice your school in the currency you choose.",
+    a: `Yes. Plans are listed in USD and ETB. When you are on a paid plan, ${BRAND_NAME} can invoice your school in the currency you choose.`,
   },
   {
     q: "Do parents need to download an app?",
-    a: "They can use the CampusOne app on Google Play or the App Store, or sign in through the mobile-friendly web portal. Same school code and login either way.",
+    a: `They can use the ${BRAND_NAME} app on Google Play or the App Store, or sign in through the mobile-friendly web portal. Same school code and login either way.`,
   },
   {
     q: "What happens when the trial ends?",

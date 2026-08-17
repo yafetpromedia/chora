@@ -8,6 +8,7 @@ import {
   sendAiChat,
   type AiChatMessage,
 } from "@/lib/ai";
+import { BRAND_NAME } from "@/lib/brand";
 
 type Props = {
   role: UserRole;
@@ -96,10 +97,10 @@ export function AiChatWidget({ role }: Props) {
   return (
     <div className={`ai-chat${open ? " ai-chat--open" : ""}`}>
       {open ? (
-        <section className="ai-chat__panel" aria-label="CampusOne AI assistant">
+        <section className="ai-chat__panel" aria-label={`${BRAND_NAME} AI assistant`}>
           <header className="ai-chat__head">
             <div>
-              <strong>CampusOne Assistant</strong>
+              <strong>{BRAND_NAME} Assistant</strong>
               <span>Powered by AI</span>
             </div>
             <button
@@ -114,7 +115,7 @@ export function AiChatWidget({ role }: Props) {
           <div className="ai-chat__messages" ref={listRef}>
             {messages.length === 0 ? (
               <div className="ai-chat__empty">
-                <p>Ask anything about CampusOne — attendance, results, fees, and more.</p>
+                <p>Ask anything about {BRAND_NAME} — attendance, results, fees, and more.</p>
                 <div className="ai-chat__starters">
                   {starters.map((q) => (
                     <button
@@ -158,7 +159,7 @@ export function AiChatWidget({ role }: Props) {
         className="ai-chat__fab"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        title="CampusOne AI assistant"
+        title={`${BRAND_NAME} AI assistant`}
       >
         <span className="ai-chat__fab-icon" aria-hidden>
           ✦

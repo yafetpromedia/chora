@@ -28,6 +28,7 @@ import {
   type PlanType,
   type SubscriptionStatus,
 } from "@/lib/api";
+import { BRAND_NAME } from "@/lib/brand";
 import { AUTH_ROLE_KEY, AUTH_TOKEN_KEY } from "@/lib/auth";
 
 const YEARLY_MULTIPLIER = 10;
@@ -153,7 +154,7 @@ function SchoolPlansPageContent() {
 
   async function onSelectPlan(plan: Exclude<PlanType, "TRIAL" | "ENTERPRISE">) {
     if (!chapaEnabled) {
-      setError("Online payments are not configured. Contact CampusOne support.");
+      setError(`Online payments are not configured. Contact ${BRAND_NAME} support.`);
       return;
     }
 

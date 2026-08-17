@@ -28,11 +28,9 @@ export function RegisterVisualPanel({ activeStep }: Props) {
   return (
     <div className="reg-visual reg-visual--photo">
       <div className="reg-visual__bg" aria-hidden>
-        <img
-          src={heroSrc}
-          alt=""
-          className="reg-visual__photo"
-        />
+        {heroSrc ? (
+          <img src={heroSrc} alt="" className="reg-visual__photo" />
+        ) : null}
         <div className="reg-visual__tint" />
       </div>
 

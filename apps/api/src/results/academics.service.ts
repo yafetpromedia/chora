@@ -527,6 +527,7 @@ export class AcademicsService implements OnModuleInit {
         name: dto.name.trim(),
         maxScore: dto.maxScore ?? 100,
         weightPercent: dto.weightPercent ?? 100,
+        entryLocked: false,
       },
     });
   }
@@ -667,7 +668,12 @@ export class AcademicsService implements OnModuleInit {
 
     const school = await this.prisma.school.findUnique({
       where: { id: schoolId },
-      select: { name: true, logoUrl: true },
+      select: {
+        name: true,
+        logoUrl: true,
+        authorizedSignatureUrl: true,
+        authorizedSignatureLabel: true,
+      },
     });
 
     const term = await this.prisma.academicTerm.findFirst({
@@ -754,7 +760,7 @@ export class AcademicsService implements OnModuleInit {
         : null;
 
     return {
-      school: { name: school?.name ?? 'School', logoUrl: school?.logoUrl ?? null },
+      school: { name: school?.name ?? 'School', logoUrl: school?.logoUrl ?? null, authorizedSignatureUrl: school?.authorizedSignatureUrl ?? null, authorizedSignatureLabel: school?.authorizedSignatureLabel ?? null },
       student: {
         profileId: profile.id,
         name: `${profile.user.firstName} ${profile.user.lastName}`,
@@ -948,6 +954,8 @@ export class AcademicsService implements OnModuleInit {
     })) as {
       name: string;
       logoUrl: string | null;
+      authorizedSignatureUrl?: string | null;
+      authorizedSignatureLabel?: string | null;
       address: string | null;
       email: string | null;
       phone: string | null;
@@ -1140,6 +1148,8 @@ export class AcademicsService implements OnModuleInit {
       school: {
         name: school?.name ?? report.school.name,
         logoUrl: school?.logoUrl ?? report.school.logoUrl ?? null,
+        authorizedSignatureUrl: school?.authorizedSignatureUrl ?? null,
+        authorizedSignatureLabel: school?.authorizedSignatureLabel ?? null,
         address: school?.address ?? null,
         email: school?.email ?? null,
         phone: school?.phone ?? null,

@@ -372,6 +372,7 @@ export class TeacherDashboardService {
           : [];
       markedToday = todayRecords.length;
       presentToday = todayRecords.filter((r) => isPresent(r.status)).length;
+      const rosterSize = homeroomStudentIds.length;
 
       for (let i = 6; i >= 0; i--) {
         const d = todayUtc(i);
@@ -392,7 +393,10 @@ export class TeacherDashboardService {
         attendanceTrend.push({
           date: d.toISOString().slice(0, 10),
           weekday: d.toLocaleDateString('en-US', { weekday: 'short' }),
-          rate: marked > 0 ? Math.round((present / marked) * 100) : null,
+          rate:
+            marked > 0 && rosterSize > 0
+              ? Math.round((present / rosterSize) * 100)
+              : null,
           marked,
           present,
         });
@@ -496,6 +500,10 @@ export class TeacherDashboardService {
         ? Math.round((gradingComplete / gradingTotal) * 100)
         : null;
 
+    const attendanceRoster = canTakeAttendance
+      ? classBuckets.reduce((s, b) => s + b.studentCount, 0)
+      : 0;
+
     return {
       totalStudents,
       subjectsTeaching: teachingSlots.length,
@@ -503,12 +511,10 @@ export class TeacherDashboardService {
       attendanceToday: {
         marked: markedToday,
         present: presentToday,
-        total: canTakeAttendance
-          ? classBuckets.reduce((s, b) => s + b.studentCount, 0)
-          : 0,
+        total: attendanceRoster,
         rate:
-          canTakeAttendance && markedToday > 0
-            ? Math.round((presentToday / markedToday) * 100)
+          canTakeAttendance && markedToday > 0 && attendanceRoster > 0
+            ? Math.round((presentToday / attendanceRoster) * 100)
             : null,
         pendingClasses: canTakeAttendance ? attendancePending.length : 0,
       },

@@ -1,4 +1,4 @@
-/* CampusOne — school settings */
+/* Chora — school settings */
 
 .cfg-page {
   display: flex;
@@ -271,6 +271,17 @@
   font-size: 0.72rem;
   font-weight: 600;
   color: var(--brand-faint);
+}
+
+.cfg-sig-upload__thumb {
+  width: 9rem;
+  height: 4.5rem;
+  background: #fff;
+}
+
+.cfg-sig-upload__thumb img {
+  object-fit: contain;
+  object-position: center;
 }
 
 .cfg-logo-upload__actions {

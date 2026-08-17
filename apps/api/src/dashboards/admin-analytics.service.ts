@@ -97,6 +97,9 @@ export class AdminAnalyticsService {
   }
 
   private async buildAttendanceTrend(schoolId: string, days: number) {
+    const totalStudents = await this.prisma.studentProfile.count({
+      where: { schoolId },
+    });
     const out: {
       date: string;
       weekday: string;
@@ -114,13 +117,15 @@ export class AdminAnalyticsService {
       });
       const marked = records.length;
       const present = records.filter((r) => isPresent(r.status)).length;
-      const absent = records.filter(
-        (r) => r.status === AttendanceStatus.absent,
-      ).length;
+      const absent =
+        marked > 0 ? Math.max(0, totalStudents - present) : 0;
       out.push({
         date: d.toISOString().slice(0, 10),
         weekday: d.toLocaleDateString('en-US', { weekday: 'short' }),
-        rate: marked > 0 ? Math.round((present / marked) * 100) : null,
+        rate:
+          marked > 0 && totalStudents > 0
+            ? Math.round((present / totalStudents) * 100)
+            : null,
         marked,
         present,
         absent,
@@ -131,31 +136,113 @@ export class AdminAnalyticsService {
 
   private async gradeRatesToday(schoolId: string) {
     const d = dayUtc(0);
-    const records = await this.prisma.attendanceRecord.findMany({
-      where: { schoolId, date: d, periodNumber: 0 },
-      include: {
-        studentProfile: {
-          include: { grade: { select: { name: true } } },
+    const [students, records] = await Promise.all([
+      this.prisma.studentProfile.findMany({
+        where: { schoolId },
+        select: {
+          id: true,
+          grade: { select: { name: true } },
+          section: { select: { name: true } },
         },
-      },
-    });
+      }),
+      this.prisma.attendanceRecord.findMany({
+        where: { schoolId, date: d, periodNumber: 0 },
+        select: { studentProfileId: true, status: true },
+      }),
+    ]);
 
-    const byGrade = new Map<string, { present: number; total: number }>();
-    for (const r of records) {
-      const name = r.studentProfile.grade.name;
-      const bucket = byGrade.get(name) ?? { present: 0, total: 0 };
-      bucket.total += 1;
-      if (isPresent(r.status)) bucket.present += 1;
-      byGrade.set(name, bucket);
+    const statusByStudent = new Map(
+      records.map((r) => [r.studentProfileId, r.status] as const),
+    );
+
+    type Bucket = { present: number; enrolled: number; marked: number };
+    const byGrade = new Map<string, Bucket>();
+    const bySection = new Map<string, Bucket & { grade: string; section: string | null }>();
+
+    for (const s of students) {
+      const grade = s.grade.name;
+      const section = s.section?.name ?? null;
+      const sectionKey = `${grade}|${section ?? ''}`;
+
+      const gradeBucket = byGrade.get(grade) ?? {
+        present: 0,
+        enrolled: 0,
+        marked: 0,
+      };
+      gradeBucket.enrolled += 1;
+
+      const sectionBucket = bySection.get(sectionKey) ?? {
+        grade,
+        section,
+        present: 0,
+        enrolled: 0,
+        marked: 0,
+      };
+      sectionBucket.enrolled += 1;
+
+      const status = statusByStudent.get(s.id);
+      if (status !== undefined) {
+        gradeBucket.marked += 1;
+        sectionBucket.marked += 1;
+        if (isPresent(status)) {
+          gradeBucket.present += 1;
+          sectionBucket.present += 1;
+        }
+      }
+
+      byGrade.set(grade, gradeBucket);
+      bySection.set(sectionKey, sectionBucket);
+    }
+
+    const sectionsByGrade = new Map<
+      string,
+      {
+        section: string | null;
+        label: string;
+        rate: number;
+        marked: number;
+        enrolled: number;
+        present: number;
+        absent: number;
+      }[]
+    >();
+
+    for (const b of bySection.values()) {
+      if (b.marked === 0) continue;
+      const list = sectionsByGrade.get(b.grade) ?? [];
+      list.push({
+        section: b.section,
+        label: b.section ? `${b.grade}-${b.section}` : b.grade,
+        rate:
+          b.enrolled > 0 ? Math.round((b.present / b.enrolled) * 100) : 0,
+        marked: b.marked,
+        enrolled: b.enrolled,
+        present: b.present,
+        absent: Math.max(0, b.enrolled - b.present),
+      });
+      sectionsByGrade.set(b.grade, list);
+    }
+
+    for (const list of sectionsByGrade.values()) {
+      list.sort(
+        (a, b) =>
+          a.rate - b.rate ||
+          (a.section ?? '').localeCompare(b.section ?? ''),
+      );
     }
 
     return [...byGrade.entries()]
+      .filter(([, b]) => b.marked > 0)
       .map(([grade, b]) => ({
         grade,
-        rate: b.total > 0 ? Math.round((b.present / b.total) * 100) : 0,
-        marked: b.total,
+        rate:
+          b.enrolled > 0 ? Math.round((b.present / b.enrolled) * 100) : 0,
+        marked: b.marked,
+        enrolled: b.enrolled,
+        present: b.present,
+        absent: Math.max(0, b.enrolled - b.present),
+        sections: sectionsByGrade.get(grade) ?? [],
       }))
-      .sort((a, b) => b.rate - a.rate)
-      .slice(0, 6);
+      .sort((a, b) => a.rate - b.rate || a.grade.localeCompare(b.grade));
   }
 }

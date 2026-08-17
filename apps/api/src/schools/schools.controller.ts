@@ -65,6 +65,8 @@ export class SchoolsController {
       phone: dto.phone,
       country: dto.country,
       logoUrl: dto.logoUrl,
+      authorizedSignatureUrl: dto.authorizedSignatureUrl,
+      authorizedSignatureLabel: dto.authorizedSignatureLabel,
       primaryColor: dto.primaryColor,
       accentColor: dto.accentColor,
       accentDeep: dto.accentDeep,

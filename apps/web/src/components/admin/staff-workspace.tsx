@@ -18,6 +18,7 @@ import {
   type StaffPermissionsDetail,
   type TeacherRecord,
 } from "@/lib/teachers";
+import { BRAND_NAME } from "@/lib/brand";
 import { AppToast } from "@/components/ui/app-toast";
 
 function initials(name: string) {
@@ -270,7 +271,7 @@ export function StaffWorkspace() {
             <h2 className="tch-v2__hero-title">Staff & teams</h2>
             <p className="tch-v2__hero-sub">
               Registrar, finance, reception, and leadership accounts. Set permissions to control
-              what each person can access in CampusOne.
+              what each person can access in {BRAND_NAME}.
             </p>
           </div>
           <div className="tch-v2__hero-stats">

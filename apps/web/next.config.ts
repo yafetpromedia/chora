@@ -22,6 +22,16 @@ const nextConfig: NextConfig = {
   },
   // Required in Next 16 when opening dev from http://192.168.x.x:3000 (phone / other PC)
   allowedDevOrigins: LAN_DEV_ORIGINS.flatMap(lanOriginVariants),
+  async rewrites() {
+    if (process.env.NODE_ENV !== "development") return [];
+    const apiPort = process.env.API_PORT?.trim() || "3001";
+    return [
+      {
+        source: "/backend/:path*",
+        destination: `http://127.0.0.1:${apiPort}/:path*`,
+      },
+    ];
+  },
 };
 
 export default nextConfig;

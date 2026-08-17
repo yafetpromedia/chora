@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { StudentSectionBanner } from "@/components/student/student-section-banner";
 import {
+  createScoreCorrection,
   getScoreMatrix,
   getStudentSubjectMatrix,
   listClassSubjects,
@@ -13,6 +14,7 @@ import {
   type StudentSubjectMatrix,
 } from "@/lib/results";
 import { AppToast } from "@/components/ui/app-toast";
+import { MyScoreReportsPanel } from "@/components/results/my-score-reports-panel";
 import {
   ResultsStudentPicker,
   type ResultsStudentOption,
@@ -105,6 +107,17 @@ export function StudentSubjectScoresPanel({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
+  const [reportTarget, setReportTarget] = useState<{
+    assessmentId: string;
+    assessmentName: string;
+    subjectName: string;
+    score: number | null;
+    maxScore: number | null;
+  } | null>(null);
+  const [reportMessage, setReportMessage] = useState("");
+  const [reportBusy, setReportBusy] = useState(false);
+  const [reportFlash, setReportFlash] = useState("");
+  const [reportsRefreshKey, setReportsRefreshKey] = useState(0);
 
   const students = studentsProp.length > 0 ? studentsProp : loadedStudents;
   const showStudentPicker = !hideStudentPicker && !isPortalView && students.length > 0;
@@ -317,6 +330,31 @@ export function StudentSubjectScoresPanel({
       setError(err instanceof Error ? err.message : "Save failed");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function submitScoreReport() {
+    if (!reportTarget || !matrix) return;
+    if (reportMessage.trim().length < 3) {
+      setError("Please describe what looks wrong (at least a few words).");
+      return;
+    }
+    setReportBusy(true);
+    setError("");
+    try {
+      await createScoreCorrection({
+        assessmentId: reportTarget.assessmentId,
+        studentProfileId: matrix.student.id,
+        message: reportMessage.trim(),
+      });
+      setReportFlash("Report sent to your subject teacher. You’ll be notified when it’s reviewed.");
+      setReportTarget(null);
+      setReportMessage("");
+      setReportsRefreshKey((key) => key + 1);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not send report");
+    } finally {
+      setReportBusy(false);
     }
   }
 
@@ -740,15 +778,40 @@ export function StudentSubjectScoresPanel({
 
                         return (
                           <td key={cell.columnKey} className="res-subject-table__cell">
-                            <span
-                              className={`res-subject-pill${
-                                isCommitted
-                                  ? " res-subject-pill--committed"
-                                  : pendingClass
-                              }`}
-                            >
-                              {isPending ? "·" : value}
-                            </span>
+                            <div className="res-subject-cell-stack">
+                              <span
+                                className={`res-subject-pill${
+                                  isCommitted
+                                    ? " res-subject-pill--committed"
+                                    : pendingClass
+                                }`}
+                              >
+                                {isPending ? "·" : value}
+                              </span>
+                              {isPortalView && isPublished && cell.assessmentId ? (
+                                <button
+                                  type="button"
+                                  className="res-subject-report-btn"
+                                  title="Report a wrong published mark"
+                                  onClick={() => {
+                                    const col = matrix.columns.find(
+                                      (c) => c.key === cell.columnKey,
+                                    );
+                                    setReportFlash("");
+                                    setReportMessage("");
+                                    setReportTarget({
+                                      assessmentId: cell.assessmentId!,
+                                      assessmentName: col?.name ?? "Component",
+                                      subjectName: subject.subject,
+                                      score: value,
+                                      maxScore: cell.maxScore,
+                                    });
+                                  }}
+                                >
+                                  Report
+                                </button>
+                              ) : null}
+                            </div>
                           </td>
                         );
                       })}
@@ -776,9 +839,82 @@ export function StudentSubjectScoresPanel({
               <strong>Assessment templates</strong>. Different schools can use different component
               names and weights.
             </p>
-          ) : null}
+          ) : (
+            <p className="res-subject-sheet__hint">
+              See a wrong published mark? Use <strong>Report</strong> under that score. Your
+              teacher will propose a fix and the school office must approve before it updates for
+              everyone.
+            </p>
+          )}
         </section>
       )}
+
+      {isPortalView && termId ? (
+        <MyScoreReportsPanel
+          termId={termId}
+          refreshKey={reportsRefreshKey}
+          role={role === "parent" ? "parent" : "student"}
+          studentProfileId={
+            role === "parent" ? (portalStudentProfileId ?? studentId) : undefined
+          }
+        />
+      ) : null}
+
+      {reportFlash ? (
+        <AppToast
+          message={reportFlash}
+          tone="success"
+          onDismiss={() => setReportFlash("")}
+        />
+      ) : null}
+
+      {reportTarget ? (
+        <div className="res-correction-drawer" role="dialog" aria-modal="true">
+          <div className="res-correction-drawer__panel">
+            <header className="res-correction-drawer__head">
+              <div>
+                <h3>Report score issue</h3>
+                <p>
+                  {reportTarget.subjectName} · {reportTarget.assessmentName}
+                  {reportTarget.score != null
+                    ? ` · showing ${reportTarget.score}${
+                        reportTarget.maxScore != null
+                          ? `/${reportTarget.maxScore}`
+                          : ""
+                      }`
+                    : ""}
+                </p>
+              </div>
+              <button
+                type="button"
+                className="res-approvals__btn res-approvals__btn--sm"
+                onClick={() => setReportTarget(null)}
+              >
+                Cancel
+              </button>
+            </header>
+            <label className="res-correction-drawer__field">
+              <span>What looks wrong?</span>
+              <textarea
+                rows={4}
+                value={reportMessage}
+                onChange={(e) => setReportMessage(e.target.value)}
+                placeholder="Example: Mid exam should be 28, not 18."
+              />
+            </label>
+            <div className="res-correction-drawer__actions">
+              <button
+                type="button"
+                className="res-approvals__btn res-approvals__btn--primary"
+                disabled={reportBusy}
+                onClick={() => void submitScoreReport()}
+              >
+                {reportBusy ? "Sending…" : "Send report"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

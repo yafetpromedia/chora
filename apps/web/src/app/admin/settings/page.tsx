@@ -16,6 +16,7 @@ import { type AttendanceMode } from "@/lib/attendance";
 import type { SchoolType } from "@/lib/api";
 import { getSchoolSubscription, type SubscriptionStatus } from "@/lib/api";
 import { SchoolLogoUpload } from "@/components/school/school-logo-upload";
+import { SchoolSignatureUpload } from "@/components/school/school-signature-upload";
 import { AppToast } from "@/components/ui/app-toast";
 import {
   AUTH_ROLE_KEY,
@@ -28,6 +29,7 @@ import {
   updateSchoolSettings,
   type SchoolSettings,
 } from "@/lib/school-settings";
+import { BRAND_NAME } from "@/lib/brand";
 
 type Tab = "school" | "attendance" | "access" | "plan";
 
@@ -83,6 +85,8 @@ export default function AdminSettingsPage() {
   const [phone, setPhone] = useState("");
   const [country, setCountry] = useState("Ethiopia");
   const [logoUrl, setLogoUrl] = useState("");
+  const [authorizedSignatureUrl, setAuthorizedSignatureUrl] = useState("");
+  const [authorizedSignatureLabel, setAuthorizedSignatureLabel] = useState("");
   const [primaryColor, setPrimaryColor] = useState(DEFAULT_SCHOOL_THEME.primaryColor);
   const [accentColor, setAccentColor] = useState(DEFAULT_SCHOOL_THEME.accentColor);
   const [accentDeep, setAccentDeep] = useState(DEFAULT_SCHOOL_THEME.accentDeep);
@@ -103,6 +107,8 @@ export default function AdminSettingsPage() {
     setPhone(s.phone ?? "");
     setCountry(s.country ?? "Ethiopia");
     setLogoUrl(s.logoUrl ?? "");
+    setAuthorizedSignatureUrl(s.authorizedSignatureUrl ?? "");
+    setAuthorizedSignatureLabel(s.authorizedSignatureLabel ?? "");
     setPrimaryColor(s.primaryColor ?? DEFAULT_SCHOOL_THEME.primaryColor);
     setAccentColor(s.accentColor ?? DEFAULT_SCHOOL_THEME.accentColor);
     setAccentDeep(s.accentDeep ?? DEFAULT_SCHOOL_THEME.accentDeep);
@@ -153,6 +159,8 @@ export default function AdminSettingsPage() {
         phone: phone.trim(),
         country: country.trim(),
         logoUrl: logoUrl.trim(),
+        authorizedSignatureUrl: authorizedSignatureUrl.trim(),
+        authorizedSignatureLabel: authorizedSignatureLabel.trim(),
         primaryColor: primaryColor.trim() || null,
         accentColor: accentColor.trim() || null,
         accentDeep: accentDeep.trim() || null,
@@ -504,6 +512,12 @@ export default function AdminSettingsPage() {
                 value={logoUrl}
                 onChange={setLogoUrl}
               />
+              <SchoolSignatureUpload
+                value={authorizedSignatureUrl}
+                label={authorizedSignatureLabel}
+                onChange={setAuthorizedSignatureUrl}
+                onLabelChange={setAuthorizedSignatureLabel}
+              />
               <div className="cfg-actions">
                 <button type="submit" className="cfg-btn cfg-btn--primary" disabled={saving}>
                   {saving ? "Saving…" : "Save profile"}
@@ -609,7 +623,7 @@ export default function AdminSettingsPage() {
                   <DashIcon name="finance" className="dash-icon--sm" />
                 </span>
                 <div>
-                  <h2 className="set-v2__panel-title">CampusOne subscription</h2>
+                  <h2 className="set-v2__panel-title">{BRAND_NAME} subscription</h2>
                   <p className="set-v2__panel-sub">
                     Your school plan, billing, and seat limits.
                   </p>

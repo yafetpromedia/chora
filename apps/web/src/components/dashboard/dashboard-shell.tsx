@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { apiFetch, apiPost, type Announcement, type SchoolInfo } from "@/lib/api";
 import type { AdminDayOverview } from "@/lib/dashboard-day";
 import {
@@ -17,6 +17,7 @@ import {
   readSchoolBrand,
   SCHOOL_BRAND_UPDATED_EVENT,
 } from "@/lib/school-brand";
+import { BRAND_NAME } from "@/lib/brand";
 import { SchoolBrandLockup } from "./school-brand-lockup";
 import { DashIcon } from "./dash-icons";
 import { getMyTeacherProfile } from "@/lib/teachers";
@@ -30,6 +31,39 @@ import {
 } from "./nav-config";
 import { AiChatWidget } from "@/components/ai/ai-chat-widget";
 
+const ACTION_ALERT_DISMISS_KEY = "campusone.actionAlerts.dismissed";
+
+function todayKey() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function readDismissedActionAlerts(): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const raw = localStorage.getItem(ACTION_ALERT_DISMISS_KEY);
+    if (!raw) return new Set();
+    const parsed = JSON.parse(raw) as { date?: string; types?: string[] };
+    if (parsed.date !== todayKey() || !Array.isArray(parsed.types)) return new Set();
+    return new Set(parsed.types);
+  } catch {
+    return new Set();
+  }
+}
+
+function writeDismissedActionAlerts(types: Set<string>) {
+  localStorage.setItem(
+    ACTION_ALERT_DISMISS_KEY,
+    JSON.stringify({ date: todayKey(), types: [...types] }),
+  );
+}
+
+function hrefForAnnouncement(item: Announcement): string | null {
+  if (/^Support (resolved|update):/i.test(item.title)) {
+    return "/admin/support";
+  }
+  return null;
+}
+
 type Props = {
   role: UserRole;
   children: React.ReactNode;
@@ -40,7 +74,7 @@ type Props = {
 export function DashboardShell({ role, children, title, subtitle }: Props) {
   const pathname = usePathname();
   const router = useRouter();
-  const [schoolName, setSchoolName] = useState("CampusOne");
+  const [schoolName, setSchoolName] = useState(BRAND_NAME);
   const [schoolLogoUrl, setSchoolLogoUrl] = useState<string | null>(null);
   const [mobileNav, setMobileNav] = useState(false);
   const [navRole, setNavRole] = useState<UserRole>(role);
@@ -52,8 +86,13 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
   const [notifyLoading, setNotifyLoading] = useState(false);
   const [showAllNotifications, setShowAllNotifications] = useState(false);
   const [actionAlerts, setActionAlerts] = useState<AdminDayOverview["alerts"]["items"]>([]);
+  const [dismissedActionTypes, setDismissedActionTypes] = useState<Set<string>>(() => new Set());
   const [expandedNav, setExpandedNav] = useState<Record<string, boolean>>({});
   const notifyRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    setDismissedActionTypes(readDismissedActionAlerts());
+  }, []);
 
   useEffect(() => {
     if (!localStorage.getItem(AUTH_TOKEN_KEY)) {
@@ -178,8 +217,12 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
   async function loadActionAlerts() {
     try {
       const res = await apiFetch<{ day?: AdminDayOverview }>("/dashboards/me");
+      const dismissed = readDismissedActionAlerts();
+      setDismissedActionTypes(dismissed);
       if (res.day?.kind === "admin_day") {
-        setActionAlerts(res.day.alerts.items);
+        setActionAlerts(
+          res.day.alerts.items.filter((alert) => !dismissed.has(alert.type)),
+        );
       } else {
         setActionAlerts([]);
       }
@@ -193,7 +236,7 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
     try {
       const tasks: Promise<void>[] = [
         apiFetch<Announcement[]>("/announcements").then((rows) => {
-          setNotifications(rows);
+          setNotifications(rows.filter((row) => !row.isRead));
         }),
       ];
       if (role === "admin" || role === "staff") {
@@ -214,33 +257,57 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
   }
 
   async function markAnnouncementRead(item: Announcement) {
-    if (item.isRead) return;
-    try {
-      await apiPost(`/announcements/${item.id}/read`, {});
-      setNotifications((prev) =>
-        prev.map((n) =>
-          n.id === item.id
-            ? { ...n, isRead: true, readAt: new Date().toISOString() }
-            : n,
-        ),
-      );
-      setUnreadCount((prev) => Math.max(0, prev - 1));
-    } catch {
-      /* no-op */
+    if (!item.isRead) {
+      try {
+        await apiPost(`/announcements/${item.id}/read`, {});
+        setUnreadCount((prev) => Math.max(0, prev - 1));
+      } catch {
+        return;
+      }
     }
+    setNotifications((prev) => prev.filter((n) => n.id !== item.id));
+  }
+
+  async function openNotification(item: Announcement) {
+    const href = hrefForAnnouncement(item);
+    setNotificationsOpen(false);
+    await markAnnouncementRead(item);
+    if (href) router.push(href);
+  }
+
+  async function dismissNotification(item: Announcement, event: MouseEvent) {
+    event.preventDefault();
+    event.stopPropagation();
+    await markAnnouncementRead(item);
   }
 
   async function markAllNotificationsRead() {
     if (unreadCount === 0) return;
     try {
       await apiPost<{ updated: number }>("/announcements/read-all", {});
-      setNotifications((prev) =>
-        prev.map((item) => ({ ...item, isRead: true, readAt: item.readAt ?? new Date().toISOString() })),
-      );
+      setNotifications([]);
       setUnreadCount(0);
     } catch {
       /* no-op */
     }
+  }
+
+  function openActionAlert(href: string) {
+    setNotificationsOpen(false);
+    if (pathname === href || pathname.startsWith(`${href}/`)) {
+      return;
+    }
+    router.push(href);
+  }
+
+  function dismissActionAlert(type: string, event: MouseEvent) {
+    event.preventDefault();
+    event.stopPropagation();
+    const next = new Set(dismissedActionTypes);
+    next.add(type);
+    setDismissedActionTypes(next);
+    writeDismissedActionAlerts(next);
+    setActionAlerts((prev) => prev.filter((alert) => alert.type !== type));
   }
 
   const roleLabel =
@@ -255,7 +322,15 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
             : "Student";
 
   const isAdminWorkspace = role === "admin" || role === "staff";
-  const actionAlertCount = actionAlerts.length;
+  const visibleActionAlerts = actionAlerts.filter((alert) => {
+    if (alert.type === "results") return false;
+    return !(pathname === alert.href || pathname.startsWith(`${alert.href}/`));
+  });
+  const actionAlertCount = visibleActionAlerts.length;
+  const unreadNotifications = notifications.filter((n) => !n.isRead);
+  const visibleNotifications = showAllNotifications
+    ? unreadNotifications
+    : unreadNotifications.slice(0, 8);
   const notifyBadgeCount = unreadCount + (isAdminWorkspace ? actionAlertCount : 0);
   const pageTitle = title ?? (isAdminWorkspace ? "Dashboard" : `${roleLabel} dashboard`);
   const mobileTabs = mobilePrimaryNav(nav, navRole);
@@ -425,64 +500,83 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
                   </header>
                   {notifyLoading ? (
                     <p className="dash-notify-empty">Loading…</p>
-                  ) : actionAlerts.length === 0 && notifications.length === 0 ? (
+                  ) : visibleActionAlerts.length === 0 && unreadNotifications.length === 0 ? (
                     <p className="dash-notify-empty">No notifications yet.</p>
                   ) : (
                     <>
-                      {actionAlerts.length > 0 ? (
+                      {visibleActionAlerts.length > 0 ? (
                         <>
                           <p className="dash-notify-section">Action needed</p>
                           <ul className="dash-notify-list dash-notify-list--actions">
-                            {actionAlerts.map((alert) => (
-                              <li key={alert.type}>
-                                <Link
-                                  href={alert.href}
+                            {visibleActionAlerts.map((alert) => (
+                              <li key={alert.type} className="dash-notify-row">
+                                <button
+                                  type="button"
                                   className="dash-notify-action"
-                                  onClick={() => setNotificationsOpen(false)}
+                                  onClick={() => openActionAlert(alert.href)}
                                 >
                                   <span className="dash-notify-action__count">{alert.count}</span>
                                   <span className="dash-notify-action__text">
                                     <strong>{alert.label}</strong>
-                                    <span>Tap to review</span>
+                                    <span>Tap to open</span>
                                   </span>
                                   <DashIcon name="chevron" className="dash-icon--xs" />
-                                </Link>
-                              </li>
-                            ))}
-                          </ul>
-                        </>
-                      ) : null}
-                      {notifications.length > 0 ? (
-                        <>
-                          {actionAlerts.length > 0 ? (
-                            <p className="dash-notify-section">Announcements</p>
-                          ) : null}
-                          <ul className="dash-notify-list">
-                            {(showAllNotifications
-                              ? notifications
-                              : notifications.slice(0, 8)
-                            ).map((item) => (
-                              <li key={item.id}>
+                                </button>
                                 <button
                                   type="button"
-                                  className={`dash-notify-item${item.isRead ? "" : " dash-notify-item--unread"}`}
-                                  onClick={() => void markAnnouncementRead(item)}
+                                  className="dash-notify-dismiss"
+                                  aria-label={`Dismiss ${alert.label}`}
+                                  title="Dismiss for today"
+                                  onClick={(e) => dismissActionAlert(alert.type, e)}
                                 >
-                                  <p className="dash-notify-title">{item.title}</p>
-                                  {item.body ? (
-                                    <p className="dash-notify-body">{item.body}</p>
-                                  ) : null}
-                                  <p className="dash-notify-time">
-                                    {new Date(item.createdAt).toLocaleString()}
-                                  </p>
+                                  ×
                                 </button>
                               </li>
                             ))}
                           </ul>
                         </>
                       ) : null}
+                      {unreadNotifications.length > 0 ? (
+                        <>
+                          {visibleActionAlerts.length > 0 ? (
+                            <p className="dash-notify-section">Announcements</p>
+                          ) : null}
+                          <ul className="dash-notify-list">
+                            {visibleNotifications.map((item) => {
+                              const href = hrefForAnnouncement(item);
+                              return (
+                                <li key={item.id} className="dash-notify-row">
+                                  <button
+                                    type="button"
+                                    className="dash-notify-item dash-notify-item--unread"
+                                    onClick={() => void openNotification(item)}
+                                  >
+                                    <p className="dash-notify-title">{item.title}</p>
+                                    {item.body ? (
+                                      <p className="dash-notify-body">{item.body}</p>
+                                    ) : null}
+                                    <p className="dash-notify-time">
+                                      {href ? "Tap to open · " : ""}
+                                      {new Date(item.createdAt).toLocaleString()}
+                                    </p>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="dash-notify-dismiss"
+                                    aria-label={`Dismiss ${item.title}`}
+                                    title="Dismiss"
+                                    onClick={(e) => void dismissNotification(item, e)}
+                                  >
+                                    ×
+                                  </button>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        </>
+                      ) : null}
                       <footer className="dash-notify-foot">
-                        {notifications.length > 8 ? (
+                        {unreadNotifications.length > 8 ? (
                           <button
                             type="button"
                             className="dash-notify-view-all"
@@ -490,7 +584,7 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
                           >
                             {showAllNotifications
                               ? "Show less"
-                              : `View all (${notifications.length})`}
+                              : `View all (${unreadNotifications.length})`}
                           </button>
                         ) : (
                           <span className="dash-notify-count">

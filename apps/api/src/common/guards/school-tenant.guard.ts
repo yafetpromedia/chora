@@ -51,7 +51,7 @@ export class SchoolTenantGuard implements CanActivate {
 
     if (school.status === SchoolStatus.SUSPENDED) {
       throw new ForbiddenException(
-        'This school account is suspended. Contact CampusOne support.',
+        'This school account is suspended. Contact Chora support.',
       );
     }
 

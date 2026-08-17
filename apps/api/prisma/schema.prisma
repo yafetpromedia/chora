@@ -207,11 +207,15 @@ model School {
   slug          String         @unique
   joinCode      String         @unique
   logoUrl       String?
-  /// Main brand color (hex, e.g. #3d9b9b). Null = CampusOne default.
+  /// School principal / authorized signature image (URL or data URL) for ID cards & reports
+  authorizedSignatureUrl String?
+  /// Label under the signature (e.g. "Principal", "Director")
+  authorizedSignatureLabel String?
+  /// Main brand color (hex, e.g. #3d9b9b). Null = Chora default.
   primaryColor  String?
-  /// Accent / highlight color (hex). Null = CampusOne default.
+  /// Accent / highlight color (hex). Null = Chora default.
   accentColor   String?
-  /// Darker brand accent for text and buttons (hex). Null = CampusOne default.
+  /// Darker brand accent for text and buttons (hex). Null = Chora default.
   accentDeep    String?
   schoolType    SchoolType?
   address       String?
@@ -255,6 +259,7 @@ model School {
   roleTemplates  RoleTemplate[]
   platformInvoices PlatformInvoice[]
   supportTickets   SupportTicket[]
+  scoreCorrections ScoreCorrectionRequest[]
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 }
@@ -484,6 +489,7 @@ model User {
   classSubjectsTaught  ClassSubject[]       @relation("ClassSubjectTeacher")
   timetableEntries     TimetableEntry[]     @relation("TimetableEntryTeacher")
   announcements   Announcement[]      @relation("AnnouncementCreatedBy")
+  announcementInbox Announcement[]    @relation("AnnouncementRecipient")
   reads           AnnouncementRead[]
   libraryUploads  LibraryResource[]   @relation("LibraryUploadedBy")
   studentDocumentsUploaded StudentDocument[] @relation("StudentDocumentUploadedBy")
@@ -494,6 +500,9 @@ model User {
   attendancePermissionsRequested AttendancePermissionRequest[] @relation("AttendancePermissionRequester")
   attendancePermissionsReviewed  AttendancePermissionRequest[] @relation("AttendancePermissionReviewer")
   supportTicketsCreated          SupportTicket[]               @relation("SupportTicketsCreated")
+  scoreCorrectionsReported       ScoreCorrectionRequest[]      @relation("ScoreCorrectionReporter")
+  scoreCorrectionsAssigned       ScoreCorrectionRequest[]      @relation("ScoreCorrectionTeacher")
+  scoreCorrectionsReviewed       ScoreCorrectionRequest[]      @relation("ScoreCorrectionReviewer")
   createdAt       DateTime            @default(now())
   updatedAt       DateTime            @updatedAt
 
@@ -603,6 +612,7 @@ model StudentProfile {
   classworkSubmissions ClassworkSubmission[]
   attendancePermissionRequests AttendancePermissionRequest[]
   examSeatingAssignments ExamSeatingAssignment[]
+  scoreCorrections       ScoreCorrectionRequest[]
 
   @@unique([schoolId, fan])
   @@unique([schoolId, fcn])
@@ -710,6 +720,7 @@ model AcademicTerm {
   resultSheets        ClassSubjectTermSheet[]
   studentTermReports  StudentTermReport[]
   examSchedules       ExamSchedule[]
+  scoreCorrections    ScoreCorrectionRequest[]
 
   @@unique([academicYearId, name])
   @@index([schoolId, isCurrent])
@@ -755,6 +766,7 @@ model ClassSubject {
   assessmentTemplate   AssessmentTemplate?  @relation(fields: [assessmentTemplateId], references: [id], onDelete: SetNull)
   termSheets           ClassSubjectTermSheet[]
   classworkAssignments ClassworkAssignment[]
+  scoreCorrections     ScoreCorrectionRequest[]
 
   @@unique([schoolId, subjectId, gradeId, sectionId, academicYearId])
   @@index([schoolId, gradeId])
@@ -860,11 +872,53 @@ model Assessment {
   weightPercent  Int                      @default(100)
   sortOrder      Int                      @default(0)
   /// When true, teachers cannot enter or edit scores for this component.
-  entryLocked    Boolean                  @default(true)
+  entryLocked    Boolean                  @default(false)
   scores         StudentAssessmentScore[]
+  scoreCorrections ScoreCorrectionRequest[]
 
   @@unique([termId, classSubjectId, name])
   @@index([schoolId, termId])
+}
+
+enum ScoreCorrectionStatus {
+  OPEN
+  PROPOSED
+  APPROVED
+  REJECTED
+}
+
+/// Post-publish score dispute: report → teacher propose → admin approve/reject
+model ScoreCorrectionRequest {
+  id               String                @id @default(cuid())
+  schoolId         String
+  school           School                @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  termId           String
+  term             AcademicTerm          @relation(fields: [termId], references: [id], onDelete: Cascade)
+  classSubjectId   String
+  classSubject     ClassSubject          @relation(fields: [classSubjectId], references: [id], onDelete: Cascade)
+  assessmentId     String
+  assessment       Assessment            @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  studentProfileId String
+  studentProfile   StudentProfile        @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+  reportedById     String
+  reportedBy       User                  @relation("ScoreCorrectionReporter", fields: [reportedById], references: [id], onDelete: Cascade)
+  teacherId        String?
+  teacher          User?                 @relation("ScoreCorrectionTeacher", fields: [teacherId], references: [id], onDelete: SetNull)
+  message          String                @db.Text
+  currentScore     Int?
+  proposedScore    Int?
+  status           ScoreCorrectionStatus @default(OPEN)
+  reviewedById     String?
+  reviewedBy       User?                 @relation("ScoreCorrectionReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt       DateTime?
+  reviewNote       String?               @db.Text
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+
+  @@index([schoolId, status, createdAt])
+  @@index([teacherId, status])
+  @@index([studentProfileId, status])
+  @@index([assessmentId, studentProfileId])
 }
 
 model StudentAssessmentScore {
@@ -901,16 +955,20 @@ model GradingBand {
 }
 
 model Announcement {
-  id         String             @id @default(cuid())
-  schoolId   String
-  title      String
-  body       String
-  createdBy  String
-  creator    User               @relation("AnnouncementCreatedBy", fields: [createdBy], references: [id])
-  reads      AnnouncementRead[]
-  createdAt  DateTime           @default(now())
+  id              String             @id @default(cuid())
+  schoolId        String
+  title           String
+  body            String
+  createdBy       String
+  creator         User               @relation("AnnouncementCreatedBy", fields: [createdBy], references: [id])
+  /// When set, only this user sees the item in their notification inbox.
+  recipientUserId String?
+  recipient       User?              @relation("AnnouncementRecipient", fields: [recipientUserId], references: [id], onDelete: Cascade)
+  reads           AnnouncementRead[]
+  createdAt       DateTime           @default(now())
 
   @@index([schoolId, createdAt])
+  @@index([recipientUserId, createdAt])
 }
 
 model AnnouncementRead {
@@ -937,7 +995,7 @@ model PlatformUser {
 
 model PlatformSettings {
   id                    String           @id @default("default")
-  platformName          String           @default("CampusOne")
+  platformName          String           @default("Chora")
   supportEmail          String?
   supportPhone          String?
   defaultCountry        String           @default("Ethiopia")

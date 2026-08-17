@@ -463,6 +463,8 @@ export class TeachersService {
       select: {
         name: true,
         logoUrl: true,
+        authorizedSignatureUrl: true,
+        authorizedSignatureLabel: true,
         joinCode: true,
         phone: true,
         address: true,
@@ -475,8 +477,10 @@ export class TeachersService {
     });
     const year = new Date().getFullYear();
     return {
-      name: school?.name ?? 'CampusOne',
+      name: school?.name ?? 'Chora',
       logoUrl: school?.logoUrl ?? null,
+      authorizedSignatureUrl: school?.authorizedSignatureUrl ?? null,
+      authorizedSignatureLabel: school?.authorizedSignatureLabel ?? null,
       joinCode: school?.joinCode ?? '',
       phone: school?.phone ?? null,
       address: school?.address ?? null,
@@ -505,6 +509,8 @@ export class TeachersService {
     school: {
       name: string;
       logoUrl: string | null;
+      authorizedSignatureUrl: string | null;
+      authorizedSignatureLabel: string | null;
       joinCode: string;
       phone: string | null;
       address: string | null;
@@ -537,6 +543,8 @@ export class TeachersService {
       homeroom,
       schoolName: school.name,
       schoolLogoUrl: school.logoUrl,
+      schoolSignatureUrl: school.authorizedSignatureUrl,
+      schoolSignatureLabel: school.authorizedSignatureLabel,
       schoolJoinCode: school.joinCode,
       schoolPhone: school.phone,
       schoolAddress: school.address,

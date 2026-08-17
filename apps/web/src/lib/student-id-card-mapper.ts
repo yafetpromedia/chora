@@ -1,6 +1,7 @@
 import type { StudentRecord } from "@/lib/api";
 import type { StudentIdCard } from "@/lib/student-cards";
 import { AUTH_SCHOOL_JOIN_CODE_KEY, AUTH_SCHOOL_NAME_KEY } from "@/lib/auth";
+import { BRAND_NAME } from "@/lib/brand";
 
 function ageFromDob(iso: string | null) {
   if (!iso) return null;
@@ -21,7 +22,7 @@ export function mapStudentRecordToIdCard(
   const schoolName =
     partial?.schoolName ??
     (typeof window !== "undefined" ? localStorage.getItem(AUTH_SCHOOL_NAME_KEY) : null) ??
-    "CampusOne";
+    BRAND_NAME;
   const schoolJoinCode =
     partial?.schoolJoinCode ??
     (typeof window !== "undefined" ? localStorage.getItem(AUTH_SCHOOL_JOIN_CODE_KEY) : null) ??
@@ -63,6 +64,8 @@ export function mapStudentRecordToIdCard(
     phone: student.phone,
     schoolName,
     schoolLogoUrl: partial?.schoolLogoUrl ?? null,
+    schoolSignatureUrl: partial?.schoolSignatureUrl ?? null,
+    schoolSignatureLabel: partial?.schoolSignatureLabel ?? null,
     schoolJoinCode,
     schoolPhone: partial?.schoolPhone ?? null,
     schoolAddress: partial?.schoolAddress ?? null,
