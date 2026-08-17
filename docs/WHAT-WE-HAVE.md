@@ -296,6 +296,7 @@ Login: **Student ID** (`STU-…`) or portal email + password (see Manage student
 ### Marketing
 
 - Landing page `/` with FAQ, preview, animations
+- **Chora Connect** — planned communication module, shown as **Coming Soon** on landing (`#connect`) — [CHORA-CONNECT.md](./CHORA-CONNECT.md)
 
 ---
 
@@ -413,7 +414,8 @@ Login: **Student ID** (`STU-…`) or portal email + password (see Manage student
 - ~~Academic year promotion~~ ✅ `/admin/results/promotion`  
 - Admissions module UI  
 - ~~Timetable~~ ✅ `/admin/timetable` + teacher/student/parent views  
-- Structured parent messaging (routed tickets)  
+- **Chora Connect** — advanced communication layer (direct messaging, departments, file sharing) — **Coming Soon** on landing; see [CHORA-CONNECT.md](./CHORA-CONNECT.md)  
+- Structured parent messaging (routed tickets) — early step toward Connect  
 - Telebirr + Chapa live payments  
 - Live Fayda API + SMS provider  
 - Librarian / admissions officer roles  

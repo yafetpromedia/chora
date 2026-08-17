@@ -7,13 +7,14 @@ import { BRAND_MARK, BRAND_NAME } from "@/lib/brand";
 const LINKS = [
   { href: "#hero", label: "Home" },
   { href: "#features", label: "Product" },
+  { href: "#connect", label: "Connect" },
   { href: "#app", label: "Mobile app" },
   { href: "#portals", label: "Portals" },
   { href: "#pricing", label: "Pricing" },
   { href: "#faq", label: "FAQ" },
 ] as const;
 
-const SECTION_IDS = ["hero", "features", "app", "portals", "pricing", "faq"];
+const SECTION_IDS = ["hero", "features", "connect", "app", "portals", "pricing", "faq"];
 
 export function LandingNav() {
   const [open, setOpen] = useState(false);
@@ -84,7 +85,14 @@ export function LandingNav() {
           <nav className="lp3-nav__links" aria-label="Main">
             {LINKS.map((l) => {
               const isActive = l.href === `#${active}`;
-              const className = `lp3-nav__link${isActive ? " lp3-nav__link--active" : ""}`;
+              const isConnect = l.href === "#connect";
+              const className = [
+                "lp3-nav__link",
+                isActive ? "lp3-nav__link--active" : "",
+                isConnect ? "lp3-nav__link--connect" : "",
+              ]
+                .filter(Boolean)
+                .join(" ");
 
               return (
                 <a
@@ -94,6 +102,7 @@ export function LandingNav() {
                   aria-current={isActive ? "page" : undefined}
                 >
                   {l.label}
+                  {isConnect ? <span className="lp3-nav__link-soon">Soon</span> : null}
                 </a>
               );
             })}
@@ -133,6 +142,7 @@ export function LandingNav() {
             <div className="lp3-nav__mobile-links">
               {LINKS.map((l) => {
                 const isActive = l.href === `#${active}`;
+                const isConnect = l.href === "#connect";
                 return (
                   <a
                     key={l.href}
@@ -141,6 +151,7 @@ export function LandingNav() {
                     onClick={() => setOpen(false)}
                   >
                     {l.label}
+                    {isConnect ? <span className="lp3-nav__link-soon">Soon</span> : null}
                   </a>
                 );
               })}

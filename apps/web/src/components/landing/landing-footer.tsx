@@ -4,6 +4,7 @@ import { BRAND_MARK, BRAND_NAME, BRAND_TAGLINE } from "@/lib/brand";
 
 const PRODUCT_LINKS = [
   { href: "#features", label: "Product" },
+  { href: "#connect", label: "Chora Connect" },
   { href: "#app", label: "Mobile app" },
   { href: "#portals", label: "Portals" },
   { href: "#pricing", label: "Pricing" },

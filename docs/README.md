@@ -64,6 +64,7 @@ Central index for all project documentation. Start here based on your role.
 | eLibrary | [ELIBRARY.md](./ELIBRARY.md) |
 | Timetable | [TIMETABLE.md](./TIMETABLE.md) |
 | Student/parent portals | [STUDENT-PARENT-PORTAL.md](./STUDENT-PARENT-PORTAL.md) |
+| Chora Connect (planned) | [CHORA-CONNECT.md](./CHORA-CONNECT.md) |
 
 ---
 

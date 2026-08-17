@@ -135,9 +135,13 @@ Turn provisioning from a **one-time copy** into a **platform operating layer**. 
 
 ---
 
-## Priority 5: Parent communication (Sprint 4)
+## Priority 5: Chora Connect & parent communication
 
-Structured tickets, not open chat:
+**Chora Connect** is the planned communication module — direct messaging, department channels, smart notifications, and file sharing. Publicly shown as **Coming Soon** on the landing page until built. See [CHORA-CONNECT.md](./CHORA-CONNECT.md).
+
+**Today:** announcements, notification bell, targeted recipients, and parent fee/attendance alerts remain separate.
+
+**Near term (Sprint 4):** structured tickets, not open chat:
 
 - Absence → homeroom teacher  
 - Academic → subject / admin  
