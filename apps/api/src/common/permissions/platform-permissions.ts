@@ -6,6 +6,7 @@ export const PlatformPermission = {
   SCHOOLS_SUSPEND: 'platform.schools.suspend',
   SCHOOLS_DELETE: 'platform.schools.delete',
   SUPPORT_MANAGE: 'platform.support.manage',
+  BILLING_MANAGE: 'platform.billing.manage',
 } as const;
 
 export type PlatformPermissionKey =
@@ -40,6 +41,11 @@ export const PLATFORM_PERMISSION_CATALOG: {
     key: PlatformPermission.SUPPORT_MANAGE,
     label: 'Support inbox',
     description: 'View and update school support tickets across tenants',
+  },
+  {
+    key: PlatformPermission.BILLING_MANAGE,
+    label: 'Billing & coupons',
+    description: 'Issue invoices, mark them paid, and manage coupon codes',
   },
 ];
 

@@ -28,6 +28,12 @@ const DEFAULTS: {
   maintenanceMessage: string | null;
   sessionTimeoutMinutes: number;
   landingHeroImageUrl: string | null;
+  bankName: string | null;
+  bankAccountHolder: string | null;
+  bankAccountNumber: string | null;
+  telebirrNumber: string | null;
+  telebirrAccountName: string | null;
+  payoutInstructions: string | null;
 } = {
   id: 'default',
   platformName: 'Chora',
@@ -50,6 +56,12 @@ const DEFAULTS: {
   maintenanceMessage: null,
   sessionTimeoutMinutes: 60,
   landingHeroImageUrl: null,
+  bankName: null,
+  bankAccountHolder: null,
+  bankAccountNumber: null,
+  telebirrNumber: null,
+  telebirrAccountName: null,
+  payoutInstructions: null,
 };
 
 export type PlatformSettingsRecord = typeof DEFAULTS & {
@@ -146,6 +158,24 @@ export class PlatformSettingsService {
             landingHeroImageUrl: dto.landingHeroImageUrl.trim() || null,
           }
         : {}),
+      ...(dto.bankName !== undefined
+        ? { bankName: dto.bankName.trim() || null }
+        : {}),
+      ...(dto.bankAccountHolder !== undefined
+        ? { bankAccountHolder: dto.bankAccountHolder.trim() || null }
+        : {}),
+      ...(dto.bankAccountNumber !== undefined
+        ? { bankAccountNumber: dto.bankAccountNumber.trim() || null }
+        : {}),
+      ...(dto.telebirrNumber !== undefined
+        ? { telebirrNumber: dto.telebirrNumber.trim() || null }
+        : {}),
+      ...(dto.telebirrAccountName !== undefined
+        ? { telebirrAccountName: dto.telebirrAccountName.trim() || null }
+        : {}),
+      ...(dto.payoutInstructions !== undefined
+        ? { payoutInstructions: dto.payoutInstructions.trim() || null }
+        : {}),
     };
 
     const updated = await this.prisma.platformSettings.update({
@@ -161,5 +191,33 @@ export class PlatformSettingsService {
     }
 
     return updated;
+  }
+
+  async getPayoutInstructions() {
+    const settings = await this.getSettings();
+    const hasBank = !!settings.bankName?.trim() && !!settings.bankAccountNumber?.trim();
+    const hasTelebirr = !!settings.telebirrNumber?.trim();
+    return {
+      bank: hasBank
+        ? {
+            bankName: settings.bankName!,
+            accountHolder:
+              settings.bankAccountHolder?.trim() || settings.bankName!,
+            accountNumber: settings.bankAccountNumber!,
+          }
+        : null,
+      telebirr: hasTelebirr
+        ? {
+            number: settings.telebirrNumber!,
+            accountName:
+              settings.telebirrAccountName?.trim() ||
+              settings.bankAccountHolder?.trim() ||
+              settings.platformName,
+          }
+        : null,
+      instructions: settings.payoutInstructions?.trim() || null,
+      supportEmail: settings.supportEmail,
+      supportPhone: settings.supportPhone,
+    };
   }
 }

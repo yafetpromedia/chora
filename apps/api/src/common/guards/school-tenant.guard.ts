@@ -57,6 +57,53 @@ export class SchoolTenantGuard implements CanActivate {
 
     request.schoolId = user.schoolId;
     request.user = { ...user, scope: 'school' };
+
+    const method = request.method.toUpperCase();
+    const path = (request.originalUrl || request.url || '').split('?')[0];
+    const billingAllowed =
+      path.includes('/schools/subscription') ||
+      path.includes('/schools/billing') ||
+      path.includes('/schools/plans');
+    const identityAllowed =
+      path === '/schools/me' || path.endsWith('/schools/me');
+
+    if (
+      (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') &&
+      (billingAllowed || identityAllowed)
+    ) {
+      return true;
+    }
+    if (billingAllowed) {
+      return true;
+    }
+
+    const subscription = await this.prisma.subscription.findUnique({
+      where: { schoolId: user.schoolId },
+    });
+    if (!subscription) {
+      return true;
+    }
+    const now = new Date();
+    const trialEnded =
+      subscription.plan === 'TRIAL' &&
+      subscription.trialEndsAt != null &&
+      subscription.trialEndsAt < now;
+    const periodEnded =
+      subscription.plan !== 'TRIAL' &&
+      subscription.currentPeriodEnd != null &&
+      subscription.currentPeriodEnd < now;
+    if (!subscription.isActive || trialEnded || periodEnded) {
+      if (subscription.isActive && (trialEnded || periodEnded)) {
+        await this.prisma.subscription.update({
+          where: { schoolId: user.schoolId },
+          data: { isActive: false },
+        });
+      }
+      throw new ForbiddenException(
+        'Your Chora trial has ended. Pay for a plan or enter a coupon code to continue.',
+      );
+    }
+
     return true;
   }
 }

@@ -88,6 +88,12 @@ function applySettings(s: SettingsRow) {
     maintenanceMessage: s.maintenanceMessage ?? "",
     sessionTimeoutMinutes: String(s.sessionTimeoutMinutes),
     landingHeroImageUrl: s.landingHeroImageUrl ?? "",
+    bankName: s.bankName ?? "",
+    bankAccountHolder: s.bankAccountHolder ?? "",
+    bankAccountNumber: s.bankAccountNumber ?? "",
+    telebirrNumber: s.telebirrNumber ?? "",
+    telebirrAccountName: s.telebirrAccountName ?? "",
+    payoutInstructions: s.payoutInstructions ?? "",
   };
 }
 
@@ -167,6 +173,12 @@ export function PlatformSettings({ user, onOpenProfile, onNavigate }: Props) {
         maintenanceMessage: draft.maintenanceMessage.trim(),
         sessionTimeoutMinutes: Number(draft.sessionTimeoutMinutes) || 60,
         landingHeroImageUrl: draft.landingHeroImageUrl.trim(),
+        bankName: draft.bankName.trim(),
+        bankAccountHolder: draft.bankAccountHolder.trim(),
+        bankAccountNumber: draft.bankAccountNumber.trim(),
+        telebirrNumber: draft.telebirrNumber.trim(),
+        telebirrAccountName: draft.telebirrAccountName.trim(),
+        payoutInstructions: draft.payoutInstructions.trim(),
       });
       setSettings(updated);
       setDraft(applySettings(updated));
@@ -495,6 +507,76 @@ export function PlatformSettings({ user, onOpenProfile, onNavigate }: Props) {
                   <small>Suspend tenant access when invoices pass due date (coming soon)</small>
                 </span>
               </label>
+              <h3 className="set-v2__subhead" style={{ marginTop: "1.25rem" }}>
+                Where schools pay you
+              </h3>
+              <p className="set-v2__panel-sub" style={{ marginBottom: "0.85rem" }}>
+                Schools send subscription payments here after they request an invoice. This is
+                your CampusOne account, not the school’s fee account.
+              </p>
+              <div className="cfg-form-row">
+                <div className="cfg-field">
+                  <label htmlFor="ps-telebirr">Telebirr number</label>
+                  <input
+                    id="ps-telebirr"
+                    value={draft.telebirrNumber}
+                    onChange={(e) => patch("telebirrNumber", e.target.value)}
+                    disabled={!isOwner}
+                    placeholder="0911…"
+                  />
+                </div>
+                <div className="cfg-field">
+                  <label htmlFor="ps-telebirr-name">Telebirr account name</label>
+                  <input
+                    id="ps-telebirr-name"
+                    value={draft.telebirrAccountName}
+                    onChange={(e) => patch("telebirrAccountName", e.target.value)}
+                    disabled={!isOwner}
+                    placeholder="CampusOne / your business name"
+                  />
+                </div>
+              </div>
+              <div className="cfg-field">
+                <label htmlFor="ps-bank">Bank name</label>
+                <input
+                  id="ps-bank"
+                  value={draft.bankName}
+                  onChange={(e) => patch("bankName", e.target.value)}
+                  disabled={!isOwner}
+                  placeholder="Commercial Bank of Ethiopia"
+                />
+              </div>
+              <div className="cfg-form-row">
+                <div className="cfg-field">
+                  <label htmlFor="ps-acc-name">Account holder</label>
+                  <input
+                    id="ps-acc-name"
+                    value={draft.bankAccountHolder}
+                    onChange={(e) => patch("bankAccountHolder", e.target.value)}
+                    disabled={!isOwner}
+                  />
+                </div>
+                <div className="cfg-field">
+                  <label htmlFor="ps-acc-num">Account number</label>
+                  <input
+                    id="ps-acc-num"
+                    value={draft.bankAccountNumber}
+                    onChange={(e) => patch("bankAccountNumber", e.target.value)}
+                    disabled={!isOwner}
+                  />
+                </div>
+              </div>
+              <div className="cfg-field">
+                <label htmlFor="ps-payout-note">Payment instructions</label>
+                <textarea
+                  id="ps-payout-note"
+                  rows={3}
+                  value={draft.payoutInstructions}
+                  onChange={(e) => patch("payoutInstructions", e.target.value)}
+                  disabled={!isOwner}
+                  placeholder="Include the invoice number in the Telebirr remark or bank reference…"
+                />
+              </div>
             </div>
             {onNavigate ? (
               <button

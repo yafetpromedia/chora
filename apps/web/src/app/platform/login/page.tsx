@@ -7,7 +7,8 @@ import { motion, useReducedMotion } from "framer-motion";
 import { AuthInput } from "@/components/auth/auth-input";
 import { AuthSubmitButton } from "@/components/auth/auth-submit-button";
 import { useLandingHeroImage } from "@/hooks/use-landing-hero-image";
-import { BRAND_MARK, BRAND_NAME } from "@/lib/brand";
+import { BrandMark } from "@/components/brand-mark";
+import { BRAND_NAME } from "@/lib/brand";
 import { platformLogin, persistPlatformSession } from "@/lib/platform-auth";
 
 export default function PlatformLoginPage() {
@@ -42,7 +43,7 @@ export default function PlatformLoginPage() {
 
           <header className="reg-top">
             <Link href="/" className="reg-top__brand no-underline">
-              <span className="logo-mark reg-top__logo">{BRAND_MARK}</span>
+              <BrandMark className="logo-mark reg-top__logo" />
               <span>{BRAND_NAME}</span>
             </Link>
             <Link href="/login" className="reg-top__link">

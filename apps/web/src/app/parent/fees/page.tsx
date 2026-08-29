@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { DashboardPage } from "@/components/dashboard/dashboard-page";
 import { ParentChildBar } from "@/components/parent/parent-child-bar";
@@ -13,6 +13,7 @@ import {
   verifyChapaPayment,
   type ParentFeesDue,
   type ParentFinanceOverview,
+  type ParentPayMethod,
 } from "@/lib/finance";
 import {
   pickChildId,
@@ -20,6 +21,31 @@ import {
   type ParentChildOption,
 } from "@/lib/parent-child";
 import { AUTH_ROLE_KEY, AUTH_TOKEN_KEY } from "@/lib/auth";
+
+function defaultMethod(methods: ParentPayMethod[]): ParentPayMethod {
+  if (methods.includes("TELEBIRR")) return "TELEBIRR";
+  if (methods.includes("BANK_TRANSFER")) return "BANK_TRANSFER";
+  if (methods.includes("CHAPA")) return "CHAPA";
+  return "BANK_TRANSFER";
+}
+
+function methodLabel(method?: string) {
+  if (method === "TELEBIRR") return "Telebirr";
+  if (method === "BANK_TRANSFER") return "CBE / bank";
+  if (method === "CHAPA") return "Chapa";
+  return method ?? "Payment";
+}
+
+const MAX_PROOF_BYTES = 4_000_000;
+
+function readProofAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error("Could not read screenshot"));
+    reader.readAsDataURL(file);
+  });
+}
 
 export default function ParentFeesPage() {
   const router = useRouter();
@@ -32,6 +58,7 @@ export default function ParentFeesPage() {
   const [paying, setPaying] = useState(false);
   const [chapaPaying, setChapaPaying] = useState(false);
   const [showPayForm, setShowPayForm] = useState(false);
+  const [payMethod, setPayMethod] = useState<ParentPayMethod>("TELEBIRR");
   const [reference, setReference] = useState("");
   const [payAmount, setPayAmount] = useState("");
   const [proofPreview, setProofPreview] = useState<string | null>(null);
@@ -68,6 +95,7 @@ export default function ParentFeesPage() {
       .then((d) => {
         setDue(d);
         setPayAmount(d.totalDueCents > 0 ? String(d.totalDueCents / 100) : "");
+        setPayMethod(defaultMethod(d.paymentInstructions.methods));
       })
       .catch((err) => setError(err instanceof Error ? err.message : "Load failed"));
   }, [selectedId]);
@@ -99,18 +127,40 @@ export default function ParentFeesPage() {
       });
   }, [searchParams, router, selectedId]);
 
-  function onProofFile(file: File | null) {
+  const steps = useMemo(() => {
+    const fromApi = due?.paymentInstructions.steps;
+    if (fromApi?.length) return fromApi;
+    return [
+      "Choose Telebirr or CBE / bank transfer.",
+      "Send the fee, then open the Successful / Thank you receipt.",
+      "Copy the Transaction Number (Telebirr) or Transaction ID (CBE).",
+      "Upload a screenshot of that receipt and submit.",
+      "Finance matches the screenshot, then issues the school receipt.",
+    ];
+  }, [due]);
+
+  const selectedMethodReady =
+    payMethod === "TELEBIRR"
+      ? !!due?.paymentInstructions.telebirr
+      : payMethod === "BANK_TRANSFER"
+        ? !!due?.paymentInstructions.bank
+        : payMethod === "CHAPA";
+
+  async function onProofFile(file: File | null) {
     if (!file) {
       setProofPreview(null);
       return;
     }
-    if (file.size > 400_000) {
-      setError("Screenshot must be under 400 KB");
+    if (file.size > MAX_PROOF_BYTES) {
+      setError("Screenshot must be under 4 MB");
       return;
     }
-    const reader = new FileReader();
-    reader.onload = () => setProofPreview(reader.result as string);
-    reader.readAsDataURL(file);
+    try {
+      setProofPreview(await readProofAsDataUrl(file));
+      setError("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not read screenshot");
+    }
   }
 
   async function onPayWithChapa() {
@@ -135,8 +185,20 @@ export default function ParentFeesPage() {
   async function onSubmitPayment() {
     if (!due || !selectedId) return;
     const amountCents = Math.round(parseFloat(payAmount) * 100);
+    if (payMethod !== "TELEBIRR" && payMethod !== "BANK_TRANSFER") {
+      setError("Choose Telebirr or bank transfer");
+      return;
+    }
     if (!reference.trim()) {
-      setError("Enter the bank reference / transaction number");
+      setError(
+        payMethod === "TELEBIRR"
+          ? "Enter the Telebirr Transaction Number from the success screen"
+          : "Enter the CBE Transaction ID from the success screen",
+      );
+      return;
+    }
+    if (!proofPreview) {
+      setError("Upload the Successful / Thank you receipt screenshot");
       return;
     }
     if (!Number.isFinite(amountCents) || amountCents < 1) {
@@ -150,6 +212,7 @@ export default function ParentFeesPage() {
       const res = await submitParentPayment(selectedId, {
         amountCents,
         reference: reference.trim(),
+        method: payMethod,
         proofUrl: proofPreview ?? undefined,
       });
       setMessage(`${res.message}\n\nTracking #: ${res.receiptNumber}`);
@@ -166,6 +229,10 @@ export default function ParentFeesPage() {
   }
 
   const selectedChild = overview?.children.find((c) => c.profileId === selectedId);
+  const offlineMethods = (due?.paymentInstructions.methods ?? []).filter(
+    (m) => m === "TELEBIRR" || m === "BANK_TRANSFER",
+  );
+  const chapaAvailable = due?.paymentInstructions.methods.includes("CHAPA") ?? false;
 
   return (
     <DashboardPage
@@ -279,7 +346,8 @@ export default function ParentFeesPage() {
                               <div>
                                 <p className="stu-fees__row-title">{formatEtb(p.amountCents)}</p>
                                 <p className="stu-fees__row-meta">
-                                  Ref: {p.reference ?? "—"} · #{p.receiptNumber}
+                                  {methodLabel(p.method)} · Ref: {p.reference ?? "—"} · #
+                                  {p.receiptNumber}
                                 </p>
                               </div>
                               <span className="stu-fees__badge stu-fees__badge--pending">
@@ -297,7 +365,14 @@ export default function ParentFeesPage() {
                   <>
                     {!showPayForm ? (
                       <div className="par-fees__pay">
-                        {due.paymentInstructions.methods.includes("CHAPA") ? (
+                        <button
+                          type="button"
+                          className="auth-page-submit"
+                          onClick={() => setShowPayForm(true)}
+                        >
+                          Pay fees
+                        </button>
+                        {chapaAvailable ? (
                           <>
                             <label className="att-field" style={{ flex: "1 1 100%", margin: 0 }}>
                               <span>Amount to pay (ETB)</span>
@@ -309,7 +384,7 @@ export default function ParentFeesPage() {
                             </label>
                             <button
                               type="button"
-                              className="auth-page-submit"
+                              className="att-btn att-btn--ghost"
                               disabled={chapaPaying || paying}
                               onClick={() => void onPayWithChapa()}
                             >
@@ -317,22 +392,61 @@ export default function ParentFeesPage() {
                             </button>
                           </>
                         ) : null}
-                        <button
-                          type="button"
-                          className={
-                            due.paymentInstructions.methods.includes("CHAPA")
-                              ? "att-btn att-btn--ghost"
-                              : "auth-page-submit"
-                          }
-                          onClick={() => setShowPayForm(true)}
-                        >
-                          Pay by bank transfer
-                        </button>
                       </div>
                     ) : (
                       <div className="par-fees__bank">
-                        <h3 className="stu-fees__card-title">Bank transfer</h3>
-                        {due.paymentInstructions.bank ? (
+                        <h3 className="stu-fees__card-title">Pay in 5 steps</h3>
+                        <ol className="par-fees__steps">
+                          {steps.map((step, i) => (
+                            <li key={step}>
+                              <span className="par-fees__step-num">{i + 1}</span>
+                              <span>{step}</span>
+                            </li>
+                          ))}
+                        </ol>
+                        <p className="stu-fees__row-meta">{due.paymentInstructions.note}</p>
+
+                        {offlineMethods.length > 0 ? (
+                          <div className="par-fees__methods" role="group" aria-label="Payment method">
+                            {offlineMethods.includes("TELEBIRR") ? (
+                              <button
+                                type="button"
+                                className={`par-fees__method${payMethod === "TELEBIRR" ? " par-fees__method--active" : ""}`}
+                                onClick={() => setPayMethod("TELEBIRR")}
+                              >
+                                Telebirr
+                              </button>
+                            ) : null}
+                            {offlineMethods.includes("BANK_TRANSFER") ? (
+                              <button
+                                type="button"
+                                className={`par-fees__method${payMethod === "BANK_TRANSFER" ? " par-fees__method--active" : ""}`}
+                                onClick={() => setPayMethod("BANK_TRANSFER")}
+                              >
+                                CBE / bank
+                              </button>
+                            ) : null}
+                          </div>
+                        ) : (
+                          <p className="stu-fees__alert stu-fees__alert--error">
+                            The school has not published a Telebirr number or bank account yet.
+                            Pay at the office or ask finance to add payment details in Settings.
+                          </p>
+                        )}
+
+                        {payMethod === "TELEBIRR" && due.paymentInstructions.telebirr ? (
+                          <div className="att-summary-block" style={{ margin: "0.75rem 0" }}>
+                            <p className="stu-fees__row-meta">Send Telebirr to</p>
+                            <p className="stu-fees__row-title">
+                              {due.paymentInstructions.telebirr.accountName}
+                            </p>
+                            <p className="att-summary-rate" style={{ fontSize: "1.1rem" }}>
+                              {due.paymentInstructions.telebirr.number}
+                            </p>
+                          </div>
+                        ) : null}
+
+                        {payMethod === "BANK_TRANSFER" && due.paymentInstructions.bank ? (
                           <div className="att-summary-block" style={{ margin: "0.75rem 0" }}>
                             <p className="stu-fees__row-title">
                               {due.paymentInstructions.bank.bankName}
@@ -344,15 +458,57 @@ export default function ParentFeesPage() {
                               {due.paymentInstructions.bank.accountNumber}
                             </p>
                           </div>
-                        ) : (
-                          <p className="stu-fees__alert stu-fees__alert--error">
-                            School has not configured a bank account yet. Contact the office.
-                          </p>
-                        )}
-                        <p className="stu-fees__row-meta">{due.paymentInstructions.note}</p>
+                        ) : null}
+
+                        <aside
+                          className={`par-fees__sample par-fees__sample--${payMethod === "TELEBIRR" ? "telebirr" : "cbe"}`}
+                          aria-label="Example receipt"
+                        >
+                          {payMethod === "TELEBIRR" ? (
+                            <>
+                              <p className="par-fees__sample-status">Successful</p>
+                              <p className="par-fees__sample-amount">−{payAmount || "0.00"} (ETB)</p>
+                              <dl>
+                                <div>
+                                  <dt>Transaction Type</dt>
+                                  <dd>Transfer Money</dd>
+                                </div>
+                                <div>
+                                  <dt>Transaction To</dt>
+                                  <dd>{due.paymentInstructions.telebirr?.accountName ?? "School"}</dd>
+                                </div>
+                                <div>
+                                  <dt>Transaction Number</dt>
+                                  <dd>DHR97D11WZ</dd>
+                                </div>
+                              </dl>
+                              <p className="par-fees__sample-hint">
+                                Copy the Transaction Number from your Telebirr success screen, then upload that screenshot.
+                              </p>
+                            </>
+                          ) : (
+                            <>
+                              <p className="par-fees__sample-status">Thank you · Success</p>
+                              <p className="par-fees__sample-amount">ETB {payAmount || "0.00"}</p>
+                              <dl>
+                                <div>
+                                  <dt>Paid to</dt>
+                                  <dd>{due.paymentInstructions.bank?.accountHolder ?? "School"}</dd>
+                                </div>
+                                <div>
+                                  <dt>Transaction ID</dt>
+                                  <dd>FT26239YHGVN</dd>
+                                </div>
+                              </dl>
+                              <p className="par-fees__sample-hint">
+                                Copy the Transaction ID from your CBE success screen, then upload that screenshot.
+                              </p>
+                            </>
+                          )}
+                        </aside>
 
                         <label className="att-field" style={{ marginTop: "0.75rem" }}>
-                          <span>Amount (ETB)</span>
+                          <span>Amount on the receipt (ETB)</span>
                           <input
                             className="auth-input auth-input--login auth-input--login-plain"
                             value={payAmount}
@@ -360,35 +516,41 @@ export default function ParentFeesPage() {
                           />
                         </label>
                         <label className="att-field">
-                          <span>Reference / transaction number</span>
+                          <span>
+                            {payMethod === "TELEBIRR"
+                              ? "Transaction Number"
+                              : "Transaction ID"}
+                          </span>
                           <input
                             className="auth-input auth-input--login auth-input--login-plain"
                             value={reference}
                             onChange={(e) => setReference(e.target.value)}
-                            placeholder="CBE ref, Telebirr ref at branch, etc."
+                            placeholder={
+                              payMethod === "TELEBIRR" ? "e.g. DHR97D11WZ" : "e.g. FT26239YHGVN"
+                            }
                           />
                         </label>
                         <label className="att-field">
-                          <span>Payment screenshot (optional)</span>
+                          <span>Receipt screenshot (required)</span>
                           <input
                             type="file"
                             accept="image/*"
-                            onChange={(e) => onProofFile(e.target.files?.[0] ?? null)}
+                            onChange={(e) => void onProofFile(e.target.files?.[0] ?? null)}
                           />
                         </label>
                         {proofPreview ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
+                            className="par-fees__proof"
                             src={proofPreview}
-                            alt="Payment proof"
-                            style={{ maxWidth: "100%", maxHeight: 160, borderRadius: 8 }}
+                            alt="Payment receipt screenshot"
                           />
                         ) : null}
                         <div className="par-fees__pay">
                           <button
                             type="button"
                             className="auth-page-submit"
-                            disabled={paying || !due.paymentInstructions.bank}
+                            disabled={paying || !selectedMethodReady || !proofPreview}
                             onClick={() => void onSubmitPayment()}
                           >
                             {paying ? "Submitting…" : "Submit for verification"}

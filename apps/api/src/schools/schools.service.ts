@@ -32,6 +32,8 @@ export type SchoolRecord = {
   bankName: string | null;
   bankAccountHolder: string | null;
   bankAccountNumber: string | null;
+  telebirrNumber: string | null;
+  telebirrAccountName: string | null;
   paymentInstructions: string | null;
   reportCardTitle: string | null;
   reportCardTagline: string | null;
@@ -58,8 +60,10 @@ export class SchoolsService implements OnModuleInit {
         bankName: 'Commercial Bank of Ethiopia',
         bankAccountHolder: 'Bright Side International School',
         bankAccountNumber: '1000123456789',
+        telebirrNumber: '0911123456',
+        telebirrAccountName: 'Bright Side International School',
         paymentInstructions:
-          'Use your child’s full name as the transfer reference. Upload the bank receipt after paying.',
+          'Pay with Telebirr or CBE. Use your child’s full name in the remark, then submit the transaction ID and a screenshot.',
       },
       update: {
         name: 'Bright Side International School',
@@ -68,8 +72,10 @@ export class SchoolsService implements OnModuleInit {
         bankName: 'Commercial Bank of Ethiopia',
         bankAccountHolder: 'Bright Side International School',
         bankAccountNumber: '1000123456789',
+        telebirrNumber: '0911123456',
+        telebirrAccountName: 'Bright Side International School',
         paymentInstructions:
-          'Use your child’s full name as the transfer reference. Upload the bank receipt after paying.',
+          'Pay with Telebirr or CBE. Use your child’s full name in the remark, then submit the transaction ID and a screenshot.',
       },
     });
 
@@ -228,6 +234,8 @@ export class SchoolsService implements OnModuleInit {
       bankName?: string | null;
       bankAccountHolder?: string | null;
       bankAccountNumber?: string | null;
+      telebirrNumber?: string | null;
+      telebirrAccountName?: string | null;
       paymentInstructions?: string | null;
       reportCardTitle?: string | null;
       reportCardTagline?: string | null;
@@ -288,6 +296,12 @@ export class SchoolsService implements OnModuleInit {
     }
     if (input.bankAccountNumber !== undefined) {
       data.bankAccountNumber = input.bankAccountNumber?.trim() || null;
+    }
+    if (input.telebirrNumber !== undefined) {
+      data.telebirrNumber = input.telebirrNumber?.trim() || null;
+    }
+    if (input.telebirrAccountName !== undefined) {
+      data.telebirrAccountName = input.telebirrAccountName?.trim() || null;
     }
     if (input.paymentInstructions !== undefined) {
       data.paymentInstructions = input.paymentInstructions?.trim() || null;
@@ -368,6 +382,8 @@ export class SchoolsService implements OnModuleInit {
     bankName: string | null;
     bankAccountHolder: string | null;
     bankAccountNumber: string | null;
+    telebirrNumber?: string | null;
+    telebirrAccountName?: string | null;
     paymentInstructions: string | null;
     reportCardTitle?: string | null;
     reportCardTagline?: string | null;
@@ -396,6 +412,8 @@ export class SchoolsService implements OnModuleInit {
       bankName: school.bankName,
       bankAccountHolder: school.bankAccountHolder,
       bankAccountNumber: school.bankAccountNumber,
+      telebirrNumber: school.telebirrNumber ?? null,
+      telebirrAccountName: school.telebirrAccountName ?? null,
       paymentInstructions: school.paymentInstructions,
       reportCardTitle: school.reportCardTitle ?? null,
       reportCardTagline: school.reportCardTagline ?? null,

@@ -77,10 +77,13 @@ export type ParentFinanceOverview = {
   }>;
 };
 
+export type ParentPayMethod = "TELEBIRR" | "BANK_TRANSFER" | "CHAPA";
+
 export type PendingPaymentSubmission = {
   id: string;
   receiptNumber: string;
   amountCents: number;
+  method?: string;
   reference: string | null;
   createdAt: string;
 };
@@ -91,12 +94,17 @@ export type ParentFeesDue = {
   totalDueCents: number;
   pendingSubmissions: PendingPaymentSubmission[];
   paymentInstructions: {
-    methods: Array<"CHAPA" | "BANK_TRANSFER">;
+    methods: ParentPayMethod[];
     note: string;
+    steps?: string[];
     bank: {
       bankName: string;
       accountHolder: string;
       accountNumber: string;
+    } | null;
+    telebirr?: {
+      number: string;
+      accountName: string;
     } | null;
   };
 };
@@ -215,6 +223,7 @@ export async function submitParentPayment(
   body: {
     amountCents: number;
     reference: string;
+    method?: "BANK_TRANSFER" | "TELEBIRR";
     proofUrl?: string;
     notes?: string;
   },

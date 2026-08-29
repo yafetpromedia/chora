@@ -31,6 +31,13 @@ import {
 import { AppToast } from "@/components/ui/app-toast";
 import { AUTH_ROLE_KEY, AUTH_TOKEN_KEY, isSchoolWorkspaceRole } from "@/lib/auth";
 
+function isSafeProofUrl(url: string) {
+  return (
+    url.startsWith("data:image/") ||
+    url.startsWith("https://")
+  );
+}
+
 type Tab = "pending" | "billing" | "payments" | "tools";
 
 export default function AdminFinancePage() {
@@ -316,7 +323,7 @@ export default function AdminFinancePage() {
                   <div>
                     <h3 className="fin-v2__card-title">Payment verification</h3>
                     <p className="fin-v2__card-sub">
-                      Approve or reject bank transfers submitted by parents.
+                      Approve or reject Telebirr and bank transfers submitted by parents.
                     </p>
                   </div>
                 </header>
@@ -333,14 +340,32 @@ export default function AdminFinancePage() {
                           <span className="fin-v2__pending-amount">{formatEtb(p.amountCents)}</span>
                           <p>
                             {p.student.grade}
-                            {p.student.section ? ` · ${p.student.section}` : ""} · Ref:{" "}
-                            {p.reference ?? "—"} · #{p.receiptNumber}
+                            {p.student.section ? ` · ${p.student.section}` : ""} ·{" "}
+                            {p.method === "TELEBIRR"
+                              ? "Telebirr"
+                              : p.method === "BANK_TRANSFER"
+                                ? "CBE / bank"
+                                : p.method}{" "}
+                            · Tx: {p.reference ?? "—"} · #{p.receiptNumber}
                           </p>
-                          {p.proofUrl ? (
-                            <a href={p.proofUrl} target="_blank" rel="noreferrer" className="fin-v2__link">
-                              View proof screenshot →
+                          {p.proofUrl && isSafeProofUrl(p.proofUrl) ? (
+                            <a
+                              href={p.proofUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="fin-v2__receipt-link"
+                            >
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={p.proofUrl}
+                                alt={`${p.student.name} payment receipt`}
+                                className="fin-v2__receipt-thumb"
+                              />
+                              Open full receipt
                             </a>
-                          ) : null}
+                          ) : (
+                            <p>No receipt screenshot attached.</p>
+                          )}
                         </div>
                         <div className="fin-v2__pending-actions">
                           <button
@@ -534,7 +559,8 @@ export default function AdminFinancePage() {
                   <label className="fin-v2__field">
                     <span>Method</span>
                     <select value={payMethod} onChange={(e) => setPayMethod(e.target.value)}>
-                      <option value="CASH">Cash</option>
+                      <option value="CASH">Cash at office</option>
+                      <option value="TELEBIRR">Telebirr</option>
                       <option value="BANK_TRANSFER">Bank transfer</option>
                       <option value="OTHER">Other</option>
                     </select>

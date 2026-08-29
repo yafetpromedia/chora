@@ -37,6 +37,8 @@ import {
   UpdatePlatformInvoiceDto,
 } from './dto/platform-invoice.dto';
 import { UpdateSupportTicketDto } from '../support/dto/update-support-ticket.dto';
+import { CouponsService } from '../subscriptions/coupons.service';
+import { CreateCouponDto, UpdateCouponDto } from '../subscriptions/dto/coupon.dto';
 import { PlatformAuthService } from './platform-auth.service';
 import { PlatformBillingService } from './platform-billing.service';
 import { PlatformService } from './platform.service';
@@ -94,6 +96,7 @@ export class PlatformController {
     private readonly platformSettings: PlatformSettingsService,
     private readonly platformAccess: PlatformAccessService,
     private readonly supportService: SupportService,
+    private readonly couponsService: CouponsService,
   ) {}
 
   @Post('auth/login')
@@ -619,15 +622,37 @@ export class PlatformController {
   }
 
   @Post('invoices')
-  @UseGuards(JwtAuthGuard, PlatformGuard)
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformPermissions(PlatformPermission.BILLING_MANAGE)
   createInvoice(@Body() dto: CreatePlatformInvoiceDto) {
     return this.platformBillingService.createInvoice(dto);
   }
 
   @Patch('invoices/:id')
-  @UseGuards(JwtAuthGuard, PlatformGuard)
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformPermissions(PlatformPermission.BILLING_MANAGE)
   updateInvoice(@Param('id') id: string, @Body() dto: UpdatePlatformInvoiceDto) {
     return this.platformBillingService.updateInvoice(id, dto);
+  }
+
+  @Get('coupons')
+  @UseGuards(JwtAuthGuard, PlatformGuard)
+  listCoupons() {
+    return this.couponsService.list();
+  }
+
+  @Post('coupons')
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformPermissions(PlatformPermission.BILLING_MANAGE)
+  createCoupon(@Body() dto: CreateCouponDto) {
+    return this.couponsService.create(dto);
+  }
+
+  @Patch('coupons/:id')
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformPermissions(PlatformPermission.BILLING_MANAGE)
+  updateCoupon(@Param('id') id: string, @Body() dto: UpdateCouponDto) {
+    return this.couponsService.update(id, dto);
   }
 
   @Get('support-tickets')

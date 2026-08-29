@@ -436,6 +436,33 @@
   text-align: center;
 }
 
+.sb-v2__payout {
+  display: grid;
+  grid-template-columns: 7.5rem 1fr;
+  gap: 0.45rem 0.85rem;
+  margin: 0.85rem 0 0;
+}
+
+.sb-v2__payout dt {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--brand-muted);
+}
+
+.sb-v2__payout dd {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  font-size: 0.85rem;
+}
+
+.sb-v2__payout strong {
+  font-size: 1rem;
+  letter-spacing: 0.02em;
+}
+
 .sb-v2__pay-badge {
   display: inline-flex;
   align-items: center;

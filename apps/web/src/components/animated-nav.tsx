@@ -3,7 +3,7 @@
 import { motion, useReducedMotion, useScroll, useTransform } from "framer-motion";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { BRAND_MARK, BRAND_NAME } from "@/lib/brand";
+import { BRAND_LOGO_SRC, BRAND_NAME } from "@/lib/brand";
 
 export function AnimatedNav({ children }: { children: ReactNode }) {
   const { scrollY } = useScroll();
@@ -45,7 +45,7 @@ export function NavBrand() {
         whileHover={{ scale: 1.05, rotate: 3 }}
         transition={{ type: "spring", stiffness: 400, damping: 15 }}
       >
-        {BRAND_MARK}
+        <img src={BRAND_LOGO_SRC} alt="" className="brand-mark" />
       </motion.div>
       <span className="text-lg font-bold c-black">{BRAND_NAME}</span>
     </Link>

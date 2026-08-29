@@ -9,6 +9,7 @@ import {
   PlanPriceDisplay,
 } from "@/components/billing/plan-billing-ui";
 import { SchoolBillingShell } from "@/components/school-billing/school-billing-shell";
+import { PayoutInstructions } from "@/components/school-billing/payout-instructions";
 import {
   getPlanPricing,
   PLAN_CATALOG,
@@ -21,7 +22,9 @@ import {
   getBillingPaymentConfig,
   getSchoolSubscription,
   listPlans,
+  redeemSchoolCoupon,
   startSubscriptionCheckout,
+  upgradeSchoolPlan,
   verifySubscriptionCheckout,
   type BillingPaymentConfig,
   type PlanOption,
@@ -92,6 +95,8 @@ function SchoolPlansPageContent() {
   const [paymentConfig, setPaymentConfig] = useState<BillingPaymentConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [checkingOut, setCheckingOut] = useState<PlanType | null>(null);
+  const [couponCode, setCouponCode] = useState("");
+  const [applyingCoupon, setApplyingCoupon] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [billingInterval, setBillingInterval] = useState<BillingInterval>("month");
@@ -153,23 +158,42 @@ function SchoolPlansPageContent() {
   );
 
   async function onSelectPlan(plan: Exclude<PlanType, "TRIAL" | "ENTERPRISE">) {
-    if (!chapaEnabled) {
-      setError(`Online payments are not configured. Contact ${BRAND_NAME} support.`);
-      return;
-    }
-
     setCheckingOut(plan);
     setError("");
     setSuccess("");
     try {
-      const res = await startSubscriptionCheckout({
-        plan,
-        interval: billingInterval,
-      });
-      window.location.href = res.checkoutUrl;
+      if (chapaEnabled) {
+        const res = await startSubscriptionCheckout({
+          plan,
+          interval: billingInterval,
+        });
+        window.location.href = res.checkoutUrl;
+        return;
+      }
+      const updated = await upgradeSchoolPlan(plan);
+      setSubscription(updated);
+      setSuccess(updated.message ?? `${updated.planLabel} update submitted.`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Checkout failed");
+      setError(err instanceof Error ? err.message : "Could not change plan");
+    } finally {
       setCheckingOut(null);
+    }
+  }
+
+  async function onApplyCoupon() {
+    if (!couponCode.trim()) return;
+    setApplyingCoupon(true);
+    setError("");
+    setSuccess("");
+    try {
+      const next = await redeemSchoolCoupon(couponCode.trim());
+      setSubscription(next);
+      setSuccess(next.coupon?.result ?? next.message ?? "Coupon applied.");
+      setCouponCode("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not apply coupon");
+    } finally {
+      setApplyingCoupon(false);
     }
   }
 
@@ -195,9 +219,11 @@ function SchoolPlansPageContent() {
       <SchoolBillingShell
         title="Plans & upgrades"
         subtitle={
-          chapaEnabled
-            ? `You are on ${currentPlanLabel}. Pay securely with Chapa to activate or change your plan.`
-            : `You are on ${currentPlanLabel}. Online checkout is being configured.`
+          subscription?.expired
+            ? `Your trial has ended. Pay for a plan or enter a coupon code to continue.`
+            : chapaEnabled
+              ? `You are on ${currentPlanLabel}. Pay securely with Chapa to activate or change your plan.`
+              : `You are on ${currentPlanLabel}. Activate a paid plan by invoice, or apply a coupon.`
         }
         stats={
           subscription
@@ -231,6 +257,31 @@ function SchoolPlansPageContent() {
         loading={loading}
         loadingLabel="Loading plans…"
       >
+        <form
+          className="sb-v2__coupon"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void onApplyCoupon();
+          }}
+        >
+          <label>
+            <span>Have a coupon code?</span>
+            <input
+              value={couponCode}
+              onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+              placeholder="PILOT14 / PARTNER / SAVE50"
+              autoComplete="off"
+            />
+          </label>
+          <button type="submit" className="sb-v2__plan-card__btn" disabled={applyingCoupon || !couponCode.trim()}>
+            {applyingCoupon ? "Applying…" : "Apply coupon"}
+          </button>
+          {subscription?.couponCode ? (
+            <p className="sb-v2__footnote" style={{ margin: 0 }}>
+              Active coupon: {subscription.couponCode}
+            </p>
+          ) : null}
+        </form>
         <div className="sb-v2__plans">
           {plans.map((plan) => {
             const key = plan.plan as PaidPlan;
@@ -280,12 +331,7 @@ function SchoolPlansPageContent() {
                 <button
                   type="button"
                   className={`sb-v2__plan-card__btn${isCurrent ? " sb-v2__plan-card__btn--current" : ""}${isFeatured && !isCurrent ? " sb-v2__plan-card__btn--primary" : ""}`}
-                  disabled={
-                    isCurrent ||
-                    isCheckingOut ||
-                    isEnterprise ||
-                    (!chapaEnabled && !isEnterprise)
-                  }
+                  disabled={isCurrent || isCheckingOut || isEnterprise}
                   onClick={() => {
                     if (isEnterprise || isCurrent) return;
                     void onSelectPlan(key as Exclude<PlanType, "TRIAL" | "ENTERPRISE">);
@@ -299,17 +345,19 @@ function SchoolPlansPageContent() {
                         ? "Opening Chapa…"
                         : chapaEnabled
                           ? "Pay & activate"
-                          : "Unavailable"}
+                          : "Request invoice"}
                 </button>
               </article>
             );
           })}
         </div>
 
+        {!chapaEnabled ? <PayoutInstructions payout={paymentConfig?.payout} /> : null}
+
         <p className="sb-v2__footnote">
           {chapaEnabled
             ? "Payments are processed by Chapa. Your plan activates immediately after successful payment."
-            : "Configure CHAPA_SECRET_KEY on the API server to enable checkout."}
+            : `When the trial ends, access stops until you pay or apply a coupon. Coupons can extend the trial, discount the invoice, or grant complimentary access.`}
         </p>
       </SchoolBillingShell>
     </DashboardPage>

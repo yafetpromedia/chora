@@ -22,7 +22,8 @@ import {
 import type { GradePresetKey, GradeWithSections } from "@/lib/api";
 import { AUTH_ROLE_KEY, AUTH_TOKEN_KEY } from "@/lib/auth";
 import { AppConfirmDialog } from "@/components/ui/app-confirm-dialog";
-import { BRAND_MARK, BRAND_NAME } from "@/lib/brand";
+import { BrandMark } from "@/components/brand-mark";
+import { BRAND_NAME } from "@/lib/brand";
 
 const STEPS = [
   { num: 1 as const, label: "Grades" },
@@ -440,9 +441,7 @@ export default function SchoolSetupPage() {
       />
       <div className="sw__frame">
         <header className="sw__header">
-          <span className="sw__header-mark" aria-hidden>
-            {BRAND_MARK}
-          </span>
+          <BrandMark className="sw__header-mark" />
           <div className="sw__header-text">
             <span className="sw__header-title">{BRAND_NAME}</span>
             <span className="sw__header-sub">

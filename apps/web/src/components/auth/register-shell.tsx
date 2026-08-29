@@ -5,7 +5,8 @@ import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
 import { RegisterVisualPanel } from "@/components/auth/register-visual-panel";
 import { useLandingHeroImage } from "@/hooks/use-landing-hero-image";
-import { BRAND_MARK, BRAND_NAME } from "@/lib/brand";
+import { BrandMark } from "@/components/brand-mark";
+import { BRAND_NAME } from "@/lib/brand";
 
 const STEPS = ["School", "Admin"] as const;
 
@@ -34,7 +35,7 @@ export function RegisterShell({
 
           <header className="reg-top">
             <Link href="/" className="reg-top__brand no-underline">
-              <span className="logo-mark reg-top__logo">{BRAND_MARK}</span>
+              <BrandMark className="logo-mark reg-top__logo" />
               <span>{BRAND_NAME}</span>
             </Link>
             <Link href="/login" className="reg-top__link">

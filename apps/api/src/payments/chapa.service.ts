@@ -41,6 +41,12 @@ export class ChapaService {
     return this.secretKey.length > 0;
   }
 
+  /** Live Chapa checkout — off unless CHAPA_ENABLED=true and a secret key is set. */
+  isLiveEnabled(): boolean {
+    const flag = this.config.get<string>('CHAPA_ENABLED')?.trim().toLowerCase();
+    return flag === 'true' && this.isConfigured();
+  }
+
   verifyWebhookSignature(
     body: unknown,
     signature: string | undefined,

@@ -356,6 +356,30 @@
   gap: 0.35rem;
 }
 
+.fin-v2__receipt-link {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 0.55rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--brand-teal-dark);
+  text-decoration: none;
+}
+
+.fin-v2__receipt-link:hover {
+  text-decoration: underline;
+}
+
+.fin-v2__receipt-thumb {
+  width: 72px;
+  height: 96px;
+  object-fit: cover;
+  border-radius: 0.5rem;
+  border: 1px solid var(--brand-border);
+  background: #fff;
+}
+
 .fin-v2__actions {
   display: grid;
   gap: 0.65rem;

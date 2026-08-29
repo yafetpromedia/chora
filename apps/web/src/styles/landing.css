@@ -155,11 +155,29 @@
   width: 2.25rem;
   height: 2.25rem;
   border-radius: 0.75rem;
-  font-size: 0.75rem;
-  font-weight: 800;
-  color: #fff;
-  background: linear-gradient(135deg, var(--brand-teal) 0%, var(--brand-cyan) 100%);
-  box-shadow: 0 4px 14px rgba(94, 201, 207, 0.4);
+  overflow: hidden;
+  padding: 0;
+  background: #0f766e;
+  box-shadow: 0 4px 14px rgba(15, 118, 110, 0.28);
+}
+
+.brand-mark {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.logo-mark img,
+.lp3-nav__mark img,
+.lp3-phone__app-head img,
+.lp3-preview__side-brand img,
+.login-visual__logo-mark img,
+.sw__header-mark img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .feature-icon-box {
@@ -582,10 +600,9 @@
   width: 2rem;
   height: 2rem;
   border-radius: 0.6rem;
-  font-size: 0.68rem;
-  font-weight: 800;
-  color: #fff;
-  background: linear-gradient(135deg, var(--brand-accent-deep), var(--brand-teal));
+  overflow: hidden;
+  padding: 0;
+  background: #0f766e;
 }
 
 .lp3-nav__links {
@@ -2402,10 +2419,9 @@
   width: 1.55rem;
   height: 1.55rem;
   border-radius: 0.45rem;
-  font-size: 0.58rem;
-  font-weight: 800;
-  color: #fff;
-  background: linear-gradient(135deg, var(--brand-teal-dark), var(--brand-cyan));
+  overflow: hidden;
+  padding: 0;
+  background: #0f766e;
   flex-shrink: 0;
   box-shadow: 0 6px 14px rgba(42, 111, 111, 0.28);
 }
@@ -3412,10 +3428,9 @@
   align-items: center;
   justify-content: center;
   border-radius: 0.4rem;
-  font-size: 0.55rem;
-  font-weight: 800;
-  color: #fff;
-  background: linear-gradient(135deg, var(--brand-teal), var(--brand-cyan));
+  overflow: hidden;
+  padding: 0;
+  background: #0f766e;
 }
 
 .lp3-preview__side-brand strong {
@@ -4896,10 +4911,9 @@
   width: 1.75rem;
   height: 1.75rem;
   border-radius: 0.45rem;
-  font-size: 0.62rem;
-  font-weight: 800;
-  color: #fff;
-  background: linear-gradient(135deg, var(--brand-teal), var(--brand-cyan));
+  overflow: hidden;
+  padding: 0;
+  background: #0f766e;
 }
 
 .lp-app__screen-head strong {

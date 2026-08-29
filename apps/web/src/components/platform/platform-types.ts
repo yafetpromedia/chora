@@ -13,6 +13,7 @@ export type PlatformSection =
   | "invoices"
   | "usage"
   | "plans"
+  | "coupons"
   | "permissions"
   | "profile"
   | "settings";
@@ -133,6 +134,10 @@ export const SECTION_META: Record<
   plans: {
     title: "Plans",
     subtitle: "Prices, limits, and catalog shown to schools",
+  },
+  coupons: {
+    title: "Coupons",
+    subtitle: "Trial extensions, discounts, and partner access",
   },
   permissions: {
     title: "Access control",

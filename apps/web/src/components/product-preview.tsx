@@ -3,7 +3,7 @@
 import { motion, useInView, useReducedMotion } from "framer-motion";
 import { useRef, type CSSProperties } from "react";
 import { DashIcon, type DashIconName } from "@/components/dashboard/dash-icons";
-import { BRAND_MARK } from "@/lib/brand";
+import { BrandMark } from "@/components/brand-mark";
 
 const NAV: { label: string; icon: DashIconName; active?: boolean }[] = [
   { label: "Overview", icon: "overview", active: true },
@@ -47,7 +47,7 @@ export function ProductPreview() {
       <div className="lp3-preview__body">
         <aside className="lp3-preview__side" aria-hidden>
           <div className="lp3-preview__side-brand">
-            <span>{BRAND_MARK}</span>
+            <BrandMark />
             <div>
               <strong>Everest Youth</strong>
               <em>Admin workspace</em>

@@ -33,7 +33,7 @@ export function TrialBanner({ subscription }: TrialBannerProps) {
         <div className="trial-banner-body">
           <h2 className="trial-banner-title">Your {BRAND_NAME} trial has ended</h2>
           <p className="trial-banner-text">
-            Upgrade to continue managing attendance, results, and announcements for your school.
+            Upgrade to continue managing attendance, results, and announcements — or enter a coupon code.
           </p>
         </div>
         <Link href="/admin/billing/plans" className="trial-banner-cta">

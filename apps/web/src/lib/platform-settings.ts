@@ -23,6 +23,12 @@ export type PlatformSettings = {
   maintenanceMessage: string | null;
   sessionTimeoutMinutes: number;
   landingHeroImageUrl: string | null;
+  bankName: string | null;
+  bankAccountHolder: string | null;
+  bankAccountNumber: string | null;
+  telebirrNumber: string | null;
+  telebirrAccountName: string | null;
+  payoutInstructions: string | null;
   updatedAt: string;
 };
 
@@ -47,6 +53,12 @@ export type UpdatePlatformSettingsInput = Partial<{
   maintenanceMessage: string;
   sessionTimeoutMinutes: number;
   landingHeroImageUrl: string;
+  bankName: string;
+  bankAccountHolder: string;
+  bankAccountNumber: string;
+  telebirrNumber: string;
+  telebirrAccountName: string;
+  payoutInstructions: string;
 }>;
 
 export function getPlatformSettings() {

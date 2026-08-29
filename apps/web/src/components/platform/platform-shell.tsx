@@ -10,7 +10,8 @@ import {
   type PlatformUser,
 } from "@/lib/platform-auth";
 import { hasPlatformPermission } from "@/lib/platform-access";
-import { BRAND_MARK, BRAND_NAME } from "@/lib/brand";
+import { BrandMark } from "@/components/brand-mark";
+import { BRAND_NAME } from "@/lib/brand";
 import {
   SECTION_META,
   type PlatformSection,
@@ -31,6 +32,7 @@ const NAV: { id: PlatformSection; label: string; icon: DashIconName }[] = [
   { id: "invoices", label: "Invoices", icon: "fees" },
   { id: "usage", label: "Usage", icon: "students" },
   { id: "plans", label: "Plans", icon: "settings" },
+  { id: "coupons", label: "Coupons", icon: "fees" },
   { id: "permissions", label: "Permissions", icon: "users" },
   { id: "profile", label: "Profile", icon: "profile" },
   { id: "settings", label: "Settings", icon: "settings" },
@@ -39,6 +41,9 @@ const NAV: { id: PlatformSection; label: string; icon: DashIconName }[] = [
 function canAccessSection(user: PlatformUser | null, id: PlatformSection) {
   if (id === "support") {
     return hasPlatformPermission(user, "platform.support.manage");
+  }
+  if (id === "coupons") {
+    return hasPlatformPermission(user, "platform.billing.manage");
   }
   if (id === "permissions" || id === "settings") {
     return user?.role === "OWNER";
@@ -109,9 +114,7 @@ export function PlatformShell({
         aria-label="Platform navigation"
       >
         <div className="dash-sidebar-brand dash-sidebar-brand--pro plat-sidebar-brand">
-          <span className="logo-mark logo-mark--sidebar-pro plat-logo" aria-hidden>
-            {BRAND_MARK}
-          </span>
+          <BrandMark className="logo-mark logo-mark--sidebar-pro plat-logo" />
           <div>
             <span className="dash-sidebar-title">{BRAND_NAME}</span>
             <span className="dash-sidebar-role">Platform console</span>

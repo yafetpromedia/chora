@@ -6,7 +6,8 @@ export type PlatformPermissionKey =
   | "platform.schools.create"
   | "platform.schools.suspend"
   | "platform.schools.delete"
-  | "platform.support.manage";
+  | "platform.support.manage"
+  | "platform.billing.manage";
 
 export function hasPlatformPermission(
   user: { role?: string; permissions?: string[] } | null | undefined,

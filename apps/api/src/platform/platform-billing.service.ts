@@ -7,6 +7,7 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { PlanCatalogService } from '../subscriptions/plan-catalog.service';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { PlatformSettingsService } from '../platform/platform-settings.service';
 import type { CreatePlatformInvoiceDto } from './dto/platform-invoice.dto';
 import type { UpdatePlatformInvoiceDto } from './dto/platform-invoice.dto';
@@ -63,6 +64,7 @@ export class PlatformBillingService {
     private readonly prisma: PrismaService,
     private readonly planCatalog: PlanCatalogService,
     private readonly platformSettings: PlatformSettingsService,
+    private readonly subscriptions: SubscriptionsService,
   ) {}
 
   async getBillingSummary(): Promise<BillingSummaryDto> {
@@ -283,6 +285,17 @@ export class PlatformBillingService {
         school: { select: { id: true, name: true, joinCode: true } },
       },
     });
+
+    if (
+      status === PlatformInvoiceStatus.PAID &&
+      existing.status !== PlatformInvoiceStatus.PAID
+    ) {
+      await this.subscriptions.activateFromPaidInvoice(
+        updated.schoolId,
+        updated.plan,
+        updated.periodEnd,
+      );
+    }
 
     return this.toInvoiceDto(updated);
   }

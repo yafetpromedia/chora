@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { BRAND_MARK, BRAND_NAME } from "@/lib/brand";
+import { BrandMark } from "@/components/brand-mark";
+import { BRAND_NAME } from "@/lib/brand";
 
 const LINKS = [
   { href: "#hero", label: "Home" },
@@ -78,7 +79,7 @@ export function LandingNav() {
       <header className={navClass}>
         <div className="lp3-container lp3-nav__inner">
           <Link href="/" className="lp3-nav__brand" onClick={() => setOpen(false)}>
-            <span className="lp3-nav__mark">{BRAND_MARK}</span>
+            <BrandMark className="lp3-nav__mark" />
             <span>{BRAND_NAME}</span>
           </Link>
 

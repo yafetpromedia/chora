@@ -489,6 +489,139 @@
   border: 1px solid color-mix(in srgb, var(--brand-teal) 14%, transparent);
 }
 
+.par-fees__steps {
+  margin: 0.85rem 0 1rem;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.par-fees__steps li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  font-size: 0.88rem;
+  line-height: 1.4;
+  color: #334155;
+}
+
+.par-fees__step-num {
+  flex: 0 0 1.4rem;
+  height: 1.4rem;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #0f766e;
+  background: color-mix(in srgb, #14b8a6 18%, #fff);
+}
+
+.par-fees__methods {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin: 0.85rem 0 0.35rem;
+}
+
+.par-fees__method {
+  border: 1px solid color-mix(in srgb, var(--brand-teal) 22%, #d1d5db);
+  background: #fff;
+  color: #0f172a;
+  border-radius: 999px;
+  padding: 0.4rem 0.85rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.par-fees__method--active {
+  background: color-mix(in srgb, var(--brand-teal) 16%, #fff);
+  border-color: color-mix(in srgb, var(--brand-teal) 45%, #99f6e4);
+  color: #0f766e;
+}
+
+.par-fees__sample {
+  margin: 0.85rem 0 0.25rem;
+  padding: 0.9rem 1rem 0.85rem;
+  border-radius: 1rem;
+  color: #0f172a;
+}
+
+.par-fees__sample--telebirr {
+  background: linear-gradient(180deg, #f0fdf4 0%, #fff 70%);
+  border: 1px solid #86efac;
+}
+
+.par-fees__sample--cbe {
+  background: linear-gradient(180deg, #f5f3ff 0%, #fff 70%);
+  border: 1px solid #c4b5fd;
+}
+
+.par-fees__sample-status {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.par-fees__sample--telebirr .par-fees__sample-status {
+  color: #15803d;
+}
+
+.par-fees__sample--cbe .par-fees__sample-status {
+  color: #6d28d9;
+}
+
+.par-fees__sample-amount {
+  margin: 0.2rem 0 0.65rem;
+  font-size: 1.15rem;
+  font-weight: 800;
+}
+
+.par-fees__sample dl {
+  margin: 0;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.par-fees__sample dl div {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.8rem;
+}
+
+.par-fees__sample dt {
+  color: #64748b;
+}
+
+.par-fees__sample dd {
+  margin: 0;
+  font-weight: 700;
+  text-align: right;
+}
+
+.par-fees__sample-hint {
+  margin: 0.65rem 0 0;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: #475569;
+}
+
+.par-fees__proof {
+  display: block;
+  width: 100%;
+  max-height: 280px;
+  object-fit: contain;
+  margin-top: 0.55rem;
+  border-radius: 0.85rem;
+  border: 1px solid color-mix(in srgb, var(--brand-teal) 18%, #e5e7eb);
+  background: #fff;
+}
+
 .par-profile-children {
   margin-top: 1rem;
   padding: 1rem 1.05rem;

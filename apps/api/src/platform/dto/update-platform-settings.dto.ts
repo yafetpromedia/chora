@@ -115,4 +115,34 @@ export class UpdatePlatformSettingsDto {
   @IsString()
   @MaxLength(4_000_000)
   landingHeroImageUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  bankName?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  bankAccountHolder?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  bankAccountNumber?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  telebirrNumber?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  telebirrAccountName?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  payoutInstructions?: string;
 }

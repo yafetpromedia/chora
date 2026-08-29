@@ -426,7 +426,6 @@
 .auth-page-logo-mark {
   width: 2rem;
   height: 2rem;
-  font-size: 0.65rem;
   border-radius: 0.5rem;
 }
 
@@ -896,8 +895,8 @@
 .auth-login-nav__logo {
   width: 2.35rem;
   height: 2.35rem;
-  font-size: 0.7rem;
   border-radius: 0.55rem;
+  overflow: hidden;
 }
 
 .auth-login-nav__link {

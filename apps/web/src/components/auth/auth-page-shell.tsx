@@ -6,7 +6,8 @@ import {
   AuthPageVisual,
   type AuthVisualStep,
 } from "@/components/auth/auth-page-visual";
-import { BRAND_MARK, BRAND_NAME } from "@/lib/brand";
+import { BrandMark } from "@/components/brand-mark";
+import { BRAND_NAME } from "@/lib/brand";
 
 type AuthPageShellProps = {
   title: string;
@@ -54,7 +55,7 @@ export function AuthPageShell({
       <div className="auth-login-scene">
         <header className="auth-login-nav">
           <Link href="/" className="auth-login-nav__brand no-underline">
-            <span className="logo-mark auth-login-nav__logo">{BRAND_MARK}</span>
+            <BrandMark className="logo-mark auth-login-nav__logo" />
             <span>{BRAND_NAME}</span>
           </Link>
           <Link href={topLinkHref} className="auth-login-nav__link">
@@ -102,7 +103,7 @@ export function AuthPageShell({
           <>
               <header className="auth-page-top">
                 <Link href="/" className="auth-page-top-brand no-underline">
-                  <span className="logo-mark auth-page-logo-mark">{BRAND_MARK}</span>
+                  <BrandMark className="logo-mark auth-page-logo-mark" />
                   <span>{BRAND_NAME}</span>
                 </Link>
                 <Link href={topLinkHref} className="auth-page-top-link">

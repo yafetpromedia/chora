@@ -93,6 +93,8 @@ export default function AdminSettingsPage() {
   const [bankName, setBankName] = useState("");
   const [bankAccountHolder, setBankAccountHolder] = useState("");
   const [bankAccountNumber, setBankAccountNumber] = useState("");
+  const [telebirrNumber, setTelebirrNumber] = useState("");
+  const [telebirrAccountName, setTelebirrAccountName] = useState("");
   const [paymentInstructions, setPaymentInstructions] = useState("");
   const [reportCardTitle, setReportCardTitle] = useState("");
   const [reportCardTagline, setReportCardTagline] = useState("");
@@ -115,6 +117,8 @@ export default function AdminSettingsPage() {
     setBankName(s.bankName ?? "");
     setBankAccountHolder(s.bankAccountHolder ?? "");
     setBankAccountNumber(s.bankAccountNumber ?? "");
+    setTelebirrNumber(s.telebirrNumber ?? "");
+    setTelebirrAccountName(s.telebirrAccountName ?? "");
     setPaymentInstructions(s.paymentInstructions ?? "");
     setReportCardTitle(s.reportCardTitle ?? "");
     setReportCardTagline(s.reportCardTagline ?? "");
@@ -167,6 +171,8 @@ export default function AdminSettingsPage() {
         bankName: bankName.trim(),
         bankAccountHolder: bankAccountHolder.trim(),
         bankAccountNumber: bankAccountNumber.trim(),
+        telebirrNumber: telebirrNumber.trim(),
+        telebirrAccountName: telebirrAccountName.trim(),
         paymentInstructions: paymentInstructions.trim(),
         reportCardTitle: reportCardTitle.trim(),
         reportCardTagline: reportCardTagline.trim(),
@@ -361,10 +367,31 @@ export default function AdminSettingsPage() {
                 </div>
               </div>
 
-              <h3 className="set-v2__subhead">Bank account (parent fee payments)</h3>
+              <h3 className="set-v2__subhead">How parents pay fees</h3>
               <p className="set-v2__panel-sub" style={{ marginBottom: "0.85rem" }}>
-                Shown to parents when they pay by bank transfer. Telebirr / Chapa can be added later.
+                Parents send money by Telebirr or bank transfer, then submit the transaction ID.
+                Finance verifies it on the Finance page. No payment-gateway license is required.
               </p>
+              <div className="cfg-form-row">
+                <div className="cfg-field">
+                  <label htmlFor="cfg-telebirr">Telebirr number</label>
+                  <input
+                    id="cfg-telebirr"
+                    value={telebirrNumber}
+                    onChange={(e) => setTelebirrNumber(e.target.value)}
+                    placeholder="0911…"
+                  />
+                </div>
+                <div className="cfg-field">
+                  <label htmlFor="cfg-telebirr-name">Telebirr account name</label>
+                  <input
+                    id="cfg-telebirr-name"
+                    value={telebirrAccountName}
+                    onChange={(e) => setTelebirrAccountName(e.target.value)}
+                    placeholder="School name as it appears in Telebirr"
+                  />
+                </div>
+              </div>
               <div className="cfg-field">
                 <label htmlFor="cfg-bank">Bank name</label>
                 <input
@@ -398,7 +425,7 @@ export default function AdminSettingsPage() {
                   id="cfg-pay-note"
                   value={paymentInstructions}
                   onChange={(e) => setPaymentInstructions(e.target.value)}
-                  placeholder="Include student name in transfer reference…"
+                  placeholder="Include the student name in the Telebirr remark or bank reference…"
                 />
               </div>
               <div className="cfg-field">

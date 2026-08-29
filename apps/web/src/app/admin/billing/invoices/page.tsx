@@ -6,11 +6,14 @@ import { DashboardPage } from "@/components/dashboard/dashboard-page";
 import { SchoolBillingShell } from "@/components/school-billing/school-billing-shell";
 import { AUTH_ROLE_KEY, AUTH_TOKEN_KEY } from "@/lib/auth";
 import {
+  getSchoolBillingOverview,
   getSchoolInvoices,
   type SchoolBillingCurrency,
+  type SchoolBillingOverview,
   type SchoolInvoice,
   type SchoolInvoiceStatus,
 } from "@/lib/school-billing";
+import { PayoutInstructions } from "@/components/school-billing/payout-instructions";
 import { BRAND_NAME } from "@/lib/brand";
 
 function formatDate(iso: string) {
@@ -34,6 +37,7 @@ type Filter = SchoolInvoiceStatus | "ALL";
 export default function SchoolInvoicesPage() {
   const router = useRouter();
   const [invoices, setInvoices] = useState<SchoolInvoice[]>([]);
+  const [payout, setPayout] = useState<SchoolBillingOverview["payout"]>();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [filter, setFilter] = useState<Filter>("ALL");
@@ -45,8 +49,11 @@ export default function SchoolInvoicesPage() {
       router.replace("/login");
       return;
     }
-    void getSchoolInvoices()
-      .then(setInvoices)
+    void Promise.all([getSchoolInvoices(), getSchoolBillingOverview()])
+      .then(([rows, overview]) => {
+        setInvoices(rows);
+        setPayout(overview.payout);
+      })
       .catch((e) => setError(e instanceof Error ? e.message : "Could not load invoices"))
       .finally(() => setLoading(false));
   }, [router]);
@@ -154,6 +161,7 @@ export default function SchoolInvoicesPage() {
             Questions about an invoice? Contact {BRAND_NAME} support with your invoice number.
           </p>
         </div>
+        <PayoutInstructions payout={payout} />
       </SchoolBillingShell>
     </DashboardPage>
   );

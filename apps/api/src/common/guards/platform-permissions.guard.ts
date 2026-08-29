@@ -31,6 +31,10 @@ export class PlatformPermissionsGuard implements CanActivate {
       throw new ForbiddenException('Platform admin access only');
     }
 
+    if (user.role === 'OWNER') {
+      return true;
+    }
+
     const granted = new Set(user.permissions ?? []);
     const ok = required.every((key) => granted.has(key));
     if (!ok) {

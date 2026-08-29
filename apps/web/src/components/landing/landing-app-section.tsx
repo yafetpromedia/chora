@@ -3,7 +3,8 @@
 import type { ReactNode } from "react";
 import { Reveal } from "@/components/motion/reveal";
 import { AppStoreBadges } from "@/components/landing/app-store-badges";
-import { BRAND_MARK, BRAND_NAME } from "@/lib/brand";
+import { BrandMark } from "@/components/brand-mark";
+import { BRAND_NAME } from "@/lib/brand";
 
 const PERKS = [
   "Real-time attendance alerts for parents",
@@ -79,7 +80,7 @@ export function LandingAppSection() {
               <PhoneFrame variant="back">
                 <div className="lp3-phone__screen-body lp3-phone__screen-body--id">
                   <header className="lp3-phone__app-head">
-                    <span>{BRAND_MARK}</span>
+                    <BrandMark />
                     <div>
                       <strong>Campus ID</strong>
                       <em>Everest Youth Academy</em>
@@ -110,7 +111,7 @@ export function LandingAppSection() {
               <PhoneFrame variant="front">
                 <div className="lp3-phone__screen-body lp3-phone__screen-body--parent">
                   <header className="lp3-phone__app-head lp3-phone__app-head--row">
-                    <span>{BRAND_MARK}</span>
+                    <BrandMark />
                     <div>
                       <strong>Parent</strong>
                       <em>Everest Youth Academy</em>

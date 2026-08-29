@@ -1,6 +1,7 @@
 "use client";
 
-import { BRAND_MARK, BRAND_NAME } from "@/lib/brand";
+import { BrandMark } from "@/components/brand-mark";
+import { BRAND_NAME } from "@/lib/brand";
 
 type Props = {
   schoolName: string;
@@ -13,7 +14,7 @@ export function SchoolBrandLockup({ schoolName, schoolLogoUrl, roleLabel, compac
   return (
     <div className={`dash-brand-lockup${compact ? " dash-brand-lockup--compact" : ""}`}>
       <div className="dash-brand-lockup__logos" aria-hidden>
-        <span className="logo-mark logo-mark--sidebar-pro dash-brand-lockup__c1">{BRAND_MARK}</span>
+        <BrandMark className="logo-mark logo-mark--sidebar-pro dash-brand-lockup__c1" />
         {schoolLogoUrl ? (
           <>
             <span className="dash-brand-lockup__sep" />

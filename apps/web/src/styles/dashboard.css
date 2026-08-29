@@ -633,6 +633,138 @@
   box-shadow: 0 4px 14px rgba(220, 38, 38, 0.25);
 }
 
+.trial-paywall {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 1.25rem;
+  background: color-mix(in srgb, #0f172a 55%, transparent);
+  backdrop-filter: blur(6px);
+}
+
+.trial-paywall__card {
+  width: min(28rem, 100%);
+  padding: 1.35rem 1.4rem 1.25rem;
+  border-radius: 1.15rem;
+  background: #fff;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.28);
+}
+
+.trial-paywall__eyebrow {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #0f766e;
+}
+
+.trial-paywall__title {
+  margin: 0.35rem 0 0;
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.trial-paywall__text {
+  margin: 0.45rem 0 0;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: #475569;
+}
+
+.trial-paywall__form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 1rem;
+}
+
+.trial-paywall__form label {
+  flex: 1 1 10rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #334155;
+}
+
+.trial-paywall__form input {
+  border: 1px solid #cbd5e1;
+  border-radius: 0.6rem;
+  padding: 0.5rem 0.7rem;
+  font: inherit;
+  text-transform: uppercase;
+}
+
+.trial-paywall__form button,
+.trial-paywall__cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 0.6rem;
+  padding: 0.55rem 0.9rem;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  background: #0f766e;
+  color: #fff;
+  text-decoration: none;
+}
+
+.trial-paywall__cta {
+  margin-top: 0.75rem;
+  width: 100%;
+}
+
+.trial-paywall__error {
+  margin: 0.5rem 0 0;
+  color: #b91c1c;
+  font-size: 0.82rem;
+}
+
+.trial-paywall__ok {
+  margin: 0.5rem 0 0;
+  color: #0f766e;
+  font-size: 0.82rem;
+}
+
+.trial-paywall__hint {
+  margin: 0.4rem 0 0;
+  font-size: 0.78rem;
+  color: #64748b;
+}
+
+.par-fees__coupon,
+.sb-v2__coupon {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin: 0.85rem 0 0.25rem;
+  align-items: end;
+}
+
+.sb-v2__coupon label {
+  flex: 1 1 12rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.sb-v2__coupon input {
+  border: 1px solid var(--brand-border, #d1d5db);
+  border-radius: 0.55rem;
+  padding: 0.5rem 0.7rem;
+  font: inherit;
+  text-transform: uppercase;
+}
+
 /* Upgrade page */
 .upgrade-scene {
   min-height: 100dvh;
@@ -1232,8 +1364,7 @@
 .logo-mark--setup {
   width: 2.75rem;
   height: 2.75rem;
-  font-size: 0.9rem;
-  box-shadow: 0 4px 16px rgba(42, 111, 111, 0.2);
+  box-shadow: 0 4px 16px rgba(15, 118, 110, 0.2);
 }
 
 .setup-brand-name {
@@ -2685,7 +2816,6 @@
 .logo-mark--sidebar {
   width: 2.5rem;
   height: 2.5rem;
-  font-size: 0.85rem;
 }
 
 .dash-sidebar-title {
@@ -3045,10 +3175,8 @@
 .logo-mark--sidebar-pro {
   width: 2.35rem;
   height: 2.35rem;
-  font-size: 0.72rem;
   border-radius: 0.6rem;
-  background: linear-gradient(135deg, var(--brand-teal-dark), var(--brand-teal));
-  color: #fff;
+  background: #0f766e;
 }
 
 .dash-sidebar-brand--pro .dash-sidebar-title {

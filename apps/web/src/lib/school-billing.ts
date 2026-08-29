@@ -1,4 +1,4 @@
-import type { PlanType, SubscriptionStatus } from "@/lib/api";
+import type { PlanType, PlatformPayoutInstructions, SubscriptionStatus } from "@/lib/api";
 import { apiFetch } from "@/lib/api";
 
 export type SchoolInvoiceStatus = "DRAFT" | "SENT" | "PAID" | "OVERDUE" | "VOID";
@@ -30,6 +30,7 @@ export type SchoolBillingOverview = {
     outstandingEtb: number;
     nextDueAt: string | null;
   };
+  payout?: PlatformPayoutInstructions;
 };
 
 export function getSchoolBillingOverview() {

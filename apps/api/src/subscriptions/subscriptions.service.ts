@@ -12,6 +12,7 @@ import {
 } from '@prisma/client';
 import { ChapaService } from '../payments/chapa.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { CouponsService } from './coupons.service';
 import { PlanCatalogService } from './plan-catalog.service';
 import { UPGRADE_PLANS } from './plan-limits';
 
@@ -21,6 +22,8 @@ export type SubscriptionStatus = {
   plan: Plan;
   isActive: boolean;
   trialEndsAt: string | null;
+  currentPeriodEnd: string | null;
+  couponCode: string | null;
   daysRemaining: number | null;
   expired: boolean;
   limits: {
@@ -43,6 +46,7 @@ export class SubscriptionsService {
     private readonly prisma: PrismaService,
     private readonly planCatalog: PlanCatalogService,
     private readonly chapaService: ChapaService,
+    private readonly coupons: CouponsService,
   ) {}
 
   async createTrial(schoolId: string) {
@@ -95,8 +99,12 @@ export class SubscriptionsService {
       sub.plan === Plan.TRIAL &&
       sub.trialEndsAt !== null &&
       sub.trialEndsAt < now;
+    const periodExpired =
+      sub.plan !== Plan.TRIAL &&
+      sub.currentPeriodEnd !== null &&
+      sub.currentPeriodEnd < now;
 
-    if (trialExpired && sub.isActive) {
+    if ((trialExpired || periodExpired) && sub.isActive) {
       sub = await this.prisma.subscription.update({
         where: { schoolId },
         data: { isActive: false },
@@ -114,14 +122,25 @@ export class SubscriptionsService {
           (sub.trialEndsAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
         ),
       );
+    } else if (sub.currentPeriodEnd) {
+      daysRemaining = Math.max(
+        0,
+        Math.ceil(
+          (sub.currentPeriodEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
+        ),
+      );
     }
+
+    const expired = trialExpired || periodExpired || !sub.isActive;
 
     return {
       plan: sub.plan,
       isActive: sub.isActive,
       trialEndsAt: sub.trialEndsAt?.toISOString() ?? null,
+      currentPeriodEnd: sub.currentPeriodEnd?.toISOString() ?? null,
+      couponCode: sub.couponCode,
       daysRemaining,
-      expired: trialExpired || !sub.isActive,
+      expired,
       limits: {
         students: limits.students,
         teachers: limits.teachers,
@@ -137,7 +156,7 @@ export class SubscriptionsService {
     const status = await this.getStatus(schoolId);
     if (!status.isActive || status.expired) {
       throw new ForbiddenException(
-        'Your Chora trial has ended. Upgrade to continue managing your school.',
+        'Your Chora trial has ended. Pay for a plan or enter a coupon code to continue.',
       );
     }
     return status;
@@ -176,20 +195,53 @@ export class SubscriptionsService {
     return status;
   }
 
-  getPaymentConfig() {
+  async getPaymentConfig() {
     return {
-      chapaEnabled: this.chapaService.isConfigured(),
+      chapaEnabled: this.chapaService.isLiveEnabled(),
       currency: 'ETB' as const,
       provider: 'chapa' as const,
+      payout: await this.getPlatformPayout(),
     };
   }
 
-  async upgradePlan(schoolId: string, plan: Plan) {
+  private async getPlatformPayout() {
+    const settings = await this.prisma.platformSettings.findUnique({
+      where: { id: 'default' },
+    });
+    const hasBank =
+      !!settings?.bankName?.trim() && !!settings?.bankAccountNumber?.trim();
+    const hasTelebirr = !!settings?.telebirrNumber?.trim();
+    return {
+      bank: hasBank
+        ? {
+            bankName: settings!.bankName!,
+            accountHolder:
+              settings!.bankAccountHolder?.trim() || settings!.bankName!,
+            accountNumber: settings!.bankAccountNumber!,
+          }
+        : null,
+      telebirr: hasTelebirr
+        ? {
+            number: settings!.telebirrNumber!,
+            accountName:
+              settings!.telebirrAccountName?.trim() ||
+              settings!.bankAccountHolder?.trim() ||
+              settings!.platformName ||
+              'Chora',
+          }
+        : null,
+      instructions: settings?.payoutInstructions?.trim() || null,
+      supportEmail: settings?.supportEmail ?? null,
+      supportPhone: settings?.supportPhone ?? null,
+    };
+  }
+
+  async upgradePlan(schoolId: string, plan: Plan, adminId?: string) {
     if (!UPGRADE_PLANS.includes(plan)) {
       throw new ForbiddenException('Invalid upgrade plan');
     }
 
-    if (this.chapaService.isConfigured()) {
+    if (this.chapaService.isLiveEnabled()) {
       throw new BadRequestException(
         'Use subscription checkout to pay and activate your plan.',
       );
@@ -202,14 +254,83 @@ export class SubscriptionsService {
       throw new NotFoundException('Subscription not found');
     }
 
-    return this.prisma.subscription.update({
-      where: { schoolId },
+    const catalog = await this.planCatalog.findAll();
+    const planRow = catalog.find((p) => p.plan === plan);
+    if (!planRow || planRow.etbMonthly <= 0) {
+      throw new BadRequestException('Plan pricing is not available');
+    }
+
+    const percentOff = await this.coupons.discountForSchool(schoolId);
+    const amountEtb = this.applyPercentOff(planRow.etbMonthly, percentOff);
+    const amountUsd = this.applyPercentOff(planRow.usdMonthly, percentOff);
+
+    if (percentOff >= 100 || amountEtb <= 0) {
+      const periodEnd = new Date();
+      periodEnd.setMonth(periodEnd.getMonth() + 1);
+      await this.prisma.subscription.update({
+        where: { schoolId },
+        data: {
+          plan,
+          isActive: true,
+          trialEndsAt: null,
+          currentPeriodEnd: periodEnd,
+        },
+      });
+      const status = await this.getStatus(schoolId);
+      return {
+        ...status,
+        paymentRequired: false,
+        message: `Coupon applied. ${planRow.label} is now active.`,
+      };
+    }
+
+    const now = new Date();
+    const periodEnd = new Date(now);
+    periodEnd.setMonth(periodEnd.getMonth() + 1);
+    const invoiceNumber = await this.nextInvoiceNumber();
+
+    await this.prisma.platformInvoice.updateMany({
+      where: { schoolId, status: PlatformInvoiceStatus.SENT },
+      data: { status: PlatformInvoiceStatus.VOID },
+    });
+
+    await this.prisma.platformInvoice.create({
       data: {
+        schoolId,
+        invoiceNumber,
         plan,
-        isActive: true,
-        trialEndsAt: null,
+        periodStart: now,
+        periodEnd,
+        dueAt: now,
+        amountUsd,
+        amountEtb,
+        currency: BillingCurrency.ETB,
+        status: PlatformInvoiceStatus.SENT,
+        billingInterval: 'month',
+        initiatedBy: adminId ?? null,
+        notes: percentOff
+          ? `${planRow.label} monthly · ${percentOff}% coupon`
+          : `${planRow.label} monthly — pay by bank transfer`,
       },
     });
+
+    const status = await this.getStatus(schoolId);
+    return {
+      ...status,
+      paymentRequired: true,
+      invoiceNumber,
+      amountEtb,
+      percentOff,
+      message: percentOff
+        ? `Invoice ${invoiceNumber} issued at ${percentOff}% off (${amountEtb} ETB). Access continues after payment is confirmed.`
+        : `Invoice ${invoiceNumber} issued for ${amountEtb} ETB. Pay by bank transfer; we activate the plan when payment is confirmed.`,
+    };
+  }
+
+  async redeemCoupon(schoolId: string, code: string, appliedBy?: string) {
+    const applied = await this.coupons.redeem(schoolId, code, appliedBy);
+    const status = await this.getStatus(schoolId);
+    return { ...status, coupon: applied };
   }
 
   async initializePlanCheckout(
@@ -218,8 +339,8 @@ export class SubscriptionsService {
     plan: Plan,
     interval: 'month' | 'year',
   ) {
-    if (!this.chapaService.isConfigured()) {
-      throw new BadRequestException('Chapa payments are not configured');
+    if (!this.chapaService.isLiveEnabled()) {
+      throw new BadRequestException('Chapa payments are not enabled');
     }
     if (!UPGRADE_PLANS.includes(plan)) {
       throw new ForbiddenException('Invalid plan for checkout');
@@ -237,8 +358,9 @@ export class SubscriptionsService {
     }
 
     const factor = interval === 'year' ? YEARLY_BILLING_MULTIPLIER : 1;
-    const amountEtb = planRow.etbMonthly * factor;
-    const amountUsd = planRow.usdMonthly * factor;
+    const percentOff = await this.coupons.discountForSchool(schoolId);
+    const amountEtb = this.applyPercentOff(planRow.etbMonthly * factor, percentOff);
+    const amountUsd = this.applyPercentOff(planRow.usdMonthly * factor, percentOff);
 
     const [admin, school] = await Promise.all([
       this.prisma.user.findUnique({
@@ -408,6 +530,7 @@ export class SubscriptionsService {
           plan: invoice.plan!,
           isActive: true,
           trialEndsAt: null,
+          currentPeriodEnd: invoice.periodEnd,
         },
       });
     });
@@ -451,6 +574,24 @@ export class SubscriptionsService {
       return `0${digits.slice(3)}`;
     }
     return null;
+  }
+
+  async activateFromPaidInvoice(schoolId: string, plan: Plan | null, periodEnd: Date) {
+    if (!plan || plan === Plan.TRIAL) return;
+    await this.prisma.subscription.update({
+      where: { schoolId },
+      data: {
+        plan,
+        isActive: true,
+        trialEndsAt: null,
+        currentPeriodEnd: periodEnd,
+      },
+    });
+  }
+
+  private applyPercentOff(amount: number, percentOff: number) {
+    if (percentOff <= 0) return amount;
+    return Math.max(0, Math.round(amount * (1 - percentOff / 100)));
   }
 
   async adminSetSchoolPlan(
@@ -540,6 +681,7 @@ export class SubscriptionsService {
         outstandingEtb,
         nextDueAt,
       },
+      payout: await this.getPlatformPayout(),
     };
   }
 

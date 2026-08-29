@@ -24,6 +24,8 @@ export type SchoolSettings = {
   bankName: string | null;
   bankAccountHolder: string | null;
   bankAccountNumber: string | null;
+  telebirrNumber: string | null;
+  telebirrAccountName: string | null;
   paymentInstructions: string | null;
   reportCardTitle: string | null;
   reportCardTagline: string | null;
@@ -54,6 +56,8 @@ export type UpdateSchoolSettingsPayload = {
   bankName?: string;
   bankAccountHolder?: string;
   bankAccountNumber?: string;
+  telebirrNumber?: string;
+  telebirrAccountName?: string;
   paymentInstructions?: string;
   reportCardTitle?: string;
   reportCardTagline?: string;

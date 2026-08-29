@@ -13,6 +13,7 @@ import { PlatformAssessments } from "@/components/platform/platform-assessments"
 import { PlatformBilling } from "@/components/platform/platform-billing";
 import { PlatformInvoices } from "@/components/platform/platform-invoices";
 import { PlatformPlans } from "@/components/platform/platform-plans";
+import { PlatformCoupons } from "@/components/platform/platform-coupons";
 import { PlatformUsage } from "@/components/platform/platform-usage";
 import { PlatformOverview } from "@/components/platform/platform-overview";
 import { PlatformPermissions } from "@/components/platform/platform-permissions";
@@ -178,6 +179,10 @@ export default function PlatformDashboardPage() {
           {section === "invoices" ? <PlatformInvoices schools={schools} /> : null}
           {section === "usage" ? <PlatformUsage /> : null}
           {section === "plans" ? <PlatformPlans /> : null}
+          {section === "coupons" &&
+          hasPlatformPermission(user, "platform.billing.manage") ? (
+            <PlatformCoupons />
+          ) : null}
           {section === "permissions" && user?.role === "OWNER" ? (
             <PlatformPermissions user={user} />
           ) : null}

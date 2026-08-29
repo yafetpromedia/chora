@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { AppStoreBadges } from "@/components/landing/app-store-badges";
-import { BRAND_MARK, BRAND_NAME, BRAND_TAGLINE } from "@/lib/brand";
+import { BrandMark } from "@/components/brand-mark";
+import { BRAND_NAME, BRAND_TAGLINE } from "@/lib/brand";
 
 const PRODUCT_LINKS = [
   { href: "#features", label: "Product" },
@@ -101,7 +102,7 @@ export function LandingFooter() {
         <div className="lp3-footer__top">
           <div className="lp3-footer__brand">
             <Link href="/" className="lp3-footer__logo">
-              <span className="lp3-nav__mark">{BRAND_MARK}</span>
+              <BrandMark className="lp3-nav__mark" />
               <span>{BRAND_NAME}</span>
             </Link>
             <p>

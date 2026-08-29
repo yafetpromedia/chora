@@ -38,11 +38,10 @@
   align-items: center;
   justify-content: center;
   border-radius: 0.75rem;
-  font-size: 0.8rem;
-  font-weight: 800;
-  color: #fff;
-  background: linear-gradient(135deg, var(--brand-teal-dark), var(--brand-teal));
-  box-shadow: 0 4px 14px rgba(42, 111, 111, 0.22);
+  overflow: hidden;
+  padding: 0;
+  background: #0f766e;
+  box-shadow: 0 4px 14px rgba(15, 118, 110, 0.22);
 }
 
 .sw__header-text {

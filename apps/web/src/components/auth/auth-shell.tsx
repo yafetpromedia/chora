@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
 import { AuthVisualPanel } from "@/components/auth/auth-visual-panel";
-import { BRAND_MARK, BRAND_NAME } from "@/lib/brand";
+import { BrandMark } from "@/components/brand-mark";
+import { BRAND_NAME } from "@/lib/brand";
 
 type AuthShellProps = {
   mode: "login" | "register";
@@ -28,7 +29,7 @@ export function AuthShell({
     <div className="auth-scene">
       <header className="auth-topbar">
         <Link href="/" className="auth-logo no-underline">
-          <span className="logo-mark">{BRAND_MARK}</span>
+          <BrandMark className="logo-mark" />
           <span>{BRAND_NAME}</span>
         </Link>
         <Link href="/" className="auth-topbar-link">

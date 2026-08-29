@@ -229,6 +229,8 @@ model School {
   bankName              String?
   bankAccountHolder     String?
   bankAccountNumber     String?
+  telebirrNumber        String?
+  telebirrAccountName   String?
   paymentInstructions   String?
   gradePreset           GradePreset?
   curriculumPackageKey  String?
@@ -258,6 +260,7 @@ model School {
   feeSchedules   FeeSchedule[]
   roleTemplates  RoleTemplate[]
   platformInvoices PlatformInvoice[]
+  couponRedemptions CouponRedemption[]
   supportTickets   SupportTicket[]
   scoreCorrections ScoreCorrectionRequest[]
   createdAt      DateTime       @default(now())
@@ -309,16 +312,56 @@ model UserPermissionGrant {
 }
 
 model Subscription {
-  id          String    @id @default(cuid())
-  schoolId    String    @unique
-  school      School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  plan        Plan      @default(TRIAL)
-  trialEndsAt DateTime?
-  isActive    Boolean   @default(true)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id               String    @id @default(cuid())
+  schoolId         String    @unique
+  school           School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  plan             Plan      @default(TRIAL)
+  trialEndsAt      DateTime?
+  currentPeriodEnd DateTime?
+  couponCode       String?
+  isActive         Boolean   @default(true)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   @@index([plan, isActive])
+}
+
+enum CouponKind {
+  PERCENT_OFF
+  EXTRA_TRIAL_DAYS
+  COMPLIMENTARY
+}
+
+model Coupon {
+  id                  String             @id @default(cuid())
+  code                String             @unique
+  kind                CouponKind
+  percentOff          Int                @default(0)
+  extraDays           Int                @default(0)
+  complimentaryMonths Int                @default(1)
+  plan                Plan?
+  maxRedemptions      Int?
+  redeemedCount       Int                @default(0)
+  expiresAt           DateTime?
+  isActive            Boolean            @default(true)
+  notes               String?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  redemptions         CouponRedemption[]
+}
+
+model CouponRedemption {
+  id        String   @id @default(cuid())
+  couponId  String
+  coupon    Coupon   @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  schoolId  String
+  school    School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  appliedBy String?
+  result    String?
+  createdAt DateTime @default(now())
+
+  @@unique([couponId, schoolId])
+  @@index([schoolId])
 }
 
 /// Platform-managed sellable plans (prices, limits, copy)
@@ -1016,6 +1059,13 @@ model PlatformSettings {
   sessionTimeoutMinutes Int              @default(60)
   /// Public marketing / register hero background (URL or data URL).
   landingHeroImageUrl   String?          @db.Text
+  /// Where schools send SaaS subscription payments (Telebirr / CBE).
+  bankName              String?
+  bankAccountHolder     String?
+  bankAccountNumber     String?
+  telebirrNumber        String?
+  telebirrAccountName   String?
+  payoutInstructions    String?          @db.Text
   /// Editable platform role → permission keys (SUPPORT/SALES). OWNER always has all.
   rolePermissions       Json?
   createdAt             DateTime         @default(now())

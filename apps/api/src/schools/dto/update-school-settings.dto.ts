@@ -82,6 +82,14 @@ export class UpdateSchoolSettingsDto {
 
   @IsString()
   @IsOptional()
+  telebirrNumber?: string;
+
+  @IsString()
+  @IsOptional()
+  telebirrAccountName?: string;
+
+  @IsString()
+  @IsOptional()
   paymentInstructions?: string;
 
   @IsString()

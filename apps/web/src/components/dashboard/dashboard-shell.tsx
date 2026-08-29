@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type MouseEvent } from "react";
-import { apiFetch, apiPost, type Announcement, type SchoolInfo } from "@/lib/api";
+import { apiFetch, apiPost, getSchoolSubscription, type Announcement, type SchoolInfo, type SubscriptionStatus } from "@/lib/api";
 import type { AdminDayOverview } from "@/lib/dashboard-day";
 import {
   AUTH_ROLE_KEY,
@@ -30,6 +30,7 @@ import {
   type NavItem,
 } from "./nav-config";
 import { AiChatWidget } from "@/components/ai/ai-chat-widget";
+import { TrialPaywall } from "@/components/trial-paywall";
 
 const ACTION_ALERT_DISMISS_KEY = "campusone.actionAlerts.dismissed";
 
@@ -88,6 +89,7 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
   const [actionAlerts, setActionAlerts] = useState<AdminDayOverview["alerts"]["items"]>([]);
   const [dismissedActionTypes, setDismissedActionTypes] = useState<Set<string>>(() => new Set());
   const [expandedNav, setExpandedNav] = useState<Record<string, boolean>>({});
+  const [subscription, setSubscription] = useState<SubscriptionStatus | null>(null);
   const notifyRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -149,6 +151,10 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
     void apiFetch<{ count: number }>("/announcements/unread-count")
       .then((res) => setUnreadCount(res.count ?? 0))
       .catch(() => setUnreadCount(0));
+
+    void getSchoolSubscription()
+      .then(setSubscription)
+      .catch(() => setSubscription(null));
 
     if (role === "admin" || role === "staff") {
       void loadActionAlerts();
@@ -643,6 +649,18 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
       ) : null}
 
       <AiChatWidget role={navRole} />
+      {subscription?.expired && !pathname.startsWith("/admin/billing") ? (
+        <TrialPaywall
+          subscription={subscription}
+          role={navRole}
+          onRedeemed={(next) => {
+            setSubscription(next);
+            if (!next.expired) {
+              window.location.reload();
+            }
+          }}
+        />
+      ) : null}
     </div>
   );
 }

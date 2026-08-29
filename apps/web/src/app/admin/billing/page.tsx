@@ -8,6 +8,7 @@ import { DashboardPage } from "@/components/dashboard/dashboard-page";
 import { SchoolBillingShell } from "@/components/school-billing/school-billing-shell";
 import { UsageMeters } from "@/components/school-billing/usage-meters";
 import { AUTH_ROLE_KEY, AUTH_TOKEN_KEY } from "@/lib/auth";
+import { PayoutInstructions } from "@/components/school-billing/payout-instructions";
 import { getSchoolBillingOverview, type SchoolBillingOverview } from "@/lib/school-billing";
 import { BRAND_NAME } from "@/lib/brand";
 
@@ -167,6 +168,7 @@ export default function SchoolBillingPage() {
                 </Link>
               </div>
             </article>
+            <PayoutInstructions payout={data.payout} />
           </div>
         ) : null}
       </SchoolBillingShell>

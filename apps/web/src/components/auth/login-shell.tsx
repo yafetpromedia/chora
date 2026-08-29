@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useId } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { LoginVisualPanel } from "@/components/auth/login-visual-panel";
-import { BRAND_MARK, BRAND_NAME } from "@/lib/brand";
+import { BrandMark } from "@/components/brand-mark";
+import { BRAND_NAME } from "@/lib/brand";
 
 /** Shared seam curve (objectBoundingBox). Soft 3-wave graph down the middle. */
 const SEAM =
@@ -49,7 +50,7 @@ export function LoginShell({ children, error }: LoginShellProps) {
 
           <header className="reg-top">
             <Link href="/" className="reg-top__brand no-underline">
-              <span className="logo-mark reg-top__logo">{BRAND_MARK}</span>
+              <BrandMark className="logo-mark reg-top__logo" />
               <span>{BRAND_NAME}</span>
             </Link>
             <Link href="/" className="reg-top__link">

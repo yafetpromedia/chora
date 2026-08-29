@@ -50,6 +50,10 @@ export const metadata: Metadata = {
   title: "Chora (ጮራ) — School management for admins, teachers & parents",
   description:
     "Run attendance, results, fees, and family communication on one platform. 14-day free trial. Plans in USD and ETB for Ethiopian and international schools.",
+  icons: {
+    icon: "/brand/chora-mark.png",
+    apple: "/brand/chora-mark.png",
+  },
 };
 
 export default function RootLayout({

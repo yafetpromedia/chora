@@ -2,7 +2,8 @@
 
 import { motion, useReducedMotion } from "framer-motion";
 import { useLandingHeroImage } from "@/hooks/use-landing-hero-image";
-import { BRAND_MARK, BRAND_NAME } from "@/lib/brand";
+import { BrandMark } from "@/components/brand-mark";
+import { BRAND_NAME } from "@/lib/brand";
 
 const FEATURES = [
   {
@@ -162,7 +163,7 @@ export function LoginVisualPanel() {
           <div className="login-visual__brand-lockup">
             <span className="login-visual__logo-ring" aria-hidden>
               <span className="login-visual__logo-arc" />
-              <span className="login-visual__logo-mark">{BRAND_MARK}</span>
+              <BrandMark className="login-visual__logo-mark" />
             </span>
             <div className="login-visual__brand-text">
               <strong>{BRAND_NAME}</strong>

@@ -349,8 +349,15 @@ export type SubscriptionStatus = {
   plan: PlanType;
   isActive: boolean;
   trialEndsAt: string | null;
+  currentPeriodEnd?: string | null;
+  couponCode?: string | null;
   daysRemaining: number | null;
   expired: boolean;
+  paymentRequired?: boolean;
+  invoiceNumber?: string;
+  amountEtb?: number;
+  percentOff?: number;
+  message?: string;
   limits: {
     students: number | null;
     teachers: number | null;
@@ -363,6 +370,14 @@ export type SubscriptionStatus = {
   };
   planLabel: string;
   planDescription: string;
+  coupon?: {
+    code: string;
+    kind: string;
+    result: string;
+    activated: boolean;
+    paymentRequired: boolean;
+    percentOff: number;
+  };
 };
 
 export type PlanOption = {
@@ -524,10 +539,32 @@ export async function upgradeSchoolPlan(plan: Exclude<PlanType, "TRIAL">): Promi
   return apiPost<SubscriptionStatus>("/schools/subscription/upgrade", { plan });
 }
 
+export async function redeemSchoolCoupon(code: string) {
+  return apiPost<SubscriptionStatus>("/schools/subscription/coupon", {
+    code,
+  });
+}
+
+export type PlatformPayoutInstructions = {
+  bank: {
+    bankName: string;
+    accountHolder: string;
+    accountNumber: string;
+  } | null;
+  telebirr: {
+    number: string;
+    accountName: string;
+  } | null;
+  instructions: string | null;
+  supportEmail: string | null;
+  supportPhone: string | null;
+};
+
 export type BillingPaymentConfig = {
   chapaEnabled: boolean;
   currency: "ETB";
   provider: "chapa";
+  payout?: PlatformPayoutInstructions;
 };
 
 export async function getBillingPaymentConfig(): Promise<BillingPaymentConfig> {

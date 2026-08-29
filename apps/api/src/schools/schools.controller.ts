@@ -9,6 +9,7 @@ import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { CreateInviteDto } from './dto/create-invite.dto';
 import { SubscriptionCheckoutDto } from './dto/subscription-checkout.dto';
 import { VerifySubscriptionCheckoutDto } from './dto/verify-subscription-checkout.dto';
+import { RedeemCouponDto } from '../subscriptions/dto/coupon.dto';
 import { UpgradePlanDto } from './dto/upgrade-plan.dto';
 import { UpdateSchoolSettingsDto } from './dto/update-school-settings.dto';
 import { InvitesService } from './invites.service';
@@ -74,6 +75,8 @@ export class SchoolsController {
       bankName: dto.bankName,
       bankAccountHolder: dto.bankAccountHolder,
       bankAccountNumber: dto.bankAccountNumber,
+      telebirrNumber: dto.telebirrNumber,
+      telebirrAccountName: dto.telebirrAccountName,
       paymentInstructions: dto.paymentInstructions,
       reportCardTitle: dto.reportCardTitle,
       reportCardTagline: dto.reportCardTagline,
@@ -96,7 +99,7 @@ export class SchoolsController {
 
   @Get('subscription')
   @UseGuards(JwtAuthGuard, SchoolTenantGuard, RolesGuard)
-  @Roles('admin')
+  @Roles('admin', 'staff', 'teacher', 'parent', 'student')
   getSubscription(@CurrentUser() user: AuthUser) {
     return this.subscriptionsService.getStatus(user.schoolId);
   }
@@ -158,8 +161,22 @@ export class SchoolsController {
   @Post('subscription/upgrade')
   @UseGuards(JwtAuthGuard, SchoolTenantGuard, RolesGuard)
   @Roles('admin')
-  async upgradePlan(@CurrentUser() user: AuthUser, @Body() dto: UpgradePlanDto) {
-    await this.subscriptionsService.upgradePlan(user.schoolId, dto.plan);
-    return this.subscriptionsService.getStatus(user.schoolId);
+  upgradePlan(@CurrentUser() user: AuthUser, @Body() dto: UpgradePlanDto) {
+    return this.subscriptionsService.upgradePlan(
+      user.schoolId,
+      dto.plan,
+      user.id,
+    );
+  }
+
+  @Post('subscription/coupon')
+  @UseGuards(JwtAuthGuard, SchoolTenantGuard, RolesGuard)
+  @Roles('admin')
+  redeemCoupon(@CurrentUser() user: AuthUser, @Body() dto: RedeemCouponDto) {
+    return this.subscriptionsService.redeemCoupon(
+      user.schoolId,
+      dto.code,
+      user.id,
+    );
   }
 }

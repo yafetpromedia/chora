@@ -748,6 +748,8 @@ export class FinanceService implements OnModuleInit {
           bankName: true,
           bankAccountHolder: true,
           bankAccountNumber: true,
+          telebirrNumber: true,
+          telebirrAccountName: true,
           paymentInstructions: true,
         },
       }),
@@ -762,6 +764,7 @@ export class FinanceService implements OnModuleInit {
           id: true,
           receiptNumber: true,
           amountCents: true,
+          method: true,
           reference: true,
           createdAt: true,
         },
@@ -780,20 +783,19 @@ export class FinanceService implements OnModuleInit {
 
     const hasBank =
       !!school?.bankName?.trim() && !!school?.bankAccountNumber?.trim();
-    const chapaEnabled = this.chapaService.isConfigured();
+    const hasTelebirr = !!school?.telebirrNumber?.trim();
+    const chapaEnabled = this.chapaService.isLiveEnabled();
     const methods = [
+      ...(hasTelebirr ? (['TELEBIRR'] as const) : []),
+      ...(hasBank ? (['BANK_TRANSFER'] as const) : []),
       ...(chapaEnabled ? (['CHAPA'] as const) : []),
-      'BANK_TRANSFER',
     ];
 
-    let note =
+    const note =
       school?.paymentInstructions?.trim() ||
-      'Pay online with Chapa or transfer to the school account below, then submit your reference for verification.';
-    if (!chapaEnabled) {
-      note =
-        school?.paymentInstructions?.trim() ||
-        'Transfer to the school account below, then submit your reference number and payment screenshot. Finance will verify and issue a receipt.';
-    }
+      (hasTelebirr
+        ? 'Send the fee with Telebirr (or bank transfer), then submit the transaction ID and a screenshot. Finance verifies and issues a receipt.'
+        : 'Transfer to the school account below, then submit your reference number and payment screenshot. Finance will verify and issue a receipt.');
 
     return {
       student: summary.student,
@@ -803,11 +805,27 @@ export class FinanceService implements OnModuleInit {
       paymentInstructions: {
         methods,
         note,
+        steps: [
+          'Choose Telebirr or CBE / bank transfer.',
+          'Send the fee, then open the Successful / Thank you receipt.',
+          'Copy the Transaction Number (Telebirr, e.g. DHR97D11WZ) or Transaction ID (CBE, e.g. FT26239YHGVN).',
+          'Upload a screenshot of that receipt and submit.',
+          'Finance matches the screenshot, then issues the school receipt.',
+        ],
         bank: hasBank
           ? {
               bankName: school!.bankName!,
               accountHolder: school!.bankAccountHolder ?? school!.bankName!,
               accountNumber: school!.bankAccountNumber!,
+            }
+          : null,
+        telebirr: hasTelebirr
+          ? {
+              number: school!.telebirrNumber!,
+              accountName:
+                school!.telebirrAccountName?.trim() ||
+                school!.bankAccountHolder?.trim() ||
+                'School Telebirr',
             }
           : null,
       },
@@ -820,8 +838,8 @@ export class FinanceService implements OnModuleInit {
     studentProfileId: string,
     amountCents: number,
   ) {
-    if (!this.chapaService.isConfigured()) {
-      throw new BadRequestException('Chapa online payments are not configured');
+    if (!this.chapaService.isLiveEnabled()) {
+      throw new BadRequestException('Chapa online payments are not enabled');
     }
 
     await this.assertParentAccess(parentId, studentProfileId);
@@ -1001,12 +1019,52 @@ export class FinanceService implements OnModuleInit {
     input: {
       amountCents: number;
       reference: string;
+      method?: 'BANK_TRANSFER' | 'TELEBIRR';
       proofUrl?: string;
       notes?: string;
     },
   ) {
     await this.assertParentAccess(parentId, studentProfileId);
     await this.subscriptionsService.assertActive(schoolId);
+
+    const method =
+      input.method === 'TELEBIRR'
+        ? PaymentMethod.TELEBIRR
+        : PaymentMethod.BANK_TRANSFER;
+
+    const school = await this.prisma.school.findUnique({
+      where: { id: schoolId },
+      select: {
+        bankName: true,
+        bankAccountNumber: true,
+        telebirrNumber: true,
+      },
+    });
+    if (method === PaymentMethod.TELEBIRR && !school?.telebirrNumber?.trim()) {
+      throw new BadRequestException(
+        'This school has not published a Telebirr number yet',
+      );
+    }
+    if (
+      method === PaymentMethod.BANK_TRANSFER &&
+      !(school?.bankName?.trim() && school?.bankAccountNumber?.trim())
+    ) {
+      throw new BadRequestException(
+        'This school has not published a bank account yet',
+      );
+    }
+    if (!input.proofUrl?.trim()) {
+      throw new BadRequestException(
+        'Upload the Successful / Thank you receipt screenshot',
+      );
+    }
+    const proof = input.proofUrl.trim();
+    if (
+      !/^data:image\/(jpeg|jpg|png|webp|gif);base64,/i.test(proof) &&
+      !/^https:\/\//i.test(proof)
+    ) {
+      throw new BadRequestException('Receipt must be an image upload or an https link');
+    }
 
     const summary = await this.getStudentFinanceSummary(
       schoolId,
@@ -1019,6 +1077,8 @@ export class FinanceService implements OnModuleInit {
     }
 
     const receiptNumber = await this.nextReceiptNumber(schoolId);
+    const methodLabel =
+      method === PaymentMethod.TELEBIRR ? 'Telebirr' : 'bank transfer';
 
     const payment = await this.prisma.payment.create({
       data: {
@@ -1026,14 +1086,14 @@ export class FinanceService implements OnModuleInit {
         studentProfileId,
         receiptNumber,
         amountCents: input.amountCents,
-        method: PaymentMethod.BANK_TRANSFER,
+        method,
         status: PaymentStatus.PENDING,
         reference: input.reference.trim(),
         proofUrl: input.proofUrl?.trim() || null,
         submittedBy: parentId,
         notes:
           input.notes?.trim() ||
-          'Parent bank transfer — awaiting finance verification',
+          `Parent ${methodLabel} — awaiting finance verification`,
       },
     });
 

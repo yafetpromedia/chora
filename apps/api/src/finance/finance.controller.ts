@@ -209,7 +209,13 @@ export class FinanceController {
       user.id,
       user.schoolId,
       profileId,
-      dto,
+      {
+        amountCents: dto.amountCents,
+        reference: dto.reference,
+        method: dto.method,
+        proofUrl: dto.proofUrl,
+        notes: dto.notes,
+      },
     );
   }
 
