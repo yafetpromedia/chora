@@ -60,6 +60,69 @@ function teacherSlotKey(
   return `${teacherUserId}:${weekday}:${periodNumber}`;
 }
 
+function classDayLoad(
+  gradeId: string,
+  sectionId: string | null,
+  weekday: Weekday,
+  classBusy: Set<string>,
+) {
+  const prefix = `${gradeId}:${sectionId ?? ''}:${weekday}:`;
+  let count = 0;
+  for (const key of classBusy) {
+    if (key.startsWith(prefix)) count += 1;
+  }
+  return count;
+}
+
+function teacherDayLoad(
+  teacherUserId: string,
+  weekday: Weekday,
+  teacherBusy: Set<string>,
+) {
+  const prefix = `${teacherUserId}:${weekday}:`;
+  let count = 0;
+  for (const key of teacherBusy) {
+    if (key.startsWith(prefix)) count += 1;
+  }
+  return count;
+}
+
+/** Prefer weekdays (and periods) with fewer existing lessons so the week fills evenly. */
+function orderedWeekdaysForLesson(
+  lesson: GeneratorLesson,
+  weekdays: Weekday[],
+  classBusy: Set<string>,
+  teacherBusy: Set<string>,
+) {
+  return [...weekdays].sort((a, b) => {
+    const classLoad =
+      classDayLoad(lesson.gradeId, lesson.sectionId, a, classBusy) -
+      classDayLoad(lesson.gradeId, lesson.sectionId, b, classBusy);
+    if (classLoad !== 0) return classLoad;
+    if (lesson.teacherUserId) {
+      const teacherLoad =
+        teacherDayLoad(lesson.teacherUserId, a, teacherBusy) -
+        teacherDayLoad(lesson.teacherUserId, b, teacherBusy);
+      if (teacherLoad !== 0) return teacherLoad;
+    }
+    return weekdays.indexOf(a) - weekdays.indexOf(b);
+  });
+}
+
+function orderedPeriods(periodNumbers: number[], weekday: Weekday, classBusy: Set<string>) {
+  return [...periodNumbers].sort((a, b) => {
+    const suffixA = `:${weekday}:${a}`;
+    const suffixB = `:${weekday}:${b}`;
+    let loadA = 0;
+    let loadB = 0;
+    for (const key of classBusy) {
+      if (key.endsWith(suffixA)) loadA += 1;
+      if (key.endsWith(suffixB)) loadB += 1;
+    }
+    return loadA - loadB || a - b;
+  });
+}
+
 /** Each period is one bell slot — at most one subject per class per weekday×period. */
 export function generateTimetableSchedule(
   input: GeneratorInput,
@@ -149,8 +212,14 @@ export function generateTimetableSchedule(
 
     const [first, second] = sorted;
     let done = false;
+    const weekdayOrder = orderedWeekdaysForLesson(
+      first,
+      input.weekdays,
+      classBusy,
+      teacherBusy,
+    );
 
-    for (const weekday of input.weekdays) {
+    for (const weekday of weekdayOrder) {
       for (const [p1, p2] of DOUBLE_PERIOD_PAIRS) {
         if (
           !input.periodNumbers.includes(p1) ||
@@ -176,11 +245,12 @@ export function generateTimetableSchedule(
     }
 
     if (!done) {
-      for (const weekday of input.weekdays) {
-        for (let i = 0; i < input.periodNumbers.length && !done; i++) {
-          for (let j = i + 1; j < input.periodNumbers.length; j++) {
-            const p1 = input.periodNumbers[i];
-            const p2 = input.periodNumbers[j];
+      for (const weekday of weekdayOrder) {
+        const periods = orderedPeriods(input.periodNumbers, weekday, classBusy);
+        for (let i = 0; i < periods.length && !done; i++) {
+          for (let j = i + 1; j < periods.length; j++) {
+            const p1 = periods[i];
+            const p2 = periods[j];
             if (p1 === p2) continue;
             if (canPlaceSubject(first, weekday, p1) && canPlaceSubject(second, weekday, p2)) {
               occupy(first, weekday, p1);
@@ -220,8 +290,18 @@ export function generateTimetableSchedule(
 
   for (const lesson of singles) {
     let ok = false;
-    for (const weekday of input.weekdays) {
-      for (const periodNumber of input.periodNumbers) {
+    const weekdayOrder = orderedWeekdaysForLesson(
+      lesson,
+      input.weekdays,
+      classBusy,
+      teacherBusy,
+    );
+    for (const weekday of weekdayOrder) {
+      for (const periodNumber of orderedPeriods(
+        input.periodNumbers,
+        weekday,
+        classBusy,
+      )) {
         if (canPlaceSubject(lesson, weekday, periodNumber)) {
           occupy(lesson, weekday, periodNumber);
           ok = true;
