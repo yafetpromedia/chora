@@ -392,7 +392,7 @@ export type PlanOption = {
   features?: string[];
 };
 
-async function authPost(path: string, body: unknown): Promise<LoginResponse> {
+async function authPost<T = LoginResponse>(path: string, body: unknown): Promise<T> {
   let response: Response;
   try {
     response = await fetchWithRetry(`${getApiBaseUrl()}${path}`, {
@@ -464,18 +464,18 @@ export async function verifyStudentEnrollment(payload: {
   studentName: string;
   message: string;
 }> {
-  return authPost("/auth/verify-student", {
-    schoolCode: payload.schoolCode.trim().toUpperCase(),
-    studentId: payload.studentId.trim(),
-    firstName: payload.firstName.trim(),
-    lastName: payload.lastName.trim(),
-  }) as Promise<{
+  return authPost<{
     schoolName: string;
     joinCode: string;
     studentId: string;
     studentName: string;
     message: string;
-  }>;
+  }>("/auth/verify-student", {
+    schoolCode: payload.schoolCode.trim().toUpperCase(),
+    studentId: payload.studentId.trim(),
+    firstName: payload.firstName.trim(),
+    lastName: payload.lastName.trim(),
+  });
 }
 
 export async function login(

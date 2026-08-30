@@ -37,3 +37,37 @@ export function gradeNamesForPreset(preset: GradePreset): string[] {
     ...Array.from({ length: 12 }, (_, i) => `Grade ${i + 1}`),
   ];
 }
+
+export function gradeNamesForRange(
+  fromGrade: number,
+  toGrade: number,
+  includeEarlyChildhood = false,
+  extraNames: string[] = [],
+): string[] {
+  const from = Math.trunc(fromGrade);
+  const to = Math.trunc(toGrade);
+  const numbered = Array.from({ length: to - from + 1 }, (_, i) => `Grade ${from + i}`);
+  const extras = extraNames.map((n) => n.trim()).filter(Boolean);
+  return [
+    ...(includeEarlyChildhood ? [...EARLY_CHILDHOOD_GRADES] : []),
+    ...numbered,
+    ...extras,
+  ];
+}
+
+export function presetForGradeNames(names: string[]): GradePreset | null {
+  for (const preset of [
+    GradePreset.GRADES_1_8,
+    GradePreset.GRADES_9_12,
+    GradePreset.KG_12,
+  ]) {
+    const expected = gradeNamesForPreset(preset);
+    if (
+      expected.length === names.length &&
+      expected.every((name, i) => name === names[i])
+    ) {
+      return preset;
+    }
+  }
+  return null;
+}

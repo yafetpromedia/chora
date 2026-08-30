@@ -183,27 +183,77 @@ export class FinanceService implements OnModuleInit {
       include: {
         feeType: true,
         academicYear: true,
-        grade: { select: { id: true, name: true } },
+        grade: { select: { id: true, name: true, sortOrder: true } },
       },
-      orderBy: { feeType: { name: 'asc' } },
+      orderBy: [{ grade: { sortOrder: 'asc' } }, { feeType: { name: 'asc' } }],
     });
   }
 
-  createSchedule(schoolId: string, dto: CreateFeeScheduleDto) {
-    return this.prisma.feeSchedule.create({
-      data: {
-        schoolId,
-        feeTypeId: dto.feeTypeId,
-        academicYearId: dto.academicYearId,
-        gradeId: dto.gradeId ?? null,
-        sectionId: dto.sectionId ?? null,
-        amountCents: dto.amountCents,
-        frequency: dto.frequency ?? 'ONE_TIME',
-        installmentCount: dto.installmentCount ?? 1,
-        description: dto.description?.trim() ?? null,
-      },
-      include: { feeType: true, grade: true },
+  private async resolveGradesInRange(
+    schoolId: string,
+    fromId?: string,
+    toId?: string,
+  ) {
+    const grades = await this.prisma.grade.findMany({
+      where: { schoolId },
+      orderBy: { sortOrder: 'asc' },
+      select: { id: true, name: true, sortOrder: true },
     });
+    if (grades.length === 0) {
+      throw new BadRequestException('No grades configured for this school');
+    }
+    if (!fromId && !toId) {
+      return grades;
+    }
+    const from = grades.find((g) => g.id === (fromId ?? toId));
+    const to = grades.find((g) => g.id === (toId ?? fromId));
+    if (!from || !to) {
+      throw new BadRequestException('Invalid grade range');
+    }
+    const min = Math.min(from.sortOrder, to.sortOrder);
+    const max = Math.max(from.sortOrder, to.sortOrder);
+    return grades.filter((g) => g.sortOrder >= min && g.sortOrder <= max);
+  }
+
+  private scheduleCreateData(schoolId: string, dto: CreateFeeScheduleDto, gradeId: string | null) {
+    return {
+      schoolId,
+      feeTypeId: dto.feeTypeId,
+      academicYearId: dto.academicYearId,
+      gradeId,
+      sectionId: dto.sectionId ?? null,
+      amountCents: dto.amountCents,
+      frequency: dto.frequency ?? 'ONE_TIME',
+      installmentCount: dto.installmentCount ?? 1,
+      description: dto.description?.trim() ?? null,
+    };
+  }
+
+  async createSchedule(schoolId: string, dto: CreateFeeScheduleDto) {
+    const include = { feeType: true, grade: true } as const;
+
+    if (dto.gradeFromId || dto.gradeToId) {
+      const grades = await this.resolveGradesInRange(
+        schoolId,
+        dto.gradeFromId,
+        dto.gradeToId,
+      );
+      const schedules = [];
+      for (const grade of grades) {
+        const row = await this.prisma.feeSchedule.create({
+          data: this.scheduleCreateData(schoolId, dto, grade.id),
+          include,
+        });
+        schedules.push(row);
+      }
+      return { created: schedules.length, schedules };
+    }
+
+    const row = await this.prisma.feeSchedule.create({
+      data: this.scheduleCreateData(schoolId, dto, dto.gradeId ?? null),
+      include,
+    });
+    return { created: 1, schedules: [row] };
   }
 
   async assignGradeFees(schoolId: string, dto: AssignGradeFeesDto) {
@@ -217,10 +267,24 @@ export class FinanceService implements OnModuleInit {
       throw new NotFoundException('Fee schedule not found');
     }
 
+    let gradeIds: string[];
+    if (dto.gradeFromId || dto.gradeToId) {
+      const grades = await this.resolveGradesInRange(
+        schoolId,
+        dto.gradeFromId,
+        dto.gradeToId,
+      );
+      gradeIds = grades.map((g) => g.id);
+    } else if (dto.gradeId) {
+      gradeIds = [dto.gradeId];
+    } else {
+      throw new BadRequestException('Select a grade or grade range');
+    }
+
     const students = await this.prisma.studentProfile.findMany({
       where: {
         schoolId,
-        gradeId: dto.gradeId,
+        gradeId: { in: gradeIds },
         ...(dto.sectionId ? { sectionId: dto.sectionId } : {}),
       },
     });
@@ -246,7 +310,11 @@ export class FinanceService implements OnModuleInit {
       created += 1;
     }
 
-    return { assigned: created, students: students.length };
+    return {
+      assigned: created,
+      students: students.length,
+      grades: gradeIds.length,
+    };
   }
 
   private async createStudentFeeFromSchedule(

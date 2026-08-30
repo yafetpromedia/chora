@@ -23,15 +23,30 @@ export async function listGradePresets() {
   );
 }
 
-export async function setupGrades(preset: GradePresetKey) {
-  return apiPost<GradeWithSections[]>("/schools/grades/setup", { preset });
+export type GradeSetupInput = {
+  preset?: GradePresetKey;
+  fromGrade?: number;
+  toGrade?: number;
+  includeEarlyChildhood?: boolean;
+  extraNames?: string[];
+  defaultSections?: string[];
+};
+
+export async function setupGrades(input: GradePresetKey | GradeSetupInput) {
+  const body = typeof input === "string" ? { preset: input } : input;
+  return apiPost<GradeWithSections[]>("/schools/grades/setup", body);
 }
 
-export async function resetGrades(preset: GradePresetKey) {
+export async function resetGrades(input: GradePresetKey | GradeSetupInput) {
+  const body = typeof input === "string" ? { preset: input } : input;
   return apiPost<{ replaced: boolean; grades: GradeWithSections[] }>(
     "/schools/grades/reset",
-    { preset },
+    body,
   );
+}
+
+export async function addGrade(name: string, sections: string[] = []) {
+  return apiPost<GradeWithSections[]>("/schools/grades", { name, sections });
 }
 
 export async function listGrades() {
@@ -50,7 +65,7 @@ export async function removeSection(gradeId: string, sectionId: string) {
 
 export async function fixEarlyChildhoodGrades() {
   return apiPost<{ updated: boolean; grades: GradeWithSections[] }>(
-    '/schools/grades/fix-early-childhood',
+    "/schools/grades/fix-early-childhood",
     {},
   );
 }
@@ -108,7 +123,6 @@ export async function importStudentsCsv(file: File) {
   return apiUpload<ImportStudentsResult>("/schools/students/import", file);
 }
 
-/** CSV headers accepted by POST /schools/students/import (required + optional). */
 const STUDENTS_IMPORT_TEMPLATE_CSV = [
   "First Name,Last Name,Grade,Section,Gender,Date of Birth,Age,FAN,Parent Name,Phone",
   "Abebe,Kebede,Grade 1,A,Male,2015-03-12,,FAN1234567890,Tigist Hailu,0911234567",

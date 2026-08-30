@@ -13,6 +13,14 @@ export class CreateFeeScheduleDto {
 
   @IsOptional()
   @IsString()
+  gradeFromId?: string;
+
+  @IsOptional()
+  @IsString()
+  gradeToId?: string;
+
+  @IsOptional()
+  @IsString()
   sectionId?: string;
 
   @IsInt()

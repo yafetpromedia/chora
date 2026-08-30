@@ -87,9 +87,15 @@ export default function AdminSettingsPage() {
   const [logoUrl, setLogoUrl] = useState("");
   const [authorizedSignatureUrl, setAuthorizedSignatureUrl] = useState("");
   const [authorizedSignatureLabel, setAuthorizedSignatureLabel] = useState("");
-  const [primaryColor, setPrimaryColor] = useState(DEFAULT_SCHOOL_THEME.primaryColor);
-  const [accentColor, setAccentColor] = useState(DEFAULT_SCHOOL_THEME.accentColor);
-  const [accentDeep, setAccentDeep] = useState(DEFAULT_SCHOOL_THEME.accentDeep);
+  const [primaryColor, setPrimaryColor] = useState<string>(
+    DEFAULT_SCHOOL_THEME.primaryColor,
+  );
+  const [accentColor, setAccentColor] = useState<string>(
+    DEFAULT_SCHOOL_THEME.accentColor,
+  );
+  const [accentDeep, setAccentDeep] = useState<string>(
+    DEFAULT_SCHOOL_THEME.accentDeep,
+  );
   const [bankName, setBankName] = useState("");
   const [bankAccountHolder, setBankAccountHolder] = useState("");
   const [bankAccountNumber, setBankAccountNumber] = useState("");

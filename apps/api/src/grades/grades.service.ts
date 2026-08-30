@@ -6,7 +6,8 @@ import {
 } from '@nestjs/common';
 import { GradePreset } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { gradeNamesForPreset, EARLY_CHILDHOOD_GRADES, GRADE_PRESET_OPTIONS } from './grade-presets';
+import { gradeNamesForPreset, gradeNamesForRange, presetForGradeNames, EARLY_CHILDHOOD_GRADES, GRADE_PRESET_OPTIONS } from './grade-presets';
+import type { SetupGradesDto } from './dto/setup-grades.dto';
 
 @Injectable()
 export class GradesService {
@@ -27,7 +28,7 @@ export class GradesService {
     });
   }
 
-  async setupGrades(schoolId: string, preset: GradePreset) {
+  async setupGrades(schoolId: string, presetOrDto: GradePreset | SetupGradesDto) {
     const existing = await this.prisma.grade.count({ where: { schoolId } });
     if (existing > 0) {
       throw new ConflictException(
@@ -35,15 +36,18 @@ export class GradesService {
       );
     }
 
-    return this.createGradesForPreset(schoolId, preset);
+    return this.createGradesFromInput(schoolId, this.normalizeSetupInput(presetOrDto));
   }
 
-  async resetGrades(schoolId: string, preset: GradePreset) {
-    const [studentCount, school] = await Promise.all([
+  async resetGrades(schoolId: string, presetOrDto: GradePreset | SetupGradesDto) {
+    const input = this.normalizeSetupInput(presetOrDto);
+    const names = this.resolveGradeNames(input);
+    const [studentCount, current] = await Promise.all([
       this.prisma.studentProfile.count({ where: { schoolId } }),
-      this.prisma.school.findUnique({
-        where: { id: schoolId },
-        select: { gradePreset: true },
+      this.prisma.grade.findMany({
+        where: { schoolId },
+        orderBy: { sortOrder: 'asc' },
+        select: { name: true },
       }),
     ]);
 
@@ -53,17 +57,96 @@ export class GradesService {
       );
     }
 
-    if (school?.gradePreset === preset) {
+    const same =
+      current.length === names.length && current.every((g, i) => g.name === names[i]);
+    if (same) {
       return { replaced: false, grades: await this.listGrades(schoolId) };
     }
 
     await this.prisma.grade.deleteMany({ where: { schoolId } });
-    const grades = await this.createGradesForPreset(schoolId, preset);
+    const grades = await this.createGradesFromInput(schoolId, input);
     return { replaced: true, grades };
   }
 
-  private async createGradesForPreset(schoolId: string, preset: GradePreset) {
-    const names = gradeNamesForPreset(preset);
+  async addGrade(
+    schoolId: string,
+    name: string,
+    sections: string[] = [],
+  ) {
+    const trimmed = name.trim();
+    if (!trimmed) throw new BadRequestException('Grade name is required');
+    const existing = await this.prisma.grade.findFirst({
+      where: { schoolId, name: trimmed },
+    });
+    if (existing) throw new ConflictException('That grade already exists');
+
+    const last = await this.prisma.grade.findFirst({
+      where: { schoolId },
+      orderBy: { sortOrder: 'desc' },
+      select: { sortOrder: true },
+    });
+    const uniqueSections = this.uniqueNames(sections);
+    await this.prisma.grade.create({
+      data: {
+        schoolId,
+        name: trimmed,
+        sortOrder: (last?.sortOrder ?? -1) + 1,
+        sections:
+          uniqueSections.length > 0
+            ? { create: uniqueSections.map((sectionName) => ({ name: sectionName })) }
+            : undefined,
+      },
+    });
+    await this.prisma.school.update({
+      where: { id: schoolId },
+      data: { gradePreset: null },
+    });
+    return this.listGrades(schoolId);
+  }
+
+  private normalizeSetupInput(presetOrDto: GradePreset | SetupGradesDto): SetupGradesDto {
+    if (typeof presetOrDto === 'string') return { preset: presetOrDto };
+    return presetOrDto;
+  }
+
+  private uniqueNames(names: string[]) {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const raw of names) {
+      const name = raw.trim();
+      if (!name) continue;
+      const key = name.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(name);
+    }
+    return out;
+  }
+
+  private resolveGradeNames(input: SetupGradesDto): string[] {
+    if (input.fromGrade != null && input.toGrade != null) {
+      if (input.fromGrade > input.toGrade) {
+        throw new BadRequestException('Start grade must be less than or equal to end grade');
+      }
+      const names = gradeNamesForRange(
+        input.fromGrade,
+        input.toGrade,
+        input.includeEarlyChildhood ?? false,
+        input.extraNames ?? [],
+      );
+      if (names.length === 0) {
+        throw new BadRequestException('That range does not create any grades');
+      }
+      return this.uniqueNames(names);
+    }
+    if (input.preset) return gradeNamesForPreset(input.preset);
+    throw new BadRequestException('Choose a preset or a grade range');
+  }
+
+  private async createGradesFromInput(schoolId: string, input: SetupGradesDto) {
+    const names = this.resolveGradeNames(input);
+    const preset = presetForGradeNames(names);
+    const sections = this.uniqueNames(input.defaultSections ?? []);
 
     await this.prisma.$transaction([
       ...names.map((name, index) =>
@@ -72,6 +155,10 @@ export class GradesService {
             schoolId,
             name,
             sortOrder: index,
+            sections:
+              sections.length > 0
+                ? { create: sections.map((sectionName) => ({ name: sectionName })) }
+                : undefined,
           },
         }),
       ),

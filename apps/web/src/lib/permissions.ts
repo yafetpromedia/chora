@@ -88,7 +88,7 @@ export const PERMISSION_MODULES: PermissionModule[] = [
   },
 ];
 
-export const PERMISSION_MODULE_KEY_SET = new Set(
+export const PERMISSION_MODULE_KEY_SET: ReadonlySet<string> = new Set<string>(
   PERMISSION_MODULES.flatMap((module) => module.keys),
 );
 

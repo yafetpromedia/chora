@@ -62,11 +62,19 @@ const FEATURES = [
   },
 ] as const;
 
-const FLOATS = [
+type FloatItem = {
+  label: string;
+  value: string;
+  top: string;
+  left?: string;
+  right?: string;
+};
+
+const FLOATS: FloatItem[] = [
   { label: "Schools live", value: "120+", top: "18%", left: "58%" },
   { label: "Avg. setup", value: "8 min", top: "62%", left: "56%" },
   { label: "Uptime", value: "99.9%", top: "24%", right: "7%" },
-] as const;
+];
 
 function FeatureGraphDivider({ delay = 0 }: { delay?: number }) {
   const gradId = `login-graph-fill-${String(delay).replace(".", "")}`;

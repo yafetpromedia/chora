@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { DashboardPage } from "@/components/dashboard/dashboard-page";
 import { ParentChildBar } from "@/components/parent/parent-child-bar";
@@ -48,6 +48,22 @@ function readProofAsDataUrl(file: File): Promise<string> {
 }
 
 export default function ParentFeesPage() {
+  return (
+    <Suspense
+      fallback={
+        <DashboardPage role="parent" title="Fees">
+          <div className="par-fees">
+            <p className="stu-fees__row-meta">Loading fees…</p>
+          </div>
+        </DashboardPage>
+      }
+    >
+      <ParentFeesPageContent />
+    </Suspense>
+  );
+}
+
+function ParentFeesPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [overview, setOverview] = useState<ParentFinanceOverview | null>(null);

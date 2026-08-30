@@ -16,7 +16,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
 import { createReadStream, existsSync } from 'fs';
-import { PlatformInvoiceStatus, PlatformRole, SupportTicketStatus } from '@prisma/client';
+import { PlatformInvoiceStatus, PlatformPaymentProofStatus, PlatformRole, SupportTicketStatus } from '@prisma/client';
 import { UpdatePlatformProfileDto } from './dto/update-platform-profile.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentPlatformUser } from '../common/decorators/current-platform-user.decorator';
@@ -39,6 +39,7 @@ import {
 import { UpdateSupportTicketDto } from '../support/dto/update-support-ticket.dto';
 import { CouponsService } from '../subscriptions/coupons.service';
 import { CreateCouponDto, UpdateCouponDto } from '../subscriptions/dto/coupon.dto';
+import { ReviewPlatformPaymentDto } from '../subscriptions/dto/platform-payment.dto';
 import { PlatformAuthService } from './platform-auth.service';
 import { PlatformBillingService } from './platform-billing.service';
 import { PlatformService } from './platform.service';
@@ -633,6 +634,23 @@ export class PlatformController {
   @RequirePlatformPermissions(PlatformPermission.BILLING_MANAGE)
   updateInvoice(@Param('id') id: string, @Body() dto: UpdatePlatformInvoiceDto) {
     return this.platformBillingService.updateInvoice(id, dto);
+  }
+
+  @Get('payment-proofs')
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformPermissions(PlatformPermission.BILLING_MANAGE)
+  listPaymentProofs(@Query('status') status?: PlatformPaymentProofStatus) {
+    return this.platformBillingService.listPaymentProofs(status);
+  }
+
+  @Patch('payment-proofs/:id/review')
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformPermissions(PlatformPermission.BILLING_MANAGE)
+  reviewPaymentProof(
+    @Param('id') id: string,
+    @Body() dto: ReviewPlatformPaymentDto,
+  ) {
+    return this.platformBillingService.reviewPaymentProof(id, dto);
   }
 
   @Get('coupons')

@@ -83,7 +83,16 @@ export class CouponsService implements OnModuleInit {
   list() {
     return this.prisma.coupon.findMany({
       orderBy: { createdAt: 'desc' },
-      include: { _count: { select: { redemptions: true } } },
+      include: {
+        _count: { select: { redemptions: true } },
+        redemptions: {
+          orderBy: { createdAt: 'desc' },
+          take: 25,
+          include: {
+            school: { select: { id: true, name: true, joinCode: true } },
+          },
+        },
+      },
     });
   }
 
@@ -125,6 +134,30 @@ export class CouponsService implements OnModuleInit {
   async update(id: string, dto: UpdateCouponDto) {
     const existing = await this.prisma.coupon.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('Coupon not found');
+    if (dto.plan === Plan.TRIAL) {
+      throw new BadRequestException('Coupons cannot grant the trial plan');
+    }
+    if (existing.kind === CouponKind.COMPLIMENTARY) {
+      const nextPlan = dto.plan === undefined ? existing.plan : dto.plan;
+      if (!nextPlan || nextPlan === Plan.TRIAL) {
+        throw new BadRequestException('Complimentary coupons must grant a paid plan');
+      }
+    }
+    if (
+      existing.kind === CouponKind.PERCENT_OFF &&
+      dto.percentOff !== undefined &&
+      dto.percentOff <= 0
+    ) {
+      throw new BadRequestException('Percent-off coupons need a percent between 1 and 100');
+    }
+    if (
+      existing.kind === CouponKind.EXTRA_TRIAL_DAYS &&
+      dto.extraDays !== undefined &&
+      dto.extraDays <= 0
+    ) {
+      throw new BadRequestException('Trial coupons need extra days');
+    }
+
     return this.prisma.coupon.update({
       where: { id },
       data: {
@@ -137,7 +170,22 @@ export class CouponsService implements OnModuleInit {
             : dto.expiresAt
               ? new Date(dto.expiresAt)
               : null,
-        notes: dto.notes === undefined ? undefined : dto.notes?.trim() || null,
+        notes:
+          dto.notes === undefined ? undefined : dto.notes?.trim() || null,
+        percentOff: dto.percentOff,
+        extraDays: dto.extraDays,
+        complimentaryMonths: dto.complimentaryMonths,
+        plan: dto.plan === undefined ? undefined : dto.plan,
+      },
+      include: {
+        _count: { select: { redemptions: true } },
+        redemptions: {
+          orderBy: { createdAt: 'desc' },
+          take: 25,
+          include: {
+            school: { select: { id: true, name: true, joinCode: true } },
+          },
+        },
       },
     });
   }

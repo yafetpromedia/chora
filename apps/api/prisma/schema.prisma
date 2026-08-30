@@ -260,6 +260,7 @@ model School {
   feeSchedules   FeeSchedule[]
   roleTemplates  RoleTemplate[]
   platformInvoices PlatformInvoice[]
+  platformPaymentProofs PlatformPaymentProof[]
   couponRedemptions CouponRedemption[]
   supportTickets   SupportTicket[]
   scoreCorrections ScoreCorrectionRequest[]
@@ -402,12 +403,45 @@ model PlatformInvoice {
   paymentReference  String?               @unique
   billingInterval   String?
   initiatedBy       String?
+  paymentProofs     PlatformPaymentProof[]
   createdAt         DateTime              @default(now())
   updatedAt         DateTime              @updatedAt
 
   @@index([schoolId])
   @@index([status])
   @@index([dueAt])
+}
+
+enum PlatformPayMethod {
+  TELEBIRR
+  BANK_TRANSFER
+}
+
+enum PlatformPaymentProofStatus {
+  PENDING
+  CONFIRMED
+  REJECTED
+}
+
+/// School admin submits Telebirr/bank proof against a platform invoice
+model PlatformPaymentProof {
+  id            String                     @id @default(cuid())
+  invoiceId     String
+  invoice       PlatformInvoice            @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  schoolId      String
+  school        School                     @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  method        PlatformPayMethod
+  transactionId String
+  proofUrl      String                     @db.Text
+  status        PlatformPaymentProofStatus @default(PENDING)
+  submittedById String?
+  reviewNote    String?                    @db.Text
+  reviewedAt    DateTime?
+  createdAt     DateTime                   @default(now())
+  updatedAt     DateTime                   @updatedAt
+
+  @@index([invoiceId, status])
+  @@index([schoolId, status])
 }
 
 enum SupportTicketStatus {

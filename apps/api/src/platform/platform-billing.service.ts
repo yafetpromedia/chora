@@ -3,6 +3,7 @@ import {
   BillingCurrency,
   Plan,
   PlatformInvoiceStatus,
+  PlatformPaymentProofStatus,
   SchoolStatus,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -11,6 +12,7 @@ import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { PlatformSettingsService } from '../platform/platform-settings.service';
 import type { CreatePlatformInvoiceDto } from './dto/platform-invoice.dto';
 import type { UpdatePlatformInvoiceDto } from './dto/platform-invoice.dto';
+import type { ReviewPlatformPaymentDto } from '../subscriptions/dto/platform-payment.dto';
 
 export type BillingSummaryDto = {
   mrrUsd: number;
@@ -354,5 +356,13 @@ export class PlatformBillingService {
       paidAt: inv.paidAt?.toISOString() ?? null,
       notes: inv.notes,
     };
+  }
+
+  listPaymentProofs(status?: PlatformPaymentProofStatus) {
+    return this.subscriptions.listPlatformPaymentProofsForReview(status);
+  }
+
+  reviewPaymentProof(id: string, dto: ReviewPlatformPaymentDto) {
+    return this.subscriptions.reviewPlatformPaymentProof(id, dto);
   }
 }

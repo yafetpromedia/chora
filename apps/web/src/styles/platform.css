@@ -2235,6 +2235,43 @@
   margin-top: 0.75rem;
 }
 
+.plat-coupon-edit {
+  background: #f8fafc;
+}
+
+.plat-coupon-edit td {
+  padding-top: 0.85rem;
+  padding-bottom: 1rem;
+}
+
+.plat-coupon-code {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+}
+
+.plat-coupon-redemptions {
+  margin: 0.85rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.plat-coupon-redemptions li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.35rem 1rem;
+  padding: 0.4rem 0;
+  border-top: 1px solid var(--brand-border);
+  font-size: 0.8rem;
+  color: var(--brand-ink);
+}
+
+.plat-coupon-redemptions li span {
+  color: var(--brand-muted);
+}
+
 /* Curriculum packages (super admin) */
 .plat-curriculum-hero-stat {
   text-align: right;

@@ -1,5 +1,17 @@
 import { CouponKind, Plan } from '@prisma/client';
-import { IsBoolean, IsDateString, IsEnum, IsInt, IsOptional, IsString, Max, Min, MinLength } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import {
+  IsBoolean,
+  IsDateString,
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
+  MinLength,
+  ValidateIf,
+} from 'class-validator';
 
 export class CreateCouponDto {
   @IsString()
@@ -10,17 +22,20 @@ export class CreateCouponDto {
   kind!: CouponKind;
 
   @IsOptional()
+  @Type(() => Number)
   @IsInt()
   @Min(0)
   @Max(100)
   percentOff?: number;
 
   @IsOptional()
+  @Type(() => Number)
   @IsInt()
   @Min(1)
   extraDays?: number;
 
   @IsOptional()
+  @Type(() => Number)
   @IsInt()
   @Min(1)
   complimentaryMonths?: number;
@@ -30,6 +45,7 @@ export class CreateCouponDto {
   plan?: Plan;
 
   @IsOptional()
+  @Type(() => Number)
   @IsInt()
   @Min(1)
   maxRedemptions?: number;
@@ -53,17 +69,47 @@ export class UpdateCouponDto {
   isActive?: boolean;
 
   @IsOptional()
+  @ValidateIf((_, v) => v !== null && v !== '')
+  @Transform(({ value }) => {
+    if (value === null || value === undefined || value === '') return value === '' ? null : value;
+    return Number(value);
+  })
   @IsInt()
   @Min(1)
   maxRedemptions?: number | null;
 
   @IsOptional()
+  @ValidateIf((_, v) => v !== null && v !== '')
   @IsDateString()
   expiresAt?: string | null;
 
   @IsOptional()
   @IsString()
-  notes?: string;
+  notes?: string | null;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  percentOff?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  extraDays?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  complimentaryMonths?: number;
+
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsEnum(Plan)
+  plan?: Plan | null;
 }
 
 export class RedeemCouponDto {

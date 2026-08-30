@@ -8,7 +8,7 @@ import { DashboardPage } from "@/components/dashboard/dashboard-page";
 import { SchoolBillingShell } from "@/components/school-billing/school-billing-shell";
 import { UsageMeters } from "@/components/school-billing/usage-meters";
 import { AUTH_ROLE_KEY, AUTH_TOKEN_KEY } from "@/lib/auth";
-import { PayoutInstructions } from "@/components/school-billing/payout-instructions";
+import { PlatformPaymentPanel } from "@/components/school-billing/platform-payment-panel";
 import { getSchoolBillingOverview, type SchoolBillingOverview } from "@/lib/school-billing";
 import { BRAND_NAME } from "@/lib/brand";
 
@@ -48,6 +48,12 @@ export default function SchoolBillingPage() {
   const [data, setData] = useState<SchoolBillingOverview | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  function reload() {
+    void getSchoolBillingOverview()
+      .then(setData)
+      .catch((e) => setError(e instanceof Error ? e.message : "Could not load billing"));
+  }
 
   useEffect(() => {
     const token = localStorage.getItem(AUTH_TOKEN_KEY);
@@ -168,7 +174,14 @@ export default function SchoolBillingPage() {
                 </Link>
               </div>
             </article>
-            <PayoutInstructions payout={data.payout} />
+            <PlatformPaymentPanel
+              payout={data.payout}
+              subscription={sub}
+              planPrice={data.planPrice}
+              openInvoices={data.openInvoices ?? []}
+              paymentProofs={data.paymentProofs ?? []}
+              onSubmitted={reload}
+            />
           </div>
         ) : null}
       </SchoolBillingShell>

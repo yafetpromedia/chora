@@ -6,7 +6,7 @@ import { RolesGuard } from '../common/guards/roles.guard';
 import { SchoolTenantGuard } from '../common/guards/school-tenant.guard';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CreateSectionDto } from './dto/create-section.dto';
-import { SetupGradesDto } from './dto/setup-grades.dto';
+import { CreateGradeDto, SetupGradesDto } from './dto/setup-grades.dto';
 import { TeacherScopeService } from '../teachers/teacher-scope.service';
 import { GradesService } from './grades.service';
 
@@ -42,13 +42,19 @@ export class GradesController {
   @Post('grades/setup')
   @Roles('admin')
   setupGrades(@CurrentUser() user: AuthUser, @Body() dto: SetupGradesDto) {
-    return this.gradesService.setupGrades(user.schoolId, dto.preset);
+    return this.gradesService.setupGrades(user.schoolId, dto);
   }
 
   @Post('grades/reset')
   @Roles('admin')
   resetGrades(@CurrentUser() user: AuthUser, @Body() dto: SetupGradesDto) {
-    return this.gradesService.resetGrades(user.schoolId, dto.preset);
+    return this.gradesService.resetGrades(user.schoolId, dto);
+  }
+
+  @Post('grades')
+  @Roles('admin')
+  addGrade(@CurrentUser() user: AuthUser, @Body() dto: CreateGradeDto) {
+    return this.gradesService.addGrade(user.schoolId, dto.name, dto.sections ?? []);
   }
 
   @Post('grades/:gradeId/sections')

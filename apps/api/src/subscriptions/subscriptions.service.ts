@@ -8,8 +8,12 @@ import {
   BillingCurrency,
   Plan,
   PlatformInvoiceStatus,
+  PlatformPayMethod,
+  PlatformPaymentProofStatus,
   UserRole,
 } from '@prisma/client';
+import type { ReviewPlatformPaymentDto } from './dto/platform-payment.dto';
+import type { SubmitPlatformPaymentDto } from './dto/platform-payment.dto';
 import { ChapaService } from '../payments/chapa.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CouponsService } from './coupons.service';
@@ -666,6 +670,27 @@ export class SubscriptionsService {
       }
     }
 
+    const openInvoices = invoices
+      .filter(
+        (inv) =>
+          inv.status === PlatformInvoiceStatus.SENT ||
+          inv.status === PlatformInvoiceStatus.OVERDUE,
+      )
+      .map((inv) => ({
+        id: inv.id,
+        invoiceNumber: inv.invoiceNumber,
+        amountUsd: inv.amountUsd,
+        amountEtb: inv.amountEtb,
+        dueAt: inv.dueAt.toISOString(),
+      }));
+
+    const paymentProofs = await this.prisma.platformPaymentProof.findMany({
+      where: { schoolId },
+      orderBy: { createdAt: 'desc' },
+      take: 5,
+      include: { invoice: { select: { invoiceNumber: true } } },
+    });
+
     return {
       subscription,
       planPrice: planRow
@@ -681,7 +706,117 @@ export class SubscriptionsService {
         outstandingEtb,
         nextDueAt,
       },
+      openInvoices,
+      paymentProofs: paymentProofs.map((p) => ({
+        id: p.id,
+        invoiceId: p.invoiceId,
+        invoiceNumber: p.invoice.invoiceNumber,
+        method: p.method,
+        transactionId: p.transactionId,
+        status: p.status,
+        reviewNote: p.reviewNote,
+        createdAt: p.createdAt.toISOString(),
+        reviewedAt: p.reviewedAt?.toISOString() ?? null,
+      })),
       payout: await this.getPlatformPayout(),
+    };
+  }
+
+  async requestRenewalInvoice(schoolId: string, adminId?: string) {
+    if (this.chapaService.isLiveEnabled()) {
+      throw new BadRequestException(
+        'Use subscription checkout to renew your plan.',
+      );
+    }
+
+    const sub = await this.prisma.subscription.findUnique({
+      where: { schoolId },
+    });
+    if (!sub) {
+      throw new NotFoundException('Subscription not found');
+    }
+    if (!sub.isActive || sub.plan === Plan.TRIAL) {
+      throw new BadRequestException(
+        'Upgrade to a paid plan before requesting a renewal invoice.',
+      );
+    }
+
+    const open = await this.prisma.platformInvoice.findFirst({
+      where: {
+        schoolId,
+        status: {
+          in: [PlatformInvoiceStatus.SENT, PlatformInvoiceStatus.OVERDUE],
+        },
+      },
+    });
+    if (open) {
+      return {
+        invoice: {
+          id: open.id,
+          invoiceNumber: open.invoiceNumber,
+          amountUsd: open.amountUsd,
+          amountEtb: open.amountEtb,
+          dueAt: open.dueAt.toISOString(),
+        },
+        message: `Invoice ${open.invoiceNumber} is already open.`,
+        created: false,
+      };
+    }
+
+    const catalog = await this.planCatalog.findAll();
+    const planRow = catalog.find((p) => p.plan === sub.plan);
+    if (!planRow || planRow.etbMonthly <= 0) {
+      throw new BadRequestException('Plan pricing is not available');
+    }
+
+    const percentOff = await this.coupons.discountForSchool(schoolId);
+    const amountEtb = this.applyPercentOff(planRow.etbMonthly, percentOff);
+    const amountUsd = this.applyPercentOff(planRow.usdMonthly, percentOff);
+
+    if (percentOff >= 100 || amountEtb <= 0) {
+      throw new BadRequestException(
+        'Your coupon covers this plan — no invoice is needed.',
+      );
+    }
+
+    const now = new Date();
+    const periodStart = sub.currentPeriodEnd ?? now;
+    const periodEnd = new Date(periodStart);
+    periodEnd.setMonth(periodEnd.getMonth() + 1);
+    const dueAt = new Date(now);
+    dueAt.setDate(dueAt.getDate() + 14);
+    const invoiceNumber = await this.nextInvoiceNumber();
+
+    const invoice = await this.prisma.platformInvoice.create({
+      data: {
+        schoolId,
+        invoiceNumber,
+        plan: sub.plan,
+        periodStart,
+        periodEnd,
+        dueAt,
+        amountUsd,
+        amountEtb,
+        currency: BillingCurrency.ETB,
+        status: PlatformInvoiceStatus.SENT,
+        billingInterval: 'month',
+        initiatedBy: adminId ?? null,
+        notes: percentOff
+          ? `${planRow.label} renewal · ${percentOff}% coupon`
+          : `${planRow.label} monthly renewal`,
+      },
+    });
+
+    return {
+      invoice: {
+        id: invoice.id,
+        invoiceNumber: invoice.invoiceNumber,
+        amountUsd: invoice.amountUsd,
+        amountEtb: invoice.amountEtb,
+        dueAt: invoice.dueAt.toISOString(),
+      },
+      message: `Invoice ${invoiceNumber} created. Pay ${amountEtb.toLocaleString()} ETB and submit your receipt below.`,
+      created: true,
     };
   }
 
@@ -706,6 +841,187 @@ export class SubscriptionsService {
       paidAt: inv.paidAt?.toISOString() ?? null,
       notes: inv.notes,
     }));
+  }
+
+  async submitPlatformPaymentProof(
+    schoolId: string,
+    userId: string,
+    invoiceId: string,
+    dto: SubmitPlatformPaymentDto,
+  ) {
+    const invoice = await this.prisma.platformInvoice.findFirst({
+      where: { id: invoiceId, schoolId },
+    });
+    if (!invoice) {
+      throw new NotFoundException('Invoice not found');
+    }
+    if (invoice.status === PlatformInvoiceStatus.PAID) {
+      throw new BadRequestException('This invoice is already paid');
+    }
+    if (
+      invoice.status !== PlatformInvoiceStatus.SENT &&
+      invoice.status !== PlatformInvoiceStatus.OVERDUE
+    ) {
+      throw new BadRequestException('This invoice is not open for payment');
+    }
+
+    const payout = await this.getPlatformPayout();
+    if (dto.method === 'TELEBIRR' && !payout.telebirr) {
+      throw new BadRequestException('Telebirr is not available yet');
+    }
+    if (dto.method === 'BANK_TRANSFER' && !payout.bank) {
+      throw new BadRequestException('Bank transfer is not available yet');
+    }
+
+    const pending = await this.prisma.platformPaymentProof.findFirst({
+      where: {
+        invoiceId,
+        status: PlatformPaymentProofStatus.PENDING,
+      },
+    });
+    if (pending) {
+      throw new BadRequestException(
+        'A payment is already under review for this invoice.',
+      );
+    }
+
+    const proof = await this.prisma.platformPaymentProof.create({
+      data: {
+        invoiceId,
+        schoolId,
+        method: dto.method as PlatformPayMethod,
+        transactionId: dto.transactionId.trim(),
+        proofUrl: dto.proofUrl.trim(),
+        submittedById: userId,
+      },
+    });
+
+    return {
+      id: proof.id,
+      status: proof.status,
+      message:
+        'Payment submitted. Chora will verify your receipt and confirm your invoice.',
+    };
+  }
+
+  async listPlatformPaymentProofs(schoolId: string) {
+    const rows = await this.prisma.platformPaymentProof.findMany({
+      where: { schoolId },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+      include: { invoice: { select: { invoiceNumber: true } } },
+    });
+
+    return rows.map((p) => ({
+      id: p.id,
+      invoiceId: p.invoiceId,
+      invoiceNumber: p.invoice.invoiceNumber,
+      method: p.method,
+      transactionId: p.transactionId,
+      status: p.status,
+      reviewNote: p.reviewNote,
+      createdAt: p.createdAt.toISOString(),
+      reviewedAt: p.reviewedAt?.toISOString() ?? null,
+    }));
+  }
+
+  async listPlatformPaymentProofsForReview(status?: PlatformPaymentProofStatus) {
+    const rows = await this.prisma.platformPaymentProof.findMany({
+      where: status ? { status } : undefined,
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+      include: {
+        invoice: { select: { invoiceNumber: true, amountEtb: true, amountUsd: true } },
+        school: { select: { name: true, joinCode: true } },
+      },
+    });
+
+    return rows.map((p) => ({
+      id: p.id,
+      invoiceId: p.invoiceId,
+      invoiceNumber: p.invoice.invoiceNumber,
+      amountEtb: p.invoice.amountEtb,
+      amountUsd: p.invoice.amountUsd,
+      schoolId: p.schoolId,
+      schoolName: p.school.name,
+      joinCode: p.school.joinCode,
+      method: p.method,
+      transactionId: p.transactionId,
+      proofUrl: p.proofUrl,
+      status: p.status,
+      reviewNote: p.reviewNote,
+      createdAt: p.createdAt.toISOString(),
+      reviewedAt: p.reviewedAt?.toISOString() ?? null,
+    }));
+  }
+
+  async reviewPlatformPaymentProof(proofId: string, dto: ReviewPlatformPaymentDto) {
+    const proof = await this.prisma.platformPaymentProof.findUnique({
+      where: { id: proofId },
+      include: { invoice: true },
+    });
+    if (!proof) {
+      throw new NotFoundException('Payment proof not found');
+    }
+    if (proof.status !== PlatformPaymentProofStatus.PENDING) {
+      throw new BadRequestException('This payment has already been reviewed');
+    }
+
+    const now = new Date();
+    if (dto.status === 'REJECTED') {
+      const updated = await this.prisma.platformPaymentProof.update({
+        where: { id: proofId },
+        data: {
+          status: PlatformPaymentProofStatus.REJECTED,
+          reviewNote: dto.reviewNote?.trim() || null,
+          reviewedAt: now,
+        },
+      });
+      return {
+        id: updated.id,
+        status: updated.status,
+        message: 'Payment rejected. The school can submit again.',
+      };
+    }
+
+    const invoice = proof.invoice;
+    if (!invoice.plan) {
+      throw new BadRequestException('Invoice has no plan attached');
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.platformPaymentProof.update({
+        where: { id: proofId },
+        data: {
+          status: PlatformPaymentProofStatus.CONFIRMED,
+          reviewNote: dto.reviewNote?.trim() || null,
+          reviewedAt: now,
+        },
+      });
+      await tx.platformInvoice.update({
+        where: { id: invoice.id },
+        data: {
+          status: PlatformInvoiceStatus.PAID,
+          paidAt: now,
+          paymentReference: proof.transactionId,
+        },
+      });
+      await tx.subscription.update({
+        where: { schoolId: invoice.schoolId },
+        data: {
+          plan: invoice.plan!,
+          isActive: true,
+          trialEndsAt: null,
+          currentPeriodEnd: invoice.periodEnd,
+        },
+      });
+    });
+
+    return {
+      id: proofId,
+      status: PlatformPaymentProofStatus.CONFIRMED,
+      message: 'Payment confirmed and invoice marked paid.',
+    };
   }
 
   private async countUsersByRole(schoolId: string) {

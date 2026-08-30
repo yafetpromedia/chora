@@ -147,21 +147,28 @@ export async function createFeeSchedule(body: {
   feeTypeId: string;
   academicYearId: string;
   gradeId?: string;
+  gradeFromId?: string;
+  gradeToId?: string;
   amountCents: number;
   frequency?: string;
   installmentCount?: number;
   description?: string;
 }) {
-  return apiPost<FeeSchedule>("/finance/schedules", body);
+  return apiPost<{ created: number; schedules: FeeSchedule[] }>("/finance/schedules", body);
 }
 
 export async function assignGradeFees(body: {
   feeScheduleId: string;
-  gradeId: string;
+  gradeId?: string;
+  gradeFromId?: string;
+  gradeToId?: string;
   sectionId?: string;
   dueDate: string;
 }) {
-  return apiPost<{ assigned: number; students: number }>("/finance/assign-grade", body);
+  return apiPost<{ assigned: number; students: number; grades: number }>(
+    "/finance/assign-grade",
+    body,
+  );
 }
 
 export async function getFinanceAnalytics(month?: string) {

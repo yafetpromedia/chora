@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DashboardPage } from "@/components/dashboard/dashboard-page";
 import { SchoolBillingShell } from "@/components/school-billing/school-billing-shell";
+import { PlatformPaymentPanel } from "@/components/school-billing/platform-payment-panel";
 import { AUTH_ROLE_KEY, AUTH_TOKEN_KEY } from "@/lib/auth";
 import {
   getSchoolBillingOverview,
@@ -13,7 +14,6 @@ import {
   type SchoolInvoice,
   type SchoolInvoiceStatus,
 } from "@/lib/school-billing";
-import { PayoutInstructions } from "@/components/school-billing/payout-instructions";
 import { BRAND_NAME } from "@/lib/brand";
 
 function formatDate(iso: string) {
@@ -37,10 +37,20 @@ type Filter = SchoolInvoiceStatus | "ALL";
 export default function SchoolInvoicesPage() {
   const router = useRouter();
   const [invoices, setInvoices] = useState<SchoolInvoice[]>([]);
-  const [payout, setPayout] = useState<SchoolBillingOverview["payout"]>();
+  const [overview, setOverview] = useState<SchoolBillingOverview | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [filter, setFilter] = useState<Filter>("ALL");
+  const [payInvoiceId, setPayInvoiceId] = useState("");
+
+  function reload() {
+    void Promise.all([getSchoolInvoices(), getSchoolBillingOverview()])
+      .then(([rows, bill]) => {
+        setInvoices(rows);
+        setOverview(bill);
+      })
+      .catch((e) => setError(e instanceof Error ? e.message : "Could not load invoices"));
+  }
 
   useEffect(() => {
     const token = localStorage.getItem(AUTH_TOKEN_KEY);
@@ -50,9 +60,9 @@ export default function SchoolInvoicesPage() {
       return;
     }
     void Promise.all([getSchoolInvoices(), getSchoolBillingOverview()])
-      .then(([rows, overview]) => {
+      .then(([rows, bill]) => {
         setInvoices(rows);
-        setPayout(overview.payout);
+        setOverview(bill);
       })
       .catch((e) => setError(e instanceof Error ? e.message : "Could not load invoices"))
       .finally(() => setLoading(false));
@@ -149,6 +159,15 @@ export default function SchoolInvoicesPage() {
                         {inv.paidAt ? (
                           <div className="sb-v2__muted">Paid {formatDate(inv.paidAt)}</div>
                         ) : null}
+                        {inv.status === "SENT" || inv.status === "OVERDUE" ? (
+                          <button
+                            type="button"
+                            className="sb-v2__btn sb-v2__btn--inline"
+                            onClick={() => setPayInvoiceId(inv.id)}
+                          >
+                            Pay now
+                          </button>
+                        ) : null}
                       </td>
                     </tr>
                   ))
@@ -161,7 +180,18 @@ export default function SchoolInvoicesPage() {
             Questions about an invoice? Contact {BRAND_NAME} support with your invoice number.
           </p>
         </div>
-        <PayoutInstructions payout={payout} />
+        <PlatformPaymentPanel
+          payout={overview?.payout}
+          subscription={overview?.subscription}
+          planPrice={overview?.planPrice}
+          openInvoices={overview?.openInvoices ?? []}
+          paymentProofs={overview?.paymentProofs ?? []}
+          selectedInvoiceId={payInvoiceId}
+          onSubmitted={() => {
+            setPayInvoiceId("");
+            reload();
+          }}
+        />
       </SchoolBillingShell>
     </DashboardPage>
   );

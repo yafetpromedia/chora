@@ -13,6 +13,7 @@ import {
   removeSection,
   resetGrades,
   setupGrades,
+  addGrade,
 } from "@/lib/school-setup";
 import {
   getAttendanceSettings,
@@ -37,7 +38,7 @@ type StepNum = 1 | 2 | 3 | 4;
 const STEP_COPY: Record<StepNum, { title: string; lead: string }> = {
   1: {
     title: "Grade structure",
-    lead: "Choose how your school is organized. You can change this before enrolling students.",
+    lead: "Pick a preset or set your own range — for example Grade 1 to 6, or 9 to 12 with Nursery and KG.",
   },
   2: {
     title: "Class sections",
@@ -87,11 +88,54 @@ const STREAM_PRESETS = [
   { label: "All streams", names: ["Natural A", "Natural B", "Social A", "Social B"] },
 ] as const;
 
-function parseSectionNames(raw: string): string[] {
+const GRADE_NUMBERS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const;
+
+function parseNames(raw: string): string[] {
   return raw
     .split(/[,;]+/)
     .map((s) => s.trim())
     .filter(Boolean);
+}
+
+function previewGradeNames(
+  fromGrade: number,
+  toGrade: number,
+  includeEarlyChildhood: boolean,
+  extraRaw: string,
+): string[] {
+  const numbered = GRADE_NUMBERS.filter((n) => n >= fromGrade && n <= toGrade).map(
+    (n) => `Grade ${n}`,
+  );
+  return [
+    ...(includeEarlyChildhood ? ["Nursery", "KG 1", "KG 2"] : []),
+    ...numbered,
+    ...parseNames(extraRaw),
+  ];
+}
+
+function inferCustomRange(names: string[]) {
+  const early = new Set(["Nursery", "KG 1", "KG 2"]);
+  const nums: number[] = [];
+  const extras: string[] = [];
+  let includeEarlyChildhood = false;
+  for (const name of names) {
+    if (early.has(name)) {
+      includeEarlyChildhood = true;
+      continue;
+    }
+    const match = /^Grade (\d+)$/.exec(name);
+    if (match) {
+      nums.push(Number(match[1]));
+      continue;
+    }
+    extras.push(name);
+  }
+  return {
+    fromGrade: nums.length ? Math.min(...nums) : 1,
+    toGrade: nums.length ? Math.max(...nums) : 8,
+    includeEarlyChildhood,
+    extraGradeNames: extras.join(", "),
+  };
 }
 
 function isUpperSecondaryGrade(gradeName: string): boolean {
@@ -166,8 +210,14 @@ export default function SchoolSetupPage() {
   const [presets, setPresets] = useState<
     { key: GradePresetKey; label: string; description: string }[]
   >([]);
-  const [selected, setSelected] = useState<GradePresetKey | null>(null);
-  const [activePreset, setActivePreset] = useState<GradePresetKey | null>(null);
+  const [selected, setSelected] = useState<GradePresetKey | "CUSTOM" | null>(null);
+  const [activePreset, setActivePreset] = useState<GradePresetKey | "CUSTOM" | null>(null);
+  const [fromGrade, setFromGrade] = useState(1);
+  const [toGrade, setToGrade] = useState(8);
+  const [includeEarlyChildhood, setIncludeEarlyChildhood] = useState(false);
+  const [extraGradeNames, setExtraGradeNames] = useState("");
+  const [defaultSections, setDefaultSections] = useState("A, B");
+  const [newGradeName, setNewGradeName] = useState("");
   const [grades, setGrades] = useState<GradeWithSections[]>([]);
   const [bulkSections, setBulkSections] = useState("A, B, C");
   const [customByGrade, setCustomByGrade] = useState<Record<string, string>>({});
@@ -228,6 +278,14 @@ export default function SchoolSetupPage() {
           if (status.gradePreset) {
             setSelected(status.gradePreset);
             setActivePreset(status.gradePreset);
+          } else {
+            const inferred = inferCustomRange(gradesList.map((g) => g.name));
+            setSelected("CUSTOM");
+            setActivePreset("CUSTOM");
+            setFromGrade(inferred.fromGrade);
+            setToGrade(inferred.toGrade);
+            setIncludeEarlyChildhood(inferred.includeEarlyChildhood);
+            setExtraGradeNames(inferred.extraGradeNames);
           }
           // When revisiting from Settings, land on sections (most common edit)
           if (status.setupComplete) {
@@ -252,10 +310,48 @@ export default function SchoolSetupPage() {
     setMaxStep((prev) => (next > prev ? next : prev));
   }
 
-  async function onApplyGradeStructure() {
-    if (!selected) return;
+  async function refreshGrades() {
+    setGrades(await listGrades());
+  }
 
-    if (gradesReady && selected === activePreset) {
+  function structurePayload() {
+    if (selected === "CUSTOM") {
+      return {
+        fromGrade,
+        toGrade,
+        includeEarlyChildhood,
+        extraNames: parseNames(extraGradeNames),
+        defaultSections: parseNames(defaultSections),
+      };
+    }
+    if (!selected) return null;
+    return {
+      preset: selected,
+      defaultSections: parseNames(defaultSections),
+    };
+  }
+
+  const customPreview = previewGradeNames(
+    fromGrade,
+    toGrade,
+    includeEarlyChildhood,
+    extraGradeNames,
+  );
+  const customReady = selected === "CUSTOM" && fromGrade <= toGrade && customPreview.length > 0;
+
+  async function onApplyGradeStructure() {
+    if (!selected && !customReady) return;
+
+    if (gradesReady && selected === activePreset && selected !== "CUSTOM") {
+      goToStep(2);
+      return;
+    }
+    if (
+      gradesReady &&
+      selected === "CUSTOM" &&
+      activePreset === "CUSTOM" &&
+      customPreview.join("|") === grades.map((g) => g.name).join("|")
+    ) {
       goToStep(2);
       return;
     }
@@ -269,18 +365,19 @@ export default function SchoolSetupPage() {
   }
 
   async function applyGradeStructure() {
-    if (!selected) return;
+    const payload = structurePayload();
+    if (!payload) return;
 
     setLoading(true);
     setError("");
     try {
       if (gradesReady) {
-        const result = await resetGrades(selected);
+        const result = await resetGrades(payload);
         setGrades(result.grades);
         setActivePreset(selected);
         goToStep(2);
       } else {
-        const created = await setupGrades(selected);
+        const created = await setupGrades(payload);
         setGrades(created);
         setActivePreset(selected);
         setGradesReady(true);
@@ -303,8 +400,21 @@ export default function SchoolSetupPage() {
     }
   }
 
-  async function refreshGrades() {
-    setGrades(await listGrades());
+  async function onAddExtraGrade() {
+    const name = newGradeName.trim();
+    if (!name) return;
+    setSectionBusy(true);
+    setError("");
+    try {
+      setGrades(await addGrade(name, parseNames(defaultSections)));
+      setNewGradeName("");
+      setActivePreset("CUSTOM");
+      setSelected("CUSTOM");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not add grade");
+    } finally {
+      setSectionBusy(false);
+    }
   }
 
   async function applySections(names: string[], gradeIds?: string[]) {
@@ -336,13 +446,13 @@ export default function SchoolSetupPage() {
   }
 
   async function onApplyBulkAll() {
-    const names = parseSectionNames(bulkSections);
+    const names = parseNames(bulkSections);
     if (names.length === 0) return;
     await applySections(names);
   }
 
   async function onApplyGradeCustom(gradeId: string) {
-    const names = parseSectionNames(customByGrade[gradeId] ?? "");
+    const names = parseNames(customByGrade[gradeId] ?? "");
     if (names.length === 0) return;
     await applySections(names, [gradeId]);
     setCustomByGrade((prev) => ({ ...prev, [gradeId]: "" }));
@@ -395,7 +505,11 @@ export default function SchoolSetupPage() {
     }
   }
 
-  const presetChanging = gradesReady && selected !== activePreset;
+  const customChanged =
+    selected === "CUSTOM" &&
+    customPreview.join("|") !== grades.map((g) => g.name).join("|");
+  const presetChanging =
+    gradesReady && (selected !== activePreset || customChanged);
   const copy = STEP_COPY[step];
 
   if (bootstrapping) {
@@ -537,34 +651,136 @@ export default function SchoolSetupPage() {
             <div className="sw__scroll">
               <div className="sw__scroll-inner">
                 {step === 1 ? (
-                  <div className="sw__options">
-                    {presets.map((p) => (
+                  <div className="sw__options-wrap">
+                    <div className="sw__options">
+                      {presets.map((p) => (
+                        <button
+                          key={p.key}
+                          type="button"
+                          className={[
+                            "sw__option",
+                            selected === p.key ? "sw__option--selected" : "",
+                            activePreset === p.key ? "sw__option--current" : "",
+                          ]
+                            .filter(Boolean)
+                            .join(" ")}
+                          onClick={() => setSelected(p.key)}
+                        >
+                          <span className="sw__option-icon" aria-hidden>
+                            {PRESET_ICONS[p.key]}
+                          </span>
+                          <span className="sw__option-title">{p.label}</span>
+                          <span className="sw__option-desc">{p.description}</span>
+                          {activePreset === p.key ? (
+                            <span className="sw__option-tag">Current</span>
+                          ) : selected === p.key ? (
+                            <span className="sw__option-check" aria-hidden>
+                              ✓
+                            </span>
+                          ) : null}
+                        </button>
+                      ))}
+                    </div>
+                    <div
+                      className={[
+                        "sw__range",
+                        selected === "CUSTOM" ? "sw__range--selected" : "",
+                        activePreset === "CUSTOM" ? "sw__range--current" : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                    >
                       <button
-                        key={p.key}
                         type="button"
-                        className={[
-                          "sw__option",
-                          selected === p.key ? "sw__option--selected" : "",
-                          activePreset === p.key ? "sw__option--current" : "",
-                        ]
-                          .filter(Boolean)
-                          .join(" ")}
-                        onClick={() => setSelected(p.key)}
+                        className="sw__range-head"
+                        onClick={() => setSelected("CUSTOM")}
                       >
-                        <span className="sw__option-icon" aria-hidden>
-                          {PRESET_ICONS[p.key]}
+                        <span className="sw__option-title">Custom range</span>
+                        <span className="sw__option-desc">
+                          Choose start and end grades. Add Nursery/KG or extra named levels if you need them.
                         </span>
-                        <span className="sw__option-title">{p.label}</span>
-                        <span className="sw__option-desc">{p.description}</span>
-                        {activePreset === p.key ? (
+                        {activePreset === "CUSTOM" ? (
                           <span className="sw__option-tag">Current</span>
-                        ) : selected === p.key ? (
+                        ) : selected === "CUSTOM" ? (
                           <span className="sw__option-check" aria-hidden>
                             ✓
                           </span>
                         ) : null}
                       </button>
-                    ))}
+                      <div className="sw__range-row">
+                        <label className="sw__range-field">
+                          <span>From</span>
+                          <select
+                            value={fromGrade}
+                            onChange={(e) => {
+                              const next = Number(e.target.value);
+                              setFromGrade(next);
+                              setSelected("CUSTOM");
+                              if (next > toGrade) setToGrade(next);
+                            }}
+                          >
+                            {GRADE_NUMBERS.map((n) => (
+                              <option key={n} value={n}>
+                                Grade {n}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="sw__range-field">
+                          <span>To</span>
+                          <select
+                            value={toGrade}
+                            onChange={(e) => {
+                              const next = Number(e.target.value);
+                              setToGrade(next);
+                              setSelected("CUSTOM");
+                              if (next < fromGrade) setFromGrade(next);
+                            }}
+                          >
+                            {GRADE_NUMBERS.map((n) => (
+                              <option key={n} value={n}>
+                                Grade {n}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="sw__range-check">
+                          <input
+                            type="checkbox"
+                            checked={includeEarlyChildhood}
+                            onChange={(e) => {
+                              setIncludeEarlyChildhood(e.target.checked);
+                              setSelected("CUSTOM");
+                            }}
+                          />
+                          Include Nursery, KG 1, KG 2
+                        </label>
+                      </div>
+                      <div className="sw__range-row">
+                        <label className="sw__range-field sw__range-field--grow">
+                          <span>Extra grades (optional)</span>
+                          <input
+                            value={extraGradeNames}
+                            onChange={(e) => {
+                              setExtraGradeNames(e.target.value);
+                              setSelected("CUSTOM");
+                            }}
+                            placeholder="Remedial, Bridging…"
+                          />
+                        </label>
+                        <label className="sw__range-field sw__range-field--grow">
+                          <span>Default sections</span>
+                          <input
+                            value={defaultSections}
+                            onChange={(e) => setDefaultSections(e.target.value)}
+                            placeholder="A, B, C"
+                          />
+                        </label>
+                      </div>
+                      <p className="sw__range-preview">
+                        {customPreview.length} levels: {customPreview.join(" · ")}
+                      </p>
+                    </div>
                   </div>
                 ) : null}
 
@@ -644,7 +860,7 @@ export default function SchoolSetupPage() {
                           <button
                             type="button"
                             className="sw__grade-custom-btn"
-                            disabled={sectionBusy || !parseSectionNames(customByGrade[g.id] ?? "").length}
+                            disabled={sectionBusy || !parseNames(customByGrade[g.id] ?? "").length}
                             onClick={() => void onApplyGradeCustom(g.id)}
                           >
                             Add
@@ -652,6 +868,32 @@ export default function SchoolSetupPage() {
                         </div>
                       </article>
                     ))}
+                    <article className="sw__grade-card sw__grade-card--add">
+                      <h3 className="sw__grade-name">Add another grade</h3>
+                      <p className="sw__grade-empty">
+                        Use this for a level that is not in the numbered range.
+                      </p>
+                      <div className="sw__grade-custom">
+                        <input
+                          className="sw__grade-custom-input"
+                          placeholder="e.g. Preparatory, Bridging"
+                          value={newGradeName}
+                          disabled={sectionBusy}
+                          onChange={(e) => setNewGradeName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") void onAddExtraGrade();
+                          }}
+                        />
+                        <button
+                          type="button"
+                          className="sw__grade-custom-btn"
+                          disabled={sectionBusy || !newGradeName.trim()}
+                          onClick={() => void onAddExtraGrade()}
+                        >
+                          Add grade
+                        </button>
+                      </div>
+                    </article>
                   </div>
                 ) : null}
 
@@ -731,7 +973,7 @@ export default function SchoolSetupPage() {
                   <button
                     type="button"
                     className="sw__btn"
-                    disabled={!selected || loading}
+                    disabled={!selected || loading || (selected === "CUSTOM" && fromGrade > toGrade)}
                     onClick={() => void onApplyGradeStructure()}
                   >
                     {loading

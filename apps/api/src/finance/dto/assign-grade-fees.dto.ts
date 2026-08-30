@@ -4,8 +4,17 @@ export class AssignGradeFeesDto {
   @IsString()
   feeScheduleId!: string;
 
+  @IsOptional()
   @IsString()
-  gradeId!: string;
+  gradeId?: string;
+
+  @IsOptional()
+  @IsString()
+  gradeFromId?: string;
+
+  @IsOptional()
+  @IsString()
+  gradeToId?: string;
 
   @IsOptional()
   @IsString()

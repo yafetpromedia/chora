@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
 import type { AuthUser } from '../common/auth.types';
@@ -11,6 +11,7 @@ import { SubscriptionCheckoutDto } from './dto/subscription-checkout.dto';
 import { VerifySubscriptionCheckoutDto } from './dto/verify-subscription-checkout.dto';
 import { RedeemCouponDto } from '../subscriptions/dto/coupon.dto';
 import { UpgradePlanDto } from './dto/upgrade-plan.dto';
+import { SubmitPlatformPaymentDto } from '../subscriptions/dto/platform-payment.dto';
 import { UpdateSchoolSettingsDto } from './dto/update-school-settings.dto';
 import { InvitesService } from './invites.service';
 import { CurriculumCatalogService } from '../provisioning/curriculum-catalog.service';
@@ -128,6 +129,39 @@ export class SchoolsController {
   @Roles('admin')
   paymentConfig() {
     return this.subscriptionsService.getPaymentConfig();
+  }
+
+  @Get('billing/payment-proofs')
+  @UseGuards(JwtAuthGuard, SchoolTenantGuard, RolesGuard)
+  @Roles('admin')
+  listPaymentProofs(@CurrentUser() user: AuthUser) {
+    return this.subscriptionsService.listPlatformPaymentProofs(user.schoolId);
+  }
+
+  @Post('billing/invoices/:invoiceId/payment-proof')
+  @UseGuards(JwtAuthGuard, SchoolTenantGuard, RolesGuard)
+  @Roles('admin')
+  submitPaymentProof(
+    @CurrentUser() user: AuthUser,
+    @Param('invoiceId') invoiceId: string,
+    @Body() dto: SubmitPlatformPaymentDto,
+  ) {
+    return this.subscriptionsService.submitPlatformPaymentProof(
+      user.schoolId,
+      user.id,
+      invoiceId,
+      dto,
+    );
+  }
+
+  @Post('billing/request-invoice')
+  @UseGuards(JwtAuthGuard, SchoolTenantGuard, RolesGuard)
+  @Roles('admin')
+  requestRenewalInvoice(@CurrentUser() user: AuthUser) {
+    return this.subscriptionsService.requestRenewalInvoice(
+      user.schoolId,
+      user.id,
+    );
   }
 
   @Post('subscription/checkout')

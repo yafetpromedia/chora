@@ -165,7 +165,7 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
 
   useEffect(() => {
     if (!notificationsOpen) return;
-    function onDocClick(event: MouseEvent) {
+    function onDocClick(event: globalThis.MouseEvent) {
       if (!notifyRef.current) return;
       if (!notifyRef.current.contains(event.target as Node)) {
         setNotificationsOpen(false);

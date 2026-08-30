@@ -13,6 +13,9 @@ export async function loadStaffDashboardBase() {
 
   return {
     schoolName: schoolRes.school?.name ?? readSchoolBrand().name ?? BRAND_NAME,
-    adminDay: dashboardRes.day?.kind === "admin_day" ? dashboardRes.day : null,
+    adminDay:
+      "day" in dashboardRes && dashboardRes.day?.kind === "admin_day"
+        ? dashboardRes.day
+        : null,
   };
 }

@@ -30,6 +30,11 @@ import {
 } from "@/lib/finance";
 import { AppToast } from "@/components/ui/app-toast";
 import { AUTH_ROLE_KEY, AUTH_TOKEN_KEY, isSchoolWorkspaceRole } from "@/lib/auth";
+import {
+  formatGradeRangeLabel,
+  gradesInRange,
+  sortGrades,
+} from "@/lib/grade-range";
 
 function isSafeProofUrl(url: string) {
   return (
@@ -56,10 +61,18 @@ export default function AdminFinancePage() {
   const [pendingBusy, setPendingBusy] = useState<string | null>(null);
 
   const [scheduleFeeTypeId, setScheduleFeeTypeId] = useState("");
-  const [scheduleGradeId, setScheduleGradeId] = useState("");
+  const [scheduleScope, setScheduleScope] = useState<"all" | "range">("range");
+  const [scheduleFromId, setScheduleFromId] = useState("");
+  const [scheduleToId, setScheduleToId] = useState("");
   const [scheduleAmount, setScheduleAmount] = useState("3000");
+  const [scheduleFrequency, setScheduleFrequency] = useState<
+    "ONE_TIME" | "MONTHLY" | "TERM" | "ANNUAL"
+  >("ONE_TIME");
+  const [scheduleDescription, setScheduleDescription] = useState("");
   const [assignScheduleId, setAssignScheduleId] = useState("");
-  const [assignGradeId, setAssignGradeId] = useState("");
+  const [assignFromId, setAssignFromId] = useState("");
+  const [assignToId, setAssignToId] = useState("");
+  const [assignSectionId, setAssignSectionId] = useState("");
   const [assignDueDate, setAssignDueDate] = useState(() => {
     const d = new Date();
     d.setMonth(d.getMonth() + 1);
@@ -92,11 +105,50 @@ export default function AdminFinancePage() {
     setStudents(st);
     setAnalytics(an);
     setPending(pend);
+    const sorted = sortGrades(g);
     if (!scheduleFeeTypeId && ft[0]) setScheduleFeeTypeId(ft[0].id);
     if (!assignScheduleId && sch[0]) setAssignScheduleId(sch[0].id);
-    if (!assignGradeId && g[0]) setAssignGradeId(g[0].id);
+    if (!scheduleFromId && sorted[0]) setScheduleFromId(sorted[0].id);
+    if (!scheduleToId && sorted[sorted.length - 1]) {
+      setScheduleToId(sorted[sorted.length - 1].id);
+    }
+    if (!assignFromId && sorted[0]) setAssignFromId(sorted[0].id);
+    if (!assignToId && sorted[0]) setAssignToId(sorted[0].id);
     if (!payStudentId && st[0]) setPayStudentId(st[0].id);
   }
+
+  const sortedGrades = useMemo(() => sortGrades(grades), [grades]);
+
+  const scheduleRangeGrades = useMemo(
+    () => gradesInRange(sortedGrades, scheduleFromId, scheduleToId),
+    [sortedGrades, scheduleFromId, scheduleToId],
+  );
+
+  const assignRangeGrades = useMemo(
+    () => gradesInRange(sortedGrades, assignFromId, assignToId),
+    [sortedGrades, assignFromId, assignToId],
+  );
+
+  const assignSections = useMemo(() => {
+    const ids = new Set(assignRangeGrades.map((g) => g.id));
+    const sections: Array<{ id: string; name: string; gradeName: string }> = [];
+    for (const grade of grades) {
+      if (!ids.has(grade.id)) continue;
+      for (const section of grade.sections) {
+        sections.push({ id: section.id, name: section.name, gradeName: grade.name });
+      }
+    }
+    return sections.sort((a, b) => a.gradeName.localeCompare(b.gradeName));
+  }, [grades, assignRangeGrades]);
+
+  const assignStudentPreview = useMemo(() => {
+    const gradeIds = new Set(assignRangeGrades.map((g) => g.id));
+    return students.filter(
+      (s) =>
+        gradeIds.has(s.grade.id) &&
+        (!assignSectionId || s.section?.id === assignSectionId),
+    ).length;
+  }, [students, assignRangeGrades, assignSectionId]);
 
   useEffect(() => {
     if (
@@ -127,15 +179,22 @@ export default function AdminFinancePage() {
     setBusy(true);
     try {
       const amountCents = Math.round(parseFloat(scheduleAmount) * 100);
-      await createFeeSchedule({
+      const res = await createFeeSchedule({
         feeTypeId: scheduleFeeTypeId,
         academicYearId: currentYear.id,
-        gradeId: scheduleGradeId || undefined,
+        ...(scheduleScope === "range"
+          ? { gradeFromId: scheduleFromId, gradeToId: scheduleToId }
+          : {}),
         amountCents,
-        frequency: "MONTHLY",
+        frequency: scheduleFrequency,
         installmentCount: 1,
+        description: scheduleDescription.trim() || undefined,
       });
-      setSuccess("Fee schedule created.");
+      setSuccess(
+        res.created === 1
+          ? "Fee schedule created."
+          : `Created ${res.created} schedules for ${formatGradeRangeLabel(sortedGrades, scheduleFromId, scheduleToId)}.`,
+      );
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed");
@@ -151,10 +210,14 @@ export default function AdminFinancePage() {
     try {
       const res = await assignGradeFees({
         feeScheduleId: assignScheduleId,
-        gradeId: assignGradeId,
+        gradeFromId: assignFromId,
+        gradeToId: assignToId,
+        sectionId: assignSectionId || undefined,
         dueDate: assignDueDate,
       });
-      setSuccess(`Assigned fees to ${res.assigned} students.`);
+      setSuccess(
+        `Assigned fees to ${res.assigned} student${res.assigned === 1 ? "" : "s"} across ${res.grades} grade${res.grades === 1 ? "" : "s"}.`,
+      );
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Assign failed");
@@ -402,7 +465,7 @@ export default function AdminFinancePage() {
                     <div>
                       <h3 className="fin-v2__card-title">Create fee schedule</h3>
                       <p className="fin-v2__card-sub">
-                        Define tuition, transport, or other recurring charges for a grade.
+                        Define tuition, transport, or other charges for one grade or a range.
                       </p>
                     </div>
                   </header>
@@ -420,18 +483,79 @@ export default function AdminFinancePage() {
                         ))}
                       </select>
                     </label>
+                    <fieldset className="fin-v2__fieldset">
+                      <legend>Applies to</legend>
+                      <div className="fin-v2__scope">
+                        <button
+                          type="button"
+                          className={`fin-v2__scope-btn${scheduleScope === "all" ? " fin-v2__scope-btn--active" : ""}`}
+                          onClick={() => setScheduleScope("all")}
+                        >
+                          All grades
+                        </button>
+                        <button
+                          type="button"
+                          className={`fin-v2__scope-btn${scheduleScope === "range" ? " fin-v2__scope-btn--active" : ""}`}
+                          onClick={() => setScheduleScope("range")}
+                        >
+                          Grade range
+                        </button>
+                      </div>
+                      {scheduleScope === "range" ? (
+                        <div className="fin-v2__grade-range">
+                          <label className="fin-v2__field fin-v2__field--inline">
+                            <span>From</span>
+                            <select
+                              value={scheduleFromId}
+                              onChange={(e) => setScheduleFromId(e.target.value)}
+                            >
+                              {sortedGrades.map((g) => (
+                                <option key={g.id} value={g.id}>
+                                  {g.name}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                          <span className="fin-v2__grade-range-arrow" aria-hidden>
+                            →
+                          </span>
+                          <label className="fin-v2__field fin-v2__field--inline">
+                            <span>To</span>
+                            <select
+                              value={scheduleToId}
+                              onChange={(e) => setScheduleToId(e.target.value)}
+                            >
+                              {sortedGrades.map((g) => (
+                                <option key={g.id} value={g.id}>
+                                  {g.name}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        </div>
+                      ) : null}
+                      {scheduleScope === "range" && scheduleRangeGrades.length > 0 ? (
+                        <p className="fin-v2__preview">
+                          Creates {scheduleRangeGrades.length} schedule
+                          {scheduleRangeGrades.length === 1 ? "" : "s"}:{" "}
+                          {formatGradeRangeLabel(sortedGrades, scheduleFromId, scheduleToId)}
+                        </p>
+                      ) : null}
+                    </fieldset>
                     <label className="fin-v2__field">
-                      <span>Grade</span>
+                      <span>Frequency</span>
                       <select
-                        value={scheduleGradeId}
-                        onChange={(e) => setScheduleGradeId(e.target.value)}
+                        value={scheduleFrequency}
+                        onChange={(e) =>
+                          setScheduleFrequency(
+                            e.target.value as "ONE_TIME" | "MONTHLY" | "TERM" | "ANNUAL",
+                          )
+                        }
                       >
-                        <option value="">All grades</option>
-                        {grades.map((g) => (
-                          <option key={g.id} value={g.id}>
-                            {g.name}
-                          </option>
-                        ))}
+                        <option value="ONE_TIME">One-time</option>
+                        <option value="MONTHLY">Monthly</option>
+                        <option value="TERM">Per term</option>
+                        <option value="ANNUAL">Annual</option>
                       </select>
                     </label>
                     <label className="fin-v2__field">
@@ -440,6 +564,14 @@ export default function AdminFinancePage() {
                         value={scheduleAmount}
                         onChange={(e) => setScheduleAmount(e.target.value)}
                         required
+                      />
+                    </label>
+                    <label className="fin-v2__field">
+                      <span>Description (optional)</span>
+                      <input
+                        value={scheduleDescription}
+                        onChange={(e) => setScheduleDescription(e.target.value)}
+                        placeholder="e.g. Includes lunch for Term 1"
                       />
                     </label>
                     <button
@@ -460,7 +592,7 @@ export default function AdminFinancePage() {
                     <div>
                       <h3 className="fin-v2__card-title">Bill students by grade</h3>
                       <p className="fin-v2__card-sub">
-                        Assign a schedule to every student in a grade with a due date.
+                        Assign a schedule to students across a grade range with a due date.
                       </p>
                     </div>
                   </header>
@@ -478,16 +610,67 @@ export default function AdminFinancePage() {
                         ))}
                       </select>
                     </label>
-                    <label className="fin-v2__field">
-                      <span>Grade</span>
-                      <select value={assignGradeId} onChange={(e) => setAssignGradeId(e.target.value)}>
-                        {grades.map((g) => (
-                          <option key={g.id} value={g.id}>
-                            {g.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
+                    <fieldset className="fin-v2__fieldset">
+                      <legend>Grade range</legend>
+                      <div className="fin-v2__grade-range">
+                        <label className="fin-v2__field fin-v2__field--inline">
+                          <span>From</span>
+                          <select
+                            value={assignFromId}
+                            onChange={(e) => {
+                              setAssignFromId(e.target.value);
+                              setAssignSectionId("");
+                            }}
+                          >
+                            {sortedGrades.map((g) => (
+                              <option key={g.id} value={g.id}>
+                                {g.name}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <span className="fin-v2__grade-range-arrow" aria-hidden>
+                          →
+                        </span>
+                        <label className="fin-v2__field fin-v2__field--inline">
+                          <span>To</span>
+                          <select
+                            value={assignToId}
+                            onChange={(e) => {
+                              setAssignToId(e.target.value);
+                              setAssignSectionId("");
+                            }}
+                          >
+                            {sortedGrades.map((g) => (
+                              <option key={g.id} value={g.id}>
+                                {g.name}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      </div>
+                      <p className="fin-v2__preview">
+                        {assignRangeGrades.length} grade
+                        {assignRangeGrades.length === 1 ? "" : "s"} · ~{assignStudentPreview}{" "}
+                        student{assignStudentPreview === 1 ? "" : "s"} will be billed
+                      </p>
+                    </fieldset>
+                    {assignSections.length > 0 ? (
+                      <label className="fin-v2__field">
+                        <span>Section (optional)</span>
+                        <select
+                          value={assignSectionId}
+                          onChange={(e) => setAssignSectionId(e.target.value)}
+                        >
+                          <option value="">All sections in range</option>
+                          {assignSections.map((s) => (
+                            <option key={s.id} value={s.id}>
+                              {s.gradeName} — {s.name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    ) : null}
                     <label className="fin-v2__field">
                       <span>Due date</span>
                       <input
@@ -502,10 +685,54 @@ export default function AdminFinancePage() {
                       disabled={busy}
                       onClick={() => void onAssign()}
                     >
-                      {busy ? "Working…" : "Assign fees to class"}
+                      {busy ? "Working…" : "Assign fees to grades"}
                     </button>
                   </div>
                 </section>
+
+                {schedules.length > 0 ? (
+                  <section className="fin-v2__card fin-v2__card--wide">
+                    <header className="fin-v2__card-head">
+                      <span className="fin-v2__card-icon" aria-hidden>
+                        <DashIcon name="chart" className="dash-icon--sm" />
+                      </span>
+                      <div>
+                        <h3 className="fin-v2__card-title">Active schedules</h3>
+                        <p className="fin-v2__card-sub">
+                          {schedules.length} fee schedule{schedules.length === 1 ? "" : "s"} for{" "}
+                          {currentYear?.name ?? "this year"}.
+                        </p>
+                      </div>
+                    </header>
+                    <div className="fin-v2__schedule-table-wrap">
+                      <table className="fin-v2__schedule-table">
+                        <thead>
+                          <tr>
+                            <th>Fee</th>
+                            <th>Grade</th>
+                            <th>Amount</th>
+                            <th>Frequency</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {schedules.map((s) => (
+                            <tr key={s.id}>
+                              <td>
+                                <strong>{s.feeType.name}</strong>
+                                {s.description ? (
+                                  <span className="fin-v2__hint">{s.description}</span>
+                                ) : null}
+                              </td>
+                              <td>{s.grade?.name ?? "All grades"}</td>
+                              <td>{formatEtb(s.amountCents)}</td>
+                              <td className="fin-v2__muted">{s.frequency.replace("_", " ")}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </section>
+                ) : null}
               </div>
             ) : null}
 

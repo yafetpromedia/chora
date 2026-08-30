@@ -440,3 +440,122 @@
   color: #64748b;
   line-height: 1.4;
 }
+
+.fin-v2__card--wide {
+  grid-column: 1 / -1;
+}
+
+.fin-v2__fieldset {
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.fin-v2__fieldset legend {
+  padding: 0;
+  margin-bottom: 0.45rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.fin-v2__scope {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.65rem;
+}
+
+.fin-v2__scope-btn {
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #334155;
+  border-radius: 999px;
+  padding: 0.38rem 0.85rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.fin-v2__scope-btn--active {
+  background: color-mix(in srgb, var(--brand-teal) 14%, #fff);
+  border-color: color-mix(in srgb, var(--brand-teal) 40%, #99f6e4);
+  color: #0f766e;
+}
+
+.fin-v2__grade-range {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 0.5rem;
+  align-items: end;
+}
+
+.fin-v2__field--inline {
+  margin: 0;
+}
+
+.fin-v2__grade-range-arrow {
+  align-self: center;
+  padding-bottom: 0.55rem;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #94a3b8;
+}
+
+.fin-v2__preview {
+  margin: 0.55rem 0 0;
+  padding: 0.5rem 0.65rem;
+  border-radius: 0.65rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #0f766e;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+}
+
+.fin-v2__muted {
+  color: #64748b;
+  font-size: 0.78rem;
+  text-transform: capitalize;
+}
+
+.fin-v2__schedule-table-wrap {
+  overflow-x: auto;
+  margin-top: 0.5rem;
+}
+
+.fin-v2__schedule-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.fin-v2__schedule-table th,
+.fin-v2__schedule-table td {
+  padding: 0.55rem 0.65rem;
+  text-align: left;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.fin-v2__schedule-table th {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.fin-v2__schedule-table td strong {
+  display: block;
+  color: #0f172a;
+}
+
+.fin-v2__schedule-table .fin-v2__hint {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.72rem;
+}
