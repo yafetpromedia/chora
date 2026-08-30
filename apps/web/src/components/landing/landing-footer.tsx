@@ -81,7 +81,7 @@ const SOCIAL_LINKS = [
   },
   {
     label: "GitHub",
-    href: "https://github.com/yafetpromedia/campusone",
+    href: "https://github.com/yafetpromedia/chora",
     icon: (
       <svg viewBox="0 0 24 24" aria-hidden>
         <path

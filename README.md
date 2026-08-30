@@ -2,7 +2,7 @@
 
 Multi-tenant school platform — register your school, invite teachers/students/parents, and run attendance, grades, and announcements in one place.
 
-**Repo:** https://github.com/yafetpromedia/campusone
+**Repo:** https://github.com/yafetpromedia/chora
 
 ## Workspaces
 
@@ -19,8 +19,8 @@ Multi-tenant school platform — register your school, invite teachers/students/
 ### 1. Clone and install
 
 ```powershell
-git clone https://github.com/yafetpromedia/campusone.git
-cd campusone
+git clone https://github.com/yafetpromedia/chora.git
+cd chora
 npm install
 ```
 

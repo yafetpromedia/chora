@@ -44,7 +44,7 @@ CampusOne/
 ## First-time setup
 
 ```powershell
-git clone https://github.com/yafetpromedia/campusone.git
+git clone https://github.com/yafetpromedia/chora.git
 cd campusone
 npm install
 
