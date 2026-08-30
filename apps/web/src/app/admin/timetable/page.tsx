@@ -7,6 +7,7 @@ import { DashboardPage } from "@/components/dashboard/dashboard-page";
 import { TimetableClassCard } from "@/components/timetable/timetable-class-card";
 import { TimetableMasterBoard } from "@/components/timetable/timetable-master-board";
 import { AppToast } from "@/components/ui/app-toast";
+import { AppConfirmDialog } from "@/components/ui/app-confirm-dialog";
 import { listGrades } from "@/lib/school-setup";
 import type { GradeWithSections } from "@/lib/api";
 import { getOrEnsureCurrentAcademicYear } from "@/lib/results";
@@ -42,6 +43,15 @@ type PeriodDraft = {
   startTime: string;
   endTime: string;
 };
+
+type TimetableConfirm =
+  | {
+      type: "generate";
+      scopeLabel: string;
+      scopeGradeId?: string;
+      scopeSectionId?: string;
+    }
+  | { type: "trim-periods" };
 
 function cellKey(weekday: Weekday, periodNumber: number) {
   return `${weekday}:${periodNumber}`;
@@ -112,6 +122,7 @@ export default function AdminTimetablePage() {
   const [error, setError] = useState("");
   const [saved, setSaved] = useState("");
   const [generateScope, setGenerateScope] = useState<"school" | "class">("school");
+  const [confirm, setConfirm] = useState<TimetableConfirm | null>(null);
 
   const filterGrade = grades.find((g) => g.id === filterGradeId);
   const selectedGrade = grades.find((g) => g.id === gradeId);
@@ -354,21 +365,8 @@ export default function AdminTimetablePage() {
     );
   }
 
-  async function onSavePeriods() {
+  async function savePeriodsNow() {
     if (!canEdit || !academicYearId) return;
-    if (periods.length === 0) {
-      setError("Keep at least one period in the bell schedule.");
-      return;
-    }
-    const prevCount = overview?.periodsCount ?? grid?.periods.length ?? periods.length;
-    if (
-      periods.length < prevCount &&
-      !window.confirm(
-        "Removing periods deletes all scheduled lessons in those slots for every class. Continue?",
-      )
-    ) {
-      return;
-    }
     setBusy(true);
     setError("");
     setSaved("");
@@ -403,7 +401,21 @@ export default function AdminTimetablePage() {
     }
   }
 
-  async function onAutoGenerate() {
+  function onSavePeriods() {
+    if (!canEdit || !academicYearId) return;
+    if (periods.length === 0) {
+      setError("Keep at least one period in the bell schedule.");
+      return;
+    }
+    const prevCount = overview?.periodsCount ?? grid?.periods.length ?? periods.length;
+    if (periods.length < prevCount) {
+      setConfirm({ type: "trim-periods" });
+      return;
+    }
+    void savePeriodsNow();
+  }
+
+  function requestAutoGenerate() {
     if (!canEdit || !academicYearId) return;
 
     let scopeGradeId: string | undefined;
@@ -420,18 +432,24 @@ export default function AdminTimetablePage() {
         scopeSectionId = filteredClasses[0].sectionId ?? undefined;
         scopeLabel = classTitle(filteredClasses[0]);
       } else {
-        setError("Pick a class (open it, or filter to one class) before generating for this class only.");
+        setError(
+          "Pick a class (open it, or filter to one class) before generating for this class only.",
+        );
         return;
       }
     }
 
-    if (
-      !window.confirm(
-        `Auto-generate timetable for ${scopeLabel}? This replaces existing entries in that scope. Teachers will not be double-booked in the same period.`,
-      )
-    ) {
-      return;
-    }
+    setConfirm({
+      type: "generate",
+      scopeLabel,
+      scopeGradeId,
+      scopeSectionId,
+    });
+  }
+
+  async function runAutoGenerate(action: Extract<TimetableConfirm, { type: "generate" }>) {
+    if (!academicYearId) return;
+    setConfirm(null);
     setBusy(true);
     setError("");
     setSaved("");
@@ -439,8 +457,8 @@ export default function AdminTimetablePage() {
       const result = await generateTimetable({
         academicYearId,
         replaceExisting: true,
-        ...(scopeGradeId
-          ? { gradeId: scopeGradeId, sectionId: scopeSectionId }
+        ...(action.scopeGradeId
+          ? { gradeId: action.scopeGradeId, sectionId: action.scopeSectionId }
           : {}),
       });
       let message = `Scheduled ${result.placed} of ${result.totalLessons} lessons across ${result.classesProcessed} classes.`;
@@ -517,6 +535,43 @@ export default function AdminTimetablePage() {
       <div className="tt-admin">
         <AppToast message={error} tone="error" onDismiss={() => setError("")} />
         <AppToast message={saved} tone="success" onDismiss={() => setSaved("")} />
+        <AppConfirmDialog
+          open={confirm?.type === "generate"}
+          tone="warning"
+          title={
+            confirm?.type === "generate"
+              ? `Auto-generate for ${confirm.scopeLabel}?`
+              : "Auto-generate timetable?"
+          }
+          message="This replaces existing entries in that scope. Teachers will not be double-booked in the same period."
+          confirmLabel="Generate timetable"
+          cancelLabel="Cancel"
+          busy={busy}
+          onCancel={() => {
+            if (busy) return;
+            setConfirm(null);
+          }}
+          onConfirm={() => {
+            if (confirm?.type === "generate") void runAutoGenerate(confirm);
+          }}
+        />
+        <AppConfirmDialog
+          open={confirm?.type === "trim-periods"}
+          tone="danger"
+          title="Remove periods?"
+          message="Removing periods deletes all scheduled lessons in those slots for every class."
+          confirmLabel="Remove periods"
+          cancelLabel="Keep schedule"
+          busy={busy}
+          onCancel={() => {
+            if (busy) return;
+            setConfirm(null);
+          }}
+          onConfirm={() => {
+            setConfirm(null);
+            void savePeriodsNow();
+          }}
+        />
 
         <header className="tt-admin__hero">
           <div className="tt-admin__hero-glow" aria-hidden />
@@ -730,7 +785,7 @@ export default function AdminTimetablePage() {
                 type="button"
                 className="tt-admin__btn tt-admin__btn--ghost"
                 disabled={busy || !academicYearId}
-                onClick={() => void onAutoGenerate()}
+                onClick={() => requestAutoGenerate()}
               >
                 <DashIcon name="calendar" className="dash-icon--sm" />
                 {busy ? "Working…" : "Auto-generate"}
