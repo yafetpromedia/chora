@@ -45,7 +45,7 @@ CampusOne/
 
 ```powershell
 git clone https://github.com/yafetpromedia/chora.git
-cd campusone
+cd chora
 npm install
 
 copy apps\api\.env.example apps\api\.env
