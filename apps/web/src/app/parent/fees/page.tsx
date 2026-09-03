@@ -4,8 +4,8 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { DashboardPage } from "@/components/dashboard/dashboard-page";
 import { ParentChildBar } from "@/components/parent/parent-child-bar";
+import { EtbAmount } from "@/components/billing/etb-amount";
 import {
-  formatEtb,
   getParentFeesDue,
   getParentFinanceOverview,
   initializeChapaPayment,
@@ -284,13 +284,16 @@ function ParentFeesPageContent() {
                   <p className="stu-fees__hero-sub">
                     Total due across {overview.children.length} child
                     {overview.children.length === 1 ? "" : "ren"}:{" "}
-                    {formatEtb(overview.totalDueCents)}
+                    <EtbAmount cents={overview.totalDueCents} symbolSize={18} />
                   </p>
                 </div>
                 <div className="stu-fees__balance">
                   <span className="stu-fees__balance-label">This child outstanding</span>
                   <strong className="stu-fees__balance-value">
-                    {formatEtb(due?.totalDueCents ?? selectedChild?.outstandingCents ?? 0)}
+                    <EtbAmount
+                      cents={due?.totalDueCents ?? selectedChild?.outstandingCents ?? 0}
+                      symbolSize={18}
+                    />
                   </strong>
                 </div>
               </div>
@@ -339,7 +342,7 @@ function ParentFeesPageContent() {
                           <div className="stu-fees__row-amounts">
                             <div>
                               <span className="stu-fees__amount-label">Amount</span>
-                              <strong>{formatEtb(item.amountCents)}</strong>
+                              <strong><EtbAmount cents={item.amountCents} /></strong>
                             </div>
                           </div>
                         </div>
@@ -360,7 +363,7 @@ function ParentFeesPageContent() {
                           <div className="stu-fees__row-main">
                             <div className="stu-fees__row-top">
                               <div>
-                                <p className="stu-fees__row-title">{formatEtb(p.amountCents)}</p>
+                                <p className="stu-fees__row-title"><EtbAmount cents={p.amountCents} /></p>
                                 <p className="stu-fees__row-meta">
                                   {methodLabel(p.method)} · Ref: {p.reference ?? "—"} · #
                                   {p.receiptNumber}
@@ -483,7 +486,9 @@ function ParentFeesPageContent() {
                           {payMethod === "TELEBIRR" ? (
                             <>
                               <p className="par-fees__sample-status">Successful</p>
-                              <p className="par-fees__sample-amount">−{payAmount || "0.00"} (ETB)</p>
+                              <p className="par-fees__sample-amount">
+                                −<EtbAmount amount={Number(payAmount) || 0} maximumFractionDigits={2} />
+                              </p>
                               <dl>
                                 <div>
                                   <dt>Transaction Type</dt>
@@ -505,7 +510,9 @@ function ParentFeesPageContent() {
                           ) : (
                             <>
                               <p className="par-fees__sample-status">Thank you · Success</p>
-                              <p className="par-fees__sample-amount">ETB {payAmount || "0.00"}</p>
+                              <p className="par-fees__sample-amount">
+                                <EtbAmount amount={Number(payAmount) || 0} maximumFractionDigits={2} />
+                              </p>
                               <dl>
                                 <div>
                                   <dt>Paid to</dt>

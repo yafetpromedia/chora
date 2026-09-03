@@ -186,7 +186,9 @@ export default function PlatformDashboardPage() {
           {section === "permissions" && user?.role === "OWNER" ? (
             <PlatformPermissions user={user} />
           ) : null}
-          {section === "profile" ? <PlatformProfilePanel /> : null}
+          {section === "profile" ? (
+            <PlatformProfilePanel onUserUpdated={setUser} />
+          ) : null}
           {section === "settings" && user?.role === "OWNER" ? (
             <PlatformSettings
               user={user}

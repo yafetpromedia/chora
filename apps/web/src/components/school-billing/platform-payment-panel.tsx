@@ -11,6 +11,8 @@ import {
   type SchoolOpenInvoice,
 } from "@/lib/school-billing";
 import { BRAND_NAME } from "@/lib/brand";
+import { EtbAmount } from "@/components/billing/etb-amount";
+import { formatEtbWhole } from "@/lib/currency";
 
 const MAX_PROOF_BYTES = 4_000_000;
 
@@ -222,9 +224,13 @@ export function PlatformPaymentPanel({
                 <>
                   Your {subscription.planLabel} plan is active until{" "}
                   {formatDate(subscription.currentPeriodEnd)}.
-                  {planPrice
-                    ? ` Renewal is ${planPrice.etbMonthly.toLocaleString()} ETB/mo.`
-                    : null}
+                  {planPrice ? (
+                    <>
+                      {" "}
+                      Renewal is <EtbAmount amount={planPrice.etbMonthly} maximumFractionDigits={0} />
+                      /mo.
+                    </>
+                  ) : null}
                 </>
               ) : (
                 <>When {BRAND_NAME} issues a bill, you can pay it here.</>
@@ -255,7 +261,7 @@ export function PlatformPaymentPanel({
               <div className="sb-v2__pay-invoice">
                 <strong>{openInvoices[0].invoiceNumber}</strong>
                 <span>
-                  {openInvoices[0].amountEtb.toLocaleString()} ETB · due{" "}
+                  <EtbAmount amount={openInvoices[0].amountEtb} maximumFractionDigits={0} /> · due{" "}
                   {formatDate(openInvoices[0].dueAt)}
                 </span>
               </div>
@@ -269,7 +275,7 @@ export function PlatformPaymentPanel({
                 >
                   {openInvoices.map((inv) => (
                     <option key={inv.id} value={inv.id}>
-                      {inv.invoiceNumber} — {inv.amountEtb.toLocaleString()} ETB (due{" "}
+                      {inv.invoiceNumber} — {formatEtbWhole(inv.amountEtb)} (due{" "}
                       {formatDate(inv.dueAt)})
                     </option>
                   ))}
@@ -321,12 +327,12 @@ export function PlatformPaymentPanel({
 
             {selectedInvoice ? (
               <p className="sb-v2__pay-panel__amount">
-                Amount due: <strong>{selectedInvoice.amountEtb.toLocaleString()} ETB</strong>
+                Amount due: <strong><EtbAmount amount={selectedInvoice.amountEtb} maximumFractionDigits={0} /></strong>
                 <span> (${selectedInvoice.amountUsd.toLocaleString()} USD)</span>
               </p>
             ) : planPrice && canRequestInvoice ? (
               <p className="sb-v2__pay-panel__amount">
-                Renewal amount: <strong>{planPrice.etbMonthly.toLocaleString()} ETB</strong>
+                Renewal amount: <strong><EtbAmount amount={planPrice.etbMonthly} maximumFractionDigits={0} /></strong>
                 <span> (${planPrice.usdMonthly.toLocaleString()} USD/mo)</span>
               </p>
             ) : null}

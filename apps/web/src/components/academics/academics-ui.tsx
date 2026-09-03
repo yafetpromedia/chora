@@ -39,7 +39,7 @@ export function AcademicsAlert({
 
 export type AcademicsStatItem = {
   label: string;
-  value: string | number;
+  value: ReactNode;
   hint?: string;
   accent?: boolean;
 };

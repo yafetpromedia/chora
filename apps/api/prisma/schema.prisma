@@ -1100,6 +1100,13 @@ model PlatformSettings {
   telebirrNumber        String?
   telebirrAccountName   String?
   payoutInstructions    String?          @db.Text
+  /// Public footer / marketing social profile URLs (empty = hidden).
+  socialInstagramUrl      String?
+  socialFacebookUrl       String?
+  socialLinkedinUrl       String?
+  socialYoutubeUrl        String?
+  socialTiktokUrl         String?
+  socialGithubUrl         String?
   /// Editable platform role → permission keys (SUPPORT/SALES). OWNER always has all.
   rolePermissions       Json?
   createdAt             DateTime         @default(now())

@@ -116,10 +116,7 @@ export function LoginShell({ children, error }: LoginShellProps) {
 export function LoginFooterLinks() {
   return (
     <p className="reg-footer__line">
-      New school?{" "}
-      <Link href="/register">Register</Link>
-      <span aria-hidden>·</span>
-      <Link href="/platform/login">Platform admin</Link>
+      New school? <Link href="/register">Register</Link>
     </p>
   );
 }

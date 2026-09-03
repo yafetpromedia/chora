@@ -2089,6 +2089,50 @@
   }
 }
 
+.pilot-handout__url {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-top: 0.85rem;
+}
+
+.pilot-handout__url > span {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #334155;
+}
+
+.pilot-handout__url em {
+  font-style: normal;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: #64748b;
+}
+
+.pilot-handout__url-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.pilot-handout__url-row input {
+  flex: 1;
+  min-width: 0;
+  min-height: 2.4rem;
+  padding: 0.45rem 0.7rem;
+  border-radius: 0.6rem;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  font-size: 0.85rem;
+  font-family: inherit;
+  color: #0f172a;
+}
+
+.pilot-handout__url-row input:focus {
+  outline: 2px solid rgba(13, 92, 99, 0.25);
+  border-color: #0d5c63;
+}
+
 .pilot-handout__grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -5257,12 +5301,16 @@
 }
 
 .rc-booklet__logo {
-  width: 2.4rem;
-  height: 2.4rem;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 2px solid #fff;
-  box-shadow: 0 0 0 1px rgba(15, 118, 110, 0.35);
+  width: 2.6rem;
+  height: 2.6rem;
+  border-radius: 0.55rem;
+  object-fit: contain;
+  object-position: center;
+  padding: 0.2rem;
+  box-sizing: border-box;
+  background: #fff;
+  border: 1px solid rgba(15, 118, 110, 0.2);
+  box-shadow: none;
 }
 
 .rc-booklet__logo--fallback {
@@ -5892,6 +5940,15 @@
   min-width: 14rem;
 }
 
+.rc-v2__field--mode {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+  flex: 0 0 auto;
+  min-width: max-content;
+}
+
 .rc-v2__student-pick {
   flex: 2;
   min-width: min(100%, 16rem);
@@ -5935,6 +5992,8 @@
 
 .rc-v2__mode-toggle {
   display: inline-flex;
+  flex-shrink: 0;
+  width: max-content;
   border: 1px solid var(--brand-border, #e2e8f0);
   border-radius: 0.65rem;
   overflow: hidden;
@@ -5945,12 +6004,13 @@
   appearance: none;
   border: 0;
   background: transparent;
-  padding: 0.45rem 0.75rem;
+  padding: 0.45rem 0.85rem;
   font: inherit;
   font-size: 0.85rem;
   font-weight: 600;
   color: #64748b;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .rc-v2__mode-btn.is-active {

@@ -4,6 +4,7 @@ import { motion, useInView, useReducedMotion } from "framer-motion";
 import { useRef, type CSSProperties } from "react";
 import { DashIcon, type DashIconName } from "@/components/dashboard/dash-icons";
 import { BrandMark } from "@/components/brand-mark";
+import { BirrSymbol } from "@/components/billing/birr-symbol";
 
 const NAV: { label: string; icon: DashIconName; active?: boolean }[] = [
   { label: "Overview", icon: "overview", active: true },
@@ -92,7 +93,9 @@ export function ProductPreview() {
               </span>
               <div>
                 <span>Collected</span>
-                <strong>1.2M ETB</strong>
+                <strong>
+                  1.2M <BirrSymbol size={12} />
+                </strong>
                 <em>78% of expected</em>
               </div>
             </article>
@@ -121,11 +124,15 @@ export function ProductPreview() {
                 <ul>
                   <li>
                     <span>Collected</span>
-                    <strong>940K ETB</strong>
+                    <strong>
+                      940K <BirrSymbol size={11} />
+                    </strong>
                   </li>
                   <li>
                     <span>Outstanding</span>
-                    <strong>260K ETB</strong>
+                    <strong>
+                      260K <BirrSymbol size={11} />
+                    </strong>
                   </li>
                 </ul>
               </div>

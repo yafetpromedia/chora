@@ -1,7 +1,8 @@
 "use client";
 
 import { DashIcon } from "@/components/dashboard/dash-icons";
-import { formatEtb, type StudentFinanceSummary } from "@/lib/finance";
+import { type StudentFinanceSummary } from "@/lib/finance";
+import { EtbAmount } from "@/components/billing/etb-amount";
 
 function FinanceIcon({ className }: { className?: string }) {
   return (
@@ -76,7 +77,7 @@ export function StudentFeesPanel({ summary }: Props) {
           <div className="stu-fees__balance">
             <span className="stu-fees__balance-label">Outstanding</span>
             <strong className="stu-fees__balance-value">
-              {formatEtb(summary.outstandingCents)}
+              <EtbAmount cents={summary.outstandingCents} symbolSize={20} />
             </strong>
             {allClear ? (
               <span className="stu-fees__balance-tag stu-fees__balance-tag--clear">All clear</span>
@@ -85,11 +86,11 @@ export function StudentFeesPanel({ summary }: Props) {
         </div>
         <div className="stu-fees__hero-stats">
           <div className="stu-fees__stat">
-            <strong>{formatEtb(summary.totalDueCents)}</strong>
+            <strong><EtbAmount cents={summary.totalDueCents} /></strong>
             <span>Total due</span>
           </div>
           <div className="stu-fees__stat">
-            <strong>{formatEtb(summary.totalPaidCents)}</strong>
+            <strong><EtbAmount cents={summary.totalPaidCents} /></strong>
             <span>Paid</span>
           </div>
           <div className="stu-fees__stat stu-fees__stat--accent">
@@ -186,15 +187,15 @@ export function StudentFeesPanel({ summary }: Props) {
                     <div className="stu-fees__row-amounts">
                       <div>
                         <span className="stu-fees__amount-label">Balance</span>
-                        <strong>{formatEtb(item.balanceCents)}</strong>
+                        <strong><EtbAmount cents={item.balanceCents} /></strong>
                       </div>
                       <div>
                         <span className="stu-fees__amount-label">Total</span>
-                        <strong>{formatEtb(item.amountDueCents)}</strong>
+                        <strong><EtbAmount cents={item.amountDueCents} /></strong>
                       </div>
                       <div>
                         <span className="stu-fees__amount-label">Paid</span>
-                        <strong>{formatEtb(item.paidAmountCents)}</strong>
+                        <strong><EtbAmount cents={item.paidAmountCents} /></strong>
                       </div>
                     </div>
                   </div>
@@ -232,7 +233,7 @@ export function StudentFeesPanel({ summary }: Props) {
                     <FinanceIcon />
                   </div>
                   <div className="stu-fees__pay-main">
-                    <p className="stu-fees__pay-amount">{formatEtb(payment.amountCents)}</p>
+                    <p className="stu-fees__pay-amount"><EtbAmount cents={payment.amountCents} symbolSize={16} /></p>
                     <p className="stu-fees__pay-meta">
                       {payment.receiptNumber} · {formatDate(payment.paidAt)}
                     </p>

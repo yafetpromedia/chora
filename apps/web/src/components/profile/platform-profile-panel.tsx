@@ -42,8 +42,13 @@ function initials(first: string, last: string) {
   return `${a}${b}`.toUpperCase() || "?";
 }
 
-export function PlatformProfilePanel() {
+type Props = {
+  onUserUpdated?: (user: PlatformUser) => void;
+};
+
+export function PlatformProfilePanel({ onUserUpdated }: Props) {
   const [profile, setProfile] = useState<PlatformProfile | null>(null);
+  const [email, setEmail] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -56,6 +61,7 @@ export function PlatformProfilePanel() {
     void getPlatformProfile()
       .then((data) => {
         setProfile(data);
+        setEmail(data.user.email);
         setFirstName(data.user.firstName);
         setLastName(data.user.lastName);
       })
@@ -72,11 +78,15 @@ export function PlatformProfilePanel() {
     setToast(null);
     try {
       const updated = await updatePlatformProfile({
+        email: email.trim(),
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         newPassword: newPassword.trim() || undefined,
       });
       setProfile(updated);
+      setEmail(updated.user.email);
+      setFirstName(updated.user.firstName);
+      setLastName(updated.user.lastName);
       setNewPassword("");
       setToast("Profile saved.");
       const sessionUser: PlatformUser = {
@@ -86,8 +96,10 @@ export function PlatformProfilePanel() {
         lastName: updated.user.lastName,
         role: updated.user.role,
         scope: "platform",
+        permissions: updated.user.permissions,
       };
       localStorage.setItem(PLATFORM_USER_KEY, JSON.stringify(sessionUser));
+      onUserUpdated?.(sessionUser);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save profile");
     } finally {
@@ -113,7 +125,9 @@ export function PlatformProfilePanel() {
   }
 
   const { user } = profile;
-  const displayName = [user.firstName, user.lastName].filter(Boolean).join(" ");
+  const displayName =
+    [firstName, lastName].map((part) => part.trim()).filter(Boolean).join(" ") ||
+    user.email;
 
   return (
     <div className="plat-subjects-v2 dash-admin dash-admin--modern plat-profile-v2">
@@ -123,7 +137,7 @@ export function PlatformProfilePanel() {
       <header className="plat-subjects-v2__hero">
         <div className="plat-subjects-v2__hero-main">
           <span className="plat-subjects-v2__hero-icon plat-profile-v2__avatar" aria-hidden>
-            {initials(user.firstName, user.lastName)}
+            {initials(firstName, lastName)}
           </span>
           <div>
             <p className="plat-subjects-v2__eyebrow">Platform operator</p>
@@ -168,11 +182,24 @@ export function PlatformProfilePanel() {
             <DashIcon name="profile" className="dash-icon--sm" />
             <div>
               <h3>Edit profile</h3>
-              <p>Update your name or set a new password.</p>
+              <p>
+                Update your email, name, or password. Your first and last name appear in the
+                header and sidebar after you save.
+              </p>
             </div>
           </div>
 
           <form className="plat-profile-v2__form" onSubmit={(e) => void onSubmit(e)}>
+            <label className="plat-field">
+              <span>Email</span>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                autoComplete="email"
+              />
+            </label>
             <div className="plat-profile-v2__row">
               <label className="plat-field">
                 <span>First name</span>

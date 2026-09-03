@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { DashIcon } from "@/components/dashboard/dash-icons";
 import { AcademicsHero, AcademicsBadge } from "@/components/academics/academics-ui";
 import { DashboardPage } from "@/components/dashboard/dashboard-page";
+import { EtbAmount } from "@/components/billing/etb-amount";
+import { formatEtbPlain } from "@/lib/currency";
 import { listGrades, listStudents } from "@/lib/school-setup";
 import type { GradeWithSections, StudentRecord } from "@/lib/api";
 import {
@@ -290,17 +292,27 @@ export default function AdminFinancePage() {
           title="School finance"
           subtitle={
             analytics
-              ? `${formatEtb(analytics.collectedCents)} collected of ${formatEtb(analytics.expectedRevenueCents)} expected · ${analytics.overdueFeesCount} overdue fees`
+              ? `${formatEtbPlain(analytics.collectedCents)} collected of ${formatEtbPlain(analytics.expectedRevenueCents)} expected · ${analytics.overdueFeesCount} overdue fees`
               : "Track collections, bill students, verify payments, and export records."
           }
           stats={[
             {
               label: "This month",
-              value: loading || !analytics ? "—" : formatEtb(analytics.collectedThisMonthCents),
+              value:
+                loading || !analytics ? (
+                  "—"
+                ) : (
+                  <EtbAmount cents={analytics.collectedThisMonthCents} symbolSize={16} />
+                ),
             },
             {
               label: "Outstanding",
-              value: loading || !analytics ? "—" : formatEtb(analytics.outstandingCents),
+              value:
+                loading || !analytics ? (
+                  "—"
+                ) : (
+                  <EtbAmount cents={analytics.outstandingCents} symbolSize={16} />
+                ),
               accent: !loading && !!analytics && analytics.outstandingCents > 0,
             },
             {
@@ -400,7 +412,9 @@ export default function AdminFinancePage() {
                       <li key={p.id} className="fin-v2__pending-item">
                         <div className="fin-v2__pending-main">
                           <strong>{p.student.name}</strong>
-                          <span className="fin-v2__pending-amount">{formatEtb(p.amountCents)}</span>
+                          <span className="fin-v2__pending-amount">
+                            <EtbAmount cents={p.amountCents} />
+                          </span>
                           <p>
                             {p.student.grade}
                             {p.student.section ? ` · ${p.student.section}` : ""} ·{" "}
@@ -605,7 +619,8 @@ export default function AdminFinancePage() {
                       >
                         {schedules.map((s) => (
                           <option key={s.id} value={s.id}>
-                            {s.feeType.name} — {s.grade?.name ?? "All"} — {formatEtb(s.amountCents)}
+                            {s.feeType.name} — {s.grade?.name ?? "All"} —{" "}
+                            <EtbAmount cents={s.amountCents} />
                           </option>
                         ))}
                       </select>
@@ -724,7 +739,7 @@ export default function AdminFinancePage() {
                                 ) : null}
                               </td>
                               <td>{s.grade?.name ?? "All grades"}</td>
-                              <td>{formatEtb(s.amountCents)}</td>
+                              <td><EtbAmount cents={s.amountCents} /></td>
                               <td className="fin-v2__muted">{s.frequency.replace("_", " ")}</td>
                             </tr>
                           ))}

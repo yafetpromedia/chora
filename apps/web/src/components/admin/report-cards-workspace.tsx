@@ -235,7 +235,7 @@ export function ReportCardsWorkspace({ students, onError }: Props) {
             ))}
           </select>
         </label>
-        <div className="rc-v2__field" role="group" aria-label="Report type">
+        <div className="rc-v2__field rc-v2__field--mode" role="group" aria-label="Report type">
           <span>Report type</span>
           <div className="rc-v2__mode-toggle">
             <button

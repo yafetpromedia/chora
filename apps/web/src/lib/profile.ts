@@ -32,6 +32,7 @@ export type UserProfile = {
 
 export type UpdateProfilePayload = {
   username?: string;
+  email?: string;
   firstName?: string;
   lastName?: string;
   phone?: string;

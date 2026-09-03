@@ -337,8 +337,11 @@ function sharedStyles(): string {
     }
     .rc-logo {
       width: 16mm; height: 16mm; border-radius: 3mm;
-      object-fit: cover; border: 1px solid var(--line);
-      background: var(--soft);
+      object-fit: contain; object-position: center;
+      border: 1px solid var(--line);
+      background: #fff;
+      padding: 1mm;
+      box-sizing: border-box;
     }
     .rc-logo--fallback {
       display: grid; place-items: center;
@@ -727,10 +730,10 @@ function buildTermReportHtml(data: ReportCardPrintPayload): string {
                   ${subjectRows || '<tr><td colspan="3">No scores recorded yet.</td></tr>'}
                 </tbody>
               </table>
+              </div>
             </div>
-          </div>
-        </section>
-      </div>
+          </section>
+            </div>
 
       <div class="rc-remarks">
         ${remarkBlock('Teacher comment', data.remarks.teacher)}
@@ -806,11 +809,11 @@ function buildAnnualReportHtml(data: ReportCardPrintPayload): string {
           <div class="rc-panel__b">
             <div class="rc-id">
               ${avatar}
-              <div>
+        <div>
                 <strong>${studentNameUpper}</strong>
                 <span>${escapeHtml(data.student.gradeLabel)} · ${escapeHtml(data.student.academicYear)}</span>
-              </div>
-            </div>
+        </div>
+        </div>
             <div class="rc-fields">
               <div class="rc-field"><em>Student ID</em><strong>${data.student.number ? escapeHtml(data.student.number) : '—'}</strong></div>
               <div class="rc-field"><em>Document ref</em><strong>${documentRef}</strong></div>
@@ -818,9 +821,9 @@ function buildAnnualReportHtml(data: ReportCardPrintPayload): string {
               <div class="rc-field"><em>Age</em><strong>${data.student.age != null ? String(data.student.age) : '—'}</strong></div>
               <div class="rc-field"><em>Grade / section</em><strong>${escapeHtml(data.student.gradeLabel)}</strong></div>
               <div class="rc-field"><em>Academic year</em><strong>${escapeHtml(data.student.academicYear)}</strong></div>
-            </div>
-          </div>
-        </section>
+      </div>
+    </div>
+  </section>
 
         <section class="rc-panel">
           <h2 class="rc-panel__h">Year summary</h2>

@@ -31,7 +31,7 @@ import {
   type PlanType,
   type SubscriptionStatus,
 } from "@/lib/api";
-import { BRAND_NAME } from "@/lib/brand";
+import { EtbAmount } from "@/components/billing/etb-amount";
 import { AUTH_ROLE_KEY, AUTH_TOKEN_KEY } from "@/lib/auth";
 
 const YEARLY_MULTIPLIER = 10;
@@ -317,7 +317,7 @@ function SchoolPlansPageContent() {
 
                 {!isEnterprise && chapaEnabled && !isCurrent ? (
                   <p className="sb-v2__plan-card__hint">
-                    Charged {payAmount.toLocaleString("en-ET")} ETB
+                    Charged <EtbAmount amount={payAmount} maximumFractionDigits={0} />
                     {billingInterval === "year" ? " / year" : " / month"}
                   </p>
                 ) : null}

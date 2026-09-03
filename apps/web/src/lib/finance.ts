@@ -1,8 +1,11 @@
 import { apiFetch, apiPost, getApiBaseUrl } from "@/lib/api";
 import { AUTH_TOKEN_KEY } from "@/lib/auth";
 
+import { formatEtbPlain } from "@/lib/currency";
+
+/** @deprecated Prefer `<EtbAmount />` in UI. Plain string keeps "ETB" for non-React contexts. */
 export function formatEtb(cents: number): string {
-  return `${(cents / 100).toLocaleString("en-ET", { maximumFractionDigits: 2 })} ETB`;
+  return formatEtbPlain(cents);
 }
 
 export type FeeType = {

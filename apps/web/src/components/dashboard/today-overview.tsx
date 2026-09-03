@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { formatEtb } from "@/lib/finance";
+import { EtbAmount } from "@/components/billing/etb-amount";
+import { formatEtbPlain } from "@/lib/currency";
 import type { AdminDayOverview, ParentDayOverview } from "@/lib/dashboard-day";
 import { DashIcon } from "@/components/dashboard/dash-icons";
 
@@ -44,7 +45,7 @@ export function AdminTodayOverview({ day }: { day: AdminDayOverview }) {
 
       {day.finance.outstandingCents != null ? (
         <p className="dash-admin-today__note">
-          Outstanding fees: <strong>{formatEtb(day.finance.outstandingCents)}</strong>
+          Outstanding fees: <strong><EtbAmount cents={day.finance.outstandingCents} /></strong>
           {day.finance.unpaidStudents != null ? ` · ${day.finance.unpaidStudents} students` : ""}
         </p>
       ) : null}
@@ -100,7 +101,7 @@ export function ParentTodayOverview({ day }: { day: ParentDayOverview }) {
       </div>
       {day.totalDueCents > 0 ? (
         <p className="auth-alert" style={{ marginBottom: "0.75rem" }}>
-          Total fees due: {formatEtb(day.totalDueCents)} —{" "}
+          Total fees due: <EtbAmount cents={day.totalDueCents} /> —{" "}
           <Link href="/parent/fees">Pay or view details</Link>
         </p>
       ) : null}
@@ -123,7 +124,7 @@ export function ParentTodayOverview({ day }: { day: ParentDayOverview }) {
                       }`
                     : ""}
                   {child.outstandingCents > 0
-                    ? ` · Fees: ${formatEtb(child.outstandingCents)} due`
+                    ? ` · Fees: ${formatEtbPlain(child.outstandingCents)} due`
                     : " · Fees: up to date"}
                 </p>
               </div>

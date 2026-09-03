@@ -3,7 +3,7 @@
 import Link from "next/link";
 import type { Announcement, SubscriptionStatus } from "@/lib/api";
 import { TrialBanner } from "@/components/trial-banner";
-import { formatEtb } from "@/lib/finance";
+import { EtbAmount } from "@/components/billing/etb-amount";
 import type { AdminAnalyticsOverview } from "@/lib/dashboard-analytics";
 import type { AdminDayOverview } from "@/lib/dashboard-day";
 import { AdminAnalyticsSection } from "@/components/dashboard/admin-analytics";
@@ -119,7 +119,7 @@ export function AdminDashboard({
               </span>
               <div>
                 <p className="dash-admin-kpi__label">Collected</p>
-                <p className="dash-admin-kpi__value">{formatEtb(fin.collectedCents)}</p>
+                <p className="dash-admin-kpi__value"><EtbAmount cents={fin.collectedCents} symbolSize={18} /></p>
                 <p className="dash-admin-kpi__hint">{fin.collectionRate}% of billed fees</p>
               </div>
             </Link>

@@ -18,6 +18,7 @@ import type { PlatformSection } from "./platform-types";
 import { AppToast } from "@/components/ui/app-toast";
 import { LandingHeroUpload } from "@/components/platform/landing-hero-upload";
 import { BRAND_NAME } from "@/lib/brand";
+import { SOCIAL_LINK_DEFS } from "@/lib/social-links";
 
 type Props = {
   user: PlatformUser | null;
@@ -52,7 +53,6 @@ const SHORTCUTS: {
   { href: "/", label: "Public site", desc: "Marketing & school registration", icon: "overview" },
   { href: "/login", label: "School login", desc: "Staff, teachers, families", icon: "students" },
   { href: "/register", label: "Register school", desc: "Self-serve tenant signup", icon: "plus" },
-  { href: "/platform/login", label: "Platform login", desc: "This operator console", icon: "settings" },
 ];
 
 function getApiUrl() {
@@ -94,6 +94,12 @@ function applySettings(s: SettingsRow) {
     telebirrNumber: s.telebirrNumber ?? "",
     telebirrAccountName: s.telebirrAccountName ?? "",
     payoutInstructions: s.payoutInstructions ?? "",
+    socialInstagramUrl: s.socialInstagramUrl ?? "",
+    socialFacebookUrl: s.socialFacebookUrl ?? "",
+    socialLinkedinUrl: s.socialLinkedinUrl ?? "",
+    socialYoutubeUrl: s.socialYoutubeUrl ?? "",
+    socialTiktokUrl: s.socialTiktokUrl ?? "",
+    socialGithubUrl: s.socialGithubUrl ?? "",
   };
 }
 
@@ -179,6 +185,12 @@ export function PlatformSettings({ user, onOpenProfile, onNavigate }: Props) {
         telebirrNumber: draft.telebirrNumber.trim(),
         telebirrAccountName: draft.telebirrAccountName.trim(),
         payoutInstructions: draft.payoutInstructions.trim(),
+        socialInstagramUrl: draft.socialInstagramUrl.trim(),
+        socialFacebookUrl: draft.socialFacebookUrl.trim(),
+        socialLinkedinUrl: draft.socialLinkedinUrl.trim(),
+        socialYoutubeUrl: draft.socialYoutubeUrl.trim(),
+        socialTiktokUrl: draft.socialTiktokUrl.trim(),
+        socialGithubUrl: draft.socialGithubUrl.trim(),
       });
       setSettings(updated);
       setDraft(applySettings(updated));
@@ -200,11 +212,38 @@ export function PlatformSettings({ user, onOpenProfile, onNavigate }: Props) {
     }
   }
 
-  if (loading || !draft) {
+  if (loading) {
     return (
       <div className="plat-subjects-v2 plat-subjects-v2--loading">
         <div className="plat-curriculum__skeleton plat-curriculum__skeleton--hero" />
         <div className="plat-curriculum__skeleton" />
+      </div>
+    );
+  }
+
+  if (!draft) {
+    return (
+      <div className="plat-subjects-v2 plat-settings-v2">
+        <AppToast message={error} tone="error" onDismiss={() => setError("")} />
+        <div className="plat-subjects-v2__empty" style={{ padding: "2rem 1.25rem", textAlign: "center" }}>
+          <p style={{ margin: 0, fontWeight: 700, color: "#0f172a" }}>Couldn’t load platform settings</p>
+          <p style={{ margin: "0.5rem 0 1rem", color: "#64748b", fontSize: "0.9rem" }}>
+            {error || "The settings API failed. Check that the database is up to date, then retry."}
+          </p>
+          <button
+            type="button"
+            className="cfg-btn"
+            onClick={() => {
+              setLoading(true);
+              setError("");
+              void load()
+                .catch((err) => fail(err, "Failed to load settings"))
+                .finally(() => setLoading(false));
+            }}
+          >
+            Retry
+          </button>
+        </div>
       </div>
     );
   }
@@ -319,6 +358,28 @@ export function PlatformSettings({ user, onOpenProfile, onNavigate }: Props) {
                 onChange={(url) => patch("landingHeroImageUrl", url)}
                 disabled={!isOwner}
               />
+              <div className="cfg-field">
+                <label>Social media links</label>
+                <p className="set-v2__panel-sub" style={{ margin: "0 0 0.75rem" }}>
+                  Shown in the public site footer. Leave a field empty to hide that icon.
+                </p>
+                <div className="plat-settings-social">
+                  {SOCIAL_LINK_DEFS.map((item) => (
+                    <div key={item.field} className="plat-settings-social__row">
+                      <span className="plat-settings-social__label">{item.label}</span>
+                      <input
+                        id={`ps-${item.field}`}
+                        type="url"
+                        value={draft[item.field]}
+                        onChange={(e) => patch(item.field, e.target.value)}
+                        disabled={!isOwner}
+                        placeholder={item.placeholder}
+                        autoComplete="off"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
               <div className="cfg-form-row">
                 <div className="cfg-field">
                   <label htmlFor="ps-email">Support email</label>

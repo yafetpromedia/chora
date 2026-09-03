@@ -8,6 +8,7 @@ import type {
   GradeAttendanceRow,
 } from "@/lib/dashboard-analytics";
 import { DashIcon } from "./dash-icons";
+import { EtbAmount } from "@/components/billing/etb-amount";
 
 export function todayLabel() {
   return new Date().toLocaleDateString(undefined, {
@@ -164,11 +165,9 @@ export function LinkageRing({ linked, total }: { linked: number; total: number }
 export function FinanceRing({
   collectedCents,
   outstandingCents,
-  formatEtb,
 }: {
   collectedCents: number;
   outstandingCents: number;
-  formatEtb: (cents: number) => string;
 }) {
   const total = collectedCents + outstandingCents;
   const pct = total > 0 ? Math.round((collectedCents / total) * 100) : 0;
@@ -191,11 +190,11 @@ export function FinanceRing({
       <ul className="da-finance__legend">
         <li>
           <span className="da-finance__dot da-finance__dot--collected" />
-          Collected <strong>{formatEtb(collectedCents)}</strong>
+          Collected <strong><EtbAmount cents={collectedCents} /></strong>
         </li>
         <li>
           <span className="da-finance__dot da-finance__dot--outstanding" />
-          Outstanding <strong>{formatEtb(outstandingCents)}</strong>
+          Outstanding <strong><EtbAmount cents={outstandingCents} /></strong>
         </li>
       </ul>
     </div>

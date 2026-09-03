@@ -67,6 +67,8 @@ export function UserProfilePanel() {
 
   const [username, setUsername] = useState("");
 
+  const [email, setEmail] = useState("");
+
   const [firstName, setFirstName] = useState("");
 
   const [lastName, setLastName] = useState("");
@@ -98,6 +100,8 @@ export function UserProfilePanel() {
       setProfile(data);
 
       setUsername(data.user.username);
+
+      setEmail(data.user.email);
 
       setFirstName(data.user.firstName);
 
@@ -141,6 +145,10 @@ export function UserProfilePanel() {
 
       const updated = await updateMyProfile({
 
+        username: username.trim(),
+
+        email: email.trim(),
+
         firstName: firstName.trim(),
 
         lastName: lastName.trim(),
@@ -152,6 +160,10 @@ export function UserProfilePanel() {
       });
 
       setProfile(updated);
+
+      setUsername(updated.user.username);
+
+      setEmail(updated.user.email);
 
       setNewPassword("");
 
@@ -596,9 +608,9 @@ export function UserProfilePanel() {
 
             <p className="profile-card__hint">
 
-              Change your name, phone, or password. Sign in with username and school code{" "}
+              Update your username, email, name, phone, or password. Sign in with username and school code{" "}
 
-              <code>{school.joinCode}</code>. Email changes require your school admin.
+              <code>{school.joinCode}</code>, or with your email.
 
             </p>
 
@@ -621,6 +633,28 @@ export function UserProfilePanel() {
                   autoComplete="username"
 
                   placeholder="Letters, numbers, . _ -"
+
+                />
+
+              </label>
+
+              <label className="profile-field">
+
+                <span>Email</span>
+
+                <input
+
+                  type="email"
+
+                  value={email}
+
+                  onChange={(e) => setEmail(e.target.value)}
+
+                  required
+
+                  autoComplete="email"
+
+                  placeholder="you@example.com"
 
                 />
 

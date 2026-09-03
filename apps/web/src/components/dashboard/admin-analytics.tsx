@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { formatEtb } from "@/lib/finance";
+import { EtbAmount } from "@/components/billing/etb-amount";
 import type { AdminAnalyticsOverview } from "@/lib/dashboard-analytics";
 import { GradeAttendanceBars } from "@/components/dashboard/staff-dashboard-shared";
 import { DashIcon } from "./dash-icons";
@@ -73,11 +73,11 @@ function FinanceRing({
       <ul className="da-finance__legend">
         <li>
           <span className="da-finance__dot da-finance__dot--collected" />
-          Collected <strong>{formatEtb(finance.collectedCents)}</strong>
+          Collected <strong><EtbAmount cents={finance.collectedCents} /></strong>
         </li>
         <li>
           <span className="da-finance__dot da-finance__dot--outstanding" />
-          Outstanding <strong>{formatEtb(finance.outstandingCents)}</strong>
+          Outstanding <strong><EtbAmount cents={finance.outstandingCents} /></strong>
         </li>
         <li className="da-finance__meta">
           {finance.paidStudents} paid · {finance.unpaidStudents} unpaid

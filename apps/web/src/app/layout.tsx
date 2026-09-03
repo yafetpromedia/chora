@@ -51,8 +51,12 @@ export const metadata: Metadata = {
   description:
     "Run attendance, results, fees, and family communication on one platform. 14-day free trial. Plans in USD and ETB for Ethiopian and international schools.",
   icons: {
-    icon: "/brand/chora-mark.png",
-    apple: "/brand/chora-mark.png",
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/brand/favicon.png", type: "image/png", sizes: "512x512" },
+    ],
+    apple: "/brand/favicon.png",
+    shortcut: "/favicon.ico",
   },
 };
 

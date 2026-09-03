@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { DashIcon } from "@/components/dashboard/dash-icons";
 import { AppToast } from "@/components/ui/app-toast";
 import type { PlanType } from "@/lib/api";
@@ -75,6 +76,20 @@ export function SchoolDetailDrawer({
   const [planMessage, setPlanMessage] = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState("");
   const [deleting, setDeleting] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!school) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [school]);
 
   useEffect(() => {
     if (!school) {
@@ -101,7 +116,7 @@ export function SchoolDetailDrawer({
     setPlanActive(sub.isActive ?? true);
   }, [school, sub?.plan, sub?.isActive]);
 
-  if (!school) return null;
+  if (!school || !mounted) return null;
 
   const status = (detail?.school.status ?? school.status).toLowerCase();
   const usage = detail?.usage ?? {
@@ -192,7 +207,7 @@ export function SchoolDetailDrawer({
   const isSuspended = (detail?.school.status ?? school.status) === "SUSPENDED";
   const logoUrl = detail?.school.logoUrl ?? school.logoUrl ?? null;
 
-  return (
+  return createPortal(
     <>
       <button
         type="button"
@@ -568,6 +583,7 @@ export function SchoolDetailDrawer({
           </footer>
         ) : null}
       </aside>
-    </>
+    </>,
+    document.body,
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { EtbAmount } from "@/components/billing/etb-amount";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import {
   executeGraduation,
@@ -217,9 +218,11 @@ export function StudentAcademicRecord({ profileId }: { profileId: string }) {
         </div>
         <div className="stu-rec-kpi">
           <strong>
-            {summary.finance
-              ? `${(summary.finance.outstandingCents / 100).toLocaleString()} ETB due`
-              : "—"}
+            {summary.finance ? (
+              <EtbAmount cents={summary.finance.outstandingCents} maximumFractionDigits={0} />
+            ) : (
+              "—"
+            )}
           </strong>
           <span>Outstanding fees</span>
         </div>
@@ -305,10 +308,15 @@ export function StudentAcademicRecord({ profileId }: { profileId: string }) {
           <div>
             {summary.finance ? (
               <ul className="stu-rec-list">
-                <li>Total due: {(summary.finance.totalDueCents / 100).toLocaleString()} ETB</li>
-                <li>Paid: {(summary.finance.totalPaidCents / 100).toLocaleString()} ETB</li>
                 <li>
-                  Outstanding: {(summary.finance.outstandingCents / 100).toLocaleString()} ETB
+                  Total due: <EtbAmount cents={summary.finance.totalDueCents} maximumFractionDigits={0} />
+                </li>
+                <li>
+                  Paid: <EtbAmount cents={summary.finance.totalPaidCents} maximumFractionDigits={0} />
+                </li>
+                <li>
+                  Outstanding:{" "}
+                  <EtbAmount cents={summary.finance.outstandingCents} maximumFractionDigits={0} />
                 </li>
               </ul>
             ) : (

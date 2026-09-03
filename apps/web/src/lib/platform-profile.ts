@@ -17,6 +17,7 @@ export async function getPlatformProfile() {
 }
 
 export async function updatePlatformProfile(payload: {
+  email?: string;
   firstName?: string;
   lastName?: string;
   newPassword?: string;

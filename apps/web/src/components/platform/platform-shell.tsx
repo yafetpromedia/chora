@@ -241,10 +241,6 @@ export function PlatformFooterLinks() {
       <Link href="/login" className="auth-page-footer-link">
         School login
       </Link>
-      <span aria-hidden> · </span>
-      <Link href="/platform/login" className="auth-page-footer-link">
-        Platform login
-      </Link>
     </p>
   );
 }

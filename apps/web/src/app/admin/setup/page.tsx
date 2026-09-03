@@ -23,6 +23,7 @@ import {
 import type { GradePresetKey, GradeWithSections } from "@/lib/api";
 import { AUTH_ROLE_KEY, AUTH_TOKEN_KEY } from "@/lib/auth";
 import { AppConfirmDialog } from "@/components/ui/app-confirm-dialog";
+import { SchoolWelcomeGate } from "@/components/auth/school-welcome-gate";
 import { BrandMark } from "@/components/brand-mark";
 import { BRAND_NAME } from "@/lib/brand";
 
@@ -524,6 +525,8 @@ export default function SchoolSetupPage() {
   }
 
   return (
+    <>
+      <SchoolWelcomeGate />
     <div className="sw">
       <AppConfirmDialog
         open={Boolean(removeSectionTarget)}
@@ -1013,5 +1016,6 @@ export default function SchoolSetupPage() {
         </div>
       </div>
     </div>
+    </>
   );
 }

@@ -145,4 +145,34 @@ export class UpdatePlatformSettingsDto {
   @IsString()
   @MaxLength(2000)
   payoutInstructions?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  socialInstagramUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  socialFacebookUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  socialLinkedinUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  socialYoutubeUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  socialTiktokUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  socialGithubUrl?: string;
 }

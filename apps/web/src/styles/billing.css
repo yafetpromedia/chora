@@ -70,8 +70,29 @@
 }
 
 .bill-birr-mark {
-  display: block;
+  display: inline-block;
   object-fit: contain;
+  object-position: center;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
+.bill-birr-mark--bold {
+  filter: contrast(1.08);
+}
+
+.etb-amount__symbol {
+  align-self: center;
+  flex-shrink: 0;
+  overflow: visible;
+}
+
+.etb-amount {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  white-space: nowrap;
+  overflow: visible;
 }
 
 /* Price display */
@@ -92,7 +113,7 @@
 }
 
 .bill-price__birr {
-  margin-right: 0.12rem;
+  margin-left: 0.12rem;
   align-self: center;
 }
 

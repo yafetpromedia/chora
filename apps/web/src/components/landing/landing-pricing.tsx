@@ -89,7 +89,7 @@ export function LandingPricing() {
             className={`lp-toggle__btn lp-toggle__btn--birr${currency === "etb" ? " lp-toggle__btn--on" : ""}`}
             onClick={() => setCurrency("etb")}
           >
-            <BirrSymbol size={16} />
+            <BirrSymbol size={14} className="lp-toggle__birr-mark" />
             ETB
           </button>
         </div>
@@ -121,10 +121,10 @@ export function LandingPricing() {
               {featured ? <span className="lp-price-card__badge">Most schools</span> : null}
               <p className="lp-price-card__tier">{PLAN_LABELS[plan]}</p>
               <div className="lp-price-card__amount-row">
-                {currency === "etb" && !PLAN_PRICES[plan].custom ? (
-                  <BirrSymbol size={28} className="lp-price-card__birr" />
-                ) : null}
                 <p className="lp-price-card__amount">{price.main}</p>
+                {currency === "etb" && !PLAN_PRICES[plan].custom ? (
+                  <BirrSymbol size={20} className="lp-price-card__birr" />
+                ) : null}
               </div>
               <p className="lp-price-card__sub">{price.sub ?? PLAN_BLURBS[plan]}</p>
               <ul className="lp-price-card__list">

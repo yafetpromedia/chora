@@ -240,6 +240,26 @@ export class UsersService implements OnModuleInit {
     return normalized;
   }
 
+  async assertEmailAvailable(
+    email: string,
+    exceptUserId?: string,
+  ): Promise<string> {
+    const normalized = email.trim().toLowerCase();
+    if (!normalized) {
+      throw new BadRequestException('Email is required');
+    }
+    const taken = await this.prisma.user.findFirst({
+      where: {
+        email: normalized,
+        ...(exceptUserId ? { NOT: { id: exceptUserId } } : {}),
+      },
+    });
+    if (taken) {
+      throw new ConflictException('Email already registered');
+    }
+    return normalized;
+  }
+
   async findById(id: string): Promise<UserRecord | undefined> {
     const user = await this.prisma.user.findUnique({ where: { id } });
     return user ? this.toUserRecord(user) : undefined;

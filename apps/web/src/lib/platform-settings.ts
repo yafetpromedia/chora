@@ -29,6 +29,12 @@ export type PlatformSettings = {
   telebirrNumber: string | null;
   telebirrAccountName: string | null;
   payoutInstructions: string | null;
+  socialInstagramUrl: string | null;
+  socialFacebookUrl: string | null;
+  socialLinkedinUrl: string | null;
+  socialYoutubeUrl: string | null;
+  socialTiktokUrl: string | null;
+  socialGithubUrl: string | null;
   updatedAt: string;
 };
 
@@ -59,6 +65,12 @@ export type UpdatePlatformSettingsInput = Partial<{
   telebirrNumber: string;
   telebirrAccountName: string;
   payoutInstructions: string;
+  socialInstagramUrl: string;
+  socialFacebookUrl: string;
+  socialLinkedinUrl: string;
+  socialYoutubeUrl: string;
+  socialTiktokUrl: string;
+  socialGithubUrl: string;
 }>;
 
 export function getPlatformSettings() {

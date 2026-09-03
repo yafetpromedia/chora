@@ -138,6 +138,7 @@ export class AuthService {
 
     const data: {
       username?: string;
+      email?: string;
       firstName?: string;
       lastName?: string;
       phone?: string | null;
@@ -148,6 +149,12 @@ export class AuthService {
       data.username = await this.usersService.assertUsernameAvailable(
         actor.schoolId,
         dto.username,
+        actor.id,
+      );
+    }
+    if (dto.email?.trim()) {
+      data.email = await this.usersService.assertEmailAvailable(
+        dto.email,
         actor.id,
       );
     }
@@ -205,6 +212,12 @@ export class AuthService {
       defaultCountry: settings.defaultCountry,
       defaultTrialDays: settings.defaultTrialDays,
       landingHeroImageUrl: settings.landingHeroImageUrl,
+      socialInstagramUrl: settings.socialInstagramUrl,
+      socialFacebookUrl: settings.socialFacebookUrl,
+      socialLinkedinUrl: settings.socialLinkedinUrl,
+      socialYoutubeUrl: settings.socialYoutubeUrl,
+      socialTiktokUrl: settings.socialTiktokUrl,
+      socialGithubUrl: settings.socialGithubUrl,
     };
   }
 

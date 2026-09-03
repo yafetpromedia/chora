@@ -1,8 +1,11 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { useEffect, useState } from "react";
+import QRCode from "qrcode";
 import { Reveal } from "@/components/motion/reveal";
 import { AppStoreBadges } from "@/components/landing/app-store-badges";
+import { EtbAmount } from "@/components/billing/etb-amount";
 import { BrandMark } from "@/components/brand-mark";
 import { BRAND_NAME } from "@/lib/brand";
 
@@ -12,6 +15,52 @@ const PERKS = [
   "Fees, results, and notices in one feed",
   "Same login as web — school code + username",
 ];
+
+/** Matches the Everest Youth Academy sample ID card in the product demo. */
+const DEMO_CAMPUS_ID = {
+  school: "Everest Youth Academy",
+  name: "Yafet Tesfaye",
+  grade: "Grade 11 · Natural B",
+  studentId: "STU-DG82VJMC",
+  academicYear: "2026-2027",
+  photoSrc: "/fayeda/demo-male.svg",
+};
+
+function randomDemoScanPayload() {
+  const token =
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID().replace(/-/g, "").slice(0, 10)
+      : Math.random().toString(36).slice(2, 12);
+  return `CAMPUS1:${DEMO_CAMPUS_ID.studentId}:${token}`;
+}
+
+function LandingMockQr() {
+  const [src, setSrc] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void QRCode.toDataURL(randomDemoScanPayload(), {
+      margin: 0,
+      errorCorrectionLevel: "M",
+      width: 128,
+      color: { dark: "#0a3d42", light: "#ffffff" },
+    }).then((url) => {
+      if (!cancelled) setSrc(url);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return (
+    <div className="lp3-phone__qr" aria-hidden>
+      {src ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={src} alt="" />
+      ) : null}
+    </div>
+  );
+}
 
 function PhoneFrame({
   variant,
@@ -75,7 +124,9 @@ export function LandingAppSection() {
               <div className="lp3-app__phones-ring" />
 
               <div className="lp3-app__chip lp3-app__chip--attendance">Present · 8:04 AM</div>
-              <div className="lp3-app__chip lp3-app__chip--fee">2,400 ETB due</div>
+              <div className="lp3-app__chip lp3-app__chip--fee">
+                <EtbAmount amount={2400} maximumFractionDigits={0} symbolSize={11} /> due
+              </div>
 
               <PhoneFrame variant="back">
                 <div className="lp3-phone__screen-body lp3-phone__screen-body--id">
@@ -83,27 +134,25 @@ export function LandingAppSection() {
                     <BrandMark />
                     <div>
                       <strong>Campus ID</strong>
-                      <em>Everest Youth Academy</em>
+                      <em>{DEMO_CAMPUS_ID.school}</em>
                     </div>
                   </header>
                   <div className="lp3-phone__id-card">
                     <div className="lp3-phone__id-top">
-                      <div className="lp3-phone__avatar">YT</div>
+                      <div className="lp3-phone__avatar lp3-phone__avatar--photo">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={DEMO_CAMPUS_ID.photoSrc} alt="" />
+                      </div>
                       <div>
-                        <p className="lp3-phone__id-name">Yafet Tesfaye</p>
-                        <em>Grade 11 · Natural B</em>
+                        <p className="lp3-phone__id-name">{DEMO_CAMPUS_ID.name}</p>
+                        <em>{DEMO_CAMPUS_ID.grade}</em>
                       </div>
                     </div>
                     <div className="lp3-phone__id-meta">
-                      <span>ID #EYA-2041</span>
-                      <span>Valid 2026</span>
+                      <span>{DEMO_CAMPUS_ID.studentId}</span>
+                      <span>Valid {DEMO_CAMPUS_ID.academicYear}</span>
                     </div>
-                    <div className="lp3-phone__qr" aria-hidden>
-                      <span />
-                      <span />
-                      <span />
-                      <span />
-                    </div>
+                    <LandingMockQr />
                   </div>
                 </div>
               </PhoneFrame>
@@ -114,7 +163,7 @@ export function LandingAppSection() {
                     <BrandMark />
                     <div>
                       <strong>Parent</strong>
-                      <em>Everest Youth Academy</em>
+                      <em>{DEMO_CAMPUS_ID.school}</em>
                     </div>
                   </header>
                   <div className="lp3-phone__hero">
@@ -144,7 +193,7 @@ export function LandingAppSection() {
                   <div className="lp3-phone__tiles">
                     <div>
                       <span>Fees</span>
-                      <strong>2,400 ETB</strong>
+                      <strong><EtbAmount amount={2400} maximumFractionDigits={0} symbolSize={11} /></strong>
                     </div>
                     <div>
                       <span>Results</span>

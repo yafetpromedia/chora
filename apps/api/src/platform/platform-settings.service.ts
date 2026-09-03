@@ -34,6 +34,12 @@ const DEFAULTS: {
   telebirrNumber: string | null;
   telebirrAccountName: string | null;
   payoutInstructions: string | null;
+  socialInstagramUrl: string | null;
+  socialFacebookUrl: string | null;
+  socialLinkedinUrl: string | null;
+  socialYoutubeUrl: string | null;
+  socialTiktokUrl: string | null;
+  socialGithubUrl: string | null;
 } = {
   id: 'default',
   platformName: 'Chora',
@@ -62,6 +68,12 @@ const DEFAULTS: {
   telebirrNumber: null,
   telebirrAccountName: null,
   payoutInstructions: null,
+  socialInstagramUrl: null,
+  socialFacebookUrl: null,
+  socialLinkedinUrl: null,
+  socialYoutubeUrl: null,
+  socialTiktokUrl: null,
+  socialGithubUrl: null,
 };
 
 export type PlatformSettingsRecord = typeof DEFAULTS & {
@@ -175,6 +187,24 @@ export class PlatformSettingsService {
         : {}),
       ...(dto.payoutInstructions !== undefined
         ? { payoutInstructions: dto.payoutInstructions.trim() || null }
+        : {}),
+      ...(dto.socialInstagramUrl !== undefined
+        ? { socialInstagramUrl: dto.socialInstagramUrl.trim() || null }
+        : {}),
+      ...(dto.socialFacebookUrl !== undefined
+        ? { socialFacebookUrl: dto.socialFacebookUrl.trim() || null }
+        : {}),
+      ...(dto.socialLinkedinUrl !== undefined
+        ? { socialLinkedinUrl: dto.socialLinkedinUrl.trim() || null }
+        : {}),
+      ...(dto.socialYoutubeUrl !== undefined
+        ? { socialYoutubeUrl: dto.socialYoutubeUrl.trim() || null }
+        : {}),
+      ...(dto.socialTiktokUrl !== undefined
+        ? { socialTiktokUrl: dto.socialTiktokUrl.trim() || null }
+        : {}),
+      ...(dto.socialGithubUrl !== undefined
+        ? { socialGithubUrl: dto.socialGithubUrl.trim() || null }
         : {}),
     };
 

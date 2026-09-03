@@ -11,6 +11,7 @@ import { AUTH_ROLE_KEY, AUTH_TOKEN_KEY } from "@/lib/auth";
 import { PlatformPaymentPanel } from "@/components/school-billing/platform-payment-panel";
 import { getSchoolBillingOverview, type SchoolBillingOverview } from "@/lib/school-billing";
 import { BRAND_NAME } from "@/lib/brand";
+import { EtbAmount } from "@/components/billing/etb-amount";
 
 function formatDate(iso: string | null) {
   if (!iso) return "—";
@@ -134,7 +135,9 @@ export default function SchoolBillingPage() {
                   ) : null}
                   {data?.planPrice && sub.plan !== "TRIAL" && sub.plan !== "ENTERPRISE" ? (
                     <p className="sb-v2__plan-price">
-                      ${data.planPrice.usdMonthly}/mo · {data.planPrice.etbMonthly.toLocaleString()} ETB/mo
+                      ${data.planPrice.usdMonthly}/mo ·{" "}
+                      <EtbAmount amount={data.planPrice.etbMonthly} maximumFractionDigits={0} />
+                      /mo
                     </p>
                   ) : null}
                 </div>

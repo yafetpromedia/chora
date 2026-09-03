@@ -14,7 +14,7 @@ import { DashIcon } from "@/components/dashboard/dash-icons";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import { ParentChildBar } from "@/components/parent/parent-child-bar";
 import type { ParentDayChild, ParentDayOverview } from "@/lib/dashboard-day";
-import { formatEtb } from "@/lib/finance";
+import { EtbAmount } from "@/components/billing/etb-amount";
 import {
   pickChildId,
   writeStoredChildId,
@@ -367,7 +367,7 @@ export function ParentDashboard() {
                 <span>Average</span>
               </div>
               <Link href="/parent/fees" className="par-home__hero-stat par-home__hero-stat--link">
-                <strong>{formatEtb(selectedChild?.outstandingCents ?? 0)}</strong>
+                <strong><EtbAmount cents={selectedChild?.outstandingCents ?? 0} /></strong>
                 <span>Fees due</span>
               </Link>
               <div className="par-home__hero-stat par-home__hero-stat--accent">
@@ -433,7 +433,7 @@ export function ParentDashboard() {
               <div>
                 <p className="par-home__kpi-label">Fees</p>
                 <p className="par-home__kpi-value">
-                  {formatEtb(selectedChild.outstandingCents)}
+                  <EtbAmount cents={selectedChild.outstandingCents} />
                 </p>
                 <p className="par-home__kpi-hint">
                   {selectedChild.outstandingCents > 0 ? "Outstanding" : "Up to date"}
@@ -455,7 +455,7 @@ export function ParentDashboard() {
 
         {dueTotal > 0 && children.length > 1 ? (
           <p className="par-home__family-due">
-            All children · <strong>{formatEtb(dueTotal)}</strong> outstanding ·{" "}
+            All children · <strong><EtbAmount cents={dueTotal} /></strong> outstanding ·{" "}
             <Link href="/parent/fees">View fees</Link>
           </p>
         ) : null}

@@ -109,6 +109,9 @@ export function PlanPriceDisplay({ pricing, currency, compact }: PriceProps) {
   return (
     <div className={`bill-price bill-price--minimal${compact ? " bill-price--compact" : ""}`}>
       <div className="bill-price__amount-row">
+        <span className="bill-price__value">
+          {isUsd ? formatUsdAmount(pricing.usd) : formatEtbAmount(pricing.etb)}
+        </span>
         {isUsd ? (
           <span className="bill-price__sign" aria-hidden>
             $
@@ -116,9 +119,6 @@ export function PlanPriceDisplay({ pricing, currency, compact }: PriceProps) {
         ) : (
           <BirrSymbol size={compact ? 26 : 32} className="bill-price__birr" />
         )}
-        <span className="bill-price__value">
-          {isUsd ? formatUsdAmount(pricing.usd) : formatEtbAmount(pricing.etb)}
-        </span>
         <span className="bill-price__per">{per}</span>
       </div>
     </div>

@@ -1,7 +1,15 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import {
+  buildParentHandout,
+  buildStudentHandout,
+  getLoginUrl,
+  normalizeLoginUrl,
+  readSavedHandoutLoginUrl,
+  saveHandoutLoginUrl,
+} from "@/lib/school-welcome";
 
 type Props = {
   schoolName: string;
@@ -10,34 +18,37 @@ type Props = {
 };
 
 export function PilotHandoutPanel({ schoolName, joinCode, loginUrl }: Props) {
+  const detectedUrl = loginUrl ?? getLoginUrl();
+  const [urlDraft, setUrlDraft] = useState(detectedUrl);
   const [copied, setCopied] = useState<"parent" | "student" | null>(null);
-  const baseUrl =
-    loginUrl ??
-    (typeof window !== "undefined" ? `${window.location.origin}/login` : "https://your-school.chora.app/login");
+
+  useEffect(() => {
+    const saved = readSavedHandoutLoginUrl(joinCode);
+    setUrlDraft(saved ?? detectedUrl);
+  }, [joinCode, detectedUrl]);
+
+  const portalUrl = normalizeLoginUrl(urlDraft) || detectedUrl;
+  const isLocal =
+    /localhost|127\.0\.0\.1/i.test(portalUrl) || portalUrl.startsWith("/");
 
   const parentText = useMemo(
-    () =>
-      `${schoolName} — Parent portal\n\n` +
-      `1. Open: ${baseUrl}\n` +
-      `2. School code: ${joinCode}\n` +
-      `3. Username: (from the school — often your phone-based login)\n` +
-      `4. Password: (temporary password from registrar)\n\n` +
-      `View fees, timetable, and announcements after sign-in.`,
-    [schoolName, joinCode, baseUrl],
+    () => buildParentHandout({ schoolName, joinCode, loginUrl: portalUrl }),
+    [schoolName, joinCode, portalUrl],
   );
 
   const studentText = useMemo(
-    () =>
-      `${schoolName} — Student portal\n\n` +
-      `1. Open: ${baseUrl}\n` +
-      `2. School code: ${joinCode}\n` +
-      `3. Username: your Student ID (STU-… on ID card)\n` +
-      `4. Password: (from Manage student in admin, or change in Profile)\n\n` +
-      `View results, classwork, fees, and campus ID after sign-in.`,
-    [schoolName, joinCode, baseUrl],
+    () => buildStudentHandout({ schoolName, joinCode, loginUrl: portalUrl }),
+    [schoolName, joinCode, portalUrl],
   );
 
+  function persistUrl(next: string) {
+    const normalized = normalizeLoginUrl(next) || detectedUrl;
+    setUrlDraft(normalized);
+    saveHandoutLoginUrl(joinCode, normalized);
+  }
+
   async function copy(kind: "parent" | "student", text: string) {
+    persistUrl(urlDraft);
     try {
       await navigator.clipboard.writeText(text);
       setCopied(kind);
@@ -51,9 +62,36 @@ export function PilotHandoutPanel({ schoolName, joinCode, loginUrl }: Props) {
     <section className="cfg-section pilot-handout">
       <h2 className="cfg-section__title">Pilot login handout</h2>
       <p className="cfg-section__lead">
-        Copy text for parents and students. Run{" "}
-        <Link href="/admin/academics">Academics setup</Link> before the first term of results.
+        Copy text for parents and students. Set the public login URL before you share — it is saved
+        for this school. Run <Link href="/admin/academics">Academics setup</Link> before the first
+        term of results.
       </p>
+
+      <label className="pilot-handout__url">
+        <span>Public login URL</span>
+        <div className="pilot-handout__url-row">
+          <input
+            type="url"
+            value={urlDraft}
+            placeholder="https://your-school.chora.app/login"
+            onChange={(e) => setUrlDraft(e.target.value)}
+            onBlur={(e) => persistUrl(e.target.value)}
+          />
+          <button
+            type="button"
+            className="cfg-btn cfg-btn--ghost"
+            onClick={() => persistUrl(detectedUrl)}
+          >
+            Reset
+          </button>
+        </div>
+        <em>
+          {isLocal
+            ? "This looks like a local address. Change it to the URL families should open (for example https://app.chora.app/login)."
+            : "This URL is what parents and students will copy. You can change it anytime."}
+        </em>
+      </label>
+
       <div className="pilot-handout__grid">
         <div className="pilot-handout__card">
           <h3>Parents</h3>
@@ -79,8 +117,8 @@ export function PilotHandoutPanel({ schoolName, joinCode, loginUrl }: Props) {
         </div>
       </div>
       <p className="cfg-hint">
-        Staff sign-in: same page with personal username (not email). Teachers use TCH- ID or username
-        from <Link href="/admin/teachers">Teachers</Link>.
+        Staff and teachers use the same login page with credentials from{" "}
+        <Link href="/admin/teachers">Teachers</Link> or Admin → Settings → Access.
       </p>
     </section>
   );

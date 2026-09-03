@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { listStudents } from "@/lib/school-setup";
-import { getFinanceAnalytics, formatEtb, type FinanceAnalytics } from "@/lib/finance";
+import { getFinanceAnalytics, type FinanceAnalytics } from "@/lib/finance";
+import { EtbAmount } from "@/components/billing/etb-amount";
 import type { AdminDayOverview } from "@/lib/dashboard-day";
 import {
   BarChart,
@@ -83,7 +84,7 @@ export function FinanceOfficerDashboard({ error }: Props) {
               </span>
               <div>
                 <p className="dash-admin-kpi__label">Collected</p>
-                <p className="dash-admin-kpi__value">{formatEtb(finance.collectedCents)}</p>
+                <p className="dash-admin-kpi__value"><EtbAmount cents={finance.collectedCents} symbolSize={18} /></p>
                 <p className="dash-admin-kpi__hint">Total fees received</p>
               </div>
             </Link>
@@ -94,7 +95,7 @@ export function FinanceOfficerDashboard({ error }: Props) {
               </span>
               <div>
                 <p className="dash-admin-kpi__label">Outstanding</p>
-                <p className="dash-admin-kpi__value">{formatEtb(finance.outstandingCents)}</p>
+                <p className="dash-admin-kpi__value"><EtbAmount cents={finance.outstandingCents} symbolSize={18} /></p>
                 <p className="dash-admin-kpi__hint">Unpaid balances</p>
               </div>
             </Link>
@@ -137,7 +138,6 @@ export function FinanceOfficerDashboard({ error }: Props) {
                 <FinanceRing
                   collectedCents={finance.collectedCents}
                   outstandingCents={finance.outstandingCents}
-                  formatEtb={formatEtb}
                 />
               </article>
 
@@ -150,10 +150,10 @@ export function FinanceOfficerDashboard({ error }: Props) {
                 </header>
                 <ul className="da-finance__legend" style={{ marginTop: "0.5rem" }}>
                   <li className="da-finance__meta">
-                    Collected <strong>{formatEtb(finance.collectedThisMonthCents)}</strong>
+                    Collected <strong><EtbAmount cents={finance.collectedThisMonthCents} /></strong>
                   </li>
                   <li className="da-finance__meta">
-                    Expected <strong>{formatEtb(finance.expectedRevenueCents)}</strong>
+                    Expected <strong><EtbAmount cents={finance.expectedRevenueCents} /></strong>
                   </li>
                 </ul>
               </article>

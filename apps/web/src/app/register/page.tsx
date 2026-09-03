@@ -9,6 +9,7 @@ import {
   RegisterFooterLinks,
   RegisterShell,
 } from "@/components/auth/register-shell";
+import { SchoolWelcomeDialog } from "@/components/auth/school-welcome-dialog";
 import {
   fetchCurriculumPackages,
   registerSchool,
@@ -16,6 +17,12 @@ import {
   type SchoolType,
 } from "@/lib/api";
 import { persistAuthSession } from "@/lib/auth-session";
+import {
+  persistPendingSchoolWelcome,
+  readPendingSchoolWelcome,
+  clearPendingSchoolWelcome,
+  type PendingSchoolWelcome,
+} from "@/lib/school-welcome";
 
 const SCHOOL_TYPES: { value: SchoolType; label: string }[] = [
   { value: "KINDERGARTEN", label: "Kindergarten" },
@@ -55,11 +62,17 @@ export default function RegisterSchoolPage() {
   const [packages, setPackages] = useState<CurriculumPackageOption[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [welcome, setWelcome] = useState<PendingSchoolWelcome | null>(null);
 
   useEffect(() => {
     void fetchCurriculumPackages()
       .then(setPackages)
       .catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    const pending = readPendingSchoolWelcome();
+    if (pending) setWelcome(pending);
   }, []);
 
   function validateStep(index: number): string | null {
@@ -120,7 +133,21 @@ export default function RegisterSchoolPage() {
         curriculumPackageKey,
       });
       persistAuthSession(response);
-      router.push(response.school?.setupComplete ? "/admin" : "/admin/setup");
+      const joinCode = response.school?.joinCode;
+      const registeredName = response.school?.name ?? schoolName.trim();
+      const nextPath = response.school?.setupComplete ? "/admin" : "/admin/setup";
+      if (joinCode) {
+        const pending: PendingSchoolWelcome = {
+          schoolName: registeredName,
+          joinCode,
+          nextPath,
+          adminUsername: username.trim(),
+        };
+        persistPendingSchoolWelcome(pending);
+        setWelcome(pending);
+      } else {
+        router.push(nextPath);
+      }
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Registration failed");
     } finally {
@@ -129,11 +156,12 @@ export default function RegisterSchoolPage() {
   }
 
   return (
-    <RegisterShell
-      activeStep={step}
-      error={error || undefined}
-      footer={<RegisterFooterLinks />}
-    >
+    <>
+      <RegisterShell
+        activeStep={step}
+        error={error || undefined}
+        footer={<RegisterFooterLinks />}
+      >
       <form onSubmit={(e) => void onSubmit(e)} className="reg-form">
         <AnimatePresence mode="wait">
           {step === 0 ? (
@@ -366,5 +394,19 @@ export default function RegisterSchoolPage() {
         </div>
       </form>
     </RegisterShell>
+
+      <SchoolWelcomeDialog
+        open={welcome !== null}
+        schoolName={welcome?.schoolName ?? ""}
+        joinCode={welcome?.joinCode ?? ""}
+        adminUsername={welcome?.adminUsername ?? ""}
+        onContinue={() => {
+          const path = welcome?.nextPath ?? "/admin/setup";
+          clearPendingSchoolWelcome();
+          setWelcome(null);
+          router.push(path);
+        }}
+      />
+    </>
   );
 }

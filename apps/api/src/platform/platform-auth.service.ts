@@ -1,4 +1,9 @@
-import { Injectable, OnModuleInit, UnauthorizedException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  OnModuleInit,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { hashSync, compare } from 'bcrypt';
@@ -77,7 +82,12 @@ export class PlatformAuthService implements OnModuleInit {
 
   async updateProfile(
     user: PlatformAuthUser,
-    dto: { firstName?: string; lastName?: string; newPassword?: string },
+    dto: {
+      email?: string;
+      firstName?: string;
+      lastName?: string;
+      newPassword?: string;
+    },
   ) {
     const row = await this.prisma.platformUser.findUnique({
       where: { id: user.id },
@@ -87,10 +97,23 @@ export class PlatformAuthService implements OnModuleInit {
     }
 
     const data: {
+      email?: string;
       firstName?: string;
       lastName?: string;
       passwordHash?: string;
     } = {};
+    if (dto.email?.trim()) {
+      const normalized = dto.email.trim().toLowerCase();
+      if (normalized !== row.email) {
+        const taken = await this.prisma.platformUser.findUnique({
+          where: { email: normalized },
+        });
+        if (taken) {
+          throw new ConflictException('Email already registered');
+        }
+        data.email = normalized;
+      }
+    }
     if (dto.firstName?.trim()) data.firstName = dto.firstName.trim();
     if (dto.lastName?.trim()) data.lastName = dto.lastName.trim();
     if (dto.newPassword) {

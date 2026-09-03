@@ -11,6 +11,12 @@ export type PublicPlatformConfig = {
   defaultCountry: string;
   defaultTrialDays: number;
   landingHeroImageUrl: string | null;
+  socialInstagramUrl: string | null;
+  socialFacebookUrl: string | null;
+  socialLinkedinUrl: string | null;
+  socialYoutubeUrl: string | null;
+  socialTiktokUrl: string | null;
+  socialGithubUrl: string | null;
 };
 
 export async function getPublicPlatformConfig(): Promise<PublicPlatformConfig> {

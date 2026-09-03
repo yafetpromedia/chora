@@ -1689,3 +1689,392 @@
     transform: none;
   }
 }
+
+/* ── Post-registration welcome dialog ── */
+.school-welcome {
+  position: fixed;
+  inset: 0;
+  z-index: 280;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+}
+
+.school-welcome__backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(15, 23, 42, 0.52);
+  backdrop-filter: blur(6px);
+  pointer-events: none;
+  animation: app-confirm-fade 0.2s ease-out;
+}
+
+.school-welcome__dialog {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 28rem);
+  max-height: min(92dvh, 44rem);
+  overflow: auto;
+  padding: 1.35rem 1.35rem 1.15rem;
+  border-radius: 1.15rem;
+  background: linear-gradient(180deg, #fff 0%, #f8fbfb 100%);
+  border: 1px solid rgba(13, 92, 99, 0.1);
+  box-shadow:
+    0 28px 70px rgba(15, 23, 42, 0.22),
+    0 0 0 1px rgba(255, 255, 255, 0.6) inset;
+}
+
+.school-welcome__hero {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 0.65rem;
+}
+
+.school-welcome__badge {
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #0d9488, #0d5c63);
+  color: #fff;
+  font-size: 1.15rem;
+  font-weight: 800;
+  box-shadow: 0 10px 24px rgba(13, 92, 99, 0.28);
+}
+
+.school-welcome__head {
+  text-align: center;
+}
+
+.school-welcome__eyebrow {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #0d9488;
+}
+
+.school-welcome__title {
+  margin: 0.35rem 0 0;
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: #0f172a;
+  line-height: 1.25;
+}
+
+.school-welcome__lead {
+  margin: 0.55rem 0 0;
+  font-size: 0.84rem;
+  line-height: 1.55;
+  color: #64748b;
+}
+
+.school-welcome__lead strong {
+  color: #334155;
+  font-weight: 700;
+}
+
+.school-welcome__trial {
+  margin: 0.85rem 0 0;
+  padding: 0.65rem 0.75rem;
+  border-radius: 0.65rem;
+  background: linear-gradient(90deg, #ecfdf5, #f0fdfa);
+  border: 1px solid rgba(13, 148, 136, 0.18);
+  font-size: 0.8rem;
+  font-weight: 650;
+  line-height: 1.45;
+  color: #0f766e;
+  text-align: center;
+}
+
+.school-welcome__admin-card {
+  margin-top: 0.85rem;
+  padding: 0.85rem 0.95rem;
+  border-radius: 0.8rem;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+}
+
+.school-welcome__admin-label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.school-welcome__admin-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.55rem 0.75rem;
+  margin: 0.55rem 0 0;
+}
+
+.school-welcome__admin-grid dt {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 650;
+  color: #94a3b8;
+}
+
+.school-welcome__admin-grid dd {
+  margin: 0.15rem 0 0;
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.school-welcome__admin-grid dd code {
+  font-size: 0.9rem;
+  letter-spacing: 0.06em;
+  color: #0d5c63;
+}
+
+.school-welcome__admin-grid--full {
+  grid-column: 1 / -1;
+}
+
+.school-welcome__copy-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.65rem;
+}
+
+.school-welcome__copy-secondary {
+  flex: 1;
+  min-width: min(100%, 8.5rem);
+  min-height: 2.15rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: 0.55rem;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  font-size: 0.76rem;
+  font-weight: 700;
+  font-family: inherit;
+  color: #334155;
+  cursor: pointer;
+}
+
+.school-welcome__copy-secondary:hover {
+  background: #f8fafc;
+}
+
+.school-welcome__copy-secondary--primary {
+  border-color: rgba(13, 92, 99, 0.22);
+  background: #f0f9fa;
+  color: #0d5c63;
+}
+
+.school-welcome__copy-secondary--primary:hover {
+  background: #e6f4f5;
+}
+
+.school-welcome__ack {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  margin-top: 0.95rem;
+  padding: 0.7rem 0.75rem;
+  border-radius: 0.65rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  font-size: 0.82rem;
+  font-weight: 650;
+  color: #334155;
+  cursor: pointer;
+}
+
+.school-welcome__ack input {
+  margin-top: 0.15rem;
+  width: 1rem;
+  height: 1rem;
+  accent-color: #0d9488;
+  flex-shrink: 0;
+}
+
+.school-welcome__continue:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  filter: none;
+  box-shadow: none;
+}
+
+.school-welcome__code-block {
+  margin-top: 1.15rem;
+  padding: 0.95rem 1rem;
+  border-radius: 0.85rem;
+  background: #fff;
+  border: 1px solid rgba(13, 92, 99, 0.14);
+  box-shadow: 0 8px 22px rgba(13, 92, 99, 0.06);
+}
+
+.school-welcome__code-label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.school-welcome__code-row {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-top: 0.45rem;
+}
+
+.school-welcome__code {
+  flex: 1;
+  min-width: 0;
+  padding: 0.55rem 0.7rem;
+  border-radius: 0.55rem;
+  background: #f0f9fa;
+  border: 1px dashed rgba(13, 92, 99, 0.22);
+  font-size: 1.25rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: #0d5c63;
+  text-align: center;
+}
+
+.school-welcome__copy {
+  flex-shrink: 0;
+  min-height: 2.35rem;
+  padding: 0.45rem 0.85rem;
+  border-radius: 0.6rem;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  font-size: 0.8rem;
+  font-weight: 700;
+  font-family: inherit;
+  color: #334155;
+  cursor: pointer;
+}
+
+.school-welcome__copy:hover {
+  background: #f8fafc;
+}
+
+.school-welcome__login-hint {
+  margin: 0.65rem 0 0;
+  font-size: 0.78rem;
+  color: #64748b;
+}
+
+.school-welcome__login-hint a {
+  color: #0d5c63;
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.school-welcome__login-hint a:hover {
+  text-decoration: underline;
+}
+
+.school-welcome__steps {
+  list-style: none;
+  margin: 1rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.school-welcome__step {
+  display: flex;
+  gap: 0.65rem;
+  align-items: flex-start;
+  padding: 0.7rem 0.75rem;
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid #e8eef0;
+}
+
+.school-welcome__step-num {
+  flex-shrink: 0;
+  width: 1.5rem;
+  height: 1.5rem;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: #ecfdf5;
+  color: #0d9488;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.school-welcome__step-title {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.school-welcome__step-body {
+  margin: 0.2rem 0 0;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: #64748b;
+}
+
+.school-welcome__actions {
+  margin-top: 1.1rem;
+}
+
+.school-welcome__continue {
+  width: 100%;
+  min-height: 2.65rem;
+  padding: 0.55rem 1rem;
+  border: none;
+  border-radius: 0.7rem;
+  background: linear-gradient(135deg, #0d9488, #0d5c63);
+  color: #fff;
+  font-size: 0.88rem;
+  font-weight: 800;
+  font-family: inherit;
+  cursor: pointer;
+  box-shadow: 0 10px 24px rgba(13, 92, 99, 0.22);
+}
+
+.school-welcome__continue:hover {
+  filter: brightness(1.04);
+}
+
+@media (max-width: 480px) {
+  .school-welcome__dialog {
+    padding: 1.1rem 1rem 1rem;
+  }
+
+  .school-welcome__code {
+    font-size: 1.05rem;
+    letter-spacing: 0.08em;
+  }
+
+  .school-welcome__code-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .school-welcome__copy {
+    width: 100%;
+  }
+
+  .school-welcome__admin-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .school-welcome__copy-row {
+    flex-direction: column;
+  }
+
+  .school-welcome__copy-secondary {
+    width: 100%;
+  }
+}
