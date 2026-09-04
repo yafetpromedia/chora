@@ -133,7 +133,7 @@ export function PlatformSchools({
             aria-label="Search tenants"
           />
         </div>
-        {canCreateTenant(user?.role) ? (
+        {canCreateTenant(user) ? (
           <button
             type="button"
             className="plat-btn plat-btn--primary plat-tenants-v2__toolbar-btn"
