@@ -23,7 +23,7 @@ import { CurrentPlatformUser } from '../common/decorators/current-platform-user.
 import type { PlatformAuthUser } from '../common/auth.types';
 import { PlatformGuard } from '../common/guards/platform.guard';
 import { PlatformPermissionsGuard } from '../common/guards/platform-permissions.guard';
-import { RequirePlatformPermissions } from '../common/decorators/require-platform-permissions.decorator';
+import { RequirePlatformPermissions, RequirePlatformOwner } from '../common/decorators/require-platform-permissions.decorator';
 import { PlatformPermission } from '../common/permissions/platform-permissions';
 import { CreateTenantSchoolDto } from './dto/create-tenant-school.dto';
 import { PlatformLoginDto } from './dto/platform-login.dto';
@@ -133,7 +133,8 @@ export class PlatformController {
   }
 
   @Patch('settings')
-  @UseGuards(JwtAuthGuard, PlatformGuard)
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformOwner()
   updateSettings(
     @CurrentPlatformUser() user: PlatformAuthUser,
     @Body() dto: UpdatePlatformSettingsDto,
@@ -175,38 +176,53 @@ export class PlatformController {
     return this.platformAccess.createOperator(user.role, dto);
   }
 
-  @Get('dashboard')
+  @Delete('access-control/operators/:id')
   @UseGuards(JwtAuthGuard, PlatformGuard)
+  deleteOperator(
+    @CurrentPlatformUser() user: PlatformAuthUser,
+    @Param('id') id: string,
+  ) {
+    return this.platformAccess.deleteOperator(user, id);
+  }
+
+  @Get('dashboard')
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformPermissions(PlatformPermission.SCHOOLS_VIEW)
   dashboard() {
     return this.platformService.getDashboard();
   }
 
   @Get('schools')
-  @UseGuards(JwtAuthGuard, PlatformGuard)
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformPermissions(PlatformPermission.SCHOOLS_VIEW)
   listSchools() {
     return this.platformService.listSchools();
   }
 
   @Get('schools/:id')
-  @UseGuards(JwtAuthGuard, PlatformGuard)
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformPermissions(PlatformPermission.SCHOOLS_VIEW)
   schoolDetail(@Param('id') id: string) {
     return this.platformService.getSchoolDetail(id);
   }
 
   @Get('curriculum-packages')
-  @UseGuards(JwtAuthGuard, PlatformGuard)
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformOwner()
   listCurriculumPackages() {
     return this.platformService.listCurriculumPackages();
   }
 
   @Get('curriculum-packages/:key')
-  @UseGuards(JwtAuthGuard, PlatformGuard)
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformOwner()
   getCurriculumPackage(@Param('key') key: string) {
     return this.platformService.getCurriculumPackage(key);
   }
 
   @Patch('curriculum-packages/:key')
-  @UseGuards(JwtAuthGuard, PlatformGuard)
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformOwner()
   updateCurriculumPackage(
     @Param('key') key: string,
     @Body() dto: UpdateCurriculumPackageDto,
@@ -215,7 +231,8 @@ export class PlatformController {
   }
 
   @Post('curriculum-packages/:key/subjects')
-  @UseGuards(JwtAuthGuard, PlatformGuard)
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformOwner()
   addPackageSubject(
     @Param('key') key: string,
     @Body() dto: AddPackageSubjectDto,
@@ -224,7 +241,8 @@ export class PlatformController {
   }
 
   @Post('curriculum-packages/:key/subjects/:packageSubjectId/remove')
-  @UseGuards(JwtAuthGuard, PlatformGuard)
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformOwner()
   removePackageSubject(
     @Param('key') key: string,
     @Param('packageSubjectId') packageSubjectId: string,
@@ -233,7 +251,8 @@ export class PlatformController {
   }
 
   @Post('curriculum-packages/:key/library')
-  @UseGuards(JwtAuthGuard, PlatformGuard)
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformOwner()
   addPackageLibraryItem(
     @Param('key') key: string,
     @Body() dto: AddPackageLibraryItemDto,
@@ -242,7 +261,8 @@ export class PlatformController {
   }
 
   @Post('curriculum-packages/:key/library/:packageLibraryItemId/remove')
-  @UseGuards(JwtAuthGuard, PlatformGuard)
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformOwner()
   removePackageLibraryItem(
     @Param('key') key: string,
     @Param('packageLibraryItemId') packageLibraryItemId: string,
@@ -254,7 +274,8 @@ export class PlatformController {
   }
 
   @Post('curriculum-packages/:key/templates')
-  @UseGuards(JwtAuthGuard, PlatformGuard)
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformOwner()
   addPackageTemplate(
     @Param('key') key: string,
     @Body() dto: AddPackageTemplateDto,
@@ -263,7 +284,8 @@ export class PlatformController {
   }
 
   @Patch('curriculum-packages/:key/templates/:packageTemplateId')
-  @UseGuards(JwtAuthGuard, PlatformGuard)
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformOwner()
   updatePackageTemplate(
     @Param('key') key: string,
     @Param('packageTemplateId') packageTemplateId: string,
@@ -273,7 +295,8 @@ export class PlatformController {
   }
 
   @Post('curriculum-packages/:key/templates/:packageTemplateId/remove')
-  @UseGuards(JwtAuthGuard, PlatformGuard)
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformOwner()
   removePackageTemplate(
     @Param('key') key: string,
     @Param('packageTemplateId') packageTemplateId: string,
@@ -282,7 +305,8 @@ export class PlatformController {
   }
 
   @Post('curriculum-packages/:key/departments')
-  @UseGuards(JwtAuthGuard, PlatformGuard)
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformOwner()
   addPackageDepartment(
     @Param('key') key: string,
     @Body() dto: CreatePackageDepartmentDto,
@@ -291,7 +315,8 @@ export class PlatformController {
   }
 
   @Patch('curriculum-packages/:key/departments/:departmentId')
-  @UseGuards(JwtAuthGuard, PlatformGuard)
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformOwner()
   updatePackageDepartment(
     @Param('key') key: string,
     @Param('departmentId') departmentId: string,
@@ -301,7 +326,8 @@ export class PlatformController {
   }
 
   @Post('curriculum-packages/:key/departments/:departmentId/remove')
-  @UseGuards(JwtAuthGuard, PlatformGuard)
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformOwner()
   removePackageDepartment(
     @Param('key') key: string,
     @Param('departmentId') departmentId: string,
@@ -310,31 +336,36 @@ export class PlatformController {
   }
 
   @Post('catalog/sync')
-  @UseGuards(JwtAuthGuard, PlatformGuard)
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformOwner()
   syncCatalog() {
     return this.curriculumAdmin.syncCatalogFromCode();
   }
 
   @Get('subjects')
-  @UseGuards(JwtAuthGuard, PlatformGuard)
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformOwner()
   listPlatformSubjects(@Query('includeArchived') includeArchived?: string) {
     return this.platformSubjectsService.list(includeArchived === 'true');
   }
 
   @Get('subjects/:id')
-  @UseGuards(JwtAuthGuard, PlatformGuard)
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformOwner()
   getPlatformSubject(@Param('id') id: string) {
     return this.platformSubjectsService.getById(id);
   }
 
   @Post('subjects')
-  @UseGuards(JwtAuthGuard, PlatformGuard)
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformOwner()
   createPlatformSubject(@Body() dto: CreatePlatformSubjectDto) {
     return this.platformSubjectsService.create(dto);
   }
 
   @Patch('subjects/:id')
-  @UseGuards(JwtAuthGuard, PlatformGuard)
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformOwner()
   updatePlatformSubject(
     @Param('id') id: string,
     @Body() dto: UpdatePlatformSubjectDto,
@@ -343,19 +374,22 @@ export class PlatformController {
   }
 
   @Post('subjects/:id/archive')
-  @UseGuards(JwtAuthGuard, PlatformGuard)
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformOwner()
   archivePlatformSubject(@Param('id') id: string) {
     return this.platformSubjectsService.archive(id);
   }
 
   @Post('subjects/sync')
-  @UseGuards(JwtAuthGuard, PlatformGuard)
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformOwner()
   syncPlatformSubjects() {
     return this.platformSubjectsService.syncFromPackageDefinitions();
   }
 
   @Get('provisioning-logs')
-  @UseGuards(JwtAuthGuard, PlatformGuard)
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformOwner()
   listProvisioningLogs(
     @Query('schoolId') schoolId?: string,
     @Query('limit') limit?: string,
@@ -367,25 +401,29 @@ export class PlatformController {
   }
 
   @Post('content/sync')
-  @UseGuards(JwtAuthGuard, PlatformGuard)
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformOwner()
   syncPlatformContent() {
     return this.platformContent.syncAll();
   }
 
   @Get('academic-structures')
-  @UseGuards(JwtAuthGuard, PlatformGuard)
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformOwner()
   listAcademicStructures(@Query('includeArchived') includeArchived?: string) {
     return this.platformContent.listStructures(includeArchived === 'true');
   }
 
   @Post('academic-structures')
-  @UseGuards(JwtAuthGuard, PlatformGuard)
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformOwner()
   createAcademicStructure(@Body() dto: CreatePlatformStructureDto) {
     return this.platformContent.createStructure(dto);
   }
 
   @Patch('academic-structures/:id')
-  @UseGuards(JwtAuthGuard, PlatformGuard)
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformOwner()
   updateAcademicStructure(
     @Param('id') id: string,
     @Body() dto: UpdatePlatformStructureDto,
@@ -394,31 +432,36 @@ export class PlatformController {
   }
 
   @Delete('academic-structures/:id')
-  @UseGuards(JwtAuthGuard, PlatformGuard)
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformOwner()
   deleteAcademicStructure(@Param('id') id: string) {
     return this.platformContent.deleteStructure(id);
   }
 
   @Get('library/categories')
-  @UseGuards(JwtAuthGuard, PlatformGuard)
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformOwner()
   listPlatformLibraryCategories() {
     return this.platformContent.listLibraryCategories();
   }
 
   @Get('library/resources')
-  @UseGuards(JwtAuthGuard, PlatformGuard)
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformOwner()
   listPlatformLibraryResources(@Query('includeArchived') includeArchived?: string) {
     return this.platformContent.listLibraryResources(includeArchived === 'true');
   }
 
   @Post('library/resources')
-  @UseGuards(JwtAuthGuard, PlatformGuard)
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformOwner()
   createPlatformLibraryResource(@Body() dto: CreatePlatformLibraryResourceDto) {
     return this.platformContent.createLibraryResource(dto);
   }
 
   @Patch('library/resources/:id')
-  @UseGuards(JwtAuthGuard, PlatformGuard)
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformOwner()
   updatePlatformLibraryResource(
     @Param('id') id: string,
     @Body() dto: UpdatePlatformLibraryResourceDto,
@@ -427,19 +470,22 @@ export class PlatformController {
   }
 
   @Post('library/resources/:id/archive')
-  @UseGuards(JwtAuthGuard, PlatformGuard)
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformOwner()
   archivePlatformLibraryResource(@Param('id') id: string) {
     return this.platformContent.archiveLibraryResource(id);
   }
 
   @Delete('library/resources/:id')
-  @UseGuards(JwtAuthGuard, PlatformGuard)
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformOwner()
   deletePlatformLibraryResource(@Param('id') id: string) {
     return this.platformContent.deleteLibraryResource(id);
   }
 
   @Post('library/upload')
-  @UseGuards(JwtAuthGuard, PlatformGuard)
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformOwner()
   @UseInterceptors(FileInterceptor('file'))
   uploadPlatformLibraryFile(
     @UploadedFile()
@@ -452,7 +498,8 @@ export class PlatformController {
   }
 
   @Get('library/files/:filename')
-  @UseGuards(JwtAuthGuard, PlatformGuard)
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformOwner()
   downloadPlatformLibraryFile(
     @Param('filename') filename: string,
     @Res() res: Response,
@@ -466,19 +513,22 @@ export class PlatformController {
   }
 
   @Get('message-templates')
-  @UseGuards(JwtAuthGuard, PlatformGuard)
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformOwner()
   listPlatformMessageTemplates(@Query('includeArchived') includeArchived?: string) {
     return this.platformContent.listMessageTemplates(includeArchived === 'true');
   }
 
   @Post('message-templates')
-  @UseGuards(JwtAuthGuard, PlatformGuard)
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformOwner()
   createPlatformMessageTemplate(@Body() dto: CreatePlatformMessageTemplateDto) {
     return this.platformContent.createMessageTemplate(dto);
   }
 
   @Patch('message-templates/:id')
-  @UseGuards(JwtAuthGuard, PlatformGuard)
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformOwner()
   updatePlatformMessageTemplate(
     @Param('id') id: string,
     @Body() dto: UpdatePlatformMessageTemplateDto,
@@ -487,19 +537,22 @@ export class PlatformController {
   }
 
   @Post('message-templates/:id/archive')
-  @UseGuards(JwtAuthGuard, PlatformGuard)
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformOwner()
   archivePlatformMessageTemplate(@Param('id') id: string) {
     return this.platformContent.archiveMessageTemplate(id);
   }
 
   @Get('assessment-templates/catalog')
-  @UseGuards(JwtAuthGuard, PlatformGuard)
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformOwner()
   listPlatformAssessmentCatalog(@Query('includeArchived') includeArchived?: string) {
     return this.platformContent.listAssessmentTemplates(includeArchived === 'true');
   }
 
   @Get('assessment-templates/catalog/:id')
-  @UseGuards(JwtAuthGuard, PlatformGuard)
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformOwner()
   getPlatformAssessmentCatalogItem(@Param('id') id: string) {
     return this.platformContent.getAssessmentTemplate(id);
   }
@@ -517,13 +570,15 @@ export class PlatformController {
   }
 
   @Post('schools')
-  @UseGuards(JwtAuthGuard, PlatformGuard)
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformPermissions(PlatformPermission.SCHOOLS_CREATE)
   createSchool(@Body() dto: CreateTenantSchoolDto) {
     return this.platformService.createTenantSchool(dto);
   }
 
   @Post('schools/:id/provision')
-  @UseGuards(JwtAuthGuard, PlatformGuard)
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformOwner()
   reprovisionSchool(
     @Param('id') id: string,
     @Body() body: { curriculumPackageKey: string },
@@ -535,13 +590,15 @@ export class PlatformController {
   }
 
   @Patch('schools/:id/status')
-  @UseGuards(JwtAuthGuard, PlatformGuard)
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformPermissions(PlatformPermission.SCHOOLS_SUSPEND)
   updateStatus(@Param('id') id: string, @Body() dto: UpdateSchoolStatusDto) {
     return this.platformService.updateSchoolStatus(id, dto.status);
   }
 
   @Delete('schools/:id')
-  @UseGuards(JwtAuthGuard, PlatformGuard)
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformPermissions(PlatformPermission.SCHOOLS_DELETE)
   deleteSchool(
     @CurrentPlatformUser() user: PlatformAuthUser,
     @Param('id') id: string,
@@ -550,31 +607,36 @@ export class PlatformController {
   }
 
   @Get('plans')
-  @UseGuards(JwtAuthGuard, PlatformGuard)
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformPermissions(PlatformPermission.BILLING_MANAGE)
   listPlans() {
     return this.platformService.listPlanCatalog();
   }
 
   @Patch('plans/:plan')
-  @UseGuards(JwtAuthGuard, PlatformGuard)
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformPermissions(PlatformPermission.BILLING_MANAGE)
   updatePlan(@Param('plan') plan: string, @Body() dto: UpdatePlanCatalogDto) {
     return this.platformService.updatePlanCatalog(plan, dto);
   }
 
   @Patch('schools/:id/plan')
-  @UseGuards(JwtAuthGuard, PlatformGuard)
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformPermissions(PlatformPermission.BILLING_MANAGE)
   updateSchoolPlan(@Param('id') id: string, @Body() dto: UpdateSchoolPlanDto) {
     return this.platformService.updateSchoolPlan(id, dto);
   }
 
   @Get('schools/:id/assessment-templates')
-  @UseGuards(JwtAuthGuard, PlatformGuard)
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformOwner()
   listSchoolAssessmentTemplates(@Param('id') id: string) {
     return this.assessmentTemplatesService.list(id);
   }
 
   @Post('schools/:id/assessment-templates')
-  @UseGuards(JwtAuthGuard, PlatformGuard)
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformOwner()
   createSchoolAssessmentTemplate(
     @Param('id') id: string,
     @Body() dto: CreateAssessmentTemplateDto,
@@ -583,7 +645,8 @@ export class PlatformController {
   }
 
   @Patch('schools/:id/assessment-templates/:templateId')
-  @UseGuards(JwtAuthGuard, PlatformGuard)
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformOwner()
   updateSchoolAssessmentTemplate(
     @Param('id') id: string,
     @Param('templateId') templateId: string,
@@ -593,7 +656,8 @@ export class PlatformController {
   }
 
   @Post('schools/:id/assessment-templates/:templateId/delete')
-  @UseGuards(JwtAuthGuard, PlatformGuard)
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformOwner()
   deleteSchoolAssessmentTemplate(
     @Param('id') id: string,
     @Param('templateId') templateId: string,
@@ -608,13 +672,15 @@ export class PlatformController {
   }
 
   @Get('usage')
-  @UseGuards(JwtAuthGuard, PlatformGuard)
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformPermissions(PlatformPermission.SCHOOLS_VIEW)
   listUsage() {
     return this.platformBillingService.listUsage();
   }
 
   @Get('invoices')
-  @UseGuards(JwtAuthGuard, PlatformGuard)
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformPermissions(PlatformPermission.BILLING_MANAGE)
   listInvoices(
     @Query('schoolId') schoolId?: string,
     @Query('status') status?: PlatformInvoiceStatus,

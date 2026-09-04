@@ -5,7 +5,10 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { PLATFORM_PERMISSIONS_KEY } from '../decorators/require-platform-permissions.decorator';
+import {
+  PLATFORM_OWNER_ONLY_KEY,
+  PLATFORM_PERMISSIONS_KEY,
+} from '../decorators/require-platform-permissions.decorator';
 import { isPlatformUser } from '../auth.types';
 import type { PlatformPermissionKey } from '../permissions/platform-permissions';
 import { AuthenticatedRequest } from '../http.types';
@@ -15,12 +18,16 @@ export class PlatformPermissionsGuard implements CanActivate {
   constructor(private readonly reflector: Reflector) {}
 
   canActivate(context: ExecutionContext): boolean {
+    const ownerOnly = this.reflector.getAllAndOverride<boolean>(
+      PLATFORM_OWNER_ONLY_KEY,
+      [context.getHandler(), context.getClass()],
+    );
     const required = this.reflector.getAllAndOverride<PlatformPermissionKey[]>(
       PLATFORM_PERMISSIONS_KEY,
       [context.getHandler(), context.getClass()],
     );
 
-    if (!required || required.length === 0) {
+    if (!ownerOnly && (!required || required.length === 0)) {
       return true;
     }
 
@@ -33,6 +40,10 @@ export class PlatformPermissionsGuard implements CanActivate {
 
     if (user.role === 'OWNER') {
       return true;
+    }
+
+    if (ownerOnly) {
+      throw new ForbiddenException('Only platform owners can access this area');
     }
 
     const granted = new Set(user.permissions ?? []);

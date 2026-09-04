@@ -1,5 +1,6 @@
 import { platformFetch } from "@/lib/platform-auth";
 import type { PlatformUser } from "@/lib/platform-auth";
+import type { PlatformSection } from "@/components/platform/platform-types";
 
 export type PlatformPermissionKey =
   | "platform.schools.view"
@@ -18,6 +19,46 @@ export function hasPlatformPermission(
   // Support role always has inbox access (matches API defaults).
   if (key === "platform.support.manage" && user.role === "SUPPORT") return true;
   return (user.permissions ?? []).includes(key);
+}
+
+/**
+ * Which console sections each role can open.
+ * Content catalog (packages, subjects, …) is Owner-only until we add dedicated grants.
+ */
+export function canAccessPlatformSection(
+  user: PlatformUser | null | undefined,
+  section: PlatformSection,
+): boolean {
+  if (!user) return false;
+  if (user.role === "OWNER") return true;
+
+  switch (section) {
+    case "profile":
+      return true;
+    case "overview":
+    case "schools":
+    case "usage":
+      return hasPlatformPermission(user, "platform.schools.view");
+    case "support":
+      return hasPlatformPermission(user, "platform.support.manage");
+    case "billing":
+    case "invoices":
+    case "plans":
+    case "coupons":
+      return hasPlatformPermission(user, "platform.billing.manage");
+    case "messages":
+    case "permissions":
+    case "settings":
+    case "curriculum":
+    case "subjects":
+    case "library":
+    case "structures":
+    case "assessments":
+    case "provisioning":
+      return false;
+    default:
+      return false;
+  }
 }
 
 export type PlatformAccessCatalogItem = {
@@ -88,4 +129,11 @@ export async function createPlatformOperator(body: {
     method: "POST",
     body: JSON.stringify(body),
   });
+}
+
+export async function deletePlatformOperator(userId: string) {
+  return platformFetch<PlatformAccessControl>(
+    `/platform/access-control/operators/${encodeURIComponent(userId)}`,
+    { method: "DELETE" },
+  );
 }

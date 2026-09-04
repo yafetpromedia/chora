@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { DashIcon } from "@/components/dashboard/dash-icons";
 import type { PlatformUser } from "@/lib/platform-auth";
+import { hasPlatformPermission } from "@/lib/platform-access";
 import { CreateSchoolDrawer } from "./create-school-drawer";
 import { SchoolDetailDrawer } from "./school-detail-drawer";
 import type { PlatformSchoolRow } from "./platform-types";
@@ -17,12 +18,12 @@ type Props = {
 
 type StatusFilter = "ALL" | "ACTIVE" | "TRIAL" | "SUSPENDED";
 
-function canCreateTenant(role: PlatformUser["role"] | undefined) {
-  return role === "OWNER" || role === "SALES";
+function canCreateTenant(user: PlatformUser | null) {
+  return hasPlatformPermission(user, "platform.schools.create");
 }
 
-function canSuspendTenant(role: PlatformUser["role"] | undefined) {
-  return role === "OWNER" || role === "SUPPORT";
+function canSuspendTenant(user: PlatformUser | null) {
+  return hasPlatformPermission(user, "platform.schools.suspend");
 }
 
 function tenantInitials(name: string) {
@@ -32,8 +33,8 @@ function tenantInitials(name: string) {
   return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
 }
 
-function canDeleteTenant(role: PlatformUser["role"] | undefined) {
-  return role === "OWNER";
+function canDeleteTenant(user: PlatformUser | null) {
+  return hasPlatformPermission(user, "platform.schools.delete");
 }
 
 function planLabel(plan: string | undefined) {
@@ -163,7 +164,7 @@ export function PlatformSchools({
       {filtered.length === 0 ? (
         <div className="plat-tenants-v2__empty">
           <p>No tenants match your filters.</p>
-          {canCreateTenant(user?.role) ? (
+          {canCreateTenant(user) ? (
             <button
               type="button"
               className="plat-btn plat-btn--primary plat-btn--sm"
@@ -228,8 +229,8 @@ export function PlatformSchools({
         onClose={() => setSelected(null)}
         onStatusChange={onStatusChange}
         onDelete={onDelete}
-        canSuspend={canSuspendTenant(user?.role)}
-        canDelete={canDeleteTenant(user?.role)}
+        canSuspend={canSuspendTenant(user)}
+        canDelete={canDeleteTenant(user)}
       />
 
       <CreateSchoolDrawer

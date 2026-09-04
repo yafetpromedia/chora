@@ -195,4 +195,33 @@ export class PlatformAccessService implements OnModuleInit {
 
     return this.getAccessControl();
   }
+
+  async deleteOperator(actor: { id: string; role: PlatformRole }, userId: string) {
+    if (actor.role !== PlatformRole.OWNER) {
+      throw new ForbiddenException('Only platform owners can remove operators');
+    }
+
+    if (userId === actor.id) {
+      throw new BadRequestException('You cannot delete your own account');
+    }
+
+    const target = await this.prisma.platformUser.findUnique({
+      where: { id: userId },
+    });
+    if (!target) {
+      throw new NotFoundException('Operator not found');
+    }
+
+    if (target.role === PlatformRole.OWNER) {
+      const ownerCount = await this.prisma.platformUser.count({
+        where: { role: PlatformRole.OWNER },
+      });
+      if (ownerCount <= 1) {
+        throw new BadRequestException('At least one platform owner is required');
+      }
+    }
+
+    await this.prisma.platformUser.delete({ where: { id: userId } });
+    return this.getAccessControl();
+  }
 }

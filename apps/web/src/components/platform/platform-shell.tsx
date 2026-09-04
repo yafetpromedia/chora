@@ -9,7 +9,7 @@ import {
   clearPlatformSession,
   type PlatformUser,
 } from "@/lib/platform-auth";
-import { hasPlatformPermission } from "@/lib/platform-access";
+import { canAccessPlatformSection } from "@/lib/platform-access";
 import { BrandMark } from "@/components/brand-mark";
 import { BRAND_NAME } from "@/lib/brand";
 import {
@@ -37,19 +37,6 @@ const NAV: { id: PlatformSection; label: string; icon: DashIconName }[] = [
   { id: "profile", label: "Profile", icon: "profile" },
   { id: "settings", label: "Settings", icon: "settings" },
 ];
-
-function canAccessSection(user: PlatformUser | null, id: PlatformSection) {
-  if (id === "support") {
-    return hasPlatformPermission(user, "platform.support.manage");
-  }
-  if (id === "coupons") {
-    return hasPlatformPermission(user, "platform.billing.manage");
-  }
-  if (id === "permissions" || id === "settings") {
-    return user?.role === "OWNER";
-  }
-  return true;
-}
 
 const PLATFORM_MOBILE_TABS: PlatformSection[] = [
   "overview",
@@ -92,7 +79,7 @@ export function PlatformShell({
   const displayName = user
     ? `${user.firstName} ${user.lastName}`.trim() || user.email
     : "Platform operator";
-  const visibleNav = NAV.filter((item) => canAccessSection(user, item.id));
+  const visibleNav = NAV.filter((item) => canAccessPlatformSection(user, item.id));
   const mobileTabs = PLATFORM_MOBILE_TABS.flatMap((id) => {
     const item = visibleNav.find((entry) => entry.id === id);
     return item ? [item] : [];
@@ -100,9 +87,9 @@ export function PlatformShell({
   const moreActive = !PLATFORM_MOBILE_TABS.includes(section);
 
   useEffect(() => {
-    if (!ready) return;
-    if (canAccessSection(user, section)) return;
-    onSectionChange("overview");
+    if (!ready || !user) return;
+    if (canAccessPlatformSection(user, section)) return;
+    onSectionChange(canAccessPlatformSection(user, "overview") ? "overview" : "profile");
   }, [ready, user, section, onSectionChange]);
 
   return (

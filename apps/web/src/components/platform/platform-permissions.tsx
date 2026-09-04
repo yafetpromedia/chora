@@ -6,12 +6,14 @@ import { AppToast } from "@/components/ui/app-toast";
 import type { PlatformUser } from "@/lib/platform-auth";
 import {
   createPlatformOperator,
+  deletePlatformOperator,
   getPlatformAccessControl,
   updatePlatformOperatorRole,
   updatePlatformRoleGrants,
   type PlatformAccessControl,
   type PlatformPermissionKey,
 } from "@/lib/platform-access";
+import { AppConfirmDialog } from "@/components/ui/app-confirm-dialog";
 
 const ROLE_META: Record<
   PlatformUser["role"],
@@ -48,6 +50,10 @@ export function PlatformPermissions({ user }: Props) {
   const [toast, setToast] = useState<string | null>(null);
   const [selectedRole, setSelectedRole] = useState<PlatformUser["role"]>("OWNER");
   const [showCreate, setShowCreate] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
   const [creating, setCreating] = useState(false);
   const [newOp, setNewOp] = useState({
     firstName: "",
@@ -158,6 +164,23 @@ export function PlatformPermissions({ user }: Props) {
     }
   }
 
+  async function onDeleteOperator() {
+    if (!isOwner || !deleteTarget) return;
+    setBusyUserId(deleteTarget.id);
+    setError("");
+    setToast(null);
+    try {
+      const updated = await deletePlatformOperator(deleteTarget.id);
+      applyPayload(updated);
+      setToast(`${deleteTarget.name} was removed.`);
+      setDeleteTarget(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not remove operator");
+    } finally {
+      setBusyUserId(null);
+    }
+  }
+
   async function onCreateOperator(e: FormEvent) {
     e.preventDefault();
     if (!isOwner) return;
@@ -191,6 +214,20 @@ export function PlatformPermissions({ user }: Props) {
 
   return (
     <div className="plat-access dash-admin dash-admin--modern">
+      <AppConfirmDialog
+        open={Boolean(deleteTarget)}
+        tone="danger"
+        title={`Remove ${deleteTarget?.name ?? "operator"}?`}
+        message="They will lose platform console access immediately. This does not delete any school tenants."
+        confirmLabel="Remove operator"
+        cancelLabel="Keep"
+        busy={Boolean(deleteTarget && busyUserId === deleteTarget.id)}
+        onCancel={() => {
+          if (busyUserId) return;
+          setDeleteTarget(null);
+        }}
+        onConfirm={() => void onDeleteOperator()}
+      />
       <header className="plat-access__hero">
         <div className="plat-access__hero-main">
           <span className="plat-access__hero-icon" aria-hidden>
@@ -510,22 +547,39 @@ export function PlatformPermissions({ user }: Props) {
                       <span>{op.email}</span>
                     </div>
                     {isOwner ? (
-                      <select
-                        className="plat-access-op__select"
-                        value={op.role}
-                        disabled={busyUserId === op.id}
-                        onChange={(e) =>
-                          void onChangeOperatorRole(
-                            op.id,
-                            e.target.value as PlatformUser["role"],
-                          )
-                        }
-                        aria-label={`Role for ${op.firstName} ${op.lastName}`}
-                      >
-                        <option value="OWNER">Owner</option>
-                        <option value="SUPPORT">Support</option>
-                        <option value="SALES">Sales</option>
-                      </select>
+                      <div className="plat-access-op__actions">
+                        <select
+                          className="plat-access-op__select"
+                          value={op.role}
+                          disabled={busyUserId === op.id}
+                          onChange={(e) =>
+                            void onChangeOperatorRole(
+                              op.id,
+                              e.target.value as PlatformUser["role"],
+                            )
+                          }
+                          aria-label={`Role for ${op.firstName} ${op.lastName}`}
+                        >
+                          <option value="OWNER">Owner</option>
+                          <option value="SUPPORT">Support</option>
+                          <option value="SALES">Sales</option>
+                        </select>
+                        {op.id !== user?.id ? (
+                          <button
+                            type="button"
+                            className="plat-access-op__remove"
+                            disabled={busyUserId === op.id}
+                            onClick={() =>
+                              setDeleteTarget({
+                                id: op.id,
+                                name: `${op.firstName} ${op.lastName}`.trim() || op.email,
+                              })
+                            }
+                          >
+                            Remove
+                          </button>
+                        ) : null}
+                      </div>
                     ) : (
                       <span className={`plat-role-badge plat-role-badge--${op.role.toLowerCase()}`}>
                         {op.role}

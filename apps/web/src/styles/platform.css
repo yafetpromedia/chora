@@ -6802,15 +6802,45 @@ body:has(.plat-manage-drawer) .plat-shell .dash-tabbar,
 }
 
 .plat-access-op__select {
-  min-height: 2.2rem;
-  padding: 0.35rem 0.65rem;
+  min-width: 7.5rem;
+  padding: 0.4rem 0.55rem;
   border-radius: 0.55rem;
-  border: 1px solid var(--brand-border);
+  border: 1px solid #e2e8f0;
   background: #fff;
   font: inherit;
-  font-size: 0.82rem;
+  font-size: 0.8rem;
+  font-weight: 650;
+  color: #0f172a;
+}
+
+.plat-access-op__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin-left: auto;
+}
+
+.plat-access-op__remove {
+  min-height: 2.1rem;
+  padding: 0.35rem 0.7rem;
+  border-radius: 0.55rem;
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+  color: #b91c1c;
+  font: inherit;
+  font-size: 0.78rem;
   font-weight: 700;
-  color: var(--brand-teal-dark);
+  cursor: pointer;
+}
+
+.plat-access-op__remove:hover:not(:disabled) {
+  background: #fee2e2;
+}
+
+.plat-access-op__remove:disabled {
+  opacity: 0.55;
+  cursor: wait;
 }
 
 .plat-access__save-bar {
