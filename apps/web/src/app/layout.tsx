@@ -52,11 +52,12 @@ export const metadata: Metadata = {
     "Run attendance, results, fees, and family communication on one platform. 14-day free trial. Plans in USD and ETB for Ethiopian and international schools.",
   icons: {
     icon: [
-      { url: "/favicon.ico", sizes: "any" },
-      { url: "/brand/favicon.png", type: "image/png", sizes: "512x512" },
+      { url: "/brand/chora-favicon.png?v=20260904", type: "image/png", sizes: "64x64" },
+      { url: "/brand/favicon.png?v=20260904", type: "image/png", sizes: "512x512" },
+      { url: "/favicon.ico?v=20260904", sizes: "any" },
     ],
-    apple: "/brand/favicon.png",
-    shortcut: "/favicon.ico",
+    apple: [{ url: "/brand/favicon.png?v=20260904", type: "image/png", sizes: "180x180" }],
+    shortcut: "/favicon.ico?v=20260904",
   },
 };
 
