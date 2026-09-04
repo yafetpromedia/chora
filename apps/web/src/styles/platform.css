@@ -6834,6 +6834,7 @@ body:has(.plat-manage-drawer) .plat-shell .dash-tabbar,
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
   gap: 0.4rem;
   margin-left: auto;
 }
@@ -6903,3 +6904,137 @@ body:has(.plat-manage-drawer) .plat-shell .dash-tabbar,
   background: #fff;
   border-color: var(--brand-border);
 }
+
+.plat-access-create__modes {
+  display: inline-flex;
+  gap: 0.35rem;
+  margin-bottom: 0.85rem;
+  padding: 0.25rem;
+  border-radius: 0.65rem;
+  background: color-mix(in srgb, var(--brand-teal) 8%, #f8fafc);
+}
+
+.plat-access-create__modes button {
+  min-height: 2rem;
+  padding: 0.35rem 0.75rem;
+  border: 0;
+  border-radius: 0.5rem;
+  background: transparent;
+  color: var(--brand-teal-dark);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.plat-access-create__modes button.is-active {
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(15, 118, 110, 0.12);
+}
+
+.plat-access-invite-link {
+  display: grid;
+  gap: 0.55rem;
+  margin-bottom: 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--brand-teal) 25%, #d7dee5);
+  background: #fff;
+}
+
+.plat-access-invite-link p {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--brand-teal-dark);
+}
+
+.plat-access-invite-link code {
+  display: block;
+  overflow-wrap: anywhere;
+  font-size: 0.78rem;
+  color: #334155;
+}
+
+.plat-access-op.is-inactive {
+  opacity: 0.72;
+}
+
+.plat-status-pill {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 0.4rem;
+  padding: 0.12rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.plat-status-pill--off {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.plat-status-pill--invite {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.plat-access-op__secondary {
+  min-height: 2.1rem;
+  padding: 0.35rem 0.7rem;
+  border-radius: 0.55rem;
+  border: 1px solid var(--brand-border);
+  background: #fff;
+  color: var(--brand-teal-dark);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.plat-access-op__secondary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--brand-teal) 8%, #fff);
+}
+
+.plat-access-op__secondary:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.plat-access-audit {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.plat-access-audit li {
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.7rem 0.85rem;
+  border-radius: 0.7rem;
+  border: 1px solid var(--brand-border);
+  background: #fff;
+}
+
+.plat-access-audit strong {
+  font-size: 0.88rem;
+  color: var(--lite-black, #2c2c2c);
+}
+
+.plat-access-audit span,
+.plat-access-audit time {
+  font-size: 0.78rem;
+  color: #64748b;
+}
+
+.plat-access-audit__empty {
+  margin: 0;
+  font-size: 0.88rem;
+  color: #64748b;
+}
+

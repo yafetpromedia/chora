@@ -33,6 +33,7 @@ export class PlatformAuthService implements OnModuleInit {
           firstName: 'Chora',
           lastName: 'Platform',
           role: 'OWNER',
+          isActive: true,
         },
       });
     }
@@ -42,8 +43,14 @@ export class PlatformAuthService implements OnModuleInit {
     const user = await this.prisma.platformUser.findUnique({
       where: { email: email.toLowerCase() },
     });
-    if (!user) {
+    if (!user || !user.isActive) {
       throw new UnauthorizedException('Invalid credentials');
+    }
+
+    if (user.inviteToken) {
+      throw new UnauthorizedException(
+        'Accept your email invite and set a password before signing in',
+      );
     }
 
     const ok = await compare(password, user.passwordHash);
@@ -51,20 +58,28 @@ export class PlatformAuthService implements OnModuleInit {
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    await this.prisma.platformUser.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date() },
+    });
+
     const payload = this.toPayload(user);
     return this.issueTokens(payload);
   }
 
   async validateById(id: string): Promise<PlatformAuthUser | null> {
     const user = await this.prisma.platformUser.findUnique({ where: { id } });
-    return user ? this.toPayload(user) : null;
+    if (!user || !user.isActive) {
+      return null;
+    }
+    return this.toPayload(user);
   }
 
   async getProfile(user: PlatformAuthUser) {
     const row = await this.prisma.platformUser.findUnique({
       where: { id: user.id },
     });
-    if (!row) {
+    if (!row || !row.isActive) {
       throw new UnauthorizedException('User not found');
     }
     return {
@@ -76,6 +91,7 @@ export class PlatformAuthService implements OnModuleInit {
         role: row.role,
         permissions: this.platformAccess.resolveForRole(row.role),
         createdAt: row.createdAt,
+        lastLoginAt: row.lastLoginAt,
       },
     };
   }
@@ -92,7 +108,7 @@ export class PlatformAuthService implements OnModuleInit {
     const row = await this.prisma.platformUser.findUnique({
       where: { id: user.id },
     });
-    if (!row) {
+    if (!row || !row.isActive) {
       throw new UnauthorizedException('User not found');
     }
 

@@ -1,8 +1,8 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, Suspense, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion, useReducedMotion } from "framer-motion";
 import { AuthInput } from "@/components/auth/auth-input";
 import { AuthSubmitButton } from "@/components/auth/auth-submit-button";
@@ -11,12 +11,14 @@ import { BrandMark } from "@/components/brand-mark";
 import { BRAND_NAME } from "@/lib/brand";
 import { platformLogin, persistPlatformSession } from "@/lib/platform-auth";
 
-export default function PlatformLoginPage() {
+function PlatformLoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const invited = useMemo(() => searchParams.get("invited") === "1", [searchParams]);
   const reduce = useReducedMotion();
   const heroSrc = useLandingHeroImage();
 
@@ -66,6 +68,12 @@ export default function PlatformLoginPage() {
                 Manage schools, trials, billing, and curriculum for {BRAND_NAME}.
               </p>
             </div>
+
+            {invited ? (
+              <p className="auth-alert reg-error" role="status" style={{ borderColor: "#86efac", background: "#f0fdf4", color: "#166534" }}>
+                Password saved. Sign in with your email.
+              </p>
+            ) : null}
 
             {error ? (
               <p className="auth-alert auth-alert--error reg-error" role="alert">
@@ -150,5 +158,13 @@ export default function PlatformLoginPage() {
         </section>
       </div>
     </div>
+  );
+}
+
+export default function PlatformLoginPage() {
+  return (
+    <Suspense fallback={<div className="reg-scene" aria-busy="true" />}>
+      <PlatformLoginForm />
+    </Suspense>
   );
 }

@@ -1060,14 +1060,32 @@ model AnnouncementRead {
 }
 
 model PlatformUser {
-  id           String       @id @default(cuid())
-  email        String       @unique
-  passwordHash String
-  firstName    String
-  lastName     String
-  role         PlatformRole @default(OWNER)
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
+  id              String       @id @default(cuid())
+  email           String       @unique
+  passwordHash    String
+  firstName       String
+  lastName        String
+  role            PlatformRole @default(OWNER)
+  isActive        Boolean      @default(true)
+  lastLoginAt     DateTime?
+  inviteToken     String?      @unique
+  inviteExpiresAt DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+}
+
+model PlatformAuditLog {
+  id          String   @id @default(cuid())
+  actorId     String?
+  actorEmail  String
+  action      String
+  targetId    String?
+  targetEmail String?
+  meta        Json?
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([action])
 }
 
 model PlatformSettings {

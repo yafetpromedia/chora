@@ -4,6 +4,7 @@ import { PermissionsGuard } from './guards/permissions.guard';
 import { PlatformPermissionsGuard } from './guards/platform-permissions.guard';
 import { RolesGuard } from './guards/roles.guard';
 import { SchoolTenantGuard } from './guards/school-tenant.guard';
+import { MailService } from './mail.service';
 
 @Global()
 @Module({
@@ -13,12 +14,14 @@ import { SchoolTenantGuard } from './guards/school-tenant.guard';
     RolesGuard,
     PermissionsGuard,
     PlatformPermissionsGuard,
+    MailService,
   ],
   exports: [
     SchoolTenantGuard,
     RolesGuard,
     PermissionsGuard,
     PlatformPermissionsGuard,
+    MailService,
   ],
 })
 export class CommonModule {}

@@ -7,10 +7,15 @@ import type { PlatformUser } from "@/lib/platform-auth";
 import {
   createPlatformOperator,
   deletePlatformOperator,
+  getPlatformAccessAudit,
   getPlatformAccessControl,
+  invitePlatformOperator,
+  resendPlatformOperatorInvite,
+  setPlatformOperatorActive,
   updatePlatformOperatorRole,
   updatePlatformRoleGrants,
   type PlatformAccessControl,
+  type PlatformAuditLog,
   type PlatformPermissionKey,
 } from "@/lib/platform-access";
 import { AppConfirmDialog } from "@/components/ui/app-confirm-dialog";
@@ -22,6 +27,18 @@ const ROLE_META: Record<
   OWNER: { icon: "settings", tone: "owner" },
   SUPPORT: { icon: "users", tone: "support" },
   SALES: { icon: "finance", tone: "sales" },
+};
+
+const AUDIT_LABELS: Record<string, string> = {
+  OPERATOR_CREATED: "Created operator",
+  OPERATOR_INVITED: "Invited operator",
+  OPERATOR_INVITE_RESENT: "Resent invite",
+  OPERATOR_INVITE_ACCEPTED: "Accepted invite",
+  OPERATOR_ROLE_CHANGED: "Changed role",
+  OPERATOR_DEACTIVATED: "Deactivated",
+  OPERATOR_ACTIVATED: "Reactivated",
+  OPERATOR_DELETED: "Removed operator",
+  ROLE_GRANTS_UPDATED: "Updated role grants",
 };
 
 type Props = {
@@ -39,10 +56,23 @@ function sameGrants(a: PlatformPermissionKey[], b: PlatformPermissionKey[]) {
   return b.every((k) => set.has(k));
 }
 
+function formatWhen(value: string | null | undefined) {
+  if (!value) return "Never";
+  try {
+    return new Intl.DateTimeFormat(undefined, {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(new Date(value));
+  } catch {
+    return value;
+  }
+}
+
 export function PlatformPermissions({ user }: Props) {
   const isOwner = user?.role === "OWNER";
   const [data, setData] = useState<PlatformAccessControl | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
+  const [audit, setAudit] = useState<PlatformAuditLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [busyUserId, setBusyUserId] = useState<string | null>(null);
@@ -50,6 +80,8 @@ export function PlatformPermissions({ user }: Props) {
   const [toast, setToast] = useState<string | null>(null);
   const [selectedRole, setSelectedRole] = useState<PlatformUser["role"]>("OWNER");
   const [showCreate, setShowCreate] = useState(false);
+  const [createMode, setCreateMode] = useState<"invite" | "password">("invite");
+  const [inviteUrl, setInviteUrl] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{
     id: string;
     name: string;
@@ -71,15 +103,33 @@ export function PlatformPermissions({ user }: Props) {
     });
   }
 
+  async function refreshAudit() {
+    if (!isOwner) return;
+    try {
+      setAudit(await getPlatformAccessAudit(40));
+    } catch {
+      /* non-blocking */
+    }
+  }
+
   useEffect(() => {
     setLoading(true);
     void getPlatformAccessControl()
-      .then(applyPayload)
+      .then(async (payload) => {
+        applyPayload(payload);
+        if (user?.role === "OWNER") {
+          try {
+            setAudit(await getPlatformAccessAudit(40));
+          } catch {
+            /* ignore */
+          }
+        }
+      })
       .catch((err) =>
         setError(err instanceof Error ? err.message : "Could not load access control"),
       )
       .finally(() => setLoading(false));
-  }, []);
+  }, [user?.role]);
 
   const dirty = useMemo(() => {
     if (!data || !draft) return false;
@@ -132,6 +182,7 @@ export function PlatformPermissions({ user }: Props) {
         SALES: draft.SALES,
       });
       applyPayload(updated);
+      await refreshAudit();
       setToast("Role permissions saved.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save permissions");
@@ -156,9 +207,49 @@ export function PlatformPermissions({ user }: Props) {
     try {
       const updated = await updatePlatformOperatorRole(userId, role);
       applyPayload(updated);
+      await refreshAudit();
       setToast("Operator role updated.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not update role");
+    } finally {
+      setBusyUserId(null);
+    }
+  }
+
+  async function onToggleActive(userId: string, nextActive: boolean, name: string) {
+    if (!isOwner) return;
+    setBusyUserId(userId);
+    setError("");
+    setToast(null);
+    try {
+      const updated = await setPlatformOperatorActive(userId, nextActive);
+      applyPayload(updated);
+      await refreshAudit();
+      setToast(nextActive ? `${name} reactivated.` : `${name} deactivated.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not update status");
+    } finally {
+      setBusyUserId(null);
+    }
+  }
+
+  async function onResendInvite(userId: string, name: string) {
+    if (!isOwner) return;
+    setBusyUserId(userId);
+    setError("");
+    setToast(null);
+    try {
+      const result = await resendPlatformOperatorInvite(userId);
+      applyPayload(result);
+      setInviteUrl(result.inviteUrl);
+      await refreshAudit();
+      setToast(
+        result.emailSent
+          ? `Invite resent to ${name}.`
+          : `Invite link ready for ${name} (email not sent — copy the link).`,
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not resend invite");
     } finally {
       setBusyUserId(null);
     }
@@ -172,6 +263,7 @@ export function PlatformPermissions({ user }: Props) {
     try {
       const updated = await deletePlatformOperator(deleteTarget.id);
       applyPayload(updated);
+      await refreshAudit();
       setToast(`${deleteTarget.name} was removed.`);
       setDeleteTarget(null);
     } catch (err) {
@@ -187,15 +279,39 @@ export function PlatformPermissions({ user }: Props) {
     setCreating(true);
     setError("");
     setToast(null);
+    setInviteUrl(null);
     try {
-      const updated = await createPlatformOperator({
-        firstName: newOp.firstName.trim(),
-        lastName: newOp.lastName.trim(),
-        email: newOp.email.trim(),
-        password: newOp.password,
-        role: newOp.role,
-      });
-      applyPayload(updated);
+      const roleLabel =
+        newOp.role === "SALES" ? "Sales" : newOp.role === "SUPPORT" ? "Support" : "Owner";
+
+      if (createMode === "invite") {
+        const result = await invitePlatformOperator({
+          firstName: newOp.firstName.trim(),
+          lastName: newOp.lastName.trim(),
+          email: newOp.email.trim(),
+          role: newOp.role,
+        });
+        applyPayload(result);
+        setInviteUrl(result.inviteUrl);
+        await refreshAudit();
+        setToast(
+          result.emailSent
+            ? `${roleLabel} invite emailed.`
+            : `${roleLabel} invite created — copy the link below (email not configured).`,
+        );
+      } else {
+        const updated = await createPlatformOperator({
+          firstName: newOp.firstName.trim(),
+          lastName: newOp.lastName.trim(),
+          email: newOp.email.trim(),
+          password: newOp.password,
+          role: newOp.role,
+        });
+        applyPayload(updated);
+        await refreshAudit();
+        setToast(`${roleLabel} operator created.`);
+      }
+
       setNewOp({
         firstName: "",
         lastName: "",
@@ -203,12 +319,21 @@ export function PlatformPermissions({ user }: Props) {
         password: "",
         role: "SUPPORT",
       });
-      setShowCreate(false);
-      setToast(`${newOp.role === "SALES" ? "Sales" : newOp.role === "SUPPORT" ? "Support" : "Owner"} operator created.`);
+      if (createMode === "password") setShowCreate(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not create operator");
     } finally {
       setCreating(false);
+    }
+  }
+
+  async function copyInviteUrl() {
+    if (!inviteUrl) return;
+    try {
+      await navigator.clipboard.writeText(inviteUrl);
+      setToast("Invite link copied.");
+    } catch {
+      setError("Could not copy link");
     }
   }
 
@@ -447,15 +572,18 @@ export function PlatformPermissions({ user }: Props) {
               <div>
                 <h3>Operators</h3>
                 <p>
-                  Add people, change their role, or remove their login. To limit what they see,
-                  turn capabilities off in the matrix above, then ask them to refresh.
+                  Invite by email, deactivate access, or remove a login. Capability limits come
+                  from the matrix above.
                 </p>
               </div>
               {isOwner ? (
                 <button
                   type="button"
                   className="plat-v2__btn plat-v2__btn--primary"
-                  onClick={() => setShowCreate((v) => !v)}
+                  onClick={() => {
+                    setShowCreate((v) => !v);
+                    setInviteUrl(null);
+                  }}
                 >
                   {showCreate ? "Cancel" : "Add operator"}
                 </button>
@@ -464,6 +592,26 @@ export function PlatformPermissions({ user }: Props) {
 
             {isOwner && showCreate ? (
               <form className="plat-access-create" onSubmit={(e) => void onCreateOperator(e)}>
+                <div className="plat-access-create__modes" role="tablist" aria-label="Add method">
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={createMode === "invite"}
+                    className={createMode === "invite" ? "is-active" : undefined}
+                    onClick={() => setCreateMode("invite")}
+                  >
+                    Email invite
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={createMode === "password"}
+                    className={createMode === "password" ? "is-active" : undefined}
+                    onClick={() => setCreateMode("password")}
+                  >
+                    Set password
+                  </button>
+                </div>
                 <div className="plat-access-create__grid">
                   <label>
                     <span>First name</span>
@@ -494,18 +642,20 @@ export function PlatformPermissions({ user }: Props) {
                       autoComplete="off"
                     />
                   </label>
-                  <label>
-                    <span>Temporary password</span>
-                    <input
-                      type="text"
-                      value={newOp.password}
-                      onChange={(e) => setNewOp((p) => ({ ...p, password: e.target.value }))}
-                      required
-                      minLength={8}
-                      placeholder="At least 8 characters"
-                      autoComplete="new-password"
-                    />
-                  </label>
+                  {createMode === "password" ? (
+                    <label>
+                      <span>Temporary password</span>
+                      <input
+                        type="text"
+                        value={newOp.password}
+                        onChange={(e) => setNewOp((p) => ({ ...p, password: e.target.value }))}
+                        required
+                        minLength={8}
+                        placeholder="At least 8 characters"
+                        autoComplete="new-password"
+                      />
+                    </label>
+                  ) : null}
                   <label>
                     <span>Role</span>
                     <select
@@ -529,18 +679,38 @@ export function PlatformPermissions({ user }: Props) {
                     className="plat-v2__btn plat-v2__btn--primary"
                     disabled={creating}
                   >
-                    {creating ? "Creating…" : "Create operator"}
+                    {creating
+                      ? createMode === "invite"
+                        ? "Sending…"
+                        : "Creating…"
+                      : createMode === "invite"
+                        ? "Send invite"
+                        : "Create operator"}
                   </button>
                 </div>
               </form>
+            ) : null}
+
+            {inviteUrl ? (
+              <div className="plat-access-invite-link">
+                <p>Invite link (share if email did not send):</p>
+                <code>{inviteUrl}</code>
+                <button type="button" className="plat-v2__btn plat-v2__btn--ghost" onClick={() => void copyInviteUrl()}>
+                  Copy link
+                </button>
+              </div>
             ) : null}
 
             <div className="plat-access-ops">
               {data.operators.map((op) => {
                 const initials = `${op.firstName.slice(0, 1)}${op.lastName.slice(0, 1)}`;
                 const isYou = op.id === user?.id;
+                const name = `${op.firstName} ${op.lastName}`.trim() || op.email;
                 return (
-                  <div key={op.id} className={`plat-access-op${isYou ? " is-you" : ""}`}>
+                  <div
+                    key={op.id}
+                    className={`plat-access-op${isYou ? " is-you" : ""}${!op.isActive ? " is-inactive" : ""}`}
+                  >
                     <div className="plat-access-op__avatar" aria-hidden>
                       {initials}
                     </div>
@@ -548,10 +718,17 @@ export function PlatformPermissions({ user }: Props) {
                       <strong>
                         {op.firstName} {op.lastName}
                         {isYou ? <span className="plat-you-pill">You</span> : null}
+                        {!op.isActive ? (
+                          <span className="plat-status-pill plat-status-pill--off">Inactive</span>
+                        ) : null}
+                        {op.invitePending ? (
+                          <span className="plat-status-pill plat-status-pill--invite">Invite pending</span>
+                        ) : null}
                       </strong>
                       <span>{op.email}</span>
                       <em className="plat-access-op__perms">
-                        {op.permissions.length} of {data.catalog.length} capabilities
+                        {op.permissions.length} of {data.catalog.length} capabilities · Last login{" "}
+                        {formatWhen(op.lastLoginAt)}
                       </em>
                     </div>
                     {isOwner ? (
@@ -573,19 +750,41 @@ export function PlatformPermissions({ user }: Props) {
                           <option value="SALES">Sales</option>
                         </select>
                         {!isYou ? (
-                          <button
-                            type="button"
-                            className="plat-access-op__remove"
-                            disabled={busyUserId === op.id}
-                            onClick={() =>
-                              setDeleteTarget({
-                                id: op.id,
-                                name: `${op.firstName} ${op.lastName}`.trim() || op.email,
-                              })
-                            }
-                          >
-                            Remove
-                          </button>
+                          <>
+                            {op.invitePending ? (
+                              <button
+                                type="button"
+                                className="plat-access-op__secondary"
+                                disabled={busyUserId === op.id}
+                                onClick={() => void onResendInvite(op.id, name)}
+                              >
+                                Resend invite
+                              </button>
+                            ) : null}
+                            <button
+                              type="button"
+                              className="plat-access-op__secondary"
+                              disabled={busyUserId === op.id}
+                              onClick={() =>
+                                void onToggleActive(op.id, !op.isActive, name)
+                              }
+                            >
+                              {op.isActive ? "Deactivate" : "Reactivate"}
+                            </button>
+                            <button
+                              type="button"
+                              className="plat-access-op__remove"
+                              disabled={busyUserId === op.id}
+                              onClick={() =>
+                                setDeleteTarget({
+                                  id: op.id,
+                                  name,
+                                })
+                              }
+                            >
+                              Remove
+                            </button>
+                          </>
                         ) : null}
                       </div>
                     ) : (
@@ -598,6 +797,33 @@ export function PlatformPermissions({ user }: Props) {
               })}
             </div>
           </section>
+
+          {isOwner ? (
+            <section className="plat-access-panel">
+              <div className="plat-access-panel__head">
+                <div>
+                  <h3>Audit log</h3>
+                  <p>Recent invites, role changes, deactivations, and removals.</p>
+                </div>
+              </div>
+              {audit.length === 0 ? (
+                <p className="plat-access-audit__empty">No operator events yet.</p>
+              ) : (
+                <ul className="plat-access-audit">
+                  {audit.map((row) => (
+                    <li key={row.id}>
+                      <strong>{AUDIT_LABELS[row.action] ?? row.action}</strong>
+                      <span>
+                        {row.actorEmail}
+                        {row.targetEmail ? ` → ${row.targetEmail}` : ""}
+                      </span>
+                      <time dateTime={row.createdAt}>{formatWhen(row.createdAt)}</time>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          ) : null}
 
           <section className="plat-info-card">
             <DashIcon name="students" className="dash-icon--sm" />

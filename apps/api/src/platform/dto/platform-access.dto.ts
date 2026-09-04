@@ -1,6 +1,7 @@
 import { PlatformRole } from '@prisma/client';
 import {
   IsArray,
+  IsBoolean,
   IsEmail,
   IsEnum,
   IsOptional,
@@ -43,4 +44,31 @@ export class CreatePlatformOperatorDto {
 
   @IsEnum(PlatformRole)
   role!: PlatformRole;
+}
+
+export class InvitePlatformOperatorDto {
+  @IsEmail()
+  email!: string;
+
+  @IsString()
+  @MinLength(1)
+  firstName!: string;
+
+  @IsString()
+  @MinLength(1)
+  lastName!: string;
+
+  @IsEnum(PlatformRole)
+  role!: PlatformRole;
+}
+
+export class SetPlatformOperatorActiveDto {
+  @IsBoolean()
+  isActive!: boolean;
+}
+
+export class AcceptPlatformInviteDto {
+  @IsString()
+  @MinLength(8)
+  password!: string;
 }

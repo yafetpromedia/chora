@@ -79,9 +79,12 @@ import { PlatformSubjectsService } from './platform-subjects.service';
 import { PlatformAccessService } from './platform-access.service';
 import { SupportService } from '../support/support.service';
 import {
+  AcceptPlatformInviteDto,
+  CreatePlatformOperatorDto,
+  InvitePlatformOperatorDto,
+  SetPlatformOperatorActiveDto,
   UpdatePlatformOperatorRoleDto,
   UpdatePlatformRoleGrantsDto,
-  CreatePlatformOperatorDto,
 } from './dto/platform-access.dto';
 
 @Controller('platform')
@@ -103,6 +106,19 @@ export class PlatformController {
   @Post('auth/login')
   login(@Body() dto: PlatformLoginDto) {
     return this.platformAuthService.login(dto.email, dto.password);
+  }
+
+  @Get('auth/invite/:token')
+  getInvite(@Param('token') token: string) {
+    return this.platformAccess.getInvitePreview(token);
+  }
+
+  @Post('auth/invite/:token/accept')
+  acceptInvite(
+    @Param('token') token: string,
+    @Body() dto: AcceptPlatformInviteDto,
+  ) {
+    return this.platformAccess.acceptInvite(token, dto.password);
   }
 
   @Get('auth/me')
@@ -148,13 +164,22 @@ export class PlatformController {
     return this.platformAccess.getAccessControl();
   }
 
+  @Get('access-control/audit')
+  @UseGuards(JwtAuthGuard, PlatformGuard)
+  listAccessAudit(@Query('limit') limit?: string) {
+    const parsed = limit ? Number(limit) : 50;
+    return this.platformAccess.listAuditLogs(
+      Number.isFinite(parsed) ? parsed : 50,
+    );
+  }
+
   @Patch('access-control/roles')
   @UseGuards(JwtAuthGuard, PlatformGuard)
   updateAccessRoles(
     @CurrentPlatformUser() user: PlatformAuthUser,
     @Body() dto: UpdatePlatformRoleGrantsDto,
   ) {
-    return this.platformAccess.updateRoleGrants(user.role, dto);
+    return this.platformAccess.updateRoleGrants(user, dto);
   }
 
   @Patch('access-control/operators/:id/role')
@@ -167,13 +192,41 @@ export class PlatformController {
     return this.platformAccess.updateOperatorRole(user, id, dto.role);
   }
 
+  @Patch('access-control/operators/:id/active')
+  @UseGuards(JwtAuthGuard, PlatformGuard)
+  setOperatorActive(
+    @CurrentPlatformUser() user: PlatformAuthUser,
+    @Param('id') id: string,
+    @Body() dto: SetPlatformOperatorActiveDto,
+  ) {
+    return this.platformAccess.setOperatorActive(user, id, dto.isActive);
+  }
+
   @Post('access-control/operators')
   @UseGuards(JwtAuthGuard, PlatformGuard)
   createOperator(
     @CurrentPlatformUser() user: PlatformAuthUser,
     @Body() dto: CreatePlatformOperatorDto,
   ) {
-    return this.platformAccess.createOperator(user.role, dto);
+    return this.platformAccess.createOperator(user, dto);
+  }
+
+  @Post('access-control/operators/invite')
+  @UseGuards(JwtAuthGuard, PlatformGuard)
+  inviteOperator(
+    @CurrentPlatformUser() user: PlatformAuthUser,
+    @Body() dto: InvitePlatformOperatorDto,
+  ) {
+    return this.platformAccess.inviteOperator(user, dto);
+  }
+
+  @Post('access-control/operators/:id/resend-invite')
+  @UseGuards(JwtAuthGuard, PlatformGuard)
+  resendInvite(
+    @CurrentPlatformUser() user: PlatformAuthUser,
+    @Param('id') id: string,
+  ) {
+    return this.platformAccess.resendInvite(user, id);
   }
 
   @Delete('access-control/operators/:id')
