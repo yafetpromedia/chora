@@ -446,7 +446,10 @@ export function PlatformPermissions({ user }: Props) {
             <div className="plat-access-panel__head">
               <div>
                 <h3>Operators</h3>
-                <p>Create Support or Sales accounts, then assign roles as needed.</p>
+                <p>
+                  Add people, change their role, or remove their login. To limit what they see,
+                  turn capabilities off in the matrix above, then ask them to refresh.
+                </p>
               </div>
               {isOwner ? (
                 <button
@@ -535,16 +538,21 @@ export function PlatformPermissions({ user }: Props) {
             <div className="plat-access-ops">
               {data.operators.map((op) => {
                 const initials = `${op.firstName.slice(0, 1)}${op.lastName.slice(0, 1)}`;
+                const isYou = op.id === user?.id;
                 return (
-                  <div key={op.id} className="plat-access-op">
+                  <div key={op.id} className={`plat-access-op${isYou ? " is-you" : ""}`}>
                     <div className="plat-access-op__avatar" aria-hidden>
                       {initials}
                     </div>
                     <div className="plat-access-op__main">
                       <strong>
                         {op.firstName} {op.lastName}
+                        {isYou ? <span className="plat-you-pill">You</span> : null}
                       </strong>
                       <span>{op.email}</span>
+                      <em className="plat-access-op__perms">
+                        {op.permissions.length} of {data.catalog.length} capabilities
+                      </em>
                     </div>
                     {isOwner ? (
                       <div className="plat-access-op__actions">
@@ -564,7 +572,7 @@ export function PlatformPermissions({ user }: Props) {
                           <option value="SUPPORT">Support</option>
                           <option value="SALES">Sales</option>
                         </select>
-                        {op.id !== user?.id ? (
+                        {!isYou ? (
                           <button
                             type="button"
                             className="plat-access-op__remove"

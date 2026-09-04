@@ -54,6 +54,26 @@ export default function PlatformDashboardPage() {
     setSchools(s);
   }, []);
 
+  const refreshSession = useCallback(async () => {
+    if (!localStorage.getItem(PLATFORM_TOKEN_KEY)) {
+      router.replace("/platform/login");
+      return null;
+    }
+    const profile = await getPlatformProfile();
+    const nextUser: PlatformUser = {
+      id: profile.user.id,
+      email: profile.user.email,
+      firstName: profile.user.firstName,
+      lastName: profile.user.lastName,
+      role: profile.user.role,
+      scope: "platform",
+      permissions: profile.user.permissions,
+    };
+    setUser(nextUser);
+    localStorage.setItem(PLATFORM_USER_KEY, JSON.stringify(nextUser));
+    return nextUser;
+  }, [router]);
+
   useEffect(() => {
     if (!localStorage.getItem(PLATFORM_TOKEN_KEY)) {
       router.replace("/platform/login");
@@ -64,19 +84,14 @@ export default function PlatformDashboardPage() {
 
     void (async () => {
       try {
-        const profile = await getPlatformProfile();
-        const nextUser: PlatformUser = {
-          id: profile.user.id,
-          email: profile.user.email,
-          firstName: profile.user.firstName,
-          lastName: profile.user.lastName,
-          role: profile.user.role,
-          scope: "platform",
-          permissions: profile.user.permissions,
-        };
-        setUser(nextUser);
-        localStorage.setItem(PLATFORM_USER_KEY, JSON.stringify(nextUser));
-        await loadData();
+        const nextUser = await refreshSession();
+        if (!nextUser) return;
+        if (hasPlatformPermission(nextUser, "platform.schools.view")) {
+          await loadData();
+        } else {
+          setDashboard(null);
+          setSchools([]);
+        }
       } catch (err) {
         if (isPlatformAuthError(err)) {
           router.replace("/platform/login");
@@ -87,7 +102,17 @@ export default function PlatformDashboardPage() {
         setLoading(false);
       }
     })();
-  }, [router, loadData]);
+  }, [router, loadData, refreshSession]);
+
+  useEffect(() => {
+    function onFocus() {
+      void refreshSession().catch((err) => {
+        if (isPlatformAuthError(err)) router.replace("/platform/login");
+      });
+    }
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [refreshSession, router]);
 
   async function setStatus(
     schoolId: string,

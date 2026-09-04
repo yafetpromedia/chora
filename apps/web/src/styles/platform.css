@@ -6787,7 +6787,10 @@ body:has(.plat-manage-drawer) .plat-shell .dash-tabbar,
 }
 
 .plat-access-op__main strong {
-  display: block;
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
   font-size: 0.9rem;
 }
 
@@ -6799,6 +6802,20 @@ body:has(.plat-manage-drawer) .plat-shell .dash-tabbar,
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.plat-access-op__perms {
+  display: block;
+  margin-top: 0.2rem;
+  font-style: normal;
+  font-size: 0.72rem;
+  font-weight: 650;
+  color: #64748b;
+}
+
+.plat-access-op.is-you {
+  border-color: rgba(13, 92, 99, 0.28);
+  background: linear-gradient(180deg, #f0fdfa 0%, #fff 70%);
 }
 
 .plat-access-op__select {
