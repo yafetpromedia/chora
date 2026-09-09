@@ -17,6 +17,8 @@ import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { SchoolTenantGuard } from '../common/guards/school-tenant.guard';
 import { SchoolPermission } from '../common/permissions/school-permissions';
+import { RequireSchoolModule } from '../common/decorators/require-school-module.decorator';
+import { SchoolModuleGuard } from '../common/guards/school-module.guard';
 import { CreateTimetableRoomDto } from './dto/create-timetable-room.dto';
 import { SaveTimetableEntriesDto } from './dto/save-timetable-entries.dto';
 import { GenerateTimetableDto } from './dto/generate-timetable.dto';
@@ -24,7 +26,14 @@ import { UpsertTimetablePeriodsDto } from './dto/upsert-timetable-periods.dto';
 import { TimetableService } from './timetable.service';
 
 @Controller('schools/timetable')
-@UseGuards(JwtAuthGuard, SchoolTenantGuard, RolesGuard, PermissionsGuard)
+@UseGuards(
+  JwtAuthGuard,
+  SchoolTenantGuard,
+  RolesGuard,
+  PermissionsGuard,
+  SchoolModuleGuard,
+)
+@RequireSchoolModule('timetable')
 export class TimetableController {
   constructor(private readonly timetableService: TimetableService) {}
 

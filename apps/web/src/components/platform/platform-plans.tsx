@@ -167,7 +167,8 @@ export function PlatformPlans() {
             <p className="plat-subjects-v2__eyebrow">Subscription catalog</p>
             <h2 className="plat-subjects-v2__title">Plan catalog</h2>
             <p className="plat-subjects-v2__sub">
-              Set prices in USD and ETB, limits, and what schools see on the upgrade page.
+              Size-band base fees only. Module add-on prices are defined in code
+              (attendance, results, finance, …) and selected per school at checkout.
             </p>
           </div>
         </div>

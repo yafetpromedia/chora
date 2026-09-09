@@ -19,6 +19,8 @@ import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { SchoolTenantGuard } from '../common/guards/school-tenant.guard';
 import { SchoolPermission } from '../common/permissions/school-permissions';
+import { RequireSchoolModule } from '../common/decorators/require-school-module.decorator';
+import { SchoolModuleGuard } from '../common/guards/school-module.guard';
 import {
   CreateExamScheduleDto,
   CreateExamSeatingPlanDto,
@@ -29,7 +31,14 @@ import {
 import { ExamSchedulesService } from './exam-schedules.service';
 
 @Controller('schools/exam-schedules')
-@UseGuards(JwtAuthGuard, SchoolTenantGuard, RolesGuard, PermissionsGuard)
+@UseGuards(
+  JwtAuthGuard,
+  SchoolTenantGuard,
+  RolesGuard,
+  PermissionsGuard,
+  SchoolModuleGuard,
+)
+@RequireSchoolModule('timetable')
 export class ExamSchedulesController {
   constructor(private readonly examSchedulesService: ExamSchedulesService) {}
 

@@ -113,19 +113,34 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
     const effectiveRole = stored ?? role;
     setNavRole(effectiveRole);
 
-    if (effectiveRole === "teacher") {
-      void getMyTeacherProfile()
-        .then((profile) => {
+    async function loadNav() {
+      let enabledModules: string[] | null = null;
+      try {
+        const sub = await getSchoolSubscription();
+        enabledModules = sub.enabledModules ?? null;
+        setSubscription(sub);
+      } catch {
+        /* nav without module filter if subscription unavailable */
+      }
+
+      if (effectiveRole === "teacher") {
+        try {
+          const profile = await getMyTeacherProfile();
           setNav(
             navForRole(effectiveRole, {
               canTakeAttendance: profile.canTakeAttendance,
+              enabledModules,
             }),
           );
-        })
-        .catch(() => setNav(navForRole(effectiveRole)));
-    } else {
-      setNav(navForRole(effectiveRole));
+        } catch {
+          setNav(navForRole(effectiveRole, { enabledModules }));
+        }
+      } else {
+        setNav(navForRole(effectiveRole, { enabledModules }));
+      }
     }
+
+    void loadNav();
     const brand = readSchoolBrand();
     setSchoolName(brand.name);
     setSchoolLogoUrl(brand.logoUrl);

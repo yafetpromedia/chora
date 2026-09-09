@@ -296,6 +296,10 @@ export class PlatformBillingService {
         updated.schoolId,
         updated.plan,
         updated.periodEnd,
+        {
+          enabledModules: updated.enabledModules,
+          billingBundle: updated.billingBundle,
+        },
       );
     }
 

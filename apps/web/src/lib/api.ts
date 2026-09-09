@@ -370,6 +370,36 @@ export type SubscriptionStatus = {
   };
   planLabel: string;
   planDescription: string;
+  enabledModules?: string[];
+  billingBundle?: string | null;
+  priceBreakdown?: {
+    baseEtb: number;
+    baseUsd: number;
+    modulesEtb: number;
+    modulesUsd: number;
+    discountEtb: number;
+    discountUsd: number;
+    totalEtb: number;
+    totalUsd: number;
+    custom: boolean;
+    bundleId: string | null;
+    modules: string[];
+    percentOffModules: number;
+  } | null;
+  moduleCatalog?: Array<{
+    key: string;
+    label: string;
+    description: string;
+    etbMonthly: number;
+    usdMonthly: number;
+  }>;
+  bundles?: Array<{
+    id: string;
+    label: string;
+    description: string;
+    modules: string[];
+    percentOffModules: number;
+  }>;
   coupon?: {
     code: string;
     kind: string;
@@ -535,8 +565,22 @@ export async function listPlans(): Promise<PlanOption[]> {
   return response.json();
 }
 
-export async function upgradeSchoolPlan(plan: Exclude<PlanType, "TRIAL">): Promise<SubscriptionStatus> {
-  return apiPost<SubscriptionStatus>("/schools/subscription/upgrade", { plan });
+export async function upgradeSchoolPlan(
+  plan: Exclude<PlanType, "TRIAL">,
+  opts?: { modules?: string[]; bundleId?: string | null },
+): Promise<SubscriptionStatus> {
+  return apiPost<SubscriptionStatus>("/schools/subscription/upgrade", {
+    plan,
+    modules: opts?.modules,
+    bundleId: opts?.bundleId,
+  });
+}
+
+export async function updateSchoolModules(body: {
+  modules?: string[];
+  bundleId?: string | null;
+}): Promise<SubscriptionStatus> {
+  return apiPatch<SubscriptionStatus>("/schools/subscription/modules", body);
 }
 
 export async function redeemSchoolCoupon(code: string) {
@@ -574,6 +618,8 @@ export async function getBillingPaymentConfig(): Promise<BillingPaymentConfig> {
 export async function startSubscriptionCheckout(body: {
   plan: Exclude<PlanType, "TRIAL" | "ENTERPRISE">;
   interval: "month" | "year";
+  modules?: string[];
+  bundleId?: string | null;
 }) {
   return apiPost<{
     checkoutUrl: string;

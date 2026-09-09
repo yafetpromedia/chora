@@ -25,6 +25,8 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { SchoolTenantGuard } from '../common/guards/school-tenant.guard';
+import { RequireSchoolModule } from '../common/decorators/require-school-module.decorator';
+import { SchoolModuleGuard } from '../common/guards/school-module.guard';
 import { SchoolPermission } from '../common/permissions/school-permissions';
 import { CreateLibraryResourceDto } from './dto/create-library-resource.dto';
 import { UpdateLibraryResourceDto } from './dto/update-library-resource.dto';
@@ -38,7 +40,14 @@ type UploadedLibFile = {
 };
 
 @Controller('schools/library')
-@UseGuards(JwtAuthGuard, SchoolTenantGuard, RolesGuard, PermissionsGuard)
+@UseGuards(
+  JwtAuthGuard,
+  SchoolTenantGuard,
+  RolesGuard,
+  PermissionsGuard,
+  SchoolModuleGuard,
+)
+@RequireSchoolModule('library')
 export class LibraryController {
   constructor(private readonly libraryService: LibraryService) {}
 

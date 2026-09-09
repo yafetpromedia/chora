@@ -1,5 +1,11 @@
-import { IsEnum, IsIn } from 'class-validator';
 import { Plan } from '@prisma/client';
+import {
+  IsArray,
+  IsEnum,
+  IsIn,
+  IsOptional,
+  IsString,
+} from 'class-validator';
 
 export class SubscriptionCheckoutDto {
   @IsEnum(Plan)
@@ -8,4 +14,13 @@ export class SubscriptionCheckoutDto {
 
   @IsIn(['month', 'year'])
   interval!: 'month' | 'year';
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  modules?: string[];
+
+  @IsOptional()
+  @IsString()
+  bundleId?: string | null;
 }

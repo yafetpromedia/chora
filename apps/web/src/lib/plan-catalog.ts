@@ -16,17 +16,10 @@ export type PlanPriceAmounts = {
   usdMonthly: number;
 };
 
-/** USD list price; ETB derived at market rate (~158 ETB/USD, rounded to nearest 50) */
-export const USD_ETB_RATE = 158;
-
-function etbFromUsd(usd: number): number {
-  return Math.round((usd * USD_ETB_RATE) / 50) * 50;
-}
-
-/** List prices — USD is source of truth for international billing */
+/** Size-band base fees — modules priced in module-catalog */
 export const PLAN_PRICES: Record<PaidPlan, PlanPriceAmounts & { custom?: boolean }> = {
-  STARTER: { usdMonthly: 99, etbMonthly: etbFromUsd(99) },
-  PROFESSIONAL: { usdMonthly: 259, etbMonthly: etbFromUsd(259) },
+  STARTER: { usdMonthly: 13, etbMonthly: 2000 },
+  PROFESSIONAL: { usdMonthly: 25, etbMonthly: 4000 },
   ENTERPRISE: { etbMonthly: 0, usdMonthly: 0, custom: true },
 };
 
@@ -38,23 +31,29 @@ export const PLAN_CATALOG: Record<PaidPlan, PlanCatalogEntry> = {
 
 export const PLAN_FEATURES: Record<PaidPlan, string[]> = {
   STARTER: [
+    "Base workspace (users, classes, announcements)",
     "Up to 500 students",
     "Up to 50 teachers",
-    "Parent portal",
-    "Attendance, results & announcements",
+    "Add only the modules you need",
   ],
   PROFESSIONAL: [
+    "Base workspace (users, classes, announcements)",
     "Up to 2,000 students",
     "Unlimited teachers",
-    "Analytics & notifications",
-    "Mobile app access",
+    "Add only the modules you need",
   ],
   ENTERPRISE: [
     "Unlimited students",
     "Multi-campus support",
-    "Advanced analytics & API",
+    "Custom module package",
     "Dedicated support",
   ],
+};
+
+export const PLAN_LABELS: Record<PaidPlan, string> = {
+  STARTER: "Small school",
+  PROFESSIONAL: "Growing school",
+  ENTERPRISE: "Enterprise",
 };
 
 /** Yearly = 10× monthly (2 months free) */
@@ -112,6 +111,8 @@ export const TRIAL_PLAN_DISPLAY = {
   id: "TRIAL" as const,
   name: "Trial",
   desc: "Full evaluation for new tenants. Auto-assigned when a school is created.",
-  features: ["All core modules", "Up to 50 students", "Email support"],
+  features: ["All modules included", "Up to 50 students", "Email support"],
   tone: "trial",
 };
+
+export { YEARLY_MULTIPLIER };

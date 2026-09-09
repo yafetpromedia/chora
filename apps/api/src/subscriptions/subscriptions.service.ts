@@ -10,6 +10,7 @@ import {
   PlatformInvoiceStatus,
   PlatformPayMethod,
   PlatformPaymentProofStatus,
+  Prisma,
   UserRole,
 } from '@prisma/client';
 import type { ReviewPlatformPaymentDto } from './dto/platform-payment.dto';
@@ -17,6 +18,16 @@ import type { SubmitPlatformPaymentDto } from './dto/platform-payment.dto';
 import { ChapaService } from '../payments/chapa.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CouponsService } from './coupons.service';
+import { ModuleEntitlementService } from './module-entitlement.service';
+import {
+  BILLING_BUNDLES,
+  SCHOOL_MODULE_CATALOG,
+  computeModularMonthlyTotal,
+  type BillingBundleId,
+  type ModularPriceBreakdown,
+  type SchoolModuleKey,
+  allSchoolModules,
+} from './module-catalog';
 import { PlanCatalogService } from './plan-catalog.service';
 import { UPGRADE_PLANS } from './plan-limits';
 
@@ -42,6 +53,11 @@ export type SubscriptionStatus = {
   };
   planLabel: string;
   planDescription: string;
+  enabledModules: SchoolModuleKey[];
+  billingBundle: string | null;
+  priceBreakdown: ModularPriceBreakdown | null;
+  moduleCatalog: typeof SCHOOL_MODULE_CATALOG;
+  bundles: typeof BILLING_BUNDLES;
 };
 
 @Injectable()
@@ -51,6 +67,7 @@ export class SubscriptionsService {
     private readonly planCatalog: PlanCatalogService,
     private readonly chapaService: ChapaService,
     private readonly coupons: CouponsService,
+    private readonly moduleEntitlements: ModuleEntitlementService,
   ) {}
 
   async createTrial(schoolId: string) {
@@ -64,6 +81,8 @@ export class SubscriptionsService {
         plan: Plan.TRIAL,
         trialEndsAt,
         isActive: true,
+        enabledModules: allSchoolModules() as unknown as Prisma.InputJsonValue,
+        billingBundle: 'full',
       },
     });
   }
@@ -85,6 +104,8 @@ export class SubscriptionsService {
         plan,
         isActive: true,
         trialEndsAt: plan === Plan.TRIAL ? trialEndsAt : null,
+        enabledModules: allSchoolModules() as unknown as Prisma.InputJsonValue,
+        billingBundle: 'full',
       },
     });
   }
@@ -137,6 +158,26 @@ export class SubscriptionsService {
 
     const expired = trialExpired || periodExpired || !sub.isActive;
 
+    await this.moduleEntitlements.backfillAllModulesIfUnset(schoolId);
+    const refreshed = await this.prisma.subscription.findUnique({
+      where: { schoolId },
+    });
+    const subForModules = refreshed ?? sub;
+    const enabledModules =
+      this.moduleEntitlements.resolveFromSubscription(subForModules);
+    const billingBundle = subForModules.billingBundle;
+    const pricePlan = sub.plan === Plan.TRIAL ? Plan.STARTER : sub.plan;
+    const priceBreakdown = await this.buildPriceBreakdown(
+      pricePlan,
+      enabledModules,
+      billingBundle === 'base'
+        ? null
+        : billingBundle && billingBundle !== 'base'
+          ? (billingBundle as BillingBundleId)
+          : null,
+      billingBundle === 'base',
+    );
+
     return {
       plan: sub.plan,
       isActive: sub.isActive,
@@ -153,7 +194,65 @@ export class SubscriptionsService {
       usage,
       planLabel: limits.label,
       planDescription: limits.description,
+      enabledModules,
+      billingBundle,
+      priceBreakdown,
+      moduleCatalog: SCHOOL_MODULE_CATALOG,
+      bundles: BILLING_BUNDLES,
     };
+  }
+
+  getModulesCatalog() {
+    return {
+      modules: SCHOOL_MODULE_CATALOG,
+      bundles: BILLING_BUNDLES,
+    };
+  }
+
+  async updateModules(
+    schoolId: string,
+    input: { modules?: string[]; bundleId?: string | null },
+  ) {
+    await this.ensureSubscription(schoolId);
+    const normalized = this.moduleEntitlements.normalizeSelection(input);
+    await this.prisma.subscription.update({
+      where: { schoolId },
+      data: {
+        enabledModules: normalized.modules as unknown as Prisma.InputJsonValue,
+        billingBundle: normalized.billingBundle,
+      },
+    });
+    return this.getStatus(schoolId);
+  }
+
+  private async buildPriceBreakdown(
+    plan: Plan,
+    modules: SchoolModuleKey[],
+    bundleId: BillingBundleId | null,
+    baseOnly = false,
+  ): Promise<ModularPriceBreakdown | null> {
+    if (plan === Plan.TRIAL) {
+      plan = Plan.STARTER;
+    }
+    if (plan === Plan.ENTERPRISE) {
+      return computeModularMonthlyTotal({
+        plan,
+        baseEtb: 0,
+        baseUsd: 0,
+        modules: [],
+        bundleId: null,
+      });
+    }
+    const catalog = await this.planCatalog.findAll();
+    const planRow = catalog.find((p) => p.plan === plan);
+    if (!planRow) return null;
+    return computeModularMonthlyTotal({
+      plan,
+      baseEtb: planRow.etbMonthly,
+      baseUsd: planRow.usdMonthly,
+      modules: baseOnly ? [] : modules,
+      bundleId: baseOnly ? null : bundleId,
+    });
   }
 
   async assertActive(schoolId: string) {
@@ -240,7 +339,12 @@ export class SubscriptionsService {
     };
   }
 
-  async upgradePlan(schoolId: string, plan: Plan, adminId?: string) {
+  async upgradePlan(
+    schoolId: string,
+    plan: Plan,
+    adminId?: string,
+    moduleSelection?: { modules?: string[]; bundleId?: string | null },
+  ) {
     if (!UPGRADE_PLANS.includes(plan)) {
       throw new ForbiddenException('Invalid upgrade plan');
     }
@@ -258,15 +362,45 @@ export class SubscriptionsService {
       throw new NotFoundException('Subscription not found');
     }
 
+    if (moduleSelection) {
+      await this.updateModules(schoolId, moduleSelection);
+    }
+
+    const statusAfterMods = await this.getStatus(schoolId);
+    const breakdown = await this.buildPriceBreakdown(
+      plan,
+      statusAfterMods.enabledModules,
+      statusAfterMods.billingBundle === 'base'
+        ? null
+        : (statusAfterMods.billingBundle as BillingBundleId | null),
+      statusAfterMods.billingBundle === 'base',
+    );
+    if (!breakdown || (breakdown.custom && plan === Plan.ENTERPRISE)) {
+      throw new BadRequestException(
+        plan === Plan.ENTERPRISE
+          ? 'Contact sales for Enterprise pricing'
+          : 'Plan pricing is not available',
+      );
+    }
+    if (breakdown.totalEtb <= 0 && plan !== Plan.ENTERPRISE) {
+      throw new BadRequestException('Plan pricing is not available');
+    }
+
     const catalog = await this.planCatalog.findAll();
     const planRow = catalog.find((p) => p.plan === plan);
-    if (!planRow || planRow.etbMonthly <= 0) {
+    if (!planRow) {
       throw new BadRequestException('Plan pricing is not available');
     }
 
     const percentOff = await this.coupons.discountForSchool(schoolId);
-    const amountEtb = this.applyPercentOff(planRow.etbMonthly, percentOff);
-    const amountUsd = this.applyPercentOff(planRow.usdMonthly, percentOff);
+    const amountEtb = this.applyPercentOff(breakdown.totalEtb, percentOff);
+    const amountUsd = this.applyPercentOff(breakdown.totalUsd, percentOff);
+
+    const moduleData = {
+      enabledModules:
+        statusAfterMods.enabledModules as unknown as Prisma.InputJsonValue,
+      billingBundle: statusAfterMods.billingBundle,
+    };
 
     if (percentOff >= 100 || amountEtb <= 0) {
       const periodEnd = new Date();
@@ -278,6 +412,7 @@ export class SubscriptionsService {
           isActive: true,
           trialEndsAt: null,
           currentPeriodEnd: periodEnd,
+          ...moduleData,
         },
       });
       const status = await this.getStatus(schoolId);
@@ -312,9 +447,11 @@ export class SubscriptionsService {
         status: PlatformInvoiceStatus.SENT,
         billingInterval: 'month',
         initiatedBy: adminId ?? null,
+        enabledModules: moduleData.enabledModules,
+        billingBundle: moduleData.billingBundle,
         notes: percentOff
-          ? `${planRow.label} monthly · ${percentOff}% coupon`
-          : `${planRow.label} monthly — pay by bank transfer`,
+          ? `${planRow.label} modular monthly · ${percentOff}% coupon`
+          : `${planRow.label} modular monthly — pay by bank transfer`,
       },
     });
 
@@ -342,6 +479,7 @@ export class SubscriptionsService {
     adminId: string,
     plan: Plan,
     interval: 'month' | 'year',
+    moduleSelection?: { modules?: string[]; bundleId?: string | null },
   ) {
     if (!this.chapaService.isLiveEnabled()) {
       throw new BadRequestException('Chapa payments are not enabled');
@@ -350,21 +488,33 @@ export class SubscriptionsService {
       throw new ForbiddenException('Invalid plan for checkout');
     }
 
+    if (moduleSelection) {
+      await this.updateModules(schoolId, moduleSelection);
+    }
+
     const status = await this.getStatus(schoolId);
-    if (status.plan === plan) {
-      throw new BadRequestException('You are already on this plan');
+    const breakdown = await this.buildPriceBreakdown(
+      plan,
+      status.enabledModules,
+      status.billingBundle === 'base'
+        ? null
+        : (status.billingBundle as BillingBundleId | null),
+      status.billingBundle === 'base',
+    );
+    if (!breakdown || breakdown.totalEtb <= 0) {
+      throw new BadRequestException('Plan pricing is not available');
     }
 
     const catalog = await this.planCatalog.findAll();
     const planRow = catalog.find((p) => p.plan === plan);
-    if (!planRow || planRow.etbMonthly <= 0) {
+    if (!planRow) {
       throw new BadRequestException('Plan pricing is not available');
     }
 
     const factor = interval === 'year' ? YEARLY_BILLING_MULTIPLIER : 1;
     const percentOff = await this.coupons.discountForSchool(schoolId);
-    const amountEtb = this.applyPercentOff(planRow.etbMonthly * factor, percentOff);
-    const amountUsd = this.applyPercentOff(planRow.usdMonthly * factor, percentOff);
+    const amountEtb = this.applyPercentOff(breakdown.totalEtb * factor, percentOff);
+    const amountUsd = this.applyPercentOff(breakdown.totalUsd * factor, percentOff);
 
     const [admin, school] = await Promise.all([
       this.prisma.user.findUnique({
@@ -419,7 +569,10 @@ export class SubscriptionsService {
         paymentReference: txRef,
         billingInterval: interval,
         initiatedBy: adminId,
-        notes: `Chora ${planRow.label} plan (${interval}ly)`,
+        enabledModules:
+          status.enabledModules as unknown as Prisma.InputJsonValue,
+        billingBundle: status.billingBundle,
+        notes: `Chora ${planRow.label} modular plan (${interval}ly)`,
       },
     });
 
@@ -535,6 +688,12 @@ export class SubscriptionsService {
           isActive: true,
           trialEndsAt: null,
           currentPeriodEnd: invoice.periodEnd,
+          ...(invoice.enabledModules != null
+            ? {
+                enabledModules: invoice.enabledModules as Prisma.InputJsonValue,
+                billingBundle: invoice.billingBundle,
+              }
+            : {}),
         },
       });
     });
@@ -580,7 +739,12 @@ export class SubscriptionsService {
     return null;
   }
 
-  async activateFromPaidInvoice(schoolId: string, plan: Plan | null, periodEnd: Date) {
+  async activateFromPaidInvoice(
+    schoolId: string,
+    plan: Plan | null,
+    periodEnd: Date,
+    modules?: { enabledModules?: unknown; billingBundle?: string | null },
+  ) {
     if (!plan || plan === Plan.TRIAL) return;
     await this.prisma.subscription.update({
       where: { schoolId },
@@ -589,6 +753,12 @@ export class SubscriptionsService {
         isActive: true,
         trialEndsAt: null,
         currentPeriodEnd: periodEnd,
+        ...(modules?.enabledModules != null
+          ? {
+              enabledModules: modules.enabledModules as Prisma.InputJsonValue,
+              billingBundle: modules.billingBundle ?? null,
+            }
+          : {}),
       },
     });
   }
@@ -693,12 +863,20 @@ export class SubscriptionsService {
 
     return {
       subscription,
-      planPrice: planRow
+      planPrice: subscription.priceBreakdown
         ? {
-            usdMonthly: planRow.usdMonthly,
-            etbMonthly: planRow.etbMonthly,
+            usdMonthly: subscription.priceBreakdown.totalUsd,
+            etbMonthly: subscription.priceBreakdown.totalEtb,
+            baseEtb: subscription.priceBreakdown.baseEtb,
+            modulesEtb: subscription.priceBreakdown.modulesEtb,
+            discountEtb: subscription.priceBreakdown.discountEtb,
           }
-        : null,
+        : planRow
+          ? {
+              usdMonthly: planRow.usdMonthly,
+              etbMonthly: planRow.etbMonthly,
+            }
+          : null,
       invoices: {
         total: invoices.length,
         openCount,
@@ -763,15 +941,15 @@ export class SubscriptionsService {
       };
     }
 
-    const catalog = await this.planCatalog.findAll();
-    const planRow = catalog.find((p) => p.plan === sub.plan);
-    if (!planRow || planRow.etbMonthly <= 0) {
+    const status = await this.getStatus(schoolId);
+    const breakdown = status.priceBreakdown;
+    if (!breakdown || breakdown.totalEtb <= 0) {
       throw new BadRequestException('Plan pricing is not available');
     }
 
     const percentOff = await this.coupons.discountForSchool(schoolId);
-    const amountEtb = this.applyPercentOff(planRow.etbMonthly, percentOff);
-    const amountUsd = this.applyPercentOff(planRow.usdMonthly, percentOff);
+    const amountEtb = this.applyPercentOff(breakdown.totalEtb, percentOff);
+    const amountUsd = this.applyPercentOff(breakdown.totalUsd, percentOff);
 
     if (percentOff >= 100 || amountEtb <= 0) {
       throw new BadRequestException(
@@ -801,9 +979,10 @@ export class SubscriptionsService {
         status: PlatformInvoiceStatus.SENT,
         billingInterval: 'month',
         initiatedBy: adminId ?? null,
-        notes: percentOff
-          ? `${planRow.label} renewal · ${percentOff}% coupon`
-          : `${planRow.label} monthly renewal`,
+        enabledModules:
+          status.enabledModules as unknown as Prisma.InputJsonValue,
+        billingBundle: status.billingBundle,
+        notes: `${status.planLabel} modular renewal`,
       },
     });
 
@@ -1013,6 +1192,12 @@ export class SubscriptionsService {
           isActive: true,
           trialEndsAt: null,
           currentPeriodEnd: invoice.periodEnd,
+          ...(invoice.enabledModules != null
+            ? {
+                enabledModules: invoice.enabledModules as Prisma.InputJsonValue,
+                billingBundle: invoice.billingBundle,
+              }
+            : {}),
         },
       });
     });

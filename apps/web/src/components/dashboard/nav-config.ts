@@ -1,5 +1,6 @@
 import type { UserRole } from "@/lib/auth";
 import { hasPermission, Permission } from "@/lib/permissions";
+import type { SchoolModuleKey } from "@/lib/module-catalog";
 import type { DashIconName } from "./dash-icons";
 
 export type NavChild = {
@@ -19,6 +20,8 @@ export type NavItem = {
   permission?: string;
   /** Teacher-only: show only when homeroom is assigned. */
   homeroomOnly?: boolean;
+  /** Billable school module required (from subscription entitlements). */
+  module?: SchoolModuleKey;
   /** Optional sub-sections shown in the sidebar when this item is active. */
   children?: NavChild[];
 };
@@ -85,6 +88,7 @@ export const DASHBOARD_NAV: NavItem[] = [
     icon: "calendar",
     roles: ["admin", "staff"],
     permission: Permission.TIMETABLE_READ,
+    module: "timetable",
   },
   {
     href: "/admin/exams",
@@ -92,6 +96,7 @@ export const DASHBOARD_NAV: NavItem[] = [
     icon: "results",
     roles: ["admin", "staff"],
     permission: Permission.TIMETABLE_READ,
+    module: "timetable",
   },
   {
     href: "/admin/library",
@@ -99,6 +104,7 @@ export const DASHBOARD_NAV: NavItem[] = [
     icon: "library",
     roles: ["admin", "staff"],
     permission: Permission.LIBRARY_READ,
+    module: "library",
   },
   {
     href: "/admin/staff",
@@ -113,6 +119,7 @@ export const DASHBOARD_NAV: NavItem[] = [
     icon: "attendance",
     roles: ["admin", "staff"],
     permission: Permission.ATTENDANCE_MANAGE,
+    module: "attendance",
   },
   {
     href: "/admin/results",
@@ -120,6 +127,7 @@ export const DASHBOARD_NAV: NavItem[] = [
     icon: "results",
     roles: ["admin", "staff"],
     permission: Permission.RESULTS_READ,
+    module: "results",
   },
   {
     href: "/admin/report-cards",
@@ -127,6 +135,7 @@ export const DASHBOARD_NAV: NavItem[] = [
     icon: "report-card",
     roles: ["admin", "staff"],
     permission: Permission.RESULTS_READ,
+    module: "results",
   },
   {
     href: "/admin/reports",
@@ -140,6 +149,7 @@ export const DASHBOARD_NAV: NavItem[] = [
     icon: "templates",
     roles: ["admin", "staff"],
     permission: Permission.RESULTS_READ,
+    module: "results",
   },
   {
     href: "/admin/finance",
@@ -147,6 +157,7 @@ export const DASHBOARD_NAV: NavItem[] = [
     icon: "finance",
     roles: ["admin", "staff"],
     permission: Permission.FINANCE_READ,
+    module: "finance",
   },
   {
     href: "/admin/billing",
@@ -188,12 +199,14 @@ export const DASHBOARD_NAV: NavItem[] = [
     icon: "attendance",
     roles: ["teacher"],
     homeroomOnly: true,
+    module: "attendance",
   },
   {
     href: "/teacher/results",
     label: "Results",
     icon: "results",
     roles: ["teacher"],
+    module: "results",
     children: [
       {
         href: "/teacher/results",
@@ -212,15 +225,40 @@ export const DASHBOARD_NAV: NavItem[] = [
       },
     ],
   },
-  { href: "/teacher/classwork", label: "Assignments", icon: "library", roles: ["teacher"] },
-  { href: "/teacher/worksheets", label: "Worksheets", icon: "results", roles: ["teacher"] },
-  { href: "/teacher/timetable", label: "Timetable", icon: "calendar", roles: ["teacher"] },
-  { href: "/teacher/exams", label: "Exam schedules", icon: "calendar", roles: ["teacher"] },
+  {
+    href: "/teacher/classwork",
+    label: "Assignments",
+    icon: "library",
+    roles: ["teacher"],
+    module: "classroom",
+  },
+  {
+    href: "/teacher/worksheets",
+    label: "Worksheets",
+    icon: "results",
+    roles: ["teacher"],
+    module: "worksheets",
+  },
+  {
+    href: "/teacher/timetable",
+    label: "Timetable",
+    icon: "calendar",
+    roles: ["teacher"],
+    module: "timetable",
+  },
+  {
+    href: "/teacher/exams",
+    label: "Exam schedules",
+    icon: "calendar",
+    roles: ["teacher"],
+    module: "timetable",
+  },
   {
     href: "/teacher/library",
     label: "eLibrary",
     icon: "library",
     roles: ["teacher"],
+    module: "library",
     children: [
       { href: "/teacher/library", label: "Browse", description: "Search & discover" },
       { href: "/teacher/library/progress", label: "Progress", description: "My uploads" },
@@ -229,28 +267,107 @@ export const DASHBOARD_NAV: NavItem[] = [
   },
   { href: "/teacher/id-card", label: "Staff ID", icon: "students", roles: ["teacher"] },
   { href: "/teacher/profile", label: "Profile", icon: "profile", roles: ["teacher"] },
-  { href: "/parent", label: "Overview", icon: "overview", roles: ["parent"] },
-  { href: "/parent/results", label: "Results", icon: "results", roles: ["parent"] },
-  { href: "/parent/report-card", label: "Report card", icon: "report-card", roles: ["parent"] },
-  { href: "/parent/fees", label: "Fees", icon: "fees", roles: ["parent"] },
-  { href: "/parent/timetable", label: "Timetable", icon: "calendar", roles: ["parent"] },
-  { href: "/parent/exams", label: "Exam schedules", icon: "calendar", roles: ["parent"] },
+  { href: "/parent", label: "Overview", icon: "overview", roles: ["parent"], module: "parent" },
+  {
+    href: "/parent/results",
+    label: "Results",
+    icon: "results",
+    roles: ["parent"],
+    module: "results",
+  },
+  {
+    href: "/parent/report-card",
+    label: "Report card",
+    icon: "report-card",
+    roles: ["parent"],
+    module: "results",
+  },
+  {
+    href: "/parent/fees",
+    label: "Fees",
+    icon: "fees",
+    roles: ["parent"],
+    module: "finance",
+  },
+  {
+    href: "/parent/timetable",
+    label: "Timetable",
+    icon: "calendar",
+    roles: ["parent"],
+    module: "timetable",
+  },
+  {
+    href: "/parent/exams",
+    label: "Exam schedules",
+    icon: "calendar",
+    roles: ["parent"],
+    module: "timetable",
+  },
   { href: "/parent/profile", label: "Profile", icon: "profile", roles: ["parent"] },
   { href: "/student", label: "Overview", icon: "overview", roles: ["student"] },
   { href: "/student/id-card", label: "Campus ID", icon: "students", roles: ["student"] },
-  { href: "/student/attendance", label: "Attendance", icon: "attendance", roles: ["student"] },
-  { href: "/student/results", label: "Results", icon: "results", roles: ["student"] },
-  { href: "/student/report-card", label: "Report card", icon: "report-card", roles: ["student"] },
-  { href: "/student/classwork", label: "Assignments", icon: "library", roles: ["student"] },
-  { href: "/student/worksheets", label: "Worksheets", icon: "results", roles: ["student"] },
-  { href: "/student/fees", label: "Fees", icon: "fees", roles: ["student"] },
-  { href: "/student/timetable", label: "Timetable", icon: "calendar", roles: ["student"] },
-  { href: "/student/exams", label: "Exam schedules", icon: "calendar", roles: ["student"] },
+  {
+    href: "/student/attendance",
+    label: "Attendance",
+    icon: "attendance",
+    roles: ["student"],
+    module: "attendance",
+  },
+  {
+    href: "/student/results",
+    label: "Results",
+    icon: "results",
+    roles: ["student"],
+    module: "results",
+  },
+  {
+    href: "/student/report-card",
+    label: "Report card",
+    icon: "report-card",
+    roles: ["student"],
+    module: "results",
+  },
+  {
+    href: "/student/classwork",
+    label: "Assignments",
+    icon: "library",
+    roles: ["student"],
+    module: "classroom",
+  },
+  {
+    href: "/student/worksheets",
+    label: "Worksheets",
+    icon: "results",
+    roles: ["student"],
+    module: "worksheets",
+  },
+  {
+    href: "/student/fees",
+    label: "Fees",
+    icon: "fees",
+    roles: ["student"],
+    module: "finance",
+  },
+  {
+    href: "/student/timetable",
+    label: "Timetable",
+    icon: "calendar",
+    roles: ["student"],
+    module: "timetable",
+  },
+  {
+    href: "/student/exams",
+    label: "Exam schedules",
+    icon: "calendar",
+    roles: ["student"],
+    module: "timetable",
+  },
   {
     href: "/student/library",
     label: "eLibrary",
     icon: "library",
     roles: ["student"],
+    module: "library",
     children: [
       { href: "/student/library", label: "Browse", description: "Search & discover" },
       { href: "/student/library/progress", label: "Progress", description: "Reading & saves" },
@@ -260,14 +377,24 @@ export const DASHBOARD_NAV: NavItem[] = [
   { href: "/student/profile", label: "Profile", icon: "profile", roles: ["student"] },
 ];
 
-export function navForRole(role: UserRole, options?: { canTakeAttendance?: boolean }) {
+export function navForRole(
+  role: UserRole,
+  options?: {
+    canTakeAttendance?: boolean;
+    enabledModules?: string[] | null;
+  },
+) {
+  const modules = options?.enabledModules;
   return DASHBOARD_NAV.filter((n) => {
     if (!n.roles.includes(role)) return false;
     if (n.homeroomOnly && role === "teacher" && !options?.canTakeAttendance) {
       return false;
     }
     if (n.permission && (role === "admin" || role === "staff")) {
-      return hasPermission(n.permission);
+      if (!hasPermission(n.permission)) return false;
+    }
+    if (n.module && modules) {
+      if (!modules.includes(n.module)) return false;
     }
     return true;
   });

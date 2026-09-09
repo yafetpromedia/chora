@@ -20,6 +20,8 @@ import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { SchoolTenantGuard } from '../common/guards/school-tenant.guard';
 import { SchoolPermission } from '../common/permissions/school-permissions';
+import { RequireSchoolModule } from '../common/decorators/require-school-module.decorator';
+import { SchoolModuleGuard } from '../common/guards/school-module.guard';
 import { AttendanceModeDto } from '../schools/dto/attendance-mode.dto';
 import { SchoolsService } from '../schools/schools.service';
 import { BulkAttendanceDto } from './dto/bulk-attendance.dto';
@@ -29,7 +31,8 @@ import { ScanAttendanceDto } from './dto/scan-attendance.dto';
 import { AttendanceService } from './attendance.service';
 
 @Controller('attendance')
-@UseGuards(JwtAuthGuard, SchoolTenantGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, SchoolTenantGuard, RolesGuard, SchoolModuleGuard)
+@RequireSchoolModule('attendance')
 export class AttendanceController {
   constructor(
     private readonly attendanceService: AttendanceService,

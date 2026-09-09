@@ -321,6 +321,10 @@ model Subscription {
   currentPeriodEnd DateTime?
   couponCode       String?
   isActive         Boolean   @default(true)
+  /// Billable module keys enabled for this school (JSON string[]). Empty = grandfather all.
+  enabledModules   Json      @default("[]")
+  /// Optional bundle preset: ops | school | full
+  billingBundle    String?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
@@ -403,6 +407,9 @@ model PlatformInvoice {
   paymentReference  String?               @unique
   billingInterval   String?
   initiatedBy       String?
+  /// Snapshot of modules selected at invoice time (JSON string[])
+  enabledModules    Json?
+  billingBundle     String?
   paymentProofs     PlatformPaymentProof[]
   createdAt         DateTime              @default(now())
   updatedAt         DateTime              @updatedAt

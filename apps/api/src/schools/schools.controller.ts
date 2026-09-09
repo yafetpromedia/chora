@@ -11,6 +11,7 @@ import { SubscriptionCheckoutDto } from './dto/subscription-checkout.dto';
 import { VerifySubscriptionCheckoutDto } from './dto/verify-subscription-checkout.dto';
 import { RedeemCouponDto } from '../subscriptions/dto/coupon.dto';
 import { UpgradePlanDto } from './dto/upgrade-plan.dto';
+import { UpdateSubscriptionModulesDto } from './dto/update-subscription-modules.dto';
 import { SubmitPlatformPaymentDto } from '../subscriptions/dto/platform-payment.dto';
 import { UpdateSchoolSettingsDto } from './dto/update-school-settings.dto';
 import { InvitesService } from './invites.service';
@@ -105,6 +106,23 @@ export class SchoolsController {
     return this.subscriptionsService.getStatus(user.schoolId);
   }
 
+  @Get('subscription/modules')
+  @UseGuards(JwtAuthGuard, SchoolTenantGuard, RolesGuard)
+  @Roles('admin')
+  getSubscriptionModules() {
+    return this.subscriptionsService.getModulesCatalog();
+  }
+
+  @Patch('subscription/modules')
+  @UseGuards(JwtAuthGuard, SchoolTenantGuard, RolesGuard)
+  @Roles('admin')
+  updateSubscriptionModules(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: UpdateSubscriptionModulesDto,
+  ) {
+    return this.subscriptionsService.updateModules(user.schoolId, dto);
+  }
+
   @Get('billing')
   @UseGuards(JwtAuthGuard, SchoolTenantGuard, RolesGuard)
   @Roles('admin')
@@ -176,6 +194,7 @@ export class SchoolsController {
       user.id,
       dto.plan,
       dto.interval,
+      { modules: dto.modules, bundleId: dto.bundleId },
     );
   }
 
@@ -200,6 +219,7 @@ export class SchoolsController {
       user.schoolId,
       dto.plan,
       user.id,
+      { modules: dto.modules, bundleId: dto.bundleId },
     );
   }
 

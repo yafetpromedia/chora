@@ -27,6 +27,7 @@ export class PlanCatalogService implements OnModuleInit {
 
   async onModuleInit() {
     await this.ensureSeeded();
+    await this.syncListedPricesFromDefaults();
   }
 
   async ensureSeeded() {
@@ -34,6 +35,33 @@ export class PlanCatalogService implements OnModuleInit {
     if (count > 0) return;
     for (const row of DEFAULT_PLAN_CATALOG) {
       await this.prisma.planCatalog.create({ data: this.toCreate(row) });
+    }
+    this.cache = null;
+  }
+
+  /**
+   * Upsert base band label/description/prices/features from code defaults
+   * so existing DBs pick up modular pricing without a manual reset.
+   */
+  async syncListedPricesFromDefaults() {
+    for (const row of DEFAULT_PLAN_CATALOG) {
+      await this.prisma.planCatalog.upsert({
+        where: { plan: row.plan },
+        create: this.toCreate(row),
+        update: {
+          label: row.label,
+          description: row.description,
+          studentsLimit: row.studentsLimit,
+          teachersLimit: row.teachersLimit,
+          adminsLimit: row.adminsLimit,
+          usdMonthly: row.usdMonthly,
+          etbMonthly: row.etbMonthly,
+          features: row.features,
+          trialDays: row.trialDays,
+          sortOrder: row.sortOrder,
+          isListed: row.isListed,
+        },
+      });
     }
     this.cache = null;
   }

@@ -16,6 +16,8 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { SchoolTenantGuard } from '../common/guards/school-tenant.guard';
+import { RequireSchoolModule } from '../common/decorators/require-school-module.decorator';
+import { SchoolModuleGuard } from '../common/guards/school-module.guard';
 import { AssignGradeFeesDto } from './dto/assign-grade-fees.dto';
 import { CreateAcademicYearDto } from './dto/create-academic-year.dto';
 import { CreateFeeScheduleDto } from './dto/create-fee-schedule.dto';
@@ -28,7 +30,8 @@ import { VerifyChapaPaymentDto } from './dto/verify-chapa-payment.dto';
 import { FinanceService } from './finance.service';
 
 @Controller('finance')
-@UseGuards(JwtAuthGuard, SchoolTenantGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, SchoolTenantGuard, RolesGuard, SchoolModuleGuard)
+@RequireSchoolModule('finance')
 export class FinanceController {
   constructor(private readonly financeService: FinanceService) {}
 

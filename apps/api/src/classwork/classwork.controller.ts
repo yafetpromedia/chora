@@ -21,6 +21,8 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { SchoolTenantGuard } from '../common/guards/school-tenant.guard';
+import { RequireSchoolModule } from '../common/decorators/require-school-module.decorator';
+import { SchoolModuleGuard } from '../common/guards/school-module.guard';
 import {
   CreateClassworkDto,
   GradeSubmissionDto,
@@ -32,7 +34,8 @@ import { ClassworkService } from './classwork.service';
 type UploadedFile = { buffer: Buffer; originalname: string };
 
 @Controller('schools/classwork')
-@UseGuards(JwtAuthGuard, SchoolTenantGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, SchoolTenantGuard, RolesGuard, SchoolModuleGuard)
+@RequireSchoolModule('classroom')
 export class ClassworkController {
   constructor(private readonly classwork: ClassworkService) {}
 
