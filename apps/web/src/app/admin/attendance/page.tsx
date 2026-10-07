@@ -8,13 +8,22 @@ import { DashboardPage } from "@/components/dashboard/dashboard-page";
 import { AttendanceMarkPanel } from "@/components/attendance/attendance-mark-panel";
 import { AttendanceScanner } from "@/components/attendance/attendance-scanner";
 import {
+  downloadAttendanceExport,
   getAttendanceAnalytics,
   type AttendanceAnalytics,
 } from "@/lib/attendance";
 import { AUTH_ROLE_KEY, AUTH_TOKEN_KEY, isSchoolWorkspaceRole } from "@/lib/auth";
+import { hasPermission, Permission } from "@/lib/permissions";
 import { AppToast } from "@/components/ui/app-toast";
 
 type Tab = "mark" | "scan";
+
+function monthStartIso() {
+  const d = new Date();
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1))
+    .toISOString()
+    .slice(0, 10);
+}
 
 function formatHeroDate(iso: string) {
   try {
@@ -36,6 +45,10 @@ export default function AdminAttendancePage() {
   const [analyticsDate, setAnalyticsDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [exportFrom, setExportFrom] = useState(monthStartIso);
+  const [exportTo, setExportTo] = useState(() => new Date().toISOString().slice(0, 10));
+  const [exportBusy, setExportBusy] = useState(false);
+  const [toast, setToast] = useState("");
 
   useEffect(() => {
     if (
@@ -73,6 +86,7 @@ export default function AdminAttendancePage() {
     <DashboardPage role="admin" title="Attendance">
       <div className="att-v2">
         <AppToast message={error} tone="error" onDismiss={() => setError("")} />
+        <AppToast message={toast} tone="success" onDismiss={() => setToast("")} />
 
         <header className="att-v2__hero">
           <div className="att-v2__hero-glow" aria-hidden />
@@ -156,6 +170,43 @@ export default function AdminAttendancePage() {
             />
           </label>
         </div>
+
+        {hasPermission(Permission.ATTENDANCE_ANALYTICS) ? (
+          <div className="att-v2__toolbar att-v2__toolbar--export">
+            <label className="att-v2__date">
+              <span className="att-v2__date-label">Export from</span>
+              <input
+                type="date"
+                value={exportFrom}
+                onChange={(e) => setExportFrom(e.target.value)}
+              />
+            </label>
+            <label className="att-v2__date">
+              <span className="att-v2__date-label">Export to</span>
+              <input
+                type="date"
+                value={exportTo}
+                onChange={(e) => setExportTo(e.target.value)}
+              />
+            </label>
+            <button
+              type="button"
+              className="att-v2__tab att-v2__tab--link"
+              disabled={exportBusy}
+              onClick={() => {
+                setExportBusy(true);
+                void downloadAttendanceExport(exportFrom, exportTo)
+                  .then(() => setToast("Attendance CSV downloaded"))
+                  .catch((err) =>
+                    setError(err instanceof Error ? err.message : "Export failed"),
+                  )
+                  .finally(() => setExportBusy(false));
+              }}
+            >
+              {exportBusy ? "Exporting…" : "Export CSV"}
+            </button>
+          </div>
+        ) : null}
 
         {tab === "mark" ? (
           <div className="att-v2__panel">

@@ -62,20 +62,6 @@ const FEATURES = [
   },
 ] as const;
 
-type FloatItem = {
-  label: string;
-  value: string;
-  top: string;
-  left?: string;
-  right?: string;
-};
-
-const FLOATS: FloatItem[] = [
-  { label: "Schools live", value: "120+", top: "18%", left: "58%" },
-  { label: "Avg. setup", value: "8 min", top: "62%", left: "56%" },
-  { label: "Uptime", value: "99.9%", top: "24%", right: "7%" },
-];
-
 function FeatureGraphDivider({ delay = 0 }: { delay?: number }) {
   const gradId = `login-graph-fill-${String(delay).replace(".", "")}`;
 
@@ -140,26 +126,6 @@ export function LoginVisualPanel() {
         <div className="login-visual__glow login-visual__glow--1" />
         <div className="login-visual__glow login-visual__glow--2" />
       </div>
-
-      {!reduce
-        ? FLOATS.map((chip, i) => (
-            <motion.div
-              key={chip.label}
-              className="login-visual__float"
-              style={{
-                top: chip.top,
-                left: chip.left,
-                right: chip.right,
-              }}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.35 + i * 0.1, duration: 0.5 }}
-            >
-              <span>{chip.label}</span>
-              <strong>{chip.value}</strong>
-            </motion.div>
-          ))
-        : null}
 
       <div className="login-visual__content">
         <motion.header

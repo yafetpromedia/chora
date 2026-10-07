@@ -198,6 +198,13 @@
   align-items: center;
 }
 
+.ann-v2__ai-count {
+  margin-right: auto;
+  font-size: 0.72rem;
+  font-weight: 650;
+  color: #64748b;
+}
+
 .ann-v2__btn {
   display: inline-flex;
   align-items: center;

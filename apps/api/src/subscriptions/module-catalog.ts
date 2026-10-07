@@ -8,7 +8,8 @@ export type SchoolModuleKey =
   | 'finance'
   | 'classroom'
   | 'worksheets'
-  | 'library';
+  | 'library'
+  | 'payroll';
 
 export type BillingBundleId = 'ops' | 'school' | 'full';
 
@@ -46,6 +47,7 @@ export const SCHOOL_MODULE_KEYS: SchoolModuleKey[] = [
   'classroom',
   'worksheets',
   'library',
+  'payroll',
 ];
 
 export const SCHOOL_MODULE_CATALOG: SchoolModuleDef[] = [
@@ -104,6 +106,13 @@ export const SCHOOL_MODULE_CATALOG: SchoolModuleDef[] = [
     description: 'Digital library resources',
     etbMonthly: 1000,
     usdMonthly: usdFromEtb(1000),
+  },
+  {
+    key: 'payroll',
+    label: 'HR & Payroll',
+    description: 'Employee HR, compensation, and payroll',
+    etbMonthly: 2500,
+    usdMonthly: usdFromEtb(2500),
   },
 ];
 

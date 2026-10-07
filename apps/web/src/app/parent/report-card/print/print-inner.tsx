@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AUTH_TOKEN_KEY } from "@/lib/auth";
 import { getApiBaseUrl } from "@/lib/api";
@@ -19,6 +19,7 @@ function reportCardPrintUrl(
 export function ParentReportCardPrintInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const frameRef = useRef<HTMLIFrameElement>(null);
   const [html, setHtml] = useState("");
   const termId = searchParams.get("termId") ?? "";
   const studentProfileId = searchParams.get("studentProfileId");
@@ -40,10 +41,23 @@ export function ParentReportCardPrintInner() {
       })
       .then((text) => {
         setHtml(text);
-        setTimeout(() => window.print(), 500);
       })
       .catch(() => router.replace("/parent/report-card"));
   }, [termId, mode, studentProfileId, router]);
+
+  useEffect(() => {
+    if (!html) return;
+    const timer = window.setTimeout(() => {
+      const win = frameRef.current?.contentWindow;
+      if (win) {
+        win.focus();
+        win.print();
+      } else {
+        window.print();
+      }
+    }, 500);
+    return () => window.clearTimeout(timer);
+  }, [html]);
 
   if (!html) {
     return <p style={{ padding: "2rem" }}>Preparing report card…</p>;
@@ -51,6 +65,7 @@ export function ParentReportCardPrintInner() {
 
   return (
     <iframe
+      ref={frameRef}
       title="Report card"
       srcDoc={html}
       style={{ width: "100%", minHeight: "100vh", border: "none" }}

@@ -1,11 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { DashIcon } from "@/components/dashboard/dash-icons";
 import { StaffPermissionsDrawer } from "@/components/teachers/staff-permissions-drawer";
 import { getCurrentUserId } from "@/lib/auth";
 import { OFFICE_STAFF_ROLE_SLUGS } from "@/lib/people";
-import { ROLE_TEMPLATE_LABELS } from "@/lib/permissions";
+import { hasPermission, Permission, ROLE_TEMPLATE_LABELS } from "@/lib/permissions";
 import {
   createTeacher,
   getStaffPermissions,
@@ -242,11 +243,28 @@ export function StaffWorkspace() {
   }
 
   function renderActions(t: TeacherRecord, compact?: boolean) {
+    const canViewAttendance = hasPermission(Permission.STAFF_ATTENDANCE_READ);
+    const attendanceHref = `/admin/staff-attendance?userId=${encodeURIComponent(t.userId)}&name=${encodeURIComponent(displayName(t))}`;
+
     if (currentUserId && t.userId === currentUserId) {
-      return <span className="tch-v2__you-pill">You</span>;
+      return (
+        <div className={`tch-v2__actions${compact ? " tch-v2__actions--compact" : ""}`}>
+          <span className="tch-v2__you-pill">You</span>
+          {canViewAttendance ? (
+            <Link href={attendanceHref} className="tch-v2__action" title="Attendance history">
+              Attendance
+            </Link>
+          ) : null}
+        </div>
+      );
     }
     return (
       <div className={`tch-v2__actions${compact ? " tch-v2__actions--compact" : ""}`}>
+        {canViewAttendance ? (
+          <Link href={attendanceHref} className="tch-v2__action" title="Attendance history">
+            Attendance
+          </Link>
+        ) : null}
         <button
           type="button"
           className="tch-v2__action tch-v2__action--primary"

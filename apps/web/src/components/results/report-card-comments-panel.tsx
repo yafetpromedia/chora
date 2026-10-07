@@ -158,18 +158,16 @@ export function ReportCardCommentsPanel({
   }
 
   return (
-    <div className="rc-v2__comments">
-      <header className="rc-v2__card-head rc-v2__card-head--row">
-        <span className="rc-v2__card-icon rc-v2__card-icon--ai" aria-hidden>
+    <div className="rc-comments">
+      <header className="rc-comments__head">
+        <span className="rc-comments__icon" aria-hidden>
           <DashIcon name="profile" className="dash-icon--sm" />
         </span>
-        <div>
-          <h3 className="rc-v2__card-title">Teacher &amp; principal comments</h3>
-          <p className="rc-v2__card-sub">
-            Remarks appear on printed report cards when scores are published.
-          </p>
+        <div className="rc-comments__titles">
+          <h3>Teacher &amp; principal comments</h3>
+          <p>Remarks print on the report card back page when scores are published.</p>
         </div>
-        <span className="rc-v2__ai-badge">Powered by AI</span>
+        <span className="rc-comments__badge">General remarks</span>
       </header>
 
       {!hideSelectors ? (
@@ -204,13 +202,13 @@ export function ReportCardCommentsPanel({
       ) : null}
 
       {report ? (
-        <div className="ai-report-comments__grid">
-          <label className="ai-report-comments__field">
-            <span className="ai-report-comments__label-row">
+        <div className="rc-comments__grid">
+          <label className="rc-comments__field">
+            <span className="rc-comments__label-row">
               <span>Teacher comment</span>
               <button
                 type="button"
-                className="ai-inline-btn"
+                className="rc-comments__ai"
                 disabled={aiBusy !== null}
                 onClick={() => void onAiDraft("teacher")}
               >
@@ -218,19 +216,18 @@ export function ReportCardCommentsPanel({
               </button>
             </span>
             <textarea
-              className="res-v2__textarea"
-              rows={4}
+              rows={7}
               value={teacherComment}
               onChange={(e) => setTeacherComment(e.target.value)}
               placeholder="Homeroom or class teacher remark…"
             />
           </label>
-          <label className="ai-report-comments__field">
-            <span className="ai-report-comments__label-row">
+          <label className="rc-comments__field">
+            <span className="rc-comments__label-row">
               <span>Principal comment</span>
               <button
                 type="button"
-                className="ai-inline-btn"
+                className="rc-comments__ai"
                 disabled={aiBusy !== null}
                 onClick={() => void onAiDraft("principal")}
               >
@@ -238,8 +235,7 @@ export function ReportCardCommentsPanel({
               </button>
             </span>
             <textarea
-              className="res-v2__textarea"
-              rows={4}
+              rows={7}
               value={principalComment}
               onChange={(e) => setPrincipalComment(e.target.value)}
               placeholder="Principal or academic director remark…"
@@ -256,7 +252,8 @@ export function ReportCardCommentsPanel({
       <AppToast message={saved} tone="success" onDismiss={() => setSaved("")} />
 
       {report ? (
-        <div className="rc-v2__comments-foot">
+        <div className="rc-comments__foot">
+          <p>Saved remarks appear under General Remarks on the printed card.</p>
           <button
             type="button"
             className="rc-v2__btn rc-v2__btn--primary"

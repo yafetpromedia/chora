@@ -106,8 +106,8 @@ export function StudentReportCardPanel({
                   ? "Full-year summary for your child. After promotion is recorded, the printout includes a promotion stamp."
                   : "Full-year summary with all terms. After promotion is recorded, the printout includes a promotion stamp for the next grade."
                 : role === "parent"
-                  ? "Scores for the selected term. Your school publishes this after results are approved."
-                  : "Scores for the selected term. Your school publishes this after results are approved."}
+                  ? "Half-page term card (front only) — two fit on one A4. Your school publishes this after results are approved."
+                  : "Half-page term card (front only) — two fit on one A4. Your school publishes this after results are approved."}
             </p>
           </div>
           {reportPublished ? (

@@ -95,6 +95,10 @@ function AttendanceMarkPanelInner() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [confirmAction, setConfirmAction] = useState<
+    null | "all_present" | "selected_late" | "selected_absent"
+  >(null);
 
   const selectedGrade = grades.find((g) => g.id === gradeId);
 
@@ -118,6 +122,7 @@ function AttendanceMarkPanelInner() {
           localReason: s.reason,
         })),
       );
+      setSelected(new Set());
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load class");
     } finally {
@@ -204,7 +209,38 @@ function AttendanceMarkPanelInner() {
     setStudents((prev) =>
       prev.map((s) => ({ ...s, localStatus: "present" as const, localReason: null })),
     );
+    setSelected(new Set());
     setSaved(false);
+  }
+
+  function markSelected(status: "late" | "absent") {
+    setStudents((prev) =>
+      prev.map((s) => {
+        if (!selected.has(s.studentProfileId)) return s;
+        return {
+          ...s,
+          localStatus: status,
+          localReason: status === "absent" ? s.localReason ?? "unexcused" : null,
+        };
+      }),
+    );
+    setSaved(false);
+  }
+
+  function toggleSelected(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function applyConfirm() {
+    if (confirmAction === "all_present") markAllPresent();
+    if (confirmAction === "selected_late") markSelected("late");
+    if (confirmAction === "selected_absent") markSelected("absent");
+    setConfirmAction(null);
   }
 
   async function onSave() {
@@ -323,13 +359,31 @@ function AttendanceMarkPanelInner() {
                 {students.length} student{students.length === 1 ? "" : "s"} · {formatDisplayDate(date)}
               </p>
             </div>
-            <button
-              type="button"
-              className="att-v4__btn att-v4__btn--ghost att-manual__all-present"
-              onClick={markAllPresent}
-            >
-              Mark all present
-            </button>
+            <div className="att-manual__bulk-actions">
+              <button
+                type="button"
+                className="att-v4__btn att-v4__btn--ghost att-manual__all-present"
+                onClick={() => setConfirmAction("all_present")}
+              >
+                Mark all present
+              </button>
+              <button
+                type="button"
+                className="att-v4__btn att-v4__btn--ghost"
+                disabled={selected.size === 0}
+                onClick={() => setConfirmAction("selected_late")}
+              >
+                Selected late ({selected.size})
+              </button>
+              <button
+                type="button"
+                className="att-v4__btn att-v4__btn--ghost"
+                disabled={selected.size === 0}
+                onClick={() => setConfirmAction("selected_absent")}
+              >
+                Selected absent ({selected.size})
+              </button>
+            </div>
           </div>
           <div className="att-manual__kpis">
             <div className="att-manual__kpi att-manual__kpi--rate">
@@ -417,6 +471,14 @@ function AttendanceMarkPanelInner() {
               >
                 <div className="att-manual__row-main">
                   <div className="att-manual__student">
+                    <label className="att-manual__select">
+                      <input
+                        type="checkbox"
+                        checked={selected.has(s.studentProfileId)}
+                        onChange={() => toggleSelected(s.studentProfileId)}
+                        aria-label={`Select ${formatStudentName(s.firstName, s.lastName)}`}
+                      />
+                    </label>
                     <span
                       className={`att-manual__avatar att-manual__avatar--${s.localStatus}`}
                       aria-hidden
@@ -493,6 +555,41 @@ function AttendanceMarkPanelInner() {
             {saving ? "Saving…" : "Save attendance"}
           </button>
         </footer>
+      ) : null}
+
+      {confirmAction ? (
+        <div className="att-manual__confirm" role="dialog" aria-modal="true">
+          <div className="att-manual__confirm-card">
+            <h3>
+              {confirmAction === "all_present"
+                ? "Mark everyone present?"
+                : confirmAction === "selected_late"
+                  ? `Mark ${selected.size} student(s) late?`
+                  : `Mark ${selected.size} student(s) absent?`}
+            </h3>
+            <p>
+              {confirmAction === "all_present"
+                ? "This updates the local roster. Save attendance to notify parents of exceptions."
+                : "Statuses update locally. Save attendance when you are ready."}
+            </p>
+            <div className="att-manual__confirm-actions">
+              <button
+                type="button"
+                className="att-v4__btn att-v4__btn--ghost"
+                onClick={() => setConfirmAction(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="att-v4__btn att-v4__btn--primary"
+                onClick={applyConfirm}
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
       ) : null}
     </div>
   );

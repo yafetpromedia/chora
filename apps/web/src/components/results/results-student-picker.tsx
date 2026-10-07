@@ -290,7 +290,7 @@ export function ResultsStudentPicker({
       <button
         type="button"
         className="res-stu-pick__trigger"
-        disabled={disabled || students.length === 0}
+        disabled={Boolean(disabled || students.length === 0)}
         aria-haspopup="dialog"
         aria-expanded={open}
         onClick={() => setOpen(true)}

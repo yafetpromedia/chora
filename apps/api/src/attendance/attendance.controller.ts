@@ -31,7 +31,13 @@ import { ScanAttendanceDto } from './dto/scan-attendance.dto';
 import { AttendanceService } from './attendance.service';
 
 @Controller('attendance')
-@UseGuards(JwtAuthGuard, SchoolTenantGuard, RolesGuard, SchoolModuleGuard)
+@UseGuards(
+  JwtAuthGuard,
+  SchoolTenantGuard,
+  RolesGuard,
+  PermissionsGuard,
+  SchoolModuleGuard,
+)
 @RequireSchoolModule('attendance')
 export class AttendanceController {
   constructor(
@@ -211,7 +217,8 @@ export class AttendanceController {
   }
 
   @Get('export')
-  @Roles('admin')
+  @Roles('admin', 'staff')
+  @RequirePermissions(SchoolPermission.ATTENDANCE_ANALYTICS)
   @Header('Content-Type', 'text/csv')
   async exportCsv(
     @CurrentUser() user: AuthUser,

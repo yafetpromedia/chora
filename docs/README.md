@@ -63,6 +63,8 @@ Central index for all project documentation. Start here based on your role.
 | Teacher class scoping | [TEACHER-SCOPING.md](./TEACHER-SCOPING.md) |
 | eLibrary | [ELIBRARY.md](./ELIBRARY.md) |
 | Timetable | [TIMETABLE.md](./TIMETABLE.md) |
+| Attendance, leave & staff QR | [attendance.md](./attendance.md) |
+| HR, compensation & payroll | [payroll.md](./payroll.md) |
 | Student/parent portals | [STUDENT-PARENT-PORTAL.md](./STUDENT-PARENT-PORTAL.md) |
 | Chora Connect (planned) | [CHORA-CONNECT.md](./CHORA-CONNECT.md) |
 

@@ -114,12 +114,94 @@ export const DASHBOARD_NAV: NavItem[] = [
     permission: Permission.TEACHERS_READ,
   },
   {
+    href: "/admin/hr/employees",
+    label: "People",
+    icon: "users",
+    roles: ["admin", "staff"],
+    permission: Permission.HR_EMPLOYEES_READ,
+    module: "payroll",
+    children: [
+      {
+        href: "/admin/hr/employees",
+        label: "Employees",
+      },
+      {
+        href: "/admin/hr/departments",
+        label: "Departments",
+      },
+      {
+        href: "/admin/hr/positions",
+        label: "Positions",
+      },
+    ],
+  },
+  {
+    href: "/admin/payroll",
+    label: "Payroll",
+    icon: "finance",
+    roles: ["admin", "staff"],
+    permission: Permission.PAYROLL_VIEW,
+    module: "payroll",
+    children: [
+      {
+        href: "/admin/payroll",
+        label: "Runs",
+      },
+      {
+        href: "/admin/payroll/settings",
+        label: "Settings",
+      },
+    ],
+  },
+  {
     href: "/admin/attendance",
     label: "Attendance",
     icon: "attendance",
     roles: ["admin", "staff"],
     permission: Permission.ATTENDANCE_MANAGE,
     module: "attendance",
+  },
+  {
+    href: "/admin/staff-attendance",
+    label: "Staff Attendance",
+    icon: "attendance",
+    roles: ["admin", "staff"],
+    permission: Permission.STAFF_ATTENDANCE_READ,
+    module: "attendance",
+    children: [
+      {
+        href: "/admin/staff-attendance",
+        label: "Daily roll",
+      },
+      {
+        href: "/admin/staff-attendance/analytics",
+        label: "Analytics",
+      },
+    ],
+  },
+  {
+    href: "/admin/leave",
+    label: "Leave",
+    icon: "calendar",
+    roles: ["admin", "staff"],
+    permission: Permission.LEAVE_READ,
+    module: "attendance",
+  },
+  {
+    href: "/admin/my-attendance",
+    label: "My Attendance",
+    icon: "profile",
+    roles: ["admin", "staff"],
+    permission: Permission.STAFF_ATTENDANCE_SELF,
+    module: "attendance",
+  },
+  {
+    href: "/admin/payroll/me",
+    label: "My Payslips",
+    icon: "fees",
+    roles: ["admin", "staff"],
+    permission: Permission.PAYSLIP_SELF,
+    module: "payroll",
   },
   {
     href: "/admin/results",
@@ -202,6 +284,22 @@ export const DASHBOARD_NAV: NavItem[] = [
     module: "attendance",
   },
   {
+    href: "/teacher/my-attendance",
+    label: "My Attendance",
+    icon: "profile",
+    roles: ["teacher"],
+    permission: Permission.STAFF_ATTENDANCE_SELF,
+    module: "attendance",
+  },
+  {
+    href: "/teacher/payroll/me",
+    label: "My Payslips",
+    icon: "fees",
+    roles: ["teacher"],
+    permission: Permission.PAYSLIP_SELF,
+    module: "payroll",
+  },
+  {
     href: "/teacher/results",
     label: "Results",
     icon: "results",
@@ -268,6 +366,13 @@ export const DASHBOARD_NAV: NavItem[] = [
   { href: "/teacher/id-card", label: "Staff ID", icon: "students", roles: ["teacher"] },
   { href: "/teacher/profile", label: "Profile", icon: "profile", roles: ["teacher"] },
   { href: "/parent", label: "Overview", icon: "overview", roles: ["parent"], module: "parent" },
+  {
+    href: "/parent/attendance",
+    label: "Attendance",
+    icon: "attendance",
+    roles: ["parent"],
+    module: "attendance",
+  },
   {
     href: "/parent/results",
     label: "Results",
@@ -390,11 +495,12 @@ export function navForRole(
     if (n.homeroomOnly && role === "teacher" && !options?.canTakeAttendance) {
       return false;
     }
-    if (n.permission && (role === "admin" || role === "staff")) {
+    if (n.permission) {
       if (!hasPermission(n.permission)) return false;
     }
-    if (n.module && modules) {
-      if (!modules.includes(n.module)) return false;
+    // Fail closed: module-gated items stay hidden until entitlements load.
+    if (n.module) {
+      if (!modules || !modules.includes(n.module)) return false;
     }
     return true;
   });
@@ -453,7 +559,8 @@ export function isNavChildActive(pathname: string, href: string) {
   if (
     href === "/student/library" ||
     href === "/teacher/library" ||
-    href === "/teacher/results"
+    href === "/teacher/results" ||
+    href === "/admin/payroll"
   ) {
     return pathname === href;
   }

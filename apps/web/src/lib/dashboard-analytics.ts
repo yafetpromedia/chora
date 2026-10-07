@@ -26,6 +26,16 @@ export type AdminAnalyticsOverview = {
     absent: number;
     totalStudents: number;
   };
+  staffAttendanceToday: {
+    date: string;
+    totalStaff: number;
+    marked: number;
+    unmarked: number;
+    present: number;
+    late: number;
+    absent: number;
+    onLeave: number;
+  } | null;
   attendanceTrend: {
     date: string;
     weekday: string;

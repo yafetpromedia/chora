@@ -43,6 +43,13 @@ const STAFF_QUICK_LINKS: Array<StaffQuickLink & { permission: string }> = [
     permission: Permission.ATTENDANCE_MANAGE,
   },
   {
+    href: "/admin/staff-attendance",
+    label: "Staff Attendance",
+    description: "Teacher & staff check-ins",
+    icon: "attendance",
+    permission: Permission.STAFF_ATTENDANCE_READ,
+  },
+  {
     href: "/admin/academics",
     label: "Academics",
     description: "Years, terms & subjects",
@@ -57,6 +64,20 @@ const STAFF_QUICK_LINKS: Array<StaffQuickLink & { permission: string }> = [
     permission: Permission.FINANCE_READ,
   },
   {
+    href: "/admin/hr/employees",
+    label: "People",
+    description: "Employees & HR profiles",
+    icon: "users",
+    permission: Permission.HR_EMPLOYEES_READ,
+  },
+  {
+    href: "/admin/payroll",
+    label: "Payroll",
+    description: "Salary runs & payslips",
+    icon: "finance",
+    permission: Permission.PAYROLL_VIEW,
+  },
+  {
     href: "/admin/announcements",
     label: "Announcements",
     description: "Campus updates",
@@ -69,7 +90,7 @@ const ROLE_SUBTITLES: Record<string, string> = {
   registrar: "Admissions, enrollments, and student records for your campus.",
   reception: "Front desk inquiries, families, and visitor coordination.",
   finance_officer: "Fees, payments, receipts, and family billing.",
-  attendance_officer: "Gate checks, QR scans, and daily attendance monitoring.",
+  attendance_officer: "Gate checks, QR scans, student and staff attendance.",
   academic_director: "Academic programs, subjects, teachers, and results.",
 };
 

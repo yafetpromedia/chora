@@ -51,6 +51,7 @@ export function AdminDashboard({
   error,
 }: Props) {
   const att = analytics?.attendanceToday;
+  const staffAtt = analytics?.staffAttendanceToday;
   const fin = analytics?.finance;
   const enroll = analytics?.enrollment;
 
@@ -111,6 +112,28 @@ export function AdminDashboard({
               </p>
             </div>
           </article>
+
+          <Link
+            href="/admin/staff-attendance"
+            className="dash-admin-kpi dash-admin-kpi--modern dash-admin-kpi--link"
+          >
+            <span className="dash-admin-kpi__icon dash-admin-kpi__icon--slate">
+              <DashIcon name="users" />
+            </span>
+            <div>
+              <p className="dash-admin-kpi__label">Staff attendance</p>
+              <p className="dash-admin-kpi__value">
+                {staffAtt
+                  ? `${staffAtt.present + staffAtt.late}`
+                  : "—"}
+              </p>
+              <p className="dash-admin-kpi__hint">
+                {staffAtt
+                  ? `${staffAtt.marked}/${staffAtt.totalStaff} marked · ${staffAtt.late} late`
+                  : "Teachers & staff"}
+              </p>
+            </div>
+          </Link>
 
           {canViewFinance && fin ? (
             <Link href="/admin/finance" className="dash-admin-kpi dash-admin-kpi--modern dash-admin-kpi--link">

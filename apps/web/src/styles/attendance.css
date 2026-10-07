@@ -1349,6 +1349,80 @@
   flex-shrink: 0;
 }
 
+.att-manual__bulk-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  justify-content: flex-end;
+}
+
+.att-manual__select {
+  display: flex;
+  align-items: center;
+  margin-right: 0.35rem;
+}
+
+.att-manual__confirm {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.att-manual__confirm-card {
+  width: min(420px, 100%);
+  padding: 1.15rem 1.25rem;
+  border-radius: 0.9rem;
+  background: #fff;
+  border: 1px solid var(--brand-border);
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.18);
+}
+
+.att-manual__confirm-card h3 {
+  margin: 0 0 0.4rem;
+  font-size: 1.05rem;
+}
+
+.att-manual__confirm-card p {
+  margin: 0 0 1rem;
+  font-size: 0.88rem;
+  color: var(--brand-muted);
+}
+
+.att-manual__confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.att-v2__toolbar--export {
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+@media (max-width: 640px) {
+  .att-manual__bulk-actions {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .att-manual__bulk-actions .att-v4__btn {
+    flex: 1 1 auto;
+  }
+
+  .att-manual__confirm-card {
+    padding: 1rem;
+  }
+
+  .att-v2__toolbar--export .att-v2__date {
+    width: 100%;
+  }
+}
+
 .att-manual__kpis {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

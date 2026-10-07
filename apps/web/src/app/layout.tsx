@@ -10,6 +10,8 @@ import "../styles/setup.css";
 import "../styles/students.css";
 import "../styles/student-records.css";
 import "../styles/attendance.css";
+import "../styles/staff-attendance.css";
+import "../styles/hr-payroll.css";
 import "../styles/settings.css";
 import "../styles/settings-admin.css";
 import "../styles/student-cards.css";

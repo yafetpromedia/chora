@@ -123,13 +123,50 @@ export function RoleDashboard({ role }: Props) {
 
   useEffect(() => {
     const load = async () => {
-      try {
-        const dashboardData = await apiFetch<
-          Record<string, string | number> & {
-            day?: AdminDayOverview;
+      const soft = async <T,>(promise: Promise<T>, fallback: T): Promise<T> => {
+        try {
+          return await promise;
+        } catch (err) {
+          const message = err instanceof Error ? err.message : "";
+          if (message === "Session expired" || message === "Not authenticated") {
+            throw err;
           }
-        >("/dashboards/me");
-        const announcementData = await apiFetch<Announcement[]>("/announcements");
+          return fallback;
+        }
+      };
+
+      const withRetry = async <T,>(fn: () => Promise<T>, attempts = 2): Promise<T> => {
+        let lastError: unknown;
+        for (let i = 0; i < attempts; i++) {
+          try {
+            return await fn();
+          } catch (err) {
+            lastError = err;
+            const message = err instanceof Error ? err.message : "";
+            const retryable =
+              message.includes("Request failed: 5") ||
+              message.includes("API is unavailable") ||
+              message.includes("Could not reach the server");
+            if (!retryable || i === attempts - 1) throw err;
+            await new Promise((r) => setTimeout(r, 600 * (i + 1)));
+          }
+        }
+        throw lastError;
+      };
+
+      try {
+        setError("");
+        const dashboardData = await withRetry(() =>
+          apiFetch<
+            Record<string, string | number> & {
+              day?: AdminDayOverview;
+            }
+          >("/dashboards/me"),
+        );
+        const announcementData = await soft(
+          apiFetch<Announcement[]>("/announcements"),
+          [] as Announcement[],
+        );
         setDashboard(dashboardData);
         setAnnouncements(announcementData);
         if (dashboardData.day?.kind === "admin_day") {
@@ -138,11 +175,12 @@ export function RoleDashboard({ role }: Props) {
 
         if (role === "student") {
           const [attendanceData, resultsData, summary, resources] = await Promise.all([
-            apiFetch<AttendanceRecord[]>("/attendance/student"),
-            apiFetch<ResultRecord[]>("/results/student").catch(() => [] as ResultRecord[]),
-            getAttendanceSummary(),
-            listLibraryResources({ status: "PUBLISHED", limit: 4 }).catch(
-              () => [] as LibraryResource[],
+            soft(apiFetch<AttendanceRecord[]>("/attendance/student"), [] as AttendanceRecord[]),
+            soft(apiFetch<ResultRecord[]>("/results/student"), [] as ResultRecord[]),
+            soft(getAttendanceSummary(), null),
+            soft(
+              listLibraryResources({ status: "PUBLISHED", limit: 4 }),
+              [] as LibraryResource[],
             ),
           ]);
           setAttendance(attendanceData);
@@ -154,10 +192,10 @@ export function RoleDashboard({ role }: Props) {
         if (canViewAdminDashboard) {
           if (isPrincipalView) {
             const [schoolRes, analyticsData] = await Promise.all([
-              apiFetch<{ school: SchoolInfo | null }>("/schools/me").catch(() => ({
+              soft(apiFetch<{ school: SchoolInfo | null }>("/schools/me"), {
                 school: null,
-              })),
-              getAdminAnalytics().catch(() => null),
+              }),
+              soft(getAdminAnalytics(), null),
             ]);
             if (schoolRes.school) setSchoolInfo(schoolRes.school);
             if (analyticsData) setAdminAnalytics(analyticsData);
@@ -167,7 +205,7 @@ export function RoleDashboard({ role }: Props) {
                 apiFetch<{ school: SchoolInfo | null }>("/schools/me"),
                 getSchoolSubscription(),
                 getSetupStatus(),
-                getAdminAnalytics().catch(() => null),
+                soft(getAdminAnalytics(), null),
               ]);
 
             if (!setupStatus.setupComplete) {

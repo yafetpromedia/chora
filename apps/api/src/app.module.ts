@@ -11,6 +11,10 @@ import { FinanceModule } from './finance/finance.module';
 import { PlatformModule } from './platform/platform.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { AttendanceModule } from './attendance/attendance.module';
+import { StaffAttendanceModule } from './staff-attendance/staff-attendance.module';
+import { LeaveModule } from './leave/leave.module';
+import { HrModule } from './hr/hr.module';
+import { PayrollModule } from './payroll/payroll.module';
 import { AuthModule } from './auth/auth.module';
 import { AuditInterceptor } from './common/interceptors/audit.interceptor';
 import { DashboardsModule } from './dashboards/dashboards.module';
@@ -53,6 +57,10 @@ import { SupportModule } from './support/support.module';
     AuthModule,
     DashboardsModule,
     AttendanceModule,
+    StaffAttendanceModule,
+    LeaveModule,
+    HrModule,
+    PayrollModule,
     ResultsModule,
     TimetableModule,
     ExamSchedulesModule,

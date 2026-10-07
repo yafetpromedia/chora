@@ -129,6 +129,25 @@ export class SchoolDayDashboardService {
       });
     }
 
+    const staffEligible = await this.prisma.user.count({
+      where: {
+        schoolId,
+        role: { in: ['admin', 'staff', 'teacher'] },
+        roleTemplateId: { not: null },
+      },
+    });
+    const staffMarked = await this.prisma.staffAttendanceRecord.count({
+      where: { schoolId, date: today },
+    });
+    if (staffEligible > staffMarked) {
+      alerts.push({
+        type: 'staff_attendance',
+        label: 'Staff not marked today',
+        count: staffEligible - staffMarked,
+        href: '/admin/staff-attendance',
+      });
+    }
+
     return {
       kind: 'admin_day' as const,
       date: today.toISOString().slice(0, 10),

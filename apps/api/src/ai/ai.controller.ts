@@ -19,10 +19,7 @@ export class AiController {
   @Get('status')
   @Roles('admin', 'staff', 'teacher', 'student', 'parent')
   status() {
-    return {
-      configured: this.ai.isConfigured(),
-      model: this.ai.isConfigured() ? this.ai.getModel() : null,
-    };
+    return this.ai.getStatus();
   }
 
   @Post('study')
@@ -52,6 +49,6 @@ export class AiController {
   @Post('chat')
   @Roles('admin', 'staff', 'teacher', 'student', 'parent')
   chat(@Body() dto: AiChatDto, @CurrentUser() user: AuthUser) {
-    return this.ai.chat(dto.messages, dto.pageContext, user.role);
+    return this.ai.chat(dto.messages, dto.pageContext, user);
   }
 }

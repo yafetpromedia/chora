@@ -330,7 +330,7 @@ export function ParentDashboard() {
     selectedChild?.parentsCanViewResults === false
       ? null
       : selectedChild?.overallAverage ?? null;
-  const recentAttendance = attendanceSummary?.recent ?? [];
+  const recentAttendance = (attendanceSummary?.recent ?? []).slice(0, 3);
 
   return (
     <DashboardShell role="parent">

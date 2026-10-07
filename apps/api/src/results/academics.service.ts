@@ -27,12 +27,21 @@ import {
   buildGradeSectionLabel,
   buildReportCardHtml,
   buildSubjectGridRows,
-  buildSummaryFromGrid,
+  buildSubjectRows,
+  formatDateOfBirth,
   formatGenderLabel,
+  gradingBandDescription,
+  shortTermName,
+  type ReportCardAttendanceTerm,
   type ReportCardMode,
   type ReportCardPrintPayload,
   type ReportCardPromotion,
 } from './report-card-html.util';
+import {
+  buildReportCardVerifyUrl,
+  parseReportCardVerifyToken,
+  signReportCardVerifyToken,
+} from './report-card-verify.util';
 
 const DEFAULT_SUBJECTS = [
   { code: 'MATH', name: 'Mathematics' },
@@ -183,11 +192,22 @@ export class AcademicsService implements OnModuleInit {
     if (!scale?.bands.length) {
       return DEFAULT_GRADING_BANDS;
     }
-    return scale.bands.map((b) => ({
+    const bands = scale.bands.map((b) => ({
       letter: b.letter,
       minScore: b.minScore,
       maxScore: b.maxScore,
     }));
+    // Guard against broken configs (e.g. one band covering 0–100 as "A").
+    const letterAt = (score: number) =>
+      bands.find((b) => score >= b.minScore && score <= b.maxScore)?.letter ?? null;
+    const high = letterAt(95);
+    const mid = letterAt(54);
+    const low = letterAt(40);
+    const distinct = new Set(bands.map((b) => b.letter)).size;
+    if (!high || !mid || !low || distinct < 2 || high === low || mid === high) {
+      return DEFAULT_GRADING_BANDS;
+    }
+    return bands;
   }
 
   listTerms(schoolId: string, academicYearId?: string) {
@@ -909,6 +929,103 @@ export class AcademicsService implements OnModuleInit {
     return buildReportCardHtml(printPayload);
   }
 
+  async verifyReportCardPublic(token: string) {
+    const parsed = parseReportCardVerifyToken(token);
+    if (!parsed) {
+      throw new BadRequestException('Invalid or tampered verification link');
+    }
+
+    const school = await this.prisma.school.findUnique({
+      where: { id: parsed.schoolId },
+      select: { name: true, logoUrl: true },
+    });
+    if (!school) throw new NotFoundException('Report card not found');
+
+    const profile = await this.prisma.studentProfile.findFirst({
+      where: { id: parsed.studentProfileId, schoolId: parsed.schoolId },
+      include: {
+        user: { select: { firstName: true, lastName: true, externalRef: true } },
+        grade: { select: { name: true } },
+        section: { select: { name: true } },
+      },
+    });
+    if (!profile) throw new NotFoundException('Report card not found');
+
+    const year = await this.prisma.academicYear.findFirst({
+      where: { id: parsed.academicYearId, schoolId: parsed.schoolId },
+      select: { name: true },
+    });
+    if (!year) throw new NotFoundException('Report card not found');
+
+    const term = await this.prisma.academicTerm.findFirst({
+      where: { id: parsed.termId, schoolId: parsed.schoolId },
+      select: { name: true },
+    });
+
+    const bands = await this.getBands(parsed.schoolId);
+    const yearTerms = await this.prisma.academicTerm.findMany({
+      where: { schoolId: parsed.schoolId, academicYearId: parsed.academicYearId },
+      orderBy: { sortOrder: 'asc' },
+    });
+
+    const classSubjects = await this.prisma.classSubject.findMany({
+      where: {
+        schoolId: parsed.schoolId,
+        gradeId: profile.gradeId,
+        academicYearId: parsed.academicYearId,
+        ...(profile.sectionId ? { sectionId: profile.sectionId } : {}),
+      },
+      include: { subject: true },
+      orderBy: { subject: { name: 'asc' } },
+    });
+    const subjects = classSubjects.map((cs) => cs.subject.name);
+    const termAverages: Array<Array<number | null>> = [];
+    for (const yt of yearTerms) {
+      const results = await this.computeSubjectResults(
+        parsed.schoolId,
+        parsed.studentProfileId,
+        yt.id,
+        profile.gradeId,
+        profile.sectionId,
+        parsed.academicYearId,
+        bands,
+      );
+      const bySubject = new Map(results.map((r) => [r.subject, r.average]));
+      termAverages.push(subjects.map((name) => bySubject.get(name) ?? null));
+    }
+    const subjectRows = buildSubjectRows(subjects, termAverages, bands);
+    const avgs = subjectRows
+      .map((r) => r.average)
+      .filter((v): v is number => v != null && !Number.isNaN(v));
+    const overallAverage =
+      avgs.length > 0
+        ? Math.round((avgs.reduce((a, b) => a + b, 0) / avgs.length) * 10) / 10
+        : null;
+
+    return {
+      valid: true,
+      school: {
+        name: school.name,
+        logoUrl: school.logoUrl,
+      },
+      student: {
+        name: `${profile.user.firstName} ${profile.user.lastName}`,
+        number: profile.user.externalRef ?? profile.cardCode ?? null,
+        grade: profile.grade.name,
+        section: profile.section?.name ?? null,
+      },
+      academicYear: year.name,
+      termName: term?.name ?? null,
+      termCount: yearTerms.length,
+      overallAverage,
+      overallLetter:
+        overallAverage != null ? scoreToLetter(overallAverage, bands) : null,
+      subjectCount: subjectRows.length,
+      verifiedAt: new Date().toISOString(),
+      platform: { name: 'Chora', nameAm: 'ጮራ' },
+    };
+  }
+
   async buildReportCardHtmlDocument(
     schoolId: string,
     studentProfileId: string,
@@ -975,6 +1092,12 @@ export class AcademicsService implements OnModuleInit {
       orderBy: { sortOrder: 'asc' },
     });
 
+    const termColumns = yearTerms.map((yt, index) => ({
+      id: yt.id,
+      name: yt.name,
+      shortName: shortTermName(yt.name, index),
+    }));
+
     const classSubjects = await this.prisma.classSubject.findMany({
       where: {
         schoolId,
@@ -1002,23 +1125,111 @@ export class AcademicsService implements OnModuleInit {
       termAverages.push(subjects.map((name) => bySubject.get(name) ?? null));
     }
 
-    while (termAverages.length < 4) {
-      termAverages.push(subjects.map(() => null));
+    // Annual card uses every year term column; term card uses the selected term only.
+    const allSubjectRows = buildSubjectRows(subjects, termAverages, bands);
+    const subjectGrid = buildSubjectGridRows(subjects, termAverages);
+    const selectedTermIndex = Math.max(
+      0,
+      yearTerms.findIndex((yt) => yt.id === termId),
+    );
+    const subjectRows =
+      mode === 'term'
+        ? allSubjectRows.map((row) => {
+            const score = row.termScores[selectedTermIndex] ?? null;
+            return {
+              subject: row.subject,
+              termScores: [score],
+              total: score,
+              average: score,
+              letter:
+                score != null ? scoreToLetter(score, bands) : null,
+            };
+          })
+        : allSubjectRows;
+    const printTerms =
+      mode === 'term'
+        ? termColumns[selectedTermIndex]
+          ? [termColumns[selectedTermIndex]!]
+          : termColumns.slice(0, 1)
+        : termColumns;
+
+    const attendanceSource = yearTerms.length > 0 ? yearTerms : [term];
+
+    const attendanceByTerm: ReportCardAttendanceTerm[] = [];
+    for (const yt of attendanceSource) {
+      const records = await this.prisma.attendanceRecord.findMany({
+        where: {
+          schoolId,
+          studentProfileId,
+          periodNumber: 0,
+          date: { gte: yt.startDate, lte: yt.endDate },
+        },
+        select: { status: true },
+      });
+      let present = 0;
+      let absent = 0;
+      let late = 0;
+      for (const r of records) {
+        if (r.status === AttendanceStatus.late) late += 1;
+        else if (r.status === AttendanceStatus.absent) absent += 1;
+        else if (
+          r.status === AttendanceStatus.present ||
+          r.status === AttendanceStatus.excused ||
+          r.status === AttendanceStatus.medical
+        ) {
+          present += 1;
+        }
+      }
+      const termIndex = yearTerms.findIndex((t) => t.id === yt.id);
+      const termLabel = /^term\s*\d+/i.test(yt.name.trim())
+        ? yt.name.trim()
+        : /^t\d+$/i.test(yt.name.trim())
+          ? `Term ${termIndex + 1}`
+          : yt.name.trim().length <= 14
+            ? yt.name.trim()
+            : `Term ${termIndex + 1}`;
+      attendanceByTerm.push({
+        termName: termLabel,
+        present,
+        absent,
+        late,
+        totalDays: records.length,
+      });
     }
 
-    const subjectGrid = buildSubjectGridRows(subjects, termAverages);
+    const attendanceForPrint =
+      mode === 'term'
+        ? attendanceByTerm[selectedTermIndex]
+          ? [attendanceByTerm[selectedTermIndex]!]
+          : attendanceByTerm.slice(0, 1)
+        : attendanceByTerm;
+    const attendanceTotals = attendanceForPrint.reduce(
+      (acc, t) => ({
+        present: acc.present + t.present,
+        absent: acc.absent + t.absent,
+        late: acc.late + t.late,
+        totalDays: acc.totalDays + t.totalDays,
+      }),
+      { present: 0, absent: 0, late: 0, totalDays: 0 },
+    );
 
     const yearStart = yearTerms[0]?.startDate ?? term.startDate;
     const yearEnd = yearTerms[yearTerms.length - 1]?.endDate ?? term.endDate;
-    const absentDays = await this.prisma.attendanceRecord.count({
+    const behaviorStart = mode === 'term' ? term.startDate : yearStart;
+    const behaviorEnd = mode === 'term' ? term.endDate : yearEnd;
+    const behaviorRecords = await this.prisma.behaviorRecord.findMany({
       where: {
         schoolId,
         studentProfileId,
-        periodNumber: 0,
-        status: AttendanceStatus.absent,
-        date: { gte: yearStart, lte: yearEnd },
+        date: { gte: behaviorStart, lte: behaviorEnd },
       },
+      orderBy: { date: 'desc' },
+      take: 40,
     });
+    const conduct = this.mapBehaviorToConduct(
+      behaviorRecords,
+      report.overallLetter,
+    );
 
     const termReports = await this.prisma.studentTermReport.findMany({
       where: {
@@ -1028,6 +1239,17 @@ export class AcademicsService implements OnModuleInit {
       },
     });
     const commentByTerm = new Map(termReports.map((r) => [r.termId, r]));
+    const selectedTermComment = commentByTerm.get(termId) ?? null;
+    const lastTermComment =
+      commentByTerm.get(yearTerms[yearTerms.length - 1]?.id ?? '') ?? null;
+    const remarkSource =
+      mode === 'term' ? selectedTermComment : lastTermComment;
+    const generalRemark =
+      report.principalComment ??
+      remarkSource?.principalComment ??
+      report.teacherComment ??
+      remarkSource?.teacherComment ??
+      null;
 
     const enrollment = await this.prisma.studentEnrollment.findUnique({
       where: {
@@ -1055,6 +1277,7 @@ export class AcademicsService implements OnModuleInit {
 
     let promotion: ReportCardPromotion | null = null;
     if (
+      mode === 'annual' &&
       enrollment &&
       (enrollment.promotionOutcome === 'PROMOTED' ||
         enrollment.promotionOutcome === 'GRADUATED' ||
@@ -1075,7 +1298,7 @@ export class AcademicsService implements OnModuleInit {
         outcome === 'PROMOTED'
           ? nextGradeLabel
             ? `Promoted to ${nextGradeLabel}`
-            : 'Promoted to next grade'
+            : 'Promoted'
           : outcome === 'GRADUATED'
             ? 'Graduated'
             : outcome === 'RETAINED'
@@ -1084,67 +1307,48 @@ export class AcademicsService implements OnModuleInit {
       promotion = { outcome, label, nextGradeLabel };
     }
 
-    const semester1Comment =
-      commentByTerm.get(yearTerms[1]?.id ?? '')?.teacherComment ??
-      commentByTerm.get(yearTerms[0]?.id ?? '')?.teacherComment ??
-      null;
-    const semester2Comment =
-      commentByTerm.get(yearTerms[3]?.id ?? '')?.teacherComment ??
-      commentByTerm.get(yearTerms[2]?.id ?? '')?.teacherComment ??
-      null;
-    const cumulativeComment =
-      report.principalComment ??
-      commentByTerm.get(yearTerms[yearTerms.length - 1]?.id ?? '')?.principalComment ??
-      report.teacherComment ??
-      null;
+    const scoredAverages = subjectRows
+      .map((r) => r.average)
+      .filter((v): v is number => v != null && !Number.isNaN(v));
+    const overallAverage =
+      scoredAverages.length > 0
+        ? Math.round(
+            (scoredAverages.reduce((a, b) => a + b, 0) / scoredAverages.length) *
+              10,
+          ) / 10
+        : report.overallAverage;
+    const overallLetter =
+      overallAverage != null ? scoreToLetter(overallAverage, bands) : null;
 
-    const termSubjects = report.subjects.map((s) => ({
-      subject: s.subject,
-      average: s.average,
-      letter: s.letter,
-    }));
+    const gradingScale = [...bands]
+      .sort((a, b) => b.minScore - a.minScore)
+      .map((b) => ({
+        ...b,
+        description: gradingBandDescription(b.letter),
+      }));
 
-    const termAbsentDays = await this.prisma.attendanceRecord.count({
-      where: {
-        schoolId,
-        studentProfileId,
-        periodNumber: 0,
-        status: AttendanceStatus.absent,
-        date: { gte: term.startDate, lte: term.endDate },
-      },
+    const webAppUrl =
+      process.env.WEB_APP_URL?.replace(/\/$/, '') ?? 'http://localhost:3000';
+    const platformLogoUrl = `${webAppUrl}/brand/chora-mark.png?v=teal`;
+
+    const cardCode = profile.cardCode?.trim() || null;
+    const verifyToken = signReportCardVerifyToken({
+      v: 1,
+      schoolId,
+      studentProfileId,
+      academicYearId: term.academicYearId,
+      termId,
     });
-
-    const emptyCol = { total: null as number | null, average: null as number | null };
-    const termOnlySummary =
-      mode === 'term'
-        ? {
-            term1: emptyCol,
-            term2: emptyCol,
-            semester1: emptyCol,
-            term3: emptyCol,
-            term4: emptyCol,
-            semester2: emptyCol,
-            cumulative: {
-              total: null,
-              average: report.overallAverage,
-            },
-            absentDays: termAbsentDays,
-            conduct: report.overallLetter,
-            rank: report.rank,
-            classSize: report.classSize,
-            attendanceRate: report.attendance.rate,
-          }
-        : buildSummaryFromGrid(
-            subjectGrid,
-            absentDays,
-            report.overallLetter,
-            report.rank,
-            report.classSize,
-            report.attendance.rate,
-          );
+    const qrPayload = buildReportCardVerifyUrl(verifyToken);
 
     return {
       mode,
+      platform: {
+        name: 'Chora',
+        nameAm: 'ጮራ',
+        logoUrl: platformLogoUrl,
+        tagline: 'Learn · Grow · Succeed',
+      },
       school: {
         name: school?.name ?? report.school.name,
         logoUrl: school?.logoUrl ?? report.school.logoUrl ?? null,
@@ -1165,29 +1369,150 @@ export class AcademicsService implements OnModuleInit {
           profile.cardCode ??
           null,
         sex: formatGenderLabel(profile.gender),
+        dateOfBirth: formatDateOfBirth(profile.dateOfBirth),
         age: ageFromDateOfBirth(profile.dateOfBirth),
         gradeLabel: buildGradeSectionLabel(
           enrollment?.grade.name ?? profile.grade.name,
           profile.section?.name ?? null,
         ),
+        section: profile.section?.name ?? null,
         academicYear: term.academicYear.name,
-        cardCode: profile.cardCode,
+        cardCode,
         photoUrl: profile.photoUrl ?? null,
       },
+      terms: printTerms,
       termName: term.name,
-      promotion: mode === 'annual' ? promotion : null,
-      promotionText: mode === 'annual' ? (promotion?.label ?? null) : null,
-      subjectGrid: mode === 'annual' ? subjectGrid : [],
-      termSubjects: mode === 'term' ? termSubjects : [],
-      summary: termOnlySummary,
+      subjectRows,
+      gradingScale,
+      attendance: {
+        byTerm: attendanceForPrint,
+        totals: attendanceTotals,
+      },
+      conduct,
+      summary: {
+        overallAverage,
+        overallLetter,
+        rank: report.rank,
+        classSize: report.classSize,
+        promotion,
+      },
       remarks: {
-        teacher: report.teacherComment,
-        principal: report.principalComment,
-        semester1: semester1Comment,
-        semester2: semester2Comment,
-        cumulative: cumulativeComment,
+        teacher:
+          report.teacherComment ?? remarkSource?.teacherComment ?? null,
+        principal:
+          report.principalComment ?? remarkSource?.principalComment ?? null,
+        general: generalRemark,
+      },
+      verification: {
+        qrPayload,
       },
       generatedAt: report.generatedAt,
+      subjectGrid: mode === 'annual' ? subjectGrid : [],
+      termSubjects:
+        mode === 'term'
+          ? report.subjects.map((s) => ({
+              subject: s.subject,
+              average: s.average,
+              letter: s.letter,
+            }))
+          : [],
+      promotion,
+      promotionText: promotion?.label ?? null,
+    };
+  }
+
+  private mapBehaviorToConduct(
+    records: Array<{ type: string; note: string | null }>,
+    fallbackOverall: string | null,
+  ): ReportCardPrintPayload['conduct'] {
+    if (records.length === 0) {
+      return {
+        overall: fallbackOverall,
+        discipline: null,
+        participation: null,
+        attitude: null,
+        cooperation: null,
+        note: null,
+      };
+    }
+
+    const counts = {
+      excellent: 0,
+      disruptive: 0,
+      warning: 0,
+      suspension: 0,
+      late: 0,
+      other: 0,
+    };
+    for (const r of records) {
+      switch (r.type) {
+        case 'EXCELLENT_CONDUCT':
+          counts.excellent += 1;
+          break;
+        case 'DISRUPTIVE':
+          counts.disruptive += 1;
+          break;
+        case 'WARNING':
+          counts.warning += 1;
+          break;
+        case 'SUSPENSION':
+          counts.suspension += 1;
+          break;
+        case 'LATE_ARRIVAL':
+          counts.late += 1;
+          break;
+        default:
+          counts.other += 1;
+      }
+    }
+
+    const negatives = counts.disruptive + counts.warning + counts.suspension;
+    let overall: string | null = fallbackOverall;
+    if (counts.suspension > 0) overall = 'Needs attention';
+    else if (negatives >= 3) overall = 'Needs improvement';
+    else if (counts.excellent > 0 && negatives === 0) overall = 'Excellent';
+    else if (negatives === 0) overall = 'Satisfactory';
+
+    const discipline =
+      counts.suspension > 0
+        ? 'Unsatisfactory'
+        : negatives >= 2
+          ? 'Needs improvement'
+          : counts.excellent > 0
+            ? 'Excellent'
+            : 'Good';
+
+    const participation =
+      counts.late >= 3 ? 'Needs improvement' : counts.late > 0 ? 'Fair' : 'Good';
+
+    const attitude =
+      counts.disruptive > 0
+        ? 'Needs improvement'
+        : counts.excellent > 0
+          ? 'Excellent'
+          : 'Good';
+
+    const cooperation =
+      negatives === 0 && counts.excellent > 0
+        ? 'Excellent'
+        : negatives > 0
+          ? 'Fair'
+          : 'Good';
+
+    const note =
+      records
+        .map((r) => r.note?.trim())
+        .filter((n): n is string => Boolean(n))
+        .slice(0, 2)
+        .join(' · ') || null;
+
+    return {
+      overall,
+      discipline,
+      participation,
+      attitude,
+      cooperation,
+      note,
     };
   }
 

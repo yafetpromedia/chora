@@ -114,13 +114,14 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
     setNavRole(effectiveRole);
 
     async function loadNav() {
-      let enabledModules: string[] | null = null;
+      // Fail closed for billable modules: empty until subscription is verified.
+      let enabledModules: string[] = [];
       try {
         const sub = await getSchoolSubscription();
-        enabledModules = sub.enabledModules ?? null;
+        enabledModules = sub.enabledModules ?? [];
         setSubscription(sub);
       } catch {
-        /* nav without module filter if subscription unavailable */
+        enabledModules = [];
       }
 
       if (effectiveRole === "teacher") {

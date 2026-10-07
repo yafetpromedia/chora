@@ -6,13 +6,14 @@ import { AcademicYearsService } from './academic-years.service';
 import { AcademicsService } from './academics.service';
 import { AssessmentTemplatesService } from './assessment-templates.service';
 import { ResultWorkflowService } from './result-workflow.service';
+import { ReportCardPublicController } from './report-card-public.controller';
 import { ResultsController } from './results.controller';
 import { ResultsService } from './results.service';
 import { ScoreCorrectionsService } from './score-corrections.service';
 
 @Module({
   imports: [TeachersModule],
-  controllers: [ResultsController],
+  controllers: [ResultsController, ReportCardPublicController],
   providers: [
     ResultsService,
     AcademicsService,

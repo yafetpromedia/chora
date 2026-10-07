@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AUTH_TOKEN_KEY } from "@/lib/auth";
 import { reportCardPrintUrl, type ReportCardPrintMode } from "@/lib/results";
@@ -8,6 +8,7 @@ import { reportCardPrintUrl, type ReportCardPrintMode } from "@/lib/results";
 export function ReportCardPrintInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const frameRef = useRef<HTMLIFrameElement>(null);
   const [html, setHtml] = useState("");
   const [error, setError] = useState("");
   const studentProfileId = searchParams.get("studentProfileId") ?? "";
@@ -40,6 +41,12 @@ export function ReportCardPrintInner() {
   }, [load]);
 
   function onPrint() {
+    const frameWindow = frameRef.current?.contentWindow;
+    if (frameWindow) {
+      frameWindow.focus();
+      frameWindow.print();
+      return;
+    }
     window.print();
   }
 
@@ -70,18 +77,11 @@ export function ReportCardPrintInner() {
     <div className="rc-print-wrap">
       <div className="rc-print-toolbar no-print">
         <p>
-          {mode === "annual" ? (
-            <>
-              <strong>Year-end report</strong> — choose <strong>Landscape</strong>, then Print →
-              &quot;Save as PDF&quot;. Page 1 is the summary (with promotion stamp when recorded);
-              page 2 is the full-year results grid.
-            </>
-          ) : (
-            <>
-              <strong>Term report</strong> — choose <strong>Landscape</strong>, then Print →
-              &quot;Save as PDF&quot;. One page per student.
-            </>
-          )}
+          <strong>Student report card</strong>
+          {mode === "annual"
+            ? " — A4 landscape duplex. Scroll to see Front (results + grading scale) and Back (attendance, conduct, rank, signatures, QR)."
+            : " — A4 landscape term card (front only). Each report is half a page so two term reports fit on one sheet."}{" "}
+          Print → Save as PDF.
         </p>
         <div className="rc-print-toolbar__actions">
           <button
@@ -100,7 +100,12 @@ export function ReportCardPrintInner() {
           </button>
         </div>
       </div>
-      <iframe title="Report card" className="rc-print-frame" srcDoc={html} />
+      <iframe
+        ref={frameRef}
+        title="Report card"
+        className="rc-print-frame"
+        srcDoc={html}
+      />
     </div>
   );
 }

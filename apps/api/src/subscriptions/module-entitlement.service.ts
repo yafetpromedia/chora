@@ -43,6 +43,10 @@ export class ModuleEntitlementService {
     if (parsed.length === 0 && !sub.billingBundle) {
       return allSchoolModules();
     }
+    // Roll out HR/payroll alongside attendance without forcing a billing change.
+    if (parsed.includes('attendance') && !parsed.includes('payroll')) {
+      parsed.push('payroll');
+    }
     return parsed;
   }
 

@@ -10,6 +10,7 @@ import {
   type PlatformUser,
 } from "@/lib/platform-auth";
 import { canAccessPlatformSection } from "@/lib/platform-access";
+import { AiChatWidget } from "@/components/ai/ai-chat-widget";
 import { BrandMark } from "@/components/brand-mark";
 import { BRAND_NAME } from "@/lib/brand";
 import {
@@ -214,6 +215,10 @@ export function PlatformShell({
           <span className="dash-tabbar__label">More</span>
         </button>
       </nav>
+
+      {ready ? (
+        <AiChatWidget variant="platform" pageContext={`platform:${section}`} />
+      ) : null}
     </div>
   );
 }

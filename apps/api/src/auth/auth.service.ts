@@ -212,6 +212,8 @@ export class AuthService {
       defaultCountry: settings.defaultCountry,
       defaultTrialDays: settings.defaultTrialDays,
       landingHeroImageUrl: settings.landingHeroImageUrl,
+      demoVideoUrl: settings.demoVideoUrl,
+      demoVideoThumbnailUrl: settings.demoVideoThumbnailUrl,
       socialInstagramUrl: settings.socialInstagramUrl,
       socialFacebookUrl: settings.socialFacebookUrl,
       socialLinkedinUrl: settings.socialLinkedinUrl,

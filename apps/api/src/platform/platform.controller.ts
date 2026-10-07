@@ -158,6 +158,35 @@ export class PlatformController {
     return this.platformSettings.updateSettings(dto, user.role);
   }
 
+  @Post('settings/demo-video')
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformOwner()
+  @UseInterceptors(
+    FileInterceptor('file', { limits: { fileSize: 250 * 1024 * 1024 } }),
+  )
+  uploadDemoVideo(
+    @CurrentPlatformUser() user: PlatformAuthUser,
+    @UploadedFile()
+    file: { originalname: string; buffer: Buffer; mimetype: string } | undefined,
+  ) {
+    if (!file?.buffer) {
+      throw new BadRequestException('Upload a video file');
+    }
+    return this.platformSettings.saveDemoVideoFile(file, user.role);
+  }
+
+  /** Public file for the marketing demo player (no auth). */
+  @Get('demo/files/:filename')
+  streamDemoVideo(@Param('filename') filename: string, @Res() res: Response) {
+    const path = this.platformSettings.getDemoVideoFilePath(filename);
+    res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+    const lower = filename.toLowerCase();
+    if (lower.endsWith('.webm')) res.type('video/webm');
+    else if (lower.endsWith('.mov')) res.type('video/quicktime');
+    else res.type('video/mp4');
+    createReadStream(path).pipe(res);
+  }
+
   @Get('access-control')
   @UseGuards(JwtAuthGuard, PlatformGuard)
   getAccessControl() {

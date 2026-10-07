@@ -93,6 +93,10 @@ export default function AdminAnnouncementsPage() {
       setError("Describe the announcement you want the AI to draft.");
       return;
     }
+    if (prompt.length > 4000) {
+      setError("AI prompt must be 4000 characters or less.");
+      return;
+    }
     setDrafting(true);
     setError("");
     setSuccess("");
@@ -181,15 +185,19 @@ export default function AdminAnnouncementsPage() {
                   <textarea
                     className="ann-v2__textarea"
                     placeholder="e.g. School closed Friday for staff training; buses run as usual Monday…"
-                    rows={2}
+                    rows={3}
+                    maxLength={4000}
                     value={aiPrompt}
                     onChange={(e) => setAiPrompt(e.target.value)}
                   />
                   <div className="ann-v2__actions">
+                    <span className="ann-v2__ai-count" aria-live="polite">
+                      {aiPrompt.trim().length}/4000
+                    </span>
                     <button
                       type="button"
                       className="ann-v2__btn ann-v2__btn--ghost"
-                      disabled={drafting}
+                      disabled={drafting || aiPrompt.trim().length < 3}
                       onClick={() => void onAiDraft()}
                     >
                       {drafting ? "Drafting…" : "Generate draft"}

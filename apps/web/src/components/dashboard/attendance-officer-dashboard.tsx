@@ -49,6 +49,7 @@ export function AttendanceOfficerDashboard({ error }: Props) {
   }, []);
 
   const today = analytics?.attendanceToday;
+  const staffToday = analytics?.staffAttendanceToday;
 
   return (
     <StaffDashboardShell
@@ -108,14 +109,25 @@ export function AttendanceOfficerDashboard({ error }: Props) {
               </div>
             </article>
 
-            <Link href="/admin/students" className="dash-admin-kpi dash-admin-kpi--modern dash-admin-kpi--link">
+            <Link
+              href="/admin/staff-attendance"
+              className="dash-admin-kpi dash-admin-kpi--modern dash-admin-kpi--link"
+            >
               <span className="dash-admin-kpi__icon dash-admin-kpi__icon--slate">
-                <DashIcon name="students" />
+                <DashIcon name="users" />
               </span>
               <div>
-                <p className="dash-admin-kpi__label">On roll</p>
-                <p className="dash-admin-kpi__value">{studentCount}</p>
-                <p className="dash-admin-kpi__hint">Total enrolled students</p>
+                <p className="dash-admin-kpi__label">Staff today</p>
+                <p className="dash-admin-kpi__value">
+                  {staffToday
+                    ? `${staffToday.present + staffToday.late}`
+                    : "—"}
+                </p>
+                <p className="dash-admin-kpi__hint">
+                  {staffToday
+                    ? `${staffToday.marked} marked · ${staffToday.late} late`
+                    : "Open staff attendance"}
+                </p>
               </div>
             </Link>
           </StaffKpiGrid>

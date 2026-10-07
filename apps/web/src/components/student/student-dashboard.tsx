@@ -234,14 +234,16 @@ export function StudentDashboard({
       ? dashboard.upcomingAssignments
       : 0;
 
-  const recentAttendance = attendanceSummary?.recent?.length
-    ? attendanceSummary.recent
-    : attendance.slice(0, 5).map((r) => ({
-        id: r.id,
-        date: r.date,
-        status: r.status,
-        reason: r.reason ?? null,
-      }));
+  const recentAttendance = (
+    attendanceSummary?.recent?.length
+      ? attendanceSummary.recent
+      : attendance.map((r) => ({
+          id: r.id,
+          date: r.date,
+          status: r.status,
+          reason: r.reason ?? null,
+        }))
+  ).slice(0, 3);
 
   const studentName = attendanceSummary?.student.name;
   const hello = firstName(studentName);

@@ -38,6 +38,7 @@ const MODULE_ICONS: Record<SchoolModuleKey, DashIconName> = {
   classroom: "subjects",
   worksheets: "templates",
   library: "library",
+  payroll: "finance",
 };
 
 const YEARLY_MULTIPLIER = 10;

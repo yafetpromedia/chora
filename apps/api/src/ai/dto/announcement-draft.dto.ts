@@ -3,7 +3,7 @@ import { IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 export class AnnouncementDraftDto {
   @IsString()
   @MinLength(3)
-  @MaxLength(500)
+  @MaxLength(4000)
   prompt!: string;
 
   @IsOptional()

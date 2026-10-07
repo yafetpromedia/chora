@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { AttendanceStatus, UserRole } from '@prisma/client';
 import { AttendanceService } from '../attendance/attendance.service';
+import { StaffAttendanceService } from '../staff-attendance/staff-attendance.service';
 import { FinanceService } from '../finance/finance.service';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -24,13 +25,21 @@ export class AdminAnalyticsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly attendance: AttendanceService,
+    private readonly staffAttendance: StaffAttendanceService,
     private readonly finance: FinanceService,
   ) {}
 
   async getOverview(schoolId: string) {
-    const [attendanceToday, finance, userCounts, totalStudents, trend] =
-      await Promise.all([
+    const [
+      attendanceToday,
+      staffAttendanceToday,
+      finance,
+      userCounts,
+      totalStudents,
+      trend,
+    ] = await Promise.all([
         this.attendance.getAnalytics(schoolId),
+        this.staffAttendance.summary(schoolId).catch(() => null),
         this.finance.getAnalytics(schoolId).catch(() => null),
         this.prisma.user.groupBy({
           by: ['role'],
@@ -59,6 +68,18 @@ export class AdminAnalyticsService {
         absent: attendanceToday.absentToday,
         totalStudents: attendanceToday.totalStudents || totalStudents,
       },
+      staffAttendanceToday: staffAttendanceToday
+        ? {
+            date: staffAttendanceToday.date,
+            totalStaff: staffAttendanceToday.totalStaff,
+            marked: staffAttendanceToday.marked,
+            unmarked: staffAttendanceToday.unmarked,
+            present: staffAttendanceToday.present,
+            late: staffAttendanceToday.late,
+            absent: staffAttendanceToday.absent,
+            onLeave: staffAttendanceToday.on_leave,
+          }
+        : null,
       attendanceTrend: trend,
       gradeAttendance: gradeRates,
       enrollment: {

@@ -235,8 +235,33 @@ model School {
   gradePreset           GradePreset?
   curriculumPackageKey  String?
   attendanceMode        AttendanceMode @default(DAILY)
+  /// Staff attendance expected check-in (HH:mm, school-local intent).
+  staffCheckInTime      String         @default("08:00")
+  /// Staff attendance expected check-out (HH:mm).
+  staffCheckOutTime     String         @default("17:00")
+  /// Minutes after expected check-in before status becomes late.
+  staffGraceMinutes     Int            @default(10)
+  /// When true, minutes after expected check-out count as overtime.
+  staffOvertimeEnabled  Boolean        @default(true)
   setupComplete         Boolean        @default(false)
   status                SchoolStatus   @default(TRIAL)
+  staffAttendanceRecords StaffAttendanceRecord[]
+  leaveTypes             LeaveType[]
+  leaveRequests          LeaveRequest[]
+  leaveBalances          LeaveBalance[]
+  staffQrCredentials     StaffQrCredential[]
+  hrDepartments          HrDepartment[]
+  hrPositions            HrPosition[]
+  employeeProfiles       EmployeeProfile[]
+  employmentHistories    EmploymentHistory[]
+  compensationComponents CompensationComponent[]
+  employeeCompensations  EmployeeCompensation[]
+  payrollSettings        PayrollSettings?
+  payrollRuleSets        PayrollRuleSet[]
+  payrollPeriods         PayrollPeriod[]
+  payrollRuns            PayrollRun[]
+  payrollAuditEvents     PayrollAuditEvent[]
+  overtimeApprovals      OvertimeApproval[]
   invites       SchoolInvite[]
   subscription  Subscription?
   grades         Grade[]
@@ -565,6 +590,24 @@ model User {
   parentLinks          ParentStudent[]      @relation("ParentUser")
   parentNotifications  ParentNotification[] @relation("ParentNotifications")
   attendanceMarks      AttendanceRecord[]   @relation("AttendanceMarkedBy")
+  staffAttendanceAsSubject StaffAttendanceRecord[] @relation("StaffAttendanceSubject")
+  staffAttendanceRecorded  StaffAttendanceRecord[] @relation("StaffAttendanceRecordedBy")
+  staffAttendanceUpdated   StaffAttendanceRecord[] @relation("StaffAttendanceUpdatedBy")
+  staffAttendanceCorrections StaffAttendanceCorrection[] @relation("StaffAttendanceCorrectedBy")
+  leaveRequests            LeaveRequest[]          @relation("LeaveRequestSubject")
+  leaveRequestsReviewed    LeaveRequest[]          @relation("LeaveRequestReviewedBy")
+  leaveBalances            LeaveBalance[]
+  staffQrCredential        StaffQrCredential?
+  employeeProfile          EmployeeProfile?
+  supervisedEmployees      EmployeeProfile[]  @relation("EmployeeSupervisor")
+  employmentHistoriesChanged EmploymentHistory[] @relation("EmploymentHistoryChangedBy")
+  compensations            EmployeeCompensation[] @relation("EmployeeCompensationSubject")
+  compensationsApproved    EmployeeCompensation[] @relation("EmployeeCompensationApprovedBy")
+  payrollRunsApproved      PayrollRun[]           @relation("PayrollRunApprovedBy")
+  payrollAdjustmentsCreated PayrollAdjustment[]   @relation("PayrollAdjustmentCreatedBy")
+  payrollPaymentsRecorded  PayrollPayment[]       @relation("PayrollPaymentRecordedBy")
+  payrollAuditEvents       PayrollAuditEvent[]    @relation("PayrollAuditActor")
+  overtimeApprovalsReviewed OvertimeApproval[]    @relation("OvertimeApprovalReviewer")
   paymentsRecorded     Payment[]            @relation("PaymentsRecordedBy")
   resultsUpdated       ResultRecord[]       @relation("ResultUpdatedBy")
   resultSheetsSubmitted ClassSubjectTermSheet[] @relation("ResultSheetSubmittedBy")
@@ -757,6 +800,640 @@ model AttendancePermissionRequest {
 
   @@index([schoolId, status, date])
   @@index([studentProfileId, date])
+}
+
+enum StaffAttendanceStatus {
+  present
+  late
+  absent
+  half_day
+  on_leave
+  excused
+}
+
+/// One staff/teacher attendance row per school/day (teachers + office staff).
+model StaffAttendanceRecord {
+  id                    String                @id @default(cuid())
+  schoolId              String
+  school                School                @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  userId                String
+  user                  User                  @relation("StaffAttendanceSubject", fields: [userId], references: [id], onDelete: Cascade)
+  date                  DateTime              @db.Date
+  status                StaffAttendanceStatus
+  checkInAt             DateTime?
+  checkOutAt            DateTime?
+  expectedCheckInAt     DateTime?
+  expectedCheckOutAt    DateTime?
+  lateMinutes           Int                   @default(0)
+  earlyDepartureMinutes Int                   @default(0)
+  workedMinutes         Int?
+  /// Minutes worked after expected check-out (when school OT is enabled).
+  overtimeMinutes       Int                   @default(0)
+  reason                String?
+  notes                 String?               @db.Text
+  recordedById          String
+  recordedBy            User                  @relation("StaffAttendanceRecordedBy", fields: [recordedById], references: [id])
+  updatedById           String?
+  updatedBy             User?                 @relation("StaffAttendanceUpdatedBy", fields: [updatedById], references: [id])
+  corrections           StaffAttendanceCorrection[]
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+
+  @@unique([schoolId, userId, date])
+  @@index([schoolId, date])
+  @@index([userId, date])
+}
+
+model StaffAttendanceCorrection {
+  id                 String                @id @default(cuid())
+  schoolId           String
+  recordId           String
+  record             StaffAttendanceRecord @relation(fields: [recordId], references: [id], onDelete: Cascade)
+  previousStatus     StaffAttendanceStatus
+  newStatus          StaffAttendanceStatus
+  previousCheckInAt  DateTime?
+  newCheckInAt       DateTime?
+  previousCheckOutAt DateTime?
+  newCheckOutAt      DateTime?
+  reason             String?               @db.Text
+  changedById        String
+  changedBy          User                  @relation("StaffAttendanceCorrectedBy", fields: [changedById], references: [id])
+  createdAt          DateTime              @default(now())
+
+  @@index([schoolId, createdAt])
+  @@index([recordId])
+}
+
+enum LeaveRequestStatus {
+  pending
+  approved
+  rejected
+  cancelled
+}
+
+model LeaveType {
+  id                 String         @id @default(cuid())
+  schoolId           String
+  school             School         @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  name               String
+  slug               String
+  isPaid             Boolean        @default(true)
+  countsTowardBalance Boolean       @default(true)
+  annualAllocationDays Int?
+  sortOrder          Int            @default(0)
+  active             Boolean        @default(true)
+  requests           LeaveRequest[]
+  balances           LeaveBalance[]
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  @@unique([schoolId, slug])
+  @@index([schoolId, active])
+}
+
+model LeaveRequest {
+  id            String             @id @default(cuid())
+  schoolId      String
+  school        School             @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User               @relation("LeaveRequestSubject", fields: [userId], references: [id], onDelete: Cascade)
+  leaveTypeId   String
+  leaveType     LeaveType          @relation(fields: [leaveTypeId], references: [id])
+  startDate     DateTime           @db.Date
+  endDate       DateTime           @db.Date
+  days          Int
+  reason        String             @db.Text
+  notes         String?            @db.Text
+  attachmentUrl String?
+  status        LeaveRequestStatus @default(pending)
+  reviewedById  String?
+  reviewedBy    User?              @relation("LeaveRequestReviewedBy", fields: [reviewedById], references: [id])
+  reviewedAt    DateTime?
+  reviewNote    String?            @db.Text
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  @@index([schoolId, status, startDate])
+  @@index([userId, startDate])
+  @@index([schoolId, leaveTypeId])
+}
+
+model LeaveBalance {
+  id           String    @id @default(cuid())
+  schoolId     String
+  school       School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  leaveTypeId  String
+  leaveType    LeaveType @relation(fields: [leaveTypeId], references: [id], onDelete: Cascade)
+  year         Int
+  allocated    Int       @default(0)
+  used         Int       @default(0)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@unique([schoolId, userId, leaveTypeId, year])
+  @@index([schoolId, year])
+}
+
+/// Rotatable staff QR identity for gate check-in (CAMPUS1-S:{token}).
+model StaffQrCredential {
+  id        String    @id @default(cuid())
+  schoolId  String
+  school    School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  userId    String    @unique
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String
+  active    Boolean   @default(true)
+  rotatedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@unique([schoolId, token])
+  @@index([schoolId, active])
+}
+
+// ─── HR / Compensation / Payroll ───────────────────────────────────────────
+
+enum EmploymentType {
+  FULL_TIME
+  PART_TIME
+  CONTRACT
+  TEMPORARY
+  DAILY
+  HOURLY
+  INTERNSHIP
+}
+
+enum EmploymentStatus {
+  ACTIVE
+  ON_LEAVE
+  SUSPENDED
+  TERMINATED
+  RESIGNED
+  RETIRED
+}
+
+enum PayFrequency {
+  MONTHLY
+  WEEKLY
+  DAILY
+  HOURLY
+}
+
+enum CompensationComponentType {
+  EARNING
+  DEDUCTION
+}
+
+enum CompensationCalcMethod {
+  FIXED_AMOUNT
+  PERCENTAGE_OF_BASIC
+  PER_HOUR
+  PER_DAY
+}
+
+enum PayrollRunStatus {
+  DRAFT
+  CALCULATING
+  CALCULATED
+  UNDER_REVIEW
+  APPROVED
+  PAID
+  CLOSED
+  CANCELLED
+}
+
+enum PayrollLineKind {
+  EARNING
+  DEDUCTION
+  EMPLOYER
+}
+
+enum PayrollAdjustmentType {
+  BONUS
+  PENALTY
+  CORRECTION
+  ALLOWANCE
+  ADVANCE_DEDUCTION
+  REIMBURSEMENT
+  OTHER
+}
+
+enum AbsenceDeductionMethod {
+  NO_DEDUCTION
+  MONTHLY_DIVIDED_BY_WORKING_DAYS
+  MONTHLY_DIVIDED_BY_FIXED_DAYS
+}
+
+enum OvertimeApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum PayrollPaymentStatus {
+  UNPAID
+  PROCESSING
+  PAID
+  FAILED
+  CANCELLED
+}
+
+enum PayrollPayMethod {
+  BANK_TRANSFER
+  CASH
+  OTHER
+}
+
+model HrDepartment {
+  id        String            @id @default(cuid())
+  schoolId  String
+  school    School            @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  name      String
+  code      String
+  active    Boolean           @default(true)
+  sortOrder Int               @default(0)
+  profiles  EmployeeProfile[]
+  histories EmploymentHistory[]
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  @@unique([schoolId, code])
+  @@index([schoolId, active])
+}
+
+model HrPosition {
+  id        String            @id @default(cuid())
+  schoolId  String
+  school    School            @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  name      String
+  code      String
+  active    Boolean           @default(true)
+  sortOrder Int               @default(0)
+  profiles  EmployeeProfile[]
+  histories EmploymentHistory[]
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  @@unique([schoolId, code])
+  @@index([schoolId, active])
+}
+
+/// HR extension for school workforce (1:1 with User). Not a second employee identity.
+model EmployeeProfile {
+  id                 String           @id @default(cuid())
+  schoolId           String
+  school             School           @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  userId             String           @unique
+  user               User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  employeeCode       String
+  gender             Gender?
+  dateOfBirth        DateTime?        @db.Date
+  address            String?
+  emergencyName      String?
+  emergencyPhone     String?
+  employmentType     EmploymentType   @default(FULL_TIME)
+  employmentStatus   EmploymentStatus @default(ACTIVE)
+  hrDepartmentId     String?
+  hrDepartment       HrDepartment?    @relation(fields: [hrDepartmentId], references: [id], onDelete: SetNull)
+  hrPositionId       String?
+  hrPosition         HrPosition?      @relation(fields: [hrPositionId], references: [id], onDelete: SetNull)
+  supervisorUserId   String?
+  supervisor         User?            @relation("EmployeeSupervisor", fields: [supervisorUserId], references: [id], onDelete: SetNull)
+  hireDate           DateTime?        @db.Date
+  contractStart      DateTime?        @db.Date
+  contractEnd        DateTime?        @db.Date
+  photoUrl           String?
+  bankName           String?
+  bankAccountHolder  String?
+  /// Stored full; APIs must mask except for payroll.pay / hr.employees.manage
+  bankAccountNumber  String?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  histories          EmploymentHistory[]
+
+  @@unique([schoolId, employeeCode])
+  @@index([schoolId, employmentStatus])
+  @@index([schoolId, hrDepartmentId])
+  @@index([schoolId, hrPositionId])
+}
+
+model EmploymentHistory {
+  id               String          @id @default(cuid())
+  schoolId         String
+  school           School          @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  employeeProfileId String
+  employeeProfile  EmployeeProfile @relation(fields: [employeeProfileId], references: [id], onDelete: Cascade)
+  effectiveFrom    DateTime        @db.Date
+  effectiveTo      DateTime?       @db.Date
+  hrDepartmentId   String?
+  hrDepartment     HrDepartment?   @relation(fields: [hrDepartmentId], references: [id], onDelete: SetNull)
+  hrPositionId     String?
+  hrPosition       HrPosition?     @relation(fields: [hrPositionId], references: [id], onDelete: SetNull)
+  employmentType   EmploymentType
+  employmentStatus EmploymentStatus
+  reason           String?
+  changedById      String?
+  changedBy        User?           @relation("EmploymentHistoryChangedBy", fields: [changedById], references: [id], onDelete: SetNull)
+  createdAt        DateTime        @default(now())
+
+  @@index([schoolId, employeeProfileId, effectiveFrom])
+}
+
+model CompensationComponent {
+  id         String                    @id @default(cuid())
+  schoolId   String
+  school     School                    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  code       String
+  name       String
+  type       CompensationComponentType
+  method     CompensationCalcMethod    @default(FIXED_AMOUNT)
+  taxable    Boolean                   @default(true)
+  recurring  Boolean                   @default(true)
+  active     Boolean                   @default(true)
+  sortOrder  Int                       @default(0)
+  lines      EmployeeCompensationLine[]
+  createdAt  DateTime                  @default(now())
+  updatedAt  DateTime                  @updatedAt
+
+  @@unique([schoolId, code])
+  @@index([schoolId, active])
+}
+
+model EmployeeCompensation {
+  id               String                     @id @default(cuid())
+  schoolId         String
+  school           School                     @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  userId           String
+  user             User                       @relation("EmployeeCompensationSubject", fields: [userId], references: [id], onDelete: Cascade)
+  payFrequency     PayFrequency               @default(MONTHLY)
+  basicAmountCents Int                        @default(0)
+  hourlyRateCents  Int?
+  dailyRateCents   Int?
+  currency         String                     @default("ETB")
+  effectiveFrom    DateTime                   @db.Date
+  effectiveTo      DateTime?                  @db.Date
+  reason           String
+  approvedById     String?
+  approvedBy       User?                      @relation("EmployeeCompensationApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  lines            EmployeeCompensationLine[]
+  createdAt        DateTime                   @default(now())
+  updatedAt        DateTime                   @updatedAt
+
+  @@index([schoolId, userId, effectiveFrom])
+  @@index([schoolId, effectiveFrom])
+}
+
+model EmployeeCompensationLine {
+  id              String                @id @default(cuid())
+  compensationId  String
+  compensation    EmployeeCompensation  @relation(fields: [compensationId], references: [id], onDelete: Cascade)
+  componentId     String
+  component       CompensationComponent @relation(fields: [componentId], references: [id], onDelete: Restrict)
+  amountCents     Int?
+  /// Basis points (10000 = 100%) when method is PERCENTAGE_OF_BASIC
+  percentBp       Int?
+  createdAt       DateTime              @default(now())
+
+  @@index([compensationId])
+  @@index([componentId])
+}
+
+model PayrollSettings {
+  id                      String                 @id @default(cuid())
+  schoolId                String                 @unique
+  school                  School                 @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  currency                String                 @default("ETB")
+  workingDaysPerMonth     Int                    @default(22)
+  overtimeEnabled         Boolean                @default(true)
+  overtimeMultiplierBp    Int                    @default(15000)
+  overtimeApprovalRequired Boolean               @default(false)
+  absenceDeductionMethod  AbsenceDeductionMethod @default(NO_DEDUCTION)
+  absenceFixedDays        Int                    @default(30)
+  statutoryActive         Boolean                @default(false)
+  createdAt               DateTime               @default(now())
+  updatedAt               DateTime               @updatedAt
+}
+
+model PayrollRuleSet {
+  id          String             @id @default(cuid())
+  schoolId    String?
+  school      School?            @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  code        String
+  name        String
+  effectiveFrom DateTime         @db.Date
+  effectiveTo   DateTime?        @db.Date
+  active      Boolean            @default(true)
+  taxBrackets TaxBracket[]
+  contributions ContributionRule[]
+  runs        PayrollRun[]
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  @@unique([schoolId, code])
+  @@index([schoolId, active])
+}
+
+model TaxBracket {
+  id           String         @id @default(cuid())
+  ruleSetId    String
+  ruleSet      PayrollRuleSet @relation(fields: [ruleSetId], references: [id], onDelete: Cascade)
+  minCents     Int
+  maxCents     Int?
+  rateBp       Int
+  deductionCents Int          @default(0)
+  sortOrder    Int            @default(0)
+
+  @@index([ruleSetId])
+}
+
+model ContributionRule {
+  id                 String         @id @default(cuid())
+  ruleSetId          String
+  ruleSet            PayrollRuleSet @relation(fields: [ruleSetId], references: [id], onDelete: Cascade)
+  code               String
+  name               String
+  employeeRateBp     Int            @default(0)
+  employerRateBp     Int            @default(0)
+  basis              String         @default("GROSS")
+  active             Boolean        @default(true)
+
+  @@index([ruleSetId])
+}
+
+model PayrollPeriod {
+  id        String       @id @default(cuid())
+  schoolId  String
+  school    School       @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  label     String
+  startDate DateTime     @db.Date
+  endDate   DateTime     @db.Date
+  payDate   DateTime     @db.Date
+  runs      PayrollRun[]
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  @@unique([schoolId, startDate, endDate])
+  @@index([schoolId, startDate])
+}
+
+model PayrollRun {
+  id              String             @id @default(cuid())
+  schoolId        String
+  school          School             @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  periodId        String
+  period          PayrollPeriod      @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  status          PayrollRunStatus   @default(DRAFT)
+  ruleSetId       String?
+  ruleSet         PayrollRuleSet?    @relation(fields: [ruleSetId], references: [id], onDelete: SetNull)
+  statutoryActive Boolean            @default(false)
+  calculatedAt    DateTime?
+  approvedAt      DateTime?
+  approvedById    String?
+  approvedBy      User?              @relation("PayrollRunApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  closedAt        DateTime?
+  notes           String?            @db.Text
+  snapshots       PayrollEmployeeSnapshot[]
+  adjustments     PayrollAdjustment[]
+  overtimeApprovals OvertimeApproval[]
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  @@index([schoolId, status])
+  @@index([periodId])
+}
+
+model PayrollEmployeeSnapshot {
+  id               String        @id @default(cuid())
+  schoolId         String
+  runId            String
+  run              PayrollRun    @relation(fields: [runId], references: [id], onDelete: Cascade)
+  userId           String
+  employeeCode     String
+  employeeName     String
+  positionName     String?
+  departmentName   String?
+  payFrequency     PayFrequency
+  basicCents       Int
+  grossCents       Int
+  deductionCents   Int
+  netCents         Int
+  employerCostCents Int          @default(0)
+  overtimeMinutes  Int           @default(0)
+  absenceDays      Int           @default(0)
+  leaveDaysPaid    Int           @default(0)
+  leaveDaysUnpaid  Int           @default(0)
+  lines            PayrollLine[]
+  payslip          Payslip?
+  payment          PayrollPayment?
+  createdAt        DateTime      @default(now())
+
+  @@unique([runId, userId])
+  @@index([schoolId, runId])
+  @@index([userId])
+}
+
+model PayrollLine {
+  id         String                   @id @default(cuid())
+  snapshotId String
+  snapshot   PayrollEmployeeSnapshot  @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+  kind       PayrollLineKind
+  code       String
+  label      String
+  amountCents Int
+
+  @@index([snapshotId])
+}
+
+model PayrollAdjustment {
+  id          String                 @id @default(cuid())
+  schoolId    String
+  runId       String
+  run         PayrollRun             @relation(fields: [runId], references: [id], onDelete: Cascade)
+  userId      String
+  type        PayrollAdjustmentType
+  amountCents Int
+  reason      String                 @db.Text
+  createdById String
+  createdBy   User                   @relation("PayrollAdjustmentCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime               @default(now())
+
+  @@index([runId, userId])
+  @@index([schoolId])
+}
+
+model OvertimeApproval {
+  id              String                  @id @default(cuid())
+  schoolId        String
+  school          School                  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  runId           String?
+  run             PayrollRun?             @relation(fields: [runId], references: [id], onDelete: SetNull)
+  userId          String
+  periodStart     DateTime                @db.Date
+  periodEnd       DateTime                @db.Date
+  overtimeMinutes Int
+  status          OvertimeApprovalStatus  @default(PENDING)
+  reviewedById    String?
+  reviewedBy      User?                   @relation("OvertimeApprovalReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt      DateTime?
+  createdAt       DateTime                @default(now())
+
+  @@unique([schoolId, userId, periodStart, periodEnd])
+  @@index([schoolId, status])
+}
+
+model Payslip {
+  id         String                  @id @default(cuid())
+  schoolId   String
+  snapshotId String                  @unique
+  snapshot   PayrollEmployeeSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+  userId     String
+  periodLabel String
+  payDate    DateTime                @db.Date
+  payloadJson String                 @db.Text
+  createdAt  DateTime                @default(now())
+
+  @@index([schoolId, userId, payDate])
+}
+
+model PayrollPayment {
+  id          String               @id @default(cuid())
+  schoolId    String
+  snapshotId  String               @unique
+  snapshot    PayrollEmployeeSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+  userId      String
+  amountCents Int
+  method      PayrollPayMethod     @default(BANK_TRANSFER)
+  status      PayrollPaymentStatus @default(UNPAID)
+  reference   String?
+  notes       String?
+  paidAt      DateTime?
+  recordedById String?
+  recordedBy  User?                @relation("PayrollPaymentRecordedBy", fields: [recordedById], references: [id], onDelete: SetNull)
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  @@index([schoolId, status])
+  @@index([userId])
+}
+
+model PayrollAuditEvent {
+  id         String   @id @default(cuid())
+  schoolId   String
+  school     School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  actorId    String?
+  actor      User?    @relation("PayrollAuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+  entity     String
+  entityId   String
+  action     String
+  beforeJson String?  @db.Text
+  afterJson  String?  @db.Text
+  reason     String?
+  createdAt  DateTime @default(now())
+
+  @@index([schoolId, createdAt])
+  @@index([entity, entityId])
 }
 
 model ParentNotification {
@@ -1118,6 +1795,10 @@ model PlatformSettings {
   sessionTimeoutMinutes Int              @default(60)
   /// Public marketing / register hero background (URL or data URL).
   landingHeroImageUrl   String?          @db.Text
+  /// Public “See Chora in Action” walkthrough (YouTube URL or uploaded file URL).
+  demoVideoUrl          String?          @db.Text
+  /// Optional custom poster / thumbnail for the demo player (URL or data URL).
+  demoVideoThumbnailUrl String?          @db.Text
   /// Where schools send SaaS subscription payments (Telebirr / CBE).
   bankName              String?
   bankAccountHolder     String?
@@ -1134,6 +1815,13 @@ model PlatformSettings {
   socialGithubUrl         String?
   /// Editable platform role → permission keys (SUPPORT/SALES). OWNER always has all.
   rolePermissions       Json?
+  /// Platform-wide AI (Gemini / OpenAI / FreeModel). Overrides env when enabled + key set.
+  aiEnabled             Boolean          @default(false)
+  /// gemini | openai | freemodel
+  aiProvider            String           @default("gemini")
+  aiApiKey              String?          @db.Text
+  aiModel               String?
+  aiBaseUrl             String?
   createdAt             DateTime         @default(now())
   updatedAt             DateTime         @updatedAt
 }

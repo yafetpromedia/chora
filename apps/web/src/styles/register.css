@@ -1303,38 +1303,6 @@
   to { opacity: 1; transform: scale(1.08); }
 }
 
-.login-visual__float {
-  position: absolute;
-  z-index: 3;
-  display: flex;
-  flex-direction: column;
-  gap: 0.05rem;
-  padding: 0.45rem 0.65rem;
-  border-radius: 0.7rem;
-  background: rgba(255, 255, 255, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  backdrop-filter: blur(12px);
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.14);
-  pointer-events: none;
-}
-
-.login-visual__float span {
-  font-size: 0.62rem;
-  opacity: 0.85;
-}
-
-.login-visual__float strong {
-  font-size: 0.88rem;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-}
-
-@media (max-width: 1280px) {
-  .login-visual__float {
-    display: none;
-  }
-}
-
 .login-visual__content {
   position: relative;
   z-index: 2;

@@ -28,6 +28,7 @@ export function AnimatedNav({ children }: { children: ReactNode }) {
 export function NavLinks() {
   return (
     <nav className="hidden gap-8 text-sm font-semibold md:flex">
+      <Link href="/demo" className="nav-link">Demo</Link>
       <a href="#features" className="nav-link">Product</a>
       <a href="#app" className="nav-link">Mobile app</a>
       <a href="#portals" className="nav-link">Portals</a>

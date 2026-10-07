@@ -5,6 +5,7 @@ import { BrandMark } from "@/components/brand-mark";
 import { BRAND_NAME, BRAND_TAGLINE } from "@/lib/brand";
 
 const PRODUCT_LINKS = [
+  { href: "/demo", label: "Demo" },
   { href: "#features", label: "Product" },
   { href: "#connect", label: "Chora Connect" },
   { href: "#app", label: "Mobile app" },
@@ -40,11 +41,17 @@ export function LandingFooter() {
           <div className="lp3-footer__col">
             <h3>Product</h3>
             <nav aria-label="Product">
-              {PRODUCT_LINKS.map((link) => (
-                <a key={link.href} href={link.href}>
-                  {link.label}
-                </a>
-              ))}
+              {PRODUCT_LINKS.map((link) =>
+                link.href.startsWith("/") ? (
+                  <Link key={link.href} href={link.href}>
+                    {link.label}
+                  </Link>
+                ) : (
+                  <a key={link.href} href={link.href}>
+                    {link.label}
+                  </a>
+                ),
+              )}
             </nav>
           </div>
 

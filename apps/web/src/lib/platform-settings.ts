@@ -1,6 +1,8 @@
 import type { BillingCurrency } from "@/lib/platform-billing";
 import { platformFetch } from "@/lib/platform-auth";
 
+export type AiProviderId = "gemini" | "openai" | "freemodel";
+
 export type PlatformSettings = {
   id: string;
   platformName: string;
@@ -23,6 +25,8 @@ export type PlatformSettings = {
   maintenanceMessage: string | null;
   sessionTimeoutMinutes: number;
   landingHeroImageUrl: string | null;
+  demoVideoUrl: string | null;
+  demoVideoThumbnailUrl: string | null;
   bankName: string | null;
   bankAccountHolder: string | null;
   bankAccountNumber: string | null;
@@ -35,6 +39,12 @@ export type PlatformSettings = {
   socialYoutubeUrl: string | null;
   socialTiktokUrl: string | null;
   socialGithubUrl: string | null;
+  aiEnabled: boolean;
+  aiProvider: AiProviderId | string;
+  aiModel: string | null;
+  aiBaseUrl: string | null;
+  aiConfigured: boolean;
+  aiApiKeyMasked: string | null;
   updatedAt: string;
 };
 
@@ -59,6 +69,8 @@ export type UpdatePlatformSettingsInput = Partial<{
   maintenanceMessage: string;
   sessionTimeoutMinutes: number;
   landingHeroImageUrl: string;
+  demoVideoUrl: string;
+  demoVideoThumbnailUrl: string;
   bankName: string;
   bankAccountHolder: string;
   bankAccountNumber: string;
@@ -71,7 +83,20 @@ export type UpdatePlatformSettingsInput = Partial<{
   socialYoutubeUrl: string;
   socialTiktokUrl: string;
   socialGithubUrl: string;
+  aiEnabled: boolean;
+  aiProvider: AiProviderId;
+  aiApiKey: string | null;
+  aiModel: string;
+  aiBaseUrl: string;
 }>;
+
+export type AiConnectionTestResult = {
+  ok: boolean;
+  model: string;
+  provider: string;
+  source: string;
+  reply: string;
+};
 
 export function getPlatformSettings() {
   return platformFetch<PlatformSettings>("/platform/settings");
@@ -81,5 +106,17 @@ export function updatePlatformSettings(body: UpdatePlatformSettingsInput) {
   return platformFetch<PlatformSettings>("/platform/settings", {
     method: "PATCH",
     body: JSON.stringify(body),
+  });
+}
+
+export function testPlatformAiConnection(body?: {
+  aiApiKey?: string;
+  aiProvider?: AiProviderId;
+  aiModel?: string;
+  aiBaseUrl?: string;
+}) {
+  return platformFetch<AiConnectionTestResult>("/platform/settings/ai/test", {
+    method: "POST",
+    body: JSON.stringify(body ?? {}),
   });
 }

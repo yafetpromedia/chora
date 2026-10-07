@@ -3,6 +3,7 @@ import {
   IsBoolean,
   IsEmail,
   IsEnum,
+  IsIn,
   IsInt,
   IsOptional,
   IsString,
@@ -12,6 +13,9 @@ import {
   MinLength,
   ValidateIf,
 } from 'class-validator';
+
+export const AI_PROVIDERS = ['gemini', 'openai', 'freemodel'] as const;
+export type AiProviderId = (typeof AI_PROVIDERS)[number];
 
 export class UpdatePlatformSettingsDto {
   @IsOptional()
@@ -118,6 +122,16 @@ export class UpdatePlatformSettingsDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(2000)
+  demoVideoUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(4_000_000)
+  demoVideoThumbnailUrl?: string;
+
+  @IsOptional()
+  @IsString()
   @MaxLength(120)
   bankName?: string;
 
@@ -175,4 +189,30 @@ export class UpdatePlatformSettingsDto {
   @IsString()
   @MaxLength(500)
   socialGithubUrl?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  aiEnabled?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @IsIn(AI_PROVIDERS)
+  aiProvider?: AiProviderId;
+
+  /** Omit or empty string = keep existing key. Explicit null = clear. */
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsString()
+  @MaxLength(500)
+  aiApiKey?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  aiModel?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  aiBaseUrl?: string;
 }

@@ -7,6 +7,7 @@ import { AppStoreBadges } from "@/components/landing/app-store-badges";
 import { LandingFooter } from "@/components/landing/landing-footer";
 import { LandingAppSection } from "@/components/landing/landing-app-section";
 import { LandingChoraConnect } from "@/components/landing/landing-chora-connect";
+import { LandingDemoSection } from "@/components/landing/landing-demo-section";
 import { LandingNav } from "@/components/landing/landing-nav";
 import { LandingPricing } from "@/components/landing/landing-pricing";
 import { Reveal, Stagger, StaggerItem } from "@/components/motion/reveal";
@@ -182,6 +183,8 @@ export function LandingPage() {
             </div>
           </div>
         </section>
+
+        <LandingDemoSection />
 
         <section className="lp3-section lp3-section--steps">
           <div className="lp3-container">

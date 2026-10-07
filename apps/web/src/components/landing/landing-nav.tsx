@@ -1,29 +1,45 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { BrandMark } from "@/components/brand-mark";
 import { BRAND_NAME } from "@/lib/brand";
 
-const LINKS = [
-  { href: "#hero", label: "Home" },
-  { href: "#features", label: "Product" },
-  { href: "#connect", label: "Connect" },
-  { href: "#app", label: "Mobile app" },
-  { href: "#portals", label: "Portals" },
-  { href: "#pricing", label: "Pricing" },
-  { href: "#faq", label: "FAQ" },
+const HOME_LINKS = [
+  { href: "#hero", id: "hero", label: "Home" },
+  { href: "/demo", id: "demo", label: "Demo" },
+  { href: "#features", id: "features", label: "Product" },
+  { href: "#connect", id: "connect", label: "Connect" },
+  { href: "#app", id: "app", label: "Mobile app" },
+  { href: "#portals", id: "portals", label: "Portals" },
+  { href: "#pricing", id: "pricing", label: "Pricing" },
+  { href: "#faq", id: "faq", label: "FAQ" },
 ] as const;
 
-const SECTION_IDS = ["hero", "features", "connect", "app", "portals", "pricing", "faq"];
+const SECTION_IDS = ["hero", "demo", "features", "connect", "app", "portals", "pricing", "faq"];
+
+function resolveHref(href: string, onHome: boolean) {
+  if (href.startsWith("/") || onHome) return href;
+  return `/${href}`;
+}
 
 export function LandingNav() {
+  const pathname = usePathname();
+  const onHome = pathname === "/";
+  const onDemo = pathname === "/demo";
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-  const [overHero, setOverHero] = useState(true);
-  const [active, setActive] = useState("hero");
+  const [overHero, setOverHero] = useState(onHome);
+  const [active, setActive] = useState(onDemo ? "demo" : "hero");
 
   useEffect(() => {
+    if (!onHome) {
+      setOverHero(false);
+      setActive(onDemo ? "demo" : "");
+      return;
+    }
+
     const update = () => {
       const y = window.scrollY;
       setScrolled(y > 12);
@@ -43,9 +59,11 @@ export function LandingNav() {
       window.removeEventListener("scroll", update);
       window.removeEventListener("resize", update);
     };
-  }, []);
+  }, [onHome, onDemo]);
 
   useEffect(() => {
+    if (!onHome) return;
+
     const sections = SECTION_IDS.map((id) => document.getElementById(id)).filter(Boolean);
     const sectionObserver = new IntersectionObserver(
       (entries) => {
@@ -64,7 +82,7 @@ export function LandingNav() {
     return () => {
       sectionObserver.disconnect();
     };
-  }, []);
+  }, [onHome]);
 
   const navClass = [
     "lp3-nav",
@@ -84,9 +102,11 @@ export function LandingNav() {
           </Link>
 
           <nav className="lp3-nav__links" aria-label="Main">
-            {LINKS.map((l) => {
-              const isActive = l.href === `#${active}`;
-              const isConnect = l.href === "#connect";
+            {HOME_LINKS.map((l) => {
+              const href = resolveHref(l.href, onHome);
+              const isActive =
+                l.id === "demo" ? onDemo || active === "demo" : onHome && active === l.id;
+              const isConnect = l.id === "connect";
               const className = [
                 "lp3-nav__link",
                 isActive ? "lp3-nav__link--active" : "",
@@ -95,13 +115,22 @@ export function LandingNav() {
                 .filter(Boolean)
                 .join(" ");
 
+              const shared = {
+                className,
+                "aria-current": isActive ? ("page" as const) : undefined,
+              };
+
+              if (href.startsWith("/")) {
+                return (
+                  <Link key={l.href} href={href} {...shared}>
+                    {l.label}
+                    {isConnect ? <span className="lp3-nav__link-soon">Soon</span> : null}
+                  </Link>
+                );
+              }
+
               return (
-                <a
-                  key={l.href}
-                  href={l.href}
-                  className={className}
-                  aria-current={isActive ? "page" : undefined}
-                >
+                <a key={l.href} href={href} {...shared}>
                   {l.label}
                   {isConnect ? <span className="lp3-nav__link-soon">Soon</span> : null}
                 </a>
@@ -141,14 +170,32 @@ export function LandingNav() {
           />
           <div className="lp3-nav__mobile" role="dialog" aria-label="Menu">
             <div className="lp3-nav__mobile-links">
-              {LINKS.map((l) => {
-                const isActive = l.href === `#${active}`;
-                const isConnect = l.href === "#connect";
+              {HOME_LINKS.map((l) => {
+                const href = resolveHref(l.href, onHome);
+                const isActive =
+                  l.id === "demo" ? onDemo || active === "demo" : onHome && active === l.id;
+                const isConnect = l.id === "connect";
+                const className = `lp3-nav__mobile-link${isActive ? " lp3-nav__mobile-link--active" : ""}`;
+
+                if (href.startsWith("/")) {
+                  return (
+                    <Link
+                      key={l.href}
+                      href={href}
+                      className={className}
+                      onClick={() => setOpen(false)}
+                    >
+                      {l.label}
+                      {isConnect ? <span className="lp3-nav__link-soon">Soon</span> : null}
+                    </Link>
+                  );
+                }
+
                 return (
                   <a
                     key={l.href}
-                    href={l.href}
-                    className={`lp3-nav__mobile-link${isActive ? " lp3-nav__mobile-link--active" : ""}`}
+                    href={href}
+                    className={className}
                     onClick={() => setOpen(false)}
                   >
                     {l.label}
@@ -160,7 +207,11 @@ export function LandingNav() {
                 Sign in
               </Link>
             </div>
-            <Link href="/register" className="lp3-btn lp3-btn--primary lp3-btn--block" onClick={() => setOpen(false)}>
+            <Link
+              href="/register"
+              className="lp3-btn lp3-btn--primary lp3-btn--block"
+              onClick={() => setOpen(false)}
+            >
               Start free trial
             </Link>
           </div>

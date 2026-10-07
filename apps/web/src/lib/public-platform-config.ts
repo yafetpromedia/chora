@@ -11,6 +11,8 @@ export type PublicPlatformConfig = {
   defaultCountry: string;
   defaultTrialDays: number;
   landingHeroImageUrl: string | null;
+  demoVideoUrl: string | null;
+  demoVideoThumbnailUrl: string | null;
   socialInstagramUrl: string | null;
   socialFacebookUrl: string | null;
   socialLinkedinUrl: string | null;

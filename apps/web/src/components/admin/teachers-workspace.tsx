@@ -7,7 +7,7 @@ import { AppToast } from "@/components/ui/app-toast";
 import { listGrades } from "@/lib/school-setup";
 import type { GradeWithSections } from "@/lib/api";
 import { TEACHER_ROLE_SLUGS } from "@/lib/people";
-import { ROLE_TEMPLATE_LABELS } from "@/lib/permissions";
+import { hasPermission, Permission, ROLE_TEMPLATE_LABELS } from "@/lib/permissions";
 import {
   createTeacher,
   deleteTeacher,
@@ -331,8 +331,17 @@ export function TeachersWorkspace() {
   }
 
   function renderActions(t: TeacherRecord, compact?: boolean) {
+    const name = displayName(t);
+    const canViewAttendance = hasPermission(Permission.STAFF_ATTENDANCE_READ);
+    const attendanceHref = `/admin/staff-attendance?userId=${encodeURIComponent(t.userId)}&name=${encodeURIComponent(name)}`;
+
     return (
       <div className={`tch-v2__actions${compact ? " tch-v2__actions--compact" : ""}`}>
+        {canViewAttendance ? (
+          <Link href={attendanceHref} className="tch-v2__action" title="Attendance history">
+            Attendance
+          </Link>
+        ) : null}
         <button type="button" className="tch-v2__action" onClick={() => openEdit(t)} title="Edit homeroom">
           Edit
         </button>
