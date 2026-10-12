@@ -27,6 +27,7 @@ export type PlatformSettings = {
   landingHeroImageUrl: string | null;
   demoVideoUrl: string | null;
   demoVideoThumbnailUrl: string | null;
+  productDocsUrl: string | null;
   bankName: string | null;
   bankAccountHolder: string | null;
   bankAccountNumber: string | null;
@@ -71,6 +72,7 @@ export type UpdatePlatformSettingsInput = Partial<{
   landingHeroImageUrl: string;
   demoVideoUrl: string;
   demoVideoThumbnailUrl: string;
+  productDocsUrl: string;
   bankName: string;
   bankAccountHolder: string;
   bankAccountNumber: string;

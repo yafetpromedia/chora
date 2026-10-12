@@ -115,16 +115,44 @@ export function EmployeeDetailPanel({ userId }: { userId: string }) {
       <AppToast message={error} tone="error" onDismiss={() => setError("")} />
       <AppToast message={toast} tone="success" onDismiss={() => setToast("")} />
 
-      <header className="hr-hero">
-        <div>
-          <p className="hr-hero__eyebrow">
-            <Link href="/admin/hr/employees">Employees</Link>
-          </p>
-          <h2 className="hr-hero__title">{emp.name}</h2>
-          <p className="hr-hero__sub">
-            {emp.roleName}
-            {emp.profile?.employeeCode ? ` · ${emp.profile.employeeCode}` : ""}
-          </p>
+      <header className="tch-v2__hero">
+        <div className="tch-v2__hero-glow" aria-hidden />
+        <div className="tch-v2__hero-inner">
+          <div className="tch-v2__hero-main">
+            <span className="tch-v2__chip">Employee</span>
+            <h2 className="tch-v2__hero-title">{emp.name}</h2>
+            <p className="tch-v2__hero-sub">
+              <Link href="/admin/hr/employees" className="tch-v2__hero-link">
+                Employees
+              </Link>
+              {" · "}
+              {emp.roleName}
+              {emp.profile?.employeeCode
+                ? ` · ${emp.profile.employeeCode}`
+                : ""}
+              {emp.profile?.departmentName
+                ? ` · ${emp.profile.departmentName}`
+                : ""}
+            </p>
+          </div>
+          <div className="tch-v2__hero-stats">
+            <div className="tch-v2__stat">
+              <strong>{emp.profile?.employmentStatus ?? "—"}</strong>
+              <span>Status</span>
+            </div>
+            <div className="tch-v2__stat">
+              <strong>{emp.profile?.employmentType ?? "—"}</strong>
+              <span>Type</span>
+            </div>
+            <div className="tch-v2__stat">
+              <strong>{comps.length}</strong>
+              <span>Packages</span>
+            </div>
+            <div className="tch-v2__stat tch-v2__stat--accent">
+              <strong>{canManage ? "Edit" : "View"}</strong>
+              <span>Access</span>
+            </div>
+          </div>
         </div>
       </header>
 

@@ -214,6 +214,7 @@ export class AuthService {
       landingHeroImageUrl: settings.landingHeroImageUrl,
       demoVideoUrl: settings.demoVideoUrl,
       demoVideoThumbnailUrl: settings.demoVideoThumbnailUrl,
+      productDocsUrl: settings.productDocsUrl,
       socialInstagramUrl: settings.socialInstagramUrl,
       socialFacebookUrl: settings.socialFacebookUrl,
       socialLinkedinUrl: settings.socialLinkedinUrl,

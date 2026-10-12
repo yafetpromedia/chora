@@ -160,6 +160,16 @@ export const DASHBOARD_NAV: NavItem[] = [
     roles: ["admin", "staff"],
     permission: Permission.ATTENDANCE_MANAGE,
     module: "attendance",
+    children: [
+      {
+        href: "/admin/attendance",
+        label: "Mark / analytics",
+      },
+      {
+        href: "/admin/attendance/concerns",
+        label: "Concerns",
+      },
+    ],
   },
   {
     href: "/admin/staff-attendance",
@@ -281,6 +291,22 @@ export const DASHBOARD_NAV: NavItem[] = [
     icon: "attendance",
     roles: ["teacher"],
     homeroomOnly: true,
+    module: "attendance",
+  },
+  {
+    href: "/teacher/classes-today",
+    label: "My Classes",
+    icon: "calendar",
+    roles: ["teacher"],
+    permission: Permission.ATTENDANCE_CONCERNS_REPORT,
+    module: "attendance",
+  },
+  {
+    href: "/teacher/attendance/concerns",
+    label: "Attendance Concerns",
+    icon: "alert",
+    roles: ["teacher"],
+    permission: Permission.ATTENDANCE_CONCERNS_REPORT,
     module: "attendance",
   },
   {

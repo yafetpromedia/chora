@@ -26,6 +26,8 @@ export const PermissionCatalog = {
   ATTENDANCE_READ: 'attendance.read',
   ATTENDANCE_MANAGE: 'attendance.manage',
   ATTENDANCE_ANALYTICS: 'attendance.analytics',
+  ATTENDANCE_CONCERNS_REPORT: 'attendance.concerns.report',
+  ATTENDANCE_CONCERNS_REVIEW: 'attendance.concerns.review',
 
   // Staff attendance (teachers + office staff)
   STAFF_ATTENDANCE_READ: 'staff_attendance.read',
@@ -111,6 +113,8 @@ export const PERMISSION_META: PermissionMeta[] = [
   { key: 'attendance.read', label: 'View attendance', category: 'attendance', description: 'Class rolls' },
   { key: 'attendance.manage', label: 'Mark attendance', category: 'attendance', description: 'Manual mark and QR scan' },
   { key: 'attendance.analytics', label: 'Attendance analytics', category: 'attendance', description: 'School-wide stats' },
+  { key: 'attendance.concerns.report', label: 'Report attendance concerns', category: 'attendance', description: 'Subject teachers report classroom attendance discrepancies' },
+  { key: 'attendance.concerns.review', label: 'Review attendance concerns', category: 'attendance', description: 'Homeroom and officers review and resolve concerns' },
   { key: 'staff_attendance.read', label: 'View staff attendance', category: 'staff_attendance', description: 'Teacher and staff attendance rolls' },
   { key: 'staff_attendance.manage', label: 'Manage staff attendance', category: 'staff_attendance', description: 'Check-in, check-out, and corrections' },
   { key: 'staff_attendance.analytics', label: 'Staff attendance analytics', category: 'staff_attendance', description: 'Staff attendance summaries and exports' },

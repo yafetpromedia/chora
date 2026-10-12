@@ -29,6 +29,11 @@ export type SchoolSettings = {
   paymentInstructions: string | null;
   reportCardTitle: string | null;
   reportCardTagline: string | null;
+  nameAm: string | null;
+  stampUrl: string | null;
+  reportCoverImageUrl: string | null;
+  reportShowRank: boolean;
+  reportShowAttendance: boolean;
 };
 
 export async function getSchoolSettings() {
@@ -61,6 +66,11 @@ export type UpdateSchoolSettingsPayload = {
   paymentInstructions?: string;
   reportCardTitle?: string;
   reportCardTagline?: string;
+  nameAm?: string;
+  stampUrl?: string;
+  reportCoverImageUrl?: string;
+  reportShowRank?: boolean;
+  reportShowAttendance?: boolean;
 };
 
 export async function updateSchoolSettings(body: UpdateSchoolSettingsPayload) {

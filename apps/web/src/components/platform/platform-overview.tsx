@@ -120,6 +120,51 @@ export function PlatformOverview({ dashboard, schools, onNavigate }: Props) {
 
       <PlatformAnalytics dashboard={dashboard} schools={schools} />
 
+      {dashboard.alerts ? (
+        <section
+          className="plat-subjects-v2__kpis"
+          aria-label="Operations alerts"
+          style={{ marginTop: "1rem" }}
+        >
+          <button
+            type="button"
+            className="plat-subjects-v2__kpi"
+            onClick={() => onNavigate("invoices")}
+            style={{ textAlign: "left", cursor: "pointer", border: "none" }}
+          >
+            <DashIcon name="fees" className="dash-icon--sm" />
+            <div>
+              <strong>{dashboard.alerts.pendingPaymentProofs}</strong>
+              <span>Pending receipts</span>
+            </div>
+          </button>
+          <button
+            type="button"
+            className="plat-subjects-v2__kpi"
+            onClick={() => onNavigate("support")}
+            style={{ textAlign: "left", cursor: "pointer", border: "none" }}
+          >
+            <DashIcon name="support" className="dash-icon--sm" />
+            <div>
+              <strong>{dashboard.alerts.openSupportTickets}</strong>
+              <span>Open support</span>
+            </div>
+          </button>
+          <button
+            type="button"
+            className="plat-subjects-v2__kpi"
+            onClick={() => onNavigate("schools")}
+            style={{ textAlign: "left", cursor: "pointer", border: "none" }}
+          >
+            <DashIcon name="alert" className="dash-icon--sm" />
+            <div>
+              <strong>{dashboard.alerts.openAttendanceConcerns}</strong>
+              <span>Attendance concerns</span>
+            </div>
+          </button>
+        </section>
+      ) : null}
+
       <article className="plat-v2__card plat-v2__card--wide">
         <header className="plat-v2__card-head">
           <div>

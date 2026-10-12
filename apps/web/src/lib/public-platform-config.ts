@@ -13,6 +13,7 @@ export type PublicPlatformConfig = {
   landingHeroImageUrl: string | null;
   demoVideoUrl: string | null;
   demoVideoThumbnailUrl: string | null;
+  productDocsUrl: string | null;
   socialInstagramUrl: string | null;
   socialFacebookUrl: string | null;
   socialLinkedinUrl: string | null;

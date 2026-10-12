@@ -97,19 +97,41 @@ export function PayrollSettingsPanel() {
       <AppToast message={error} tone="error" onDismiss={() => setError("")} />
       <AppToast message={toast} tone="success" onDismiss={() => setToast("")} />
 
-      <header className="hr-hero">
-        <div>
-          <p className="hr-hero__eyebrow">Payroll</p>
-          <h2 className="hr-hero__title">Settings</h2>
-          <p className="hr-hero__sub">
-            Attendance feed policies, compensation catalog, and inactive
-            statutory packs for this school.
-          </p>
-        </div>
-        <div className="hr-hero__actions">
-          <Link href="/admin/payroll" className="sa-btn sa-btn--ghost">
-            Back to runs
-          </Link>
+      <header className="tch-v2__hero">
+        <div className="tch-v2__hero-glow" aria-hidden />
+        <div className="tch-v2__hero-inner">
+          <div className="tch-v2__hero-main">
+            <span className="tch-v2__chip">Payroll</span>
+            <h2 className="tch-v2__hero-title">Settings</h2>
+            <p className="tch-v2__hero-sub">
+              Attendance feed policies, compensation catalog, and inactive
+              statutory packs. Return to{" "}
+              <Link href="/admin/payroll" className="tch-v2__hero-link">
+                Payroll runs
+              </Link>
+              .
+            </p>
+          </div>
+          <div className="tch-v2__hero-stats">
+            <div className="tch-v2__stat">
+              <strong>{components.length}</strong>
+              <span>Components</span>
+            </div>
+            <div className="tch-v2__stat">
+              <strong>{ruleSets.length}</strong>
+              <span>Rule packs</span>
+            </div>
+            <div className="tch-v2__stat">
+              <strong>{ot.length}</strong>
+              <span>OT pending</span>
+            </div>
+            <div className="tch-v2__stat tch-v2__stat--accent">
+              <strong>
+                {settings?.overtimeEnabled ? "On" : "Off"}
+              </strong>
+              <span>Overtime</span>
+            </div>
+          </div>
         </div>
       </header>
 

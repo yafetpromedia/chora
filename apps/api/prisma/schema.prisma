@@ -226,6 +226,16 @@ model School {
   reportCardTitle   String?
   /// Optional motto / tagline under the school name on report cards
   reportCardTagline String?
+  /// Optional Amharic school name for report cards and stationery
+  nameAm            String?
+  /// Official school stamp image (URL or data URL) for yearly report cards
+  stampUrl          String?
+  /// Campus / cover photograph for the yearly report front-right column
+  reportCoverImageUrl String?
+  /// When false, class rank is omitted from yearly report cards
+  reportShowRank    Boolean        @default(true)
+  /// When false, attendance summary is omitted from yearly report cards
+  reportShowAttendance Boolean     @default(true)
   bankName              String?
   bankAccountHolder     String?
   bankAccountNumber     String?
@@ -262,6 +272,9 @@ model School {
   payrollRuns            PayrollRun[]
   payrollAuditEvents     PayrollAuditEvent[]
   overtimeApprovals      OvertimeApproval[]
+  attendanceConcerns     AttendanceConcern[]
+  attendanceConcernAudits AttendanceConcernAuditEvent[]
+  staffNotifications     StaffNotification[]
   invites       SchoolInvite[]
   subscription  Subscription?
   grades         Grade[]
@@ -548,6 +561,7 @@ model Grade {
   admissionPlacedGrades      AdmissionApplication[]    @relation("ApplicationPlacedGrade")
   admissionPlacementRules      AdmissionPlacementRule[]
   examScheduleSlots            ExamScheduleSlot[]
+  attendanceConcerns           AttendanceConcern[]
 
   @@unique([schoolId, name])
   @@index([schoolId, sortOrder])
@@ -566,6 +580,7 @@ model Section {
   timetableEntries      TimetableEntry[]
   admissionPlacements   AdmissionApplication[]
   admissionPlacementRules AdmissionPlacementRule[]
+  attendanceConcerns    AttendanceConcern[]
 
   @@unique([gradeId, name])
 }
@@ -589,7 +604,11 @@ model User {
   teacherProfile  TeacherProfile?
   parentLinks          ParentStudent[]      @relation("ParentUser")
   parentNotifications  ParentNotification[] @relation("ParentNotifications")
+  staffNotifications   StaffNotification[]  @relation("StaffNotifications")
   attendanceMarks      AttendanceRecord[]   @relation("AttendanceMarkedBy")
+  attendanceConcernsReported AttendanceConcern[] @relation("AttendanceConcernReporter")
+  attendanceConcernsResolved AttendanceConcern[] @relation("AttendanceConcernResolver")
+  attendanceConcernAudits    AttendanceConcernAuditEvent[] @relation("AttendanceConcernAuditActor")
   staffAttendanceAsSubject StaffAttendanceRecord[] @relation("StaffAttendanceSubject")
   staffAttendanceRecorded  StaffAttendanceRecord[] @relation("StaffAttendanceRecordedBy")
   staffAttendanceUpdated   StaffAttendanceRecord[] @relation("StaffAttendanceUpdatedBy")
@@ -740,6 +759,7 @@ model StudentProfile {
   attendancePermissionRequests AttendancePermissionRequest[]
   examSeatingAssignments ExamSeatingAssignment[]
   scoreCorrections       ScoreCorrectionRequest[]
+  attendanceConcerns     AttendanceConcern[]
 
   @@unique([schoolId, fan])
   @@unique([schoolId, fcn])
@@ -800,6 +820,135 @@ model AttendancePermissionRequest {
 
   @@index([schoolId, status, date])
   @@index([studentProfileId, date])
+}
+
+/// Extensible concern category (attendance first; wellbeing/conduct later).
+enum ConcernCategory {
+  ATTENDANCE
+}
+
+enum AttendanceConcernType {
+  STUDENT_APPEARS_ABSENT
+  STUDENT_APPEARS_PRESENT
+  COUNT_MISMATCH
+  STUDENT_LEFT_CLASS
+  OTHER
+}
+
+enum AttendanceConcernStatus {
+  OPEN
+  UNDER_REVIEW
+  RESOLVED
+  DISMISSED
+}
+
+enum ObservedAttendanceStatus {
+  PRESENT
+  MISSING
+  LEFT_CLASS
+  OTHER
+}
+
+enum AttendanceConcernResolution {
+  OFFICIAL_CORRECT
+  CORRECTED_OFFICIAL
+  AUTHORIZED_ABSENCE
+  LEFT_CAMPUS
+  TEMPORARILY_OUTSIDE
+  DUPLICATE_OR_INCORRECT
+  OTHER
+}
+
+/// Subject-teacher observation about official daily attendance (does NOT change AttendanceRecord).
+model AttendanceConcern {
+  id                    String                       @id @default(cuid())
+  schoolId              String
+  school                School                       @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  /// Foundation for future Student Concern types.
+  category              ConcernCategory              @default(ATTENDANCE)
+  date                  DateTime                     @db.Date
+  gradeId               String
+  grade                 Grade                        @relation(fields: [gradeId], references: [id], onDelete: Cascade)
+  sectionId             String?
+  section               Section?                     @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  subjectId             String?
+  subject               Subject?                     @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+  timetableEntryId      String?
+  timetableEntry        TimetableEntry?              @relation(fields: [timetableEntryId], references: [id], onDelete: SetNull)
+  periodNumber          Int?
+  periodLabel           String?
+  subjectNameSnapshot   String?
+  reportedByUserId      String
+  reportedBy            User                         @relation("AttendanceConcernReporter", fields: [reportedByUserId], references: [id], onDelete: Cascade)
+  officialPresentCount  Int?
+  officialAbsentCount   Int?
+  officialLateCount     Int?
+  officialExcusedCount  Int?
+  officialSubmitted     Boolean                      @default(false)
+  totalStudents         Int?
+  observedPresentCount  Int?
+  observedAbsentCount   Int?
+  /// observedAbsentCount - officialAbsentCount when both known.
+  difference            Int?
+  concernType           AttendanceConcernType
+  studentProfileId      String?
+  studentProfile        StudentProfile?              @relation(fields: [studentProfileId], references: [id], onDelete: SetNull)
+  officialStudentStatus AttendanceStatus?
+  observedStudentStatus ObservedAttendanceStatus?
+  description           String?                      @db.Text
+  status                AttendanceConcernStatus      @default(OPEN)
+  resolution            AttendanceConcernResolution?
+  resolutionNote        String?                      @db.Text
+  resolvedByUserId      String?
+  resolvedBy            User?                        @relation("AttendanceConcernResolver", fields: [resolvedByUserId], references: [id], onDelete: SetNull)
+  reviewedAt            DateTime?
+  resolvedAt            DateTime?
+  createdAt             DateTime                     @default(now())
+  updatedAt             DateTime                     @updatedAt
+  auditEvents           AttendanceConcernAuditEvent[]
+
+  @@index([schoolId, date, status])
+  @@index([schoolId, gradeId, sectionId, date])
+  @@index([reportedByUserId, createdAt])
+  @@index([studentProfileId, date])
+  @@index([timetableEntryId])
+}
+
+model AttendanceConcernAuditEvent {
+  id         String             @id @default(cuid())
+  schoolId   String
+  school     School             @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  concernId  String
+  concern    AttendanceConcern  @relation(fields: [concernId], references: [id], onDelete: Cascade)
+  actorId    String?
+  actor      User?              @relation("AttendanceConcernAuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+  action     String
+  beforeJson String?            @db.Text
+  afterJson  String?            @db.Text
+  reason     String?
+  createdAt  DateTime           @default(now())
+
+  @@index([schoolId, createdAt])
+  @@index([concernId, createdAt])
+}
+
+/// In-app notifications for teachers/staff (parents use ParentNotification).
+model StaffNotification {
+  id        String    @id @default(cuid())
+  schoolId  String
+  school    School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User      @relation("StaffNotifications", fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  body      String
+  link      String?
+  kind      String
+  entityId  String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, readAt])
+  @@index([schoolId, createdAt])
 }
 
 enum StaffAttendanceStatus {
@@ -1502,6 +1651,7 @@ model Subject {
   assessmentTemplateGrades   AssessmentTemplateGrade[]
   timetableEntries           TimetableEntry[]
   examScheduleSlots          ExamScheduleSlot[]
+  attendanceConcerns         AttendanceConcern[]
 
   @@unique([schoolId, code])
   @@index([platformSubjectId])
@@ -1799,6 +1949,8 @@ model PlatformSettings {
   demoVideoUrl          String?          @db.Text
   /// Optional custom poster / thumbnail for the demo player (URL or data URL).
   demoVideoThumbnailUrl String?          @db.Text
+  /// Public product documentation PDF (uploaded file URL).
+  productDocsUrl        String?          @db.Text
   /// Where schools send SaaS subscription payments (Telebirr / CBE).
   bankName              String?
   bankAccountHolder     String?
@@ -1911,6 +2063,7 @@ model TimetableEntry {
   teacher         User?           @relation("TimetableEntryTeacher", fields: [teacherUserId], references: [id], onDelete: SetNull)
   roomId          String?
   room            TimetableRoom?  @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  attendanceConcerns AttendanceConcern[]
 
   @@unique([timetableId, weekday, periodId, gradeId, sectionId])
   @@index([schoolId, teacherUserId, weekday])

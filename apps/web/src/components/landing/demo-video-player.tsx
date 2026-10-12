@@ -17,14 +17,23 @@ import { BRAND_DEMO_POSTER_SRC, BRAND_NAME } from "@/lib/brand";
 type Props = {
   size?: "default" | "hero";
   showChapters?: boolean;
+  /** Premium product-card style: subtle hover, modal playback, no giant play button. */
+  variant?: "default" | "showcase";
 };
 
-export function DemoVideoPlayer({ size = "default", showChapters = true }: Props) {
+export function DemoVideoPlayer({
+  size = "default",
+  showChapters = true,
+  variant = "default",
+}: Props) {
   const labelId = useId();
+  const dialogTitleId = useId();
   const [videoUrl, setVideoUrl] = useState(DEMO_VIDEO_URL_ENV);
   const [thumbnailUrl, setThumbnailUrl] = useState("");
   const [playing, setPlaying] = useState(false);
   const [startAt, setStartAt] = useState(0);
+
+  const showcase = variant === "showcase";
 
   useEffect(() => {
     let cancelled = false;
@@ -43,6 +52,20 @@ export function DemoVideoPlayer({ size = "default", showChapters = true }: Props
     };
   }, []);
 
+  useEffect(() => {
+    if (!showcase || !playing) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setPlaying(false);
+    }
+    document.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [showcase, playing]);
+
   const resolvedVideo = resolveDemoMediaUrl(videoUrl);
   const youtubeId = youtubeIdFromUrl(videoUrl);
   const direct = isDirectVideoUrl(videoUrl);
@@ -57,26 +80,103 @@ export function DemoVideoPlayer({ size = "default", showChapters = true }: Props
     setPlaying(true);
   }
 
+  function closePlayer() {
+    setPlaying(false);
+    setStartAt(0);
+  }
+
+  const media =
+    playing && youtubeId ? (
+      <iframe
+        className="lp3-demo-stage__frame"
+        title={`${BRAND_NAME} product overview`}
+        src={youtubeEmbedSrc(youtubeId, startAt)}
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+        allowFullScreen
+      />
+    ) : playing && direct && resolvedVideo ? (
+      <video
+        className="lp3-demo-stage__frame"
+        src={`${resolvedVideo}${startAt > 0 ? `#t=${startAt}` : ""}`}
+        controls
+        autoPlay
+        playsInline
+        poster={posterSrc}
+      />
+    ) : null;
+
+  if (showcase) {
+    return (
+      <div className="lp3-explore-video">
+        <button
+          type="button"
+          className="lp3-explore-video__trigger"
+          onClick={() => (hasSource ? playFrom() : undefined)}
+          disabled={!hasSource}
+          aria-labelledby={labelId}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            className="lp3-explore-video__poster"
+            src={posterSrc}
+            alt={`${BRAND_NAME} product interface preview`}
+          />
+          <span className="lp3-explore-video__veil" aria-hidden />
+          <span className="lp3-explore-video__cue" aria-hidden>
+            <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+              <path d="M8.5 6.8v10.4L18 12 8.5 6.8z" />
+            </svg>
+          </span>
+          <span id={labelId} className="sr-only">
+            {hasSource
+              ? `Play ${BRAND_NAME} product overview video`
+              : `${BRAND_NAME} product overview video coming soon`}
+          </span>
+        </button>
+
+        {!hasSource ? (
+          <p className="lp3-explore-video__soon">
+            Overview video coming soon.{" "}
+            <Link href="/demo">Open full walkthrough</Link>
+          </p>
+        ) : null}
+
+        {playing && media ? (
+          <div
+            className="lp3-explore-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={dialogTitleId}
+            onClick={closePlayer}
+          >
+            <div
+              className="lp3-explore-modal__panel"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="lp3-explore-modal__bar">
+                <h3 id={dialogTitleId}>{BRAND_NAME} product overview</h3>
+                <button
+                  type="button"
+                  className="lp3-explore-modal__close"
+                  onClick={closePlayer}
+                  aria-label="Close video"
+                >
+                  ×
+                </button>
+              </div>
+              <div className="lp3-explore-modal__stage">{media}</div>
+            </div>
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
   return (
     <div className={`lp3-demo-player${size === "hero" ? " lp3-demo-player--hero" : ""}`}>
       <div className="lp3-demo-stage">
-        {playing && youtubeId ? (
-          <iframe
-            className="lp3-demo-stage__frame"
-            title={`${BRAND_NAME} product walkthrough`}
-            src={youtubeEmbedSrc(youtubeId, startAt)}
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen
-          />
-        ) : playing && direct && resolvedVideo ? (
-          <video
-            className="lp3-demo-stage__frame"
-            src={`${resolvedVideo}${startAt > 0 ? `#t=${startAt}` : ""}`}
-            controls
-            autoPlay
-            playsInline
-            poster={posterSrc}
-          />
+        {media ? (
+          media
         ) : (
           <>
             {/* eslint-disable-next-line @next/next/no-img-element */}

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { BarChart } from "@/components/dashboard/staff-dashboard-shared";
 import { AppToast } from "@/components/ui/app-toast";
@@ -91,14 +92,50 @@ export function StaffAttendanceAnalyticsPanel() {
       <AppToast message={error} tone="error" onDismiss={() => setError("")} />
       <AppToast message={toast} tone="success" onDismiss={() => setToast("")} />
 
-      <header className="sa-hero">
-        <div>
-          <h2 className="sa-hero__title">Staff attendance analytics</h2>
-          <p className="sa-hero__sub">
-            Rates exclude approved leave from the denominator. Rankings are
-            administrative reports only.
-          </p>
+      <header className="tch-v2__hero">
+        <div className="tch-v2__hero-glow" aria-hidden />
+        <div className="tch-v2__hero-inner">
+          <div className="tch-v2__hero-main">
+            <span className="tch-v2__chip">Analytics</span>
+            <h2 className="tch-v2__hero-title">Staff attendance analytics</h2>
+            <p className="tch-v2__hero-sub">
+              Rates exclude approved leave from the denominator. Rankings are
+              administrative reports only. Back to{" "}
+              <Link
+                href="/admin/staff-attendance"
+                className="tch-v2__hero-link"
+              >
+                Staff Attendance
+              </Link>
+              .
+            </p>
+          </div>
+          <div className="tch-v2__hero-stats">
+            <div className="tch-v2__stat">
+              <strong>
+                {loading || data?.rate == null ? "—" : `${data.rate}%`}
+              </strong>
+              <span>Rate</span>
+            </div>
+            <div className="tch-v2__stat">
+              <strong>{loading || c == null ? "—" : c.present}</strong>
+              <span>Present</span>
+            </div>
+            <div className="tch-v2__stat">
+              <strong>{loading || c == null ? "—" : c.absent}</strong>
+              <span>Absent</span>
+            </div>
+            <div className="tch-v2__stat tch-v2__stat--accent">
+              <strong>
+                {loading || data == null ? "—" : data.overtimeMinutes}
+              </strong>
+              <span>OT min</span>
+            </div>
+          </div>
         </div>
+      </header>
+
+      <div className="sa-hero__actions">
         <button
           type="button"
           className="sa-btn sa-btn--primary"
@@ -116,7 +153,7 @@ export function StaffAttendanceAnalyticsPanel() {
         >
           Export payroll hours
         </button>
-      </header>
+      </div>
 
       <div className="sa-toolbar">
         <label className="sa-field">

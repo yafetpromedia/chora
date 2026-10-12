@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import QRCode from "qrcode";
 import { AppToast } from "@/components/ui/app-toast";
 import { hasPermission, Permission } from "@/lib/permissions";
 import {
@@ -44,6 +45,7 @@ export function MyAttendancePanel() {
   const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
   const [types, setTypes] = useState<LeaveType[]>([]);
   const [qrPayload, setQrPayload] = useState<string | null>(null);
+  const [qrDataUrl, setQrDataUrl] = useState("");
   const [leaveTypeId, setLeaveTypeId] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -84,17 +86,60 @@ export function MyAttendancePanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [from, to]);
 
+  useEffect(() => {
+    if (!qrPayload) {
+      setQrDataUrl("");
+      return;
+    }
+    let cancelled = false;
+    void QRCode.toDataURL(qrPayload, {
+      width: 220,
+      margin: 1,
+      errorCorrectionLevel: "M",
+      color: { dark: "#0a3d42", light: "#ffffff" },
+    }).then((url) => {
+      if (!cancelled) setQrDataUrl(url);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [qrPayload]);
+
   return (
     <div className="sa-page">
       <AppToast message={error} tone="error" onDismiss={() => setError("")} />
       <AppToast message={toast} tone="success" onDismiss={() => setToast("")} />
 
-      <header className="sa-hero">
-        <div>
-          <h2 className="sa-hero__title">My Attendance</h2>
-          <p className="sa-hero__sub">
-            Your personal attendance, worked hours, and leave requests.
-          </p>
+      <header className="tch-v2__hero">
+        <div className="tch-v2__hero-glow" aria-hidden />
+        <div className="tch-v2__hero-inner">
+          <div className="tch-v2__hero-main">
+            <span className="tch-v2__chip">My attendance</span>
+            <h2 className="tch-v2__hero-title">My Attendance</h2>
+            <p className="tch-v2__hero-sub">
+              Your personal attendance, worked hours, and leave requests.
+            </p>
+          </div>
+          <div className="tch-v2__hero-stats">
+            <div className="tch-v2__stat">
+              <strong>
+                {loading || rate == null ? "—" : `${rate}%`}
+              </strong>
+              <span>Rate</span>
+            </div>
+            <div className="tch-v2__stat">
+              <strong>{counts.present ?? 0}</strong>
+              <span>Present</span>
+            </div>
+            <div className="tch-v2__stat">
+              <strong>{counts.late ?? 0}</strong>
+              <span>Late</span>
+            </div>
+            <div className="tch-v2__stat tch-v2__stat--accent">
+              <strong>{counts.absent ?? 0}</strong>
+              <span>Absent</span>
+            </div>
+          </div>
         </div>
       </header>
 
@@ -141,14 +186,37 @@ export function MyAttendancePanel() {
       </div>
       <p className="sa-hours-note">Total late {lateMinutes} min in this range.</p>
 
-      <div className="sa-scan__feed">
+      <div className="sa-scan__feed sa-my-qr">
         <header className="sa-scan__feed-head">
           <h3>My check-in QR</h3>
         </header>
         {qrPayload ? (
-          <p className="sa-hours-note">
-            Present this code at the gate: <code>{qrPayload}</code>
-          </p>
+          <div className="sa-my-qr__body">
+            <div className="sa-my-qr__frame">
+              {qrDataUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={qrDataUrl}
+                  alt="Staff check-in QR code"
+                  className="sa-my-qr__img"
+                  width={220}
+                  height={220}
+                />
+              ) : (
+                <div className="sa-my-qr__placeholder" aria-hidden>
+                  Generating…
+                </div>
+              )}
+            </div>
+            <div className="sa-my-qr__meta">
+              <p className="sa-my-qr__hint">
+                Show this QR at the gate scanner for check-in / check-out.
+              </p>
+              <p className="sa-hours-note">
+                Manual code: <code>{qrPayload}</code>
+              </p>
+            </div>
+          </div>
         ) : (
           <button
             type="button"

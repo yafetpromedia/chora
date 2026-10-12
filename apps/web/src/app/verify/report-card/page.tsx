@@ -8,19 +8,15 @@ import { getApiBaseUrl } from "@/lib/api";
 
 type VerifyResult = {
   valid: boolean;
+  reportType?: string;
   school: { name: string; logoUrl: string | null };
   student: {
     name: string;
-    number: string | null;
     grade: string;
     section: string | null;
   };
   academicYear: string;
-  termName: string | null;
-  termCount: number;
-  overallAverage: number | null;
-  overallLetter: string | null;
-  subjectCount: number;
+  issued?: boolean;
   verifiedAt: string;
   platform: { name: string; nameAm: string };
 };
@@ -153,28 +149,6 @@ function VerifyInner() {
           margin-top: 0.25rem;
           font-size: 1rem;
         }
-        .rc-verify-avg {
-          margin-top: 0.9rem;
-          border: 1.5px solid #147d76;
-          border-radius: 12px;
-          background: #e8f5f4;
-          padding: 0.95rem 1rem;
-          text-align: center;
-        }
-        .rc-verify-avg em {
-          display: block;
-          font-style: normal;
-          font-size: 0.75rem;
-          font-weight: 800;
-          letter-spacing: 0.06em;
-          text-transform: uppercase;
-          color: #0f5f5a;
-        }
-        .rc-verify-avg strong {
-          display: block;
-          margin-top: 0.25rem;
-          font-size: 1.8rem;
-        }
         .rc-verify-foot {
           margin-top: 1.1rem;
           font-size: 0.82rem;
@@ -223,8 +197,10 @@ function VerifyInner() {
             <p className="school">{data.school.name}</p>
             <div className="rc-verify-grid">
               <div>
-                <em>Student ID</em>
-                <strong>{data.student.number ?? "—"}</strong>
+                <em>Report type</em>
+                <strong>
+                  {data.reportType === "yearly" ? "Yearly report card" : "Report card"}
+                </strong>
               </div>
               <div>
                 <em>Grade</em>
@@ -238,20 +214,14 @@ function VerifyInner() {
                 <strong>{data.academicYear}</strong>
               </div>
               <div>
-                <em>Subjects recorded</em>
-                <strong>{data.subjectCount}</strong>
+                <em>Status</em>
+                <strong>{data.issued ? "Valid" : "Valid"}</strong>
               </div>
-            </div>
-            <div className="rc-verify-avg">
-              <em>Overall average</em>
-              <strong>
-                {data.overallAverage != null ? `${data.overallAverage}%` : "—"}
-                {data.overallLetter ? ` ${data.overallLetter}` : ""}
-              </strong>
             </div>
             <p className="rc-verify-foot">
               Verified {new Date(data.verifiedAt).toLocaleString()} · Powered by{" "}
-              {data.platform.name} ({data.platform.nameAm})
+              {data.platform.name} ({data.platform.nameAm}). Marks and private details are not
+              shown on this public page.
             </p>
           </div>
         </div>

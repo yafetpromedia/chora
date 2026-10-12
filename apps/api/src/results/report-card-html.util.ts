@@ -1,4 +1,5 @@
 import { scoreToLetter, type GradingBand } from './grading.util';
+import { buildYearlyReportCardHtml } from './yearly-report-card-html.util';
 
 export type ReportCardMode = 'term' | 'annual';
 
@@ -77,7 +78,19 @@ export type ReportCardPrintPayload = {
     phone: string | null;
     headerTitle: string | null;
     headerTagline: string | null;
+    /** Optional Amharic school name */
+    nameAm?: string | null;
+    stampUrl?: string | null;
+    coverImageUrl?: string | null;
+    primaryColor?: string | null;
+    reportShowRank?: boolean;
+    reportShowAttendance?: boolean;
   };
+  /** Configured assessment components for the student's grade (yearly front-left). */
+  assessmentComponents?: Array<{ name: string; weightPercent: number }>;
+  /** False when weights exist but do not total 100. */
+  assessmentWeightsValid?: boolean;
+  semesterLabels?: { first: string; second: string };
   student: {
     name: string;
     number: string | null;
@@ -124,6 +137,9 @@ export type ReportCardPrintPayload = {
     teacher: string | null;
     principal: string | null;
     general: string | null;
+    semester1?: string | null;
+    semester2?: string | null;
+    yearly?: string | null;
   };
   verification: {
     qrPayload: string;
@@ -352,7 +368,7 @@ function schoolLogoHtml(data: ReportCardPrintPayload): string {
       <path d="M14 18V14a10 10 0 0 1 20 0v4" stroke="#147D76" stroke-width="2.5"/>
       <path d="M24 28v6M18 34h12" stroke="#147D76" stroke-width="2.5" stroke-linecap="round"/>
     </svg>
-  </div>`;
+    </div>`;
 }
 
 function termHeading(term: { name: string; shortName: string }, index: number): string {
@@ -364,7 +380,7 @@ function termHeading(term: { name: string; shortName: string }, index: number): 
 }
 
 function sharedStyles(): string {
-  return `
+      return `
     :root {
       --chora: ${CHORA_TEAL};
       --chora-dark: ${CHORA_TEAL_DARK};
@@ -1176,20 +1192,20 @@ function frontHeader(
         <div class="rc-brand__text">
           <strong>${escapeHtml(data.platform.name.toUpperCase())}</strong>
           <span>${escapeHtml(data.platform.nameAm)}</span>
-        </div>
-      </div>
+                </div>
+              </div>
       <div class="rc-head__rule" aria-hidden="true"></div>
       <div class="rc-head__title">
         <h1>${escapeHtml(docTitle.toUpperCase())}</h1>
         <p>${escapeHtml(subtitle)}</p>
-      </div>
+              </div>
     </header>
     <div class="rc-schoolbox">
       ${schoolLogoHtml(data)}
       <div class="rc-schoolbox__meta">
         <strong>${escapeHtml(data.school.name)}</strong>
         <span>${escapeHtml(tagline)}</span>
-      </div>
+            </div>
     </div>`;
 }
 
@@ -1357,11 +1373,11 @@ function termFooterHtml(data: ReportCardPrintPayload): string {
       <div class="rc-term-kpi">
         <em>Average</em>
         <strong>${fmtScore(avg)}${avg != null ? '%' : ''}${letter ? ` ${escapeHtml(letter)}` : ''}</strong>
-      </div>
+        </div>
       <div class="rc-term-kpi">
         <em>Attendance</em>
         <strong>${escapeHtml(presentLabel)}</strong>
-      </div>
+        </div>
       <div class="rc-term-sign">
         <div class="rc-term-sign__line">${principalImg}</div>
         <strong>${escapeHtml(principalLabel)} / Class Teacher</strong>
@@ -1369,7 +1385,7 @@ function termFooterHtml(data: ReportCardPrintPayload): string {
       <div class="rc-term-qr">
         <img src="${qrUrl}" alt="Verification QR code"/>
         <span>Verify</span>
-      </div>
+    </div>
     </div>`;
 }
 
@@ -1538,7 +1554,7 @@ function remarksHtml(data: ReportCardPrintPayload): string {
       <h2 class="rc-panel__h">General Remarks</h2>
       <div class="rc-remarks__body ${text ? '' : 'is-empty'}">
         ${text ? escapeHtml(text) : 'No remarks recorded.'}
-      </div>
+        </div>
     </section>`;
 }
 
@@ -1558,7 +1574,7 @@ function signaturesAndQrHtml(data: ReportCardPrintPayload): string {
         <div class="rc-sign__line"></div>
         <strong>Class Teacher Signature</strong>
         <span>Class Teacher</span>
-      </div>
+        </div>
       <div class="rc-sign">
         <div class="rc-sign__line">${principalImg}</div>
         <strong>${escapeHtml(principalLabel)} Signature</strong>
@@ -1567,7 +1583,7 @@ function signaturesAndQrHtml(data: ReportCardPrintPayload): string {
       <div class="rc-qr">
         <img src="${qrUrl}" alt="Verification QR code"/>
         <strong>Scan to verify<br/>this report card</strong>
-      </div>
+    </div>
     </div>`;
 }
 
@@ -1626,11 +1642,11 @@ ${body}
 }
 
 export function buildReportCardHtml(data: ReportCardPrintPayload): string {
+  if (data.mode === 'annual') {
+    return buildYearlyReportCardHtml(data);
+  }
   const title = `${data.student.name} — Report Card`;
-  const body =
-    data.mode === 'term'
-      ? buildTermSheet(data)
-      : `${buildFrontPage(data)}\n${buildBackPage(data)}`;
+  const body = buildTermSheet(data);
   return documentShell(title, body);
 }
 

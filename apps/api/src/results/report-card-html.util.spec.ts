@@ -144,35 +144,62 @@ describe('report-card-html.util', () => {
   });
 
   it.each([2, 3, 4] as const)(
-    'renders %s term columns matching reference layout',
+    'renders yearly portrait booklet with %s term columns',
     (termCount) => {
       const html = buildReportCardHtml(basePayload(termCount));
       expect(html).toContain('size: A4 landscape');
       expect(html).toContain('#147D76');
       expect(html).toContain('ጮራ');
-      expect(html).toContain('CHORA');
-      expect(html).toContain('STUDENT REPORT CARD');
-      expect(html).toContain('Academic Year Report');
-      expect(html).toContain('Grading Scale');
-      expect(html).toContain('Better Students');
-      expect(html).toContain('Attendance Summary');
-      expect(html).toContain('Conduct / Behavior');
-      expect(html).toContain('Class Rank');
+      expect(html).toContain('Student Yearly');
+      expect(html).toContain('Report Card');
+      expect(html).toContain('Grading &amp; Marking Method');
+      expect(html).toContain('Grade Values');
+      expect(html).toContain('yr-fill-card');
+      expect(html).toContain('Note:');
+      expect(html).toContain('Academic Results');
+      expect(html).toContain('Promoted');
       expect(html).toContain('Scan to verify');
-      expect(html).toContain('Learn | Grow | Succeed');
+      expect(html).toContain('Powered by');
+      expect(html).toContain('yr-cover__hero');
+      expect(html).toContain('yr-powered');
+      expect(html).toContain('yr-verify__qr');
+      expect(html).toContain('Scan to verify');
+      expect(html).toContain('this report card');
+      expect(html).toContain('yr-back-banner');
+      expect(html).toContain('yr-info-list');
+      expect(html).toContain('yr-approval');
+      expect(html).toContain('yr-stamp-svg');
+      expect(html).toContain('Promoted to the Next Class');
+      expect(html).toContain('Annual average:');
+      expect(html).toContain('Class rank:');
+      const gradingSection = html.match(
+        /aria-label="Grading and marking method"[\s\S]*?<\/section>/,
+      )?.[0];
+      expect(gradingSection).toBeTruthy();
+      expect(gradingSection).not.toContain('yr-wm');
+      const studentSection = html.match(
+        /aria-label="Student information and approval"[\s\S]*?<\/section>/,
+      )?.[0];
+      expect(studentSection).toBeTruthy();
+      expect(studentSection).not.toContain('yr-wm');
+      expect(html).toContain("Teacher's Remarks");
+      expect(html).toContain('First Semester');
+      expect(html).toContain('Second Semester');
+      expect(html).toContain('yr-cover__photo');
+      expect(html).toContain('yr-stamp');
+      expect(html).toContain('aria-label="Yearly report card front"');
+      expect(html).toContain('aria-label="Yearly report card back"');
+      expect(html).toContain('A4 landscape');
       expect(html).toContain(encodeURIComponent('/verify/report-card?t='));
-      expect(html).toContain('rc-corner--bl');
-      expect(html).toContain('rc-corner--br');
-      expect(html).not.toContain('Teacher Remark');
-      expect(html).not.toContain('CAMPUS1:');
       expect(html).not.toContain('Second term report');
       expect(html).not.toContain('two per A4');
+      expect((html.match(/class="yr-page[\s"]/g) ?? []).length).toBe(2);
+      expect((html.match(/class="yr-stage"/g) ?? []).length).toBe(2);
+      expect(html).toContain('width: 297mm');
+      expect(html).toContain('height: 210mm');
 
-      if (termCount >= 2) {
-        expect(html).toContain('>Term<');
-        for (let i = 1; i <= termCount; i += 1) {
-          expect(html).toContain(`>${i}<`);
-        }
+      for (let i = 1; i <= termCount; i += 1) {
+        expect(html).toContain(`>Term ${i}<`);
       }
     },
   );

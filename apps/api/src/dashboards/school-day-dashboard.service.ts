@@ -148,6 +148,21 @@ export class SchoolDayDashboardService {
       });
     }
 
+    const openConcerns = await this.prisma.attendanceConcern.count({
+      where: {
+        schoolId,
+        status: { in: ['OPEN', 'UNDER_REVIEW'] },
+      },
+    });
+    if (openConcerns > 0) {
+      alerts.push({
+        type: 'attendance_concerns',
+        label: 'Open attendance concerns',
+        count: openConcerns,
+        href: '/admin/attendance/concerns',
+      });
+    }
+
     return {
       kind: 'admin_day' as const,
       date: today.toISOString().slice(0, 10),

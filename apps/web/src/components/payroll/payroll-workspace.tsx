@@ -310,24 +310,56 @@ export function PayrollWorkspace() {
         </div>
       ) : null}
 
-      <header className="hr-hero">
-        <div>
-          <p className="hr-hero__eyebrow">Compensation &amp; payroll</p>
-          <h2 className="hr-hero__title">Payroll runs</h2>
-          <p className="hr-hero__sub">
-            Create a period, calculate snapshots, approve, record payments, then
-            close. Ethiopian statutory tax stays disabled until verified.
-          </p>
-        </div>
-        <div className="hr-hero__actions">
-          <Link href="/admin/hr/employees" className="sa-btn sa-btn--ghost">
-            Employees
-          </Link>
-          {hasPermission(Permission.PAYROLL_SETTINGS) ? (
-            <Link href="/admin/payroll/settings" className="sa-btn sa-btn--ghost">
-              Settings
-            </Link>
-          ) : null}
+      <header className="tch-v2__hero">
+        <div className="tch-v2__hero-glow" aria-hidden />
+        <div className="tch-v2__hero-inner">
+          <div className="tch-v2__hero-main">
+            <span className="tch-v2__chip">Compensation &amp; payroll</span>
+            <h2 className="tch-v2__hero-title">Payroll runs</h2>
+            <p className="tch-v2__hero-sub">
+              Create a period, calculate snapshots, approve, record payments,
+              then close. Open{" "}
+              <Link href="/admin/hr/employees" className="tch-v2__hero-link">
+                Employees
+              </Link>
+              {hasPermission(Permission.PAYROLL_SETTINGS) ? (
+                <>
+                  {" · "}
+                  <Link
+                    href="/admin/payroll/settings"
+                    className="tch-v2__hero-link"
+                  >
+                    Settings
+                  </Link>
+                </>
+              ) : null}
+              .
+            </p>
+          </div>
+          <div className="tch-v2__hero-stats">
+            <div className="tch-v2__stat">
+              <strong>{dashboard?.totals.employees ?? 0}</strong>
+              <span>Employees</span>
+            </div>
+            <div className="tch-v2__stat">
+              <strong>{periods.length}</strong>
+              <span>Periods</span>
+            </div>
+            <div className="tch-v2__stat">
+              <strong>{run?.status ?? "—"}</strong>
+              <span>Run status</span>
+            </div>
+            <div className="tch-v2__stat tch-v2__stat--accent">
+              <strong>
+                {dashboard ? (
+                  <EtbAmount cents={dashboard.totals.netCents ?? 0} />
+                ) : (
+                  "—"
+                )}
+              </strong>
+              <span>Net</span>
+            </div>
+          </div>
         </div>
       </header>
 

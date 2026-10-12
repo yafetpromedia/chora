@@ -20,6 +20,8 @@ const DEMO_VIDEO_MIME = new Set([
   'video/quicktime',
 ]);
 const DEMO_VIDEO_MAX_BYTES = 250 * 1024 * 1024;
+const PRODUCT_DOCS_MIME = new Set(['application/pdf']);
+const PRODUCT_DOCS_MAX_BYTES = 40 * 1024 * 1024;
 
 const DEFAULTS = {
   id: 'default',
@@ -45,6 +47,7 @@ const DEFAULTS = {
   landingHeroImageUrl: null as string | null,
   demoVideoUrl: null as string | null,
   demoVideoThumbnailUrl: null as string | null,
+  productDocsUrl: null as string | null,
   bankName: null as string | null,
   bankAccountHolder: null as string | null,
   bankAccountNumber: null as string | null,
@@ -167,6 +170,8 @@ export class PlatformSettingsService {
       demoVideoThumbnailUrl:
         (row as { demoVideoThumbnailUrl?: string | null })
           .demoVideoThumbnailUrl ?? null,
+      productDocsUrl:
+        (row as { productDocsUrl?: string | null }).productDocsUrl ?? null,
       aiEnabled: Boolean((row as { aiEnabled?: boolean }).aiEnabled),
       aiProvider: normalizeProvider(
         (row as { aiProvider?: string | null }).aiProvider,
@@ -345,6 +350,9 @@ export class PlatformSettingsService {
             demoVideoThumbnailUrl: dto.demoVideoThumbnailUrl.trim() || null,
           }
         : {}),
+      ...(dto.productDocsUrl !== undefined
+        ? { productDocsUrl: dto.productDocsUrl.trim() || null }
+        : {}),
       ...(dto.bankName !== undefined
         ? { bankName: dto.bankName.trim() || null }
         : {}),
@@ -496,6 +504,57 @@ export class PlatformSettingsService {
       throw new BadRequestException('Invalid file');
     }
     const path = join(this.demoUploadRoot(), filename);
+    if (!existsSync(path)) {
+      throw new BadRequestException('File not found');
+    }
+    return path;
+  }
+
+  private productDocsUploadRoot() {
+    return join(process.cwd(), 'uploads', 'platform-docs');
+  }
+
+  async saveProductDocsFile(
+    file: { originalname: string; buffer: Buffer; mimetype: string },
+    actorRole: PlatformRole,
+  ) {
+    if (actorRole !== PlatformRole.OWNER) {
+      throw new ForbiddenException(
+        'Only platform owners can upload product documentation',
+      );
+    }
+    if (!file?.buffer?.length) {
+      throw new BadRequestException('Upload a PDF file');
+    }
+    if (file.buffer.length > PRODUCT_DOCS_MAX_BYTES) {
+      throw new BadRequestException('PDF must be 40 MB or smaller');
+    }
+    const mime = (file.mimetype || '').toLowerCase();
+    const looksPdf =
+      PRODUCT_DOCS_MIME.has(mime) ||
+      file.originalname.toLowerCase().endsWith('.pdf');
+    if (!looksPdf) {
+      throw new BadRequestException('Upload a PDF file');
+    }
+
+    const filename = `chora-product-documentation-${Date.now()}.pdf`;
+    const root = this.productDocsUploadRoot();
+    await mkdir(root, { recursive: true });
+    await writeFile(join(root, filename), file.buffer);
+
+    const productDocsUrl = `/platform/docs/files/${filename}`;
+    return this.updateSettings({ productDocsUrl }, actorRole);
+  }
+
+  getProductDocsFilePath(filename: string) {
+    if (
+      filename.includes('..') ||
+      filename.includes('/') ||
+      filename.includes('\\')
+    ) {
+      throw new BadRequestException('Invalid file');
+    }
+    const path = join(this.productDocsUploadRoot(), filename);
     if (!existsSync(path)) {
       throw new BadRequestException('File not found');
     }

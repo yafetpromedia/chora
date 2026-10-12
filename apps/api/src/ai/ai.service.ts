@@ -259,7 +259,7 @@ export class AiService {
       ) {
         return this.completeGeminiNative(
           { ...runtime, model: suggested.replace(/^models\//, '') },
-          messages,
+        messages,
           maxTokens,
           temperature,
         );

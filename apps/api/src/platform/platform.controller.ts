@@ -187,6 +187,40 @@ export class PlatformController {
     createReadStream(path).pipe(res);
   }
 
+  @Post('settings/product-docs')
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformOwner()
+  @UseInterceptors(
+    FileInterceptor('file', { limits: { fileSize: 40 * 1024 * 1024 } }),
+  )
+  uploadProductDocs(
+    @CurrentPlatformUser() user: PlatformAuthUser,
+    @UploadedFile()
+    file: { originalname: string; buffer: Buffer; mimetype: string } | undefined,
+  ) {
+    if (!file?.buffer) {
+      throw new BadRequestException('Upload a PDF file');
+    }
+    return this.platformSettings.saveProductDocsFile(file, user.role);
+  }
+
+  /** Public product documentation PDF (no auth). */
+  @Get('docs/files/:filename')
+  streamProductDocs(
+    @Param('filename') filename: string,
+    @Res() res: Response,
+    @Query('download') download?: string,
+  ) {
+    const path = this.platformSettings.getProductDocsFilePath(filename);
+    const disposition =
+      download === '1' || download === 'true'
+        ? `attachment; filename="Chora-Product-Documentation.pdf"`
+        : `inline; filename="Chora-Product-Documentation.pdf"`;
+    res.setHeader('Content-Disposition', disposition);
+    res.type('application/pdf');
+    createReadStream(path).pipe(res);
+  }
+
   @Get('access-control')
   @UseGuards(JwtAuthGuard, PlatformGuard)
   getAccessControl() {
@@ -272,6 +306,13 @@ export class PlatformController {
   @RequirePlatformPermissions(PlatformPermission.SCHOOLS_VIEW)
   dashboard() {
     return this.platformService.getDashboard();
+  }
+
+  @Get('attendance-concerns/summary')
+  @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
+  @RequirePlatformPermissions(PlatformPermission.SCHOOLS_VIEW)
+  attendanceConcernSummary() {
+    return this.platformService.getAttendanceConcernSummary();
   }
 
   @Get('schools')

@@ -2049,10 +2049,21 @@
 .rc-print-frame {
   display: block;
   width: 100%;
+  /* Tall enough to show ~1.2× A4 portrait at typical zoom without squeezing the sheet */
   min-height: calc(100vh - 56px);
   height: calc(100vh - 56px);
   border: none;
   background: #e8eef0;
+}
+
+/* Yearly preview iframe inside report-cards workspace */
+.rc-v2__yearly-preview {
+  width: 100%;
+  min-height: 1100px;
+  height: min(1400px, 92vh);
+  border: 1px solid #c9dbd9;
+  border-radius: 12px;
+  background: #d9e2e4;
 }
 
 .rc-print-shell {

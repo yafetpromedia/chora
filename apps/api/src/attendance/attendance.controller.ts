@@ -24,10 +24,17 @@ import { RequireSchoolModule } from '../common/decorators/require-school-module.
 import { SchoolModuleGuard } from '../common/guards/school-module.guard';
 import { AttendanceModeDto } from '../schools/dto/attendance-mode.dto';
 import { SchoolsService } from '../schools/schools.service';
+import {
+  AttendanceConcernStatus,
+  AttendanceConcernType,
+} from '@prisma/client';
 import { BulkAttendanceDto } from './dto/bulk-attendance.dto';
+import { CreateAttendanceConcernDto } from './dto/create-attendance-concern.dto';
 import { CreateAttendancePermissionDto } from './dto/create-attendance-permission.dto';
+import { ResolveAttendanceConcernDto } from './dto/resolve-attendance-concern.dto';
 import { ReviewAttendancePermissionDto } from './dto/review-attendance-permission.dto';
 import { ScanAttendanceDto } from './dto/scan-attendance.dto';
+import { AttendanceConcernsService } from './attendance-concerns.service';
 import { AttendanceService } from './attendance.service';
 
 @Controller('attendance')
@@ -42,8 +49,154 @@ import { AttendanceService } from './attendance.service';
 export class AttendanceController {
   constructor(
     private readonly attendanceService: AttendanceService,
+    private readonly concernsService: AttendanceConcernsService,
     private readonly schoolsService: SchoolsService,
   ) {}
+
+  @Get('my-classes/today')
+  @Roles('teacher', 'admin')
+  @RequirePermissions(SchoolPermission.ATTENDANCE_CONCERNS_REPORT)
+  myClassesToday(@CurrentUser() user: AuthUser) {
+    return this.concernsService.myClassesToday(
+      user.schoolId,
+      user.id,
+      user.role,
+    );
+  }
+
+  @Get('classes/:timetableEntryId/context')
+  @Roles('teacher', 'admin')
+  @RequirePermissions(SchoolPermission.ATTENDANCE_CONCERNS_REPORT)
+  classContext(
+    @CurrentUser() user: AuthUser,
+    @Param('timetableEntryId') timetableEntryId: string,
+    @Query('date') date?: string,
+  ) {
+    return this.concernsService.getClassContext(
+      user.schoolId,
+      user.id,
+      user.role,
+      timetableEntryId,
+      date,
+    );
+  }
+
+  @Get('concerns/summary')
+  @Roles('teacher', 'admin', 'staff')
+  @RequirePermissions(SchoolPermission.ATTENDANCE_CONCERNS_REVIEW)
+  concernsSummary(@CurrentUser() user: AuthUser) {
+    return this.concernsService.summaryForHomeroom(
+      user.schoolId,
+      user.id,
+      user.role,
+    );
+  }
+
+  @Get('concerns')
+  @Roles('teacher', 'admin', 'staff')
+  listConcerns(
+    @CurrentUser() user: AuthUser,
+    @Query('date') date?: string,
+    @Query('gradeId') gradeId?: string,
+    @Query('sectionId') sectionId?: string,
+    @Query('status') status?: AttendanceConcernStatus,
+    @Query('concernType') concernType?: AttendanceConcernType,
+    @Query('reportedByUserId') reportedByUserId?: string,
+    @Query('subjectId') subjectId?: string,
+    @Query('mine') mine?: string,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+  ) {
+    return this.concernsService.listConcerns(
+      user.schoolId,
+      user.id,
+      user.role,
+      {
+        date,
+        gradeId,
+        sectionId,
+        status,
+        concernType,
+        reportedByUserId,
+        subjectId,
+        mine,
+        page,
+        pageSize,
+      },
+    );
+  }
+
+  @Post('concerns')
+  @Roles('teacher', 'admin')
+  @RequirePermissions(SchoolPermission.ATTENDANCE_CONCERNS_REPORT)
+  createConcern(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: CreateAttendanceConcernDto,
+  ) {
+    return this.concernsService.createConcern(
+      user.schoolId,
+      user.id,
+      user.role,
+      dto,
+    );
+  }
+
+  @Get('concerns/:id')
+  @Roles('teacher', 'admin', 'staff')
+  getConcern(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.concernsService.getConcern(
+      user.schoolId,
+      user.id,
+      user.role,
+      id,
+    );
+  }
+
+  @Post('concerns/:id/review')
+  @Roles('teacher', 'admin', 'staff')
+  @RequirePermissions(SchoolPermission.ATTENDANCE_CONCERNS_REVIEW)
+  reviewConcern(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.concernsService.markUnderReview(
+      user.schoolId,
+      user.id,
+      user.role,
+      id,
+    );
+  }
+
+  @Post('concerns/:id/resolve')
+  @Roles('teacher', 'admin', 'staff')
+  @RequirePermissions(SchoolPermission.ATTENDANCE_CONCERNS_REVIEW)
+  resolveConcern(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: ResolveAttendanceConcernDto,
+  ) {
+    return this.concernsService.resolve(
+      user.schoolId,
+      user.id,
+      user.role,
+      id,
+      dto,
+    );
+  }
+
+  @Post('concerns/:id/dismiss')
+  @Roles('teacher', 'admin', 'staff')
+  @RequirePermissions(SchoolPermission.ATTENDANCE_CONCERNS_REVIEW)
+  dismissConcern(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: ResolveAttendanceConcernDto,
+  ) {
+    return this.concernsService.dismiss(
+      user.schoolId,
+      user.id,
+      user.role,
+      id,
+      dto,
+    );
+  }
 
   @Get('settings')
   @Roles('admin', 'teacher')

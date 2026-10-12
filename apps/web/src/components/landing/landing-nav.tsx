@@ -8,7 +8,7 @@ import { BRAND_NAME } from "@/lib/brand";
 
 const HOME_LINKS = [
   { href: "#hero", id: "hero", label: "Home" },
-  { href: "/demo", id: "demo", label: "Demo" },
+  { href: "#explore", id: "explore", label: "Explore" },
   { href: "#features", id: "features", label: "Product" },
   { href: "#connect", id: "connect", label: "Connect" },
   { href: "#app", id: "app", label: "Mobile app" },
@@ -17,7 +17,16 @@ const HOME_LINKS = [
   { href: "#faq", id: "faq", label: "FAQ" },
 ] as const;
 
-const SECTION_IDS = ["hero", "demo", "features", "connect", "app", "portals", "pricing", "faq"];
+const SECTION_IDS = [
+  "hero",
+  "explore",
+  "features",
+  "connect",
+  "app",
+  "portals",
+  "pricing",
+  "faq",
+];
 
 function resolveHref(href: string, onHome: boolean) {
   if (href.startsWith("/") || onHome) return href;
@@ -27,16 +36,15 @@ function resolveHref(href: string, onHome: boolean) {
 export function LandingNav() {
   const pathname = usePathname();
   const onHome = pathname === "/";
-  const onDemo = pathname === "/demo";
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [overHero, setOverHero] = useState(onHome);
-  const [active, setActive] = useState(onDemo ? "demo" : "hero");
+  const [active, setActive] = useState("hero");
 
   useEffect(() => {
     if (!onHome) {
       setOverHero(false);
-      setActive(onDemo ? "demo" : "");
+      setActive("");
       return;
     }
 
@@ -59,7 +67,7 @@ export function LandingNav() {
       window.removeEventListener("scroll", update);
       window.removeEventListener("resize", update);
     };
-  }, [onHome, onDemo]);
+  }, [onHome]);
 
   useEffect(() => {
     if (!onHome) return;
@@ -104,8 +112,7 @@ export function LandingNav() {
           <nav className="lp3-nav__links" aria-label="Main">
             {HOME_LINKS.map((l) => {
               const href = resolveHref(l.href, onHome);
-              const isActive =
-                l.id === "demo" ? onDemo || active === "demo" : onHome && active === l.id;
+              const isActive = onHome && active === l.id;
               const isConnect = l.id === "connect";
               const className = [
                 "lp3-nav__link",
@@ -172,8 +179,7 @@ export function LandingNav() {
             <div className="lp3-nav__mobile-links">
               {HOME_LINKS.map((l) => {
                 const href = resolveHref(l.href, onHome);
-                const isActive =
-                  l.id === "demo" ? onDemo || active === "demo" : onHome && active === l.id;
+                const isActive = onHome && active === l.id;
                 const isConnect = l.id === "connect";
                 const className = `lp3-nav__mobile-link${isActive ? " lp3-nav__mobile-link--active" : ""}`;
 

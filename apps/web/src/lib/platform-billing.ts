@@ -111,3 +111,75 @@ export function updatePlatformInvoice(
     body: JSON.stringify(body),
   });
 }
+
+export type PlatformPayMethod = "TELEBIRR" | "BANK_TRANSFER";
+export type PlatformPaymentProofStatus = "PENDING" | "CONFIRMED" | "REJECTED";
+
+export type PlatformPaymentProofReview = {
+  id: string;
+  invoiceId: string;
+  invoiceNumber: string;
+  amountEtb: number;
+  amountUsd: number;
+  schoolId: string;
+  schoolName: string;
+  joinCode: string;
+  method: PlatformPayMethod;
+  transactionId: string;
+  proofUrl: string;
+  status: PlatformPaymentProofStatus;
+  reviewNote: string | null;
+  createdAt: string;
+  reviewedAt: string | null;
+};
+
+export function listPlatformPaymentProofs(status?: PlatformPaymentProofStatus) {
+  const q = status ? `?status=${status}` : "";
+  return platformFetch<PlatformPaymentProofReview[]>(
+    `/platform/payment-proofs${q}`,
+  );
+}
+
+export function reviewPlatformPaymentProof(
+  id: string,
+  body: { status: "CONFIRMED" | "REJECTED"; reviewNote?: string },
+) {
+  return platformFetch<{ id: string; status: string; message: string }>(
+    `/platform/payment-proofs/${id}/review`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    },
+  );
+}
+
+export type PlatformAttendanceConcernSummary = {
+  totalOpen: number;
+  bySchool: {
+    schoolId: string;
+    schoolName: string;
+    joinCode: string;
+    openCount: number;
+    latestAt: string | null;
+  }[];
+  recent: {
+    id: string;
+    schoolId: string;
+    schoolName: string;
+    joinCode: string;
+    status: string;
+    concernType: string;
+    description: string | null;
+    subjectName: string | null;
+    periodLabel: string | null;
+    classLabel: string;
+    date: string;
+    createdAt: string;
+  }[];
+};
+
+export function getPlatformAttendanceConcernSummary() {
+  return platformFetch<PlatformAttendanceConcernSummary>(
+    "/platform/attendance-concerns/summary",
+  );
+}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AppToast } from "@/components/ui/app-toast";
 import { hasPermission, Permission } from "@/lib/permissions";
 import {
@@ -97,18 +97,49 @@ export function LeaveWorkspace() {
     }
   }
 
+  const pendingCount = useMemo(
+    () => rows.filter((r) => r.status === "pending").length,
+    [rows],
+  );
+  const approvedCount = useMemo(
+    () => rows.filter((r) => r.status === "approved").length,
+    [rows],
+  );
+
   return (
     <div className="sa-page">
       <AppToast message={error} tone="error" onDismiss={() => setError("")} />
       <AppToast message={toast} tone="success" onDismiss={() => setToast("")} />
 
-      <header className="sa-hero">
-        <div>
-          <h2 className="sa-hero__title">Leave</h2>
-          <p className="sa-hero__sub">
-            Request and approve staff leave. Approved leave marks attendance as
-            on leave automatically.
-          </p>
+      <header className="tch-v2__hero">
+        <div className="tch-v2__hero-glow" aria-hidden />
+        <div className="tch-v2__hero-inner">
+          <div className="tch-v2__hero-main">
+            <span className="tch-v2__chip">People</span>
+            <h2 className="tch-v2__hero-title">Leave</h2>
+            <p className="tch-v2__hero-sub">
+              Request and approve staff leave. Approved leave marks attendance
+              as on leave automatically.
+            </p>
+          </div>
+          <div className="tch-v2__hero-stats">
+            <div className="tch-v2__stat">
+              <strong>{loading ? "—" : rows.length}</strong>
+              <span>Requests</span>
+            </div>
+            <div className="tch-v2__stat">
+              <strong>{loading ? "—" : pendingCount}</strong>
+              <span>Pending</span>
+            </div>
+            <div className="tch-v2__stat">
+              <strong>{loading ? "—" : approvedCount}</strong>
+              <span>Approved</span>
+            </div>
+            <div className="tch-v2__stat tch-v2__stat--accent">
+              <strong>{types.length}</strong>
+              <span>Types</span>
+            </div>
+          </div>
         </div>
       </header>
 

@@ -15,6 +15,7 @@ import {
 } from "@/components/results/results-student-picker";
 import { AppToast } from "@/components/ui/app-toast";
 import type { StudentRecord } from "@/lib/api";
+import { AUTH_TOKEN_KEY } from "@/lib/auth";
 import { BRAND_LOGO_SRC, BRAND_NAME, BRAND_NAME_AM } from "@/lib/brand";
 import {
   getReportCard,
@@ -22,6 +23,7 @@ import {
   listTerms,
   openReportCardPrint,
   publishReportCardsForStudent,
+  reportCardPrintUrl,
   type AcademicTerm,
   type ReportCard,
   type ReportCardPrintMode,
@@ -40,6 +42,7 @@ export function ReportCardsWorkspace({ students, onError }: Props) {
   const [printMode, setPrintMode] = useState<ReportCardPrintMode>("annual");
   const [viewStudentId, setViewStudentId] = useState("");
   const [report, setReport] = useState<ReportCard | null>(null);
+  const [yearlyHtml, setYearlyHtml] = useState("");
   const [publishStatus, setPublishStatus] = useState<ReportCardPublishStatus | null>(null);
   const [previewBusy, setPreviewBusy] = useState(false);
   const [publishBusy, setPublishBusy] = useState(false);
@@ -131,6 +134,19 @@ export function ReportCardsWorkspace({ students, onError }: Props) {
     setError("");
     try {
       setReport(await getReportCard(viewStudentId, termId));
+      if (printMode === "annual") {
+        const token = localStorage.getItem(AUTH_TOKEN_KEY);
+        if (token) {
+          const res = await fetch(
+            reportCardPrintUrl(viewStudentId, termId, "annual"),
+            { headers: { Authorization: `Bearer ${token}` } },
+          );
+          if (res.ok) setYearlyHtml(await res.text());
+          else setYearlyHtml("");
+        }
+      } else {
+        setYearlyHtml("");
+      }
       await refreshPublishStatus(viewStudentId, termId);
     } catch (err) {
       setErr(err instanceof Error ? err.message : "Could not load report card");
@@ -242,7 +258,7 @@ export function ReportCardsWorkspace({ students, onError }: Props) {
               aria-pressed={printMode === "annual"}
               onClick={() => setPrintMode("annual")}
             >
-              Year-end
+              Yearly
             </button>
           </div>
         </div>
@@ -307,7 +323,7 @@ export function ReportCardsWorkspace({ students, onError }: Props) {
               <h3 className="rc-v2__card-title">Preview &amp; print</h3>
               <p className="rc-v2__card-sub">
                 {printMode === "annual"
-                  ? "Year-end: A4 landscape duplex — front academic results with all term columns, back attendance, conduct, rank, signatures, and QR."
+                  ? "Yearly: A4 landscape duplex — left/right columns on each side. Front: grading + cover; back: student info, QR, results. Print with short-edge flip."
                   : "Term: A4 landscape, front only — each card is half a page so two term reports print on one sheet."}
               </p>
             </div>
@@ -318,7 +334,7 @@ export function ReportCardsWorkspace({ students, onError }: Props) {
               <div className="rc-booklet__toolbar">
                 <p>
                   {printMode === "annual"
-                    ? `A4 landscape duplex · Year-end · ${report.term.academicYear}`
+                    ? `A4 landscape duplex · Yearly · ${report.term.academicYear}`
                     : `A4 landscape · Term · 2 per page · ${report.term.name}`}
                 </p>
                 <span>Matches the printed card</span>
@@ -434,6 +450,12 @@ export function ReportCardsWorkspace({ students, onError }: Props) {
                     </p>
                   </article>
                 </div>
+              ) : yearlyHtml ? (
+                <iframe
+                  title="Yearly report card preview"
+                  className="rc-v2__yearly-preview"
+                  srcDoc={yearlyHtml}
+                />
               ) : (
                 <div className="rc-booklet__pages">
                   <article className="rc-sheet-card" aria-label="Front page preview">
@@ -636,11 +658,11 @@ export function ReportCardsWorkspace({ students, onError }: Props) {
                   className="rc-v2__btn rc-v2__btn--primary"
                   onClick={() => openReportCardPrint(viewStudentId, termId, printMode)}
                 >
-                  Open print {printMode === "annual" ? "year-end" : "term"} report
+                  Open print {printMode === "annual" ? "yearly" : "term"} report
                 </button>
                 <p>
                   {printMode === "annual"
-                    ? "Print duplex · landscape A4 · school header from Settings"
+                    ? "Print duplex · landscape A4 · short-edge flip · branding from Settings"
                     : "Print landscape A4 · two term cards per sheet · cut along the dashed line"}
                 </p>
               </div>

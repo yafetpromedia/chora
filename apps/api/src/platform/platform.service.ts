@@ -1,5 +1,13 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
-import { Plan, PlatformRole, SchoolStatus, UserRole } from '@prisma/client';
+import {
+  AttendanceConcernStatus,
+  Plan,
+  PlatformPaymentProofStatus,
+  PlatformRole,
+  SchoolStatus,
+  SupportTicketStatus,
+  UserRole,
+} from '@prisma/client';
 import { CurriculumCatalogService } from '../provisioning/curriculum-catalog.service';
 import { SchoolProvisioningService } from '../provisioning/school-provisioning.service';
 import { DEFAULT_CURRICULUM_PACKAGE_KEY } from '../provisioning/curriculum-packages.data';
@@ -84,6 +92,9 @@ export class PlatformService {
       studentCount,
       teacherCount,
       subscriptions,
+      openConcernCount,
+      pendingPaymentProofs,
+      openSupportTickets,
     ] = await Promise.all([
       this.prisma.school.count(),
       this.prisma.school.count({ where: { status: SchoolStatus.ACTIVE } }),
@@ -92,6 +103,26 @@ export class PlatformService {
       this.prisma.user.count({ where: { role: UserRole.teacher } }),
       this.prisma.subscription.findMany({
         include: { school: { select: { name: true } } },
+      }),
+      this.prisma.attendanceConcern.count({
+        where: {
+          status: {
+            in: [
+              AttendanceConcernStatus.OPEN,
+              AttendanceConcernStatus.UNDER_REVIEW,
+            ],
+          },
+        },
+      }),
+      this.prisma.platformPaymentProof.count({
+        where: { status: PlatformPaymentProofStatus.PENDING },
+      }),
+      this.prisma.supportTicket.count({
+        where: {
+          status: {
+            in: [SupportTicketStatus.OPEN, SupportTicketStatus.IN_PROGRESS],
+          },
+        },
       }),
     ]);
 
@@ -112,6 +143,85 @@ export class PlatformService {
         students: studentCount,
         teachers: teacherCount,
       },
+      alerts: {
+        openAttendanceConcerns: openConcernCount,
+        pendingPaymentProofs,
+        openSupportTickets,
+      },
+    };
+  }
+
+  /** Cross-tenant open attendance concerns for platform ops visibility. */
+  async getAttendanceConcernSummary() {
+    const openStatuses = [
+      AttendanceConcernStatus.OPEN,
+      AttendanceConcernStatus.UNDER_REVIEW,
+    ];
+    const [grouped, recent] = await Promise.all([
+      this.prisma.attendanceConcern.groupBy({
+        by: ['schoolId'],
+        where: { status: { in: openStatuses } },
+        _count: { _all: true },
+        _max: { createdAt: true },
+      }),
+      this.prisma.attendanceConcern.findMany({
+        where: { status: { in: openStatuses } },
+        orderBy: { createdAt: 'desc' },
+        take: 25,
+        select: {
+          id: true,
+          schoolId: true,
+          status: true,
+          concernType: true,
+          description: true,
+          createdAt: true,
+          date: true,
+          subjectNameSnapshot: true,
+          periodLabel: true,
+          school: { select: { name: true, joinCode: true } },
+          grade: { select: { name: true } },
+          section: { select: { name: true } },
+        },
+      }),
+    ]);
+
+    const schoolIds = grouped.map((g) => g.schoolId);
+    const schools = schoolIds.length
+      ? await this.prisma.school.findMany({
+          where: { id: { in: schoolIds } },
+          select: { id: true, name: true, joinCode: true },
+        })
+      : [];
+    const schoolMap = new Map(schools.map((s) => [s.id, s]));
+
+    return {
+      totalOpen: grouped.reduce((sum, g) => sum + g._count._all, 0),
+      bySchool: grouped
+        .map((g) => {
+          const school = schoolMap.get(g.schoolId);
+          return {
+            schoolId: g.schoolId,
+            schoolName: school?.name ?? 'Unknown school',
+            joinCode: school?.joinCode ?? '',
+            openCount: g._count._all,
+            latestAt: g._max.createdAt?.toISOString() ?? null,
+          };
+        })
+        .sort((a, b) => b.openCount - a.openCount),
+      recent: recent.map((row) => ({
+        id: row.id,
+        schoolId: row.schoolId,
+        schoolName: row.school.name,
+        joinCode: row.school.joinCode,
+        status: row.status,
+        concernType: row.concernType,
+        description: row.description,
+        subjectName: row.subjectNameSnapshot,
+        periodLabel: row.periodLabel,
+        classLabel: [row.grade.name, row.section?.name].filter(Boolean).join(' · '),
+        date: row.date.toISOString().slice(0, 10),
+        createdAt: row.createdAt.toISOString(),
+      })),
     };
   }
 

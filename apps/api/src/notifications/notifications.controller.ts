@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Patch, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import type { AuthUser } from '../common/auth.types';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -13,23 +13,43 @@ export class NotificationsController {
   constructor(private readonly notificationsService: NotificationsService) {}
 
   @Get()
-  @Roles('parent', 'admin')
+  @Roles('parent', 'admin', 'teacher', 'staff')
   list(@CurrentUser() user: AuthUser) {
-    if (user.role !== 'parent') {
-      return [];
+    if (user.role === 'parent') {
+      return this.notificationsService.listForParent(user.id, user.schoolId);
     }
-    return this.notificationsService.listForParent(user.id, user.schoolId);
+    return this.notificationsService.listForStaff(user.id, user.schoolId);
   }
 
   @Get('unread-count')
-  @Roles('parent')
-  unreadCount(@CurrentUser() user: AuthUser) {
-    return this.notificationsService.unreadCount(user.id, user.schoolId);
+  @Roles('parent', 'admin', 'teacher', 'staff')
+  async unreadCount(@CurrentUser() user: AuthUser) {
+    if (user.role === 'parent') {
+      const count = await this.notificationsService.unreadCount(
+        user.id,
+        user.schoolId,
+      );
+      return { count };
+    }
+    const count = await this.notificationsService.unreadCountForStaff(
+      user.id,
+      user.schoolId,
+    );
+    return { count };
+  }
+
+  @Post('read-all')
+  @Roles('admin', 'teacher', 'staff')
+  markAllRead(@CurrentUser() user: AuthUser) {
+    return this.notificationsService.markAllStaffRead(user.id, user.schoolId);
   }
 
   @Patch(':id/read')
-  @Roles('parent')
+  @Roles('parent', 'admin', 'teacher', 'staff')
   markRead(@CurrentUser() user: AuthUser, @Param('id') id: string) {
-    return this.notificationsService.markRead(id, user.id);
+    if (user.role === 'parent') {
+      return this.notificationsService.markRead(id, user.id);
+    }
+    return this.notificationsService.markStaffRead(id, user.id);
   }
 }

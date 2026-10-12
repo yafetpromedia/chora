@@ -14,6 +14,7 @@ import {
 import { handlePlatformAuthFailure } from "@/lib/platform-auth";
 import { DashIcon } from "@/components/dashboard/dash-icons";
 import { AppToast } from "@/components/ui/app-toast";
+import { PlatformPaymentProofs } from "./platform-payment-proofs";
 import type { PlatformSchoolRow } from "./platform-types";
 
 type Props = {
@@ -370,6 +371,12 @@ export function PlatformInvoices({ schools }: Props) {
           </div>
         </section>
       ) : null}
+
+      <PlatformPaymentProofs
+        onReviewed={() => {
+          void load().catch(() => undefined);
+        }}
+      />
 
       <div className="plat-subjects-v2__table-wrap">
         <table className="plat-subjects-v2__table">

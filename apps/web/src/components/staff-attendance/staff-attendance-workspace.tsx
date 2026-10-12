@@ -352,57 +352,101 @@ export function StaffAttendanceWorkspace() {
       <AppToast message={error} tone="error" onDismiss={() => setError("")} />
       <AppToast message={toast} tone="success" onDismiss={() => setToast("")} />
 
-      <header className="sa-hero">
-        <div>
-          <h2 className="sa-hero__title">Staff Attendance</h2>
-          <p className="sa-hero__sub">
-            Manage teacher and staff attendance, check-ins, absences and working
-            hours.
-          </p>
-        </div>
-        <div className="sa-hero__actions">
-          {canManage ? (
-            <button
-              type="button"
-              className="sa-btn sa-btn--ghost"
-              onClick={() => setModal({ type: "settings" })}
-            >
-              <DashIcon name="settings" className="dash-icon--sm" />
-              Hours
-            </button>
-          ) : null}
-          {canManage ? (
-            <button
-              type="button"
-              className="sa-btn sa-btn--danger"
-              disabled={bulkBusy || loading || unmarkedCount <= 0}
-              onClick={() => void onBulkMarkAbsent(unmarkedCount)}
-            >
-              Mark rest absent
-              {unmarkedCount > 0 ? ` (${unmarkedCount})` : ""}
-            </button>
-          ) : null}
-          {canExport ? (
-            <Link
-              href="/admin/staff-attendance/analytics"
-              className="sa-btn sa-btn--ghost"
-            >
-              <DashIcon name="chart" className="dash-icon--sm" />
-              Analytics
-            </Link>
-          ) : null}
-          {canExport ? (
-            <button
-              type="button"
-              className="sa-btn sa-btn--primary"
-              onClick={() => void onExport()}
-            >
-              <DashIcon name="chart" className="dash-icon--sm" />
-              Export CSV
-            </button>
-          ) : null}
+      <header className="tch-v2__hero">
+        <div className="tch-v2__hero-glow" aria-hidden />
+        <div className="tch-v2__hero-inner">
+          <div className="tch-v2__hero-main">
+            <span className="tch-v2__chip">Attendance</span>
+            <h2 className="tch-v2__hero-title">Staff Attendance</h2>
+            <p className="tch-v2__hero-sub">
+              Manage teacher and staff attendance, check-ins, absences and
+              working hours.
+              {canExport ? (
+                <>
+                  {" "}
+                  Open{" "}
+                  <Link
+                    href="/admin/staff-attendance/analytics"
+                    className="tch-v2__hero-link"
+                  >
+                    Analytics
+                  </Link>
+                  .
+                </>
+              ) : null}
+            </p>
+          </div>
+          <div className="tch-v2__hero-stats">
+            <div className="tch-v2__stat">
+              <strong>
+                {loading || summary == null ? "—" : summary.present}
+              </strong>
+              <span>Present</span>
+            </div>
+            <div className="tch-v2__stat">
+              <strong>
+                {loading || summary == null ? "—" : summary.late}
+              </strong>
+              <span>Late</span>
+            </div>
+            <div className="tch-v2__stat">
+              <strong>
+                {loading || summary == null ? "—" : summary.absent}
+              </strong>
+              <span>Absent</span>
+            </div>
+            <div className="tch-v2__stat tch-v2__stat--accent">
+              <strong>
+                {loading || summary == null ? "—" : unmarkedCount}
+              </strong>
+              <span>Unmarked</span>
+            </div>
+          </div>
         </div>
       </header>
+
+      <div className="sa-hero__actions">
+        {canManage ? (
+          <button
+            type="button"
+            className="sa-btn sa-btn--ghost"
+            onClick={() => setModal({ type: "settings" })}
+          >
+            <DashIcon name="settings" className="dash-icon--sm" />
+            Hours
+          </button>
+        ) : null}
+        {canManage ? (
+          <button
+            type="button"
+            className="sa-btn sa-btn--danger"
+            disabled={bulkBusy || loading || unmarkedCount <= 0}
+            onClick={() => void onBulkMarkAbsent(unmarkedCount)}
+          >
+            Mark rest absent
+            {unmarkedCount > 0 ? ` (${unmarkedCount})` : ""}
+          </button>
+        ) : null}
+        {canExport ? (
+          <Link
+            href="/admin/staff-attendance/analytics"
+            className="sa-btn sa-btn--ghost"
+          >
+            <DashIcon name="chart" className="dash-icon--sm" />
+            Analytics
+          </Link>
+        ) : null}
+        {canExport ? (
+          <button
+            type="button"
+            className="sa-btn sa-btn--primary"
+            onClick={() => void onExport()}
+          >
+            <DashIcon name="chart" className="dash-icon--sm" />
+            Export CSV
+          </button>
+        ) : null}
+      </div>
 
       <div className="sa-stats">
         {(

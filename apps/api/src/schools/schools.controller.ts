@@ -82,6 +82,11 @@ export class SchoolsController {
       paymentInstructions: dto.paymentInstructions,
       reportCardTitle: dto.reportCardTitle,
       reportCardTagline: dto.reportCardTagline,
+      nameAm: dto.nameAm,
+      stampUrl: dto.stampUrl,
+      reportCoverImageUrl: dto.reportCoverImageUrl,
+      reportShowRank: dto.reportShowRank,
+      reportShowAttendance: dto.reportShowAttendance,
     });
   }
 

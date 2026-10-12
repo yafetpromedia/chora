@@ -3136,9 +3136,8 @@
   transform: translate3d(-100%, 0, 0);
   transition: transform 0.22s ease;
   box-shadow: 4px 0 28px rgba(15, 45, 45, 0.08);
-  overflow-y: auto;
+  overflow: hidden;
   overscroll-behavior: contain;
-  -webkit-overflow-scrolling: touch;
   visibility: hidden;
   pointer-events: none;
 }
@@ -3159,7 +3158,7 @@
     height: 100dvh;
     transform: none;
     box-shadow: none;
-    overflow-y: auto;
+    overflow: hidden;
     overscroll-behavior: contain;
     visibility: visible;
     pointer-events: auto;
@@ -3256,6 +3255,8 @@
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-gutter: stable;
 }
 
 .dash-nav-item--pro {

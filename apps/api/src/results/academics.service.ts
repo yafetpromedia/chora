@@ -944,7 +944,7 @@ export class AcademicsService implements OnModuleInit {
     const profile = await this.prisma.studentProfile.findFirst({
       where: { id: parsed.studentProfileId, schoolId: parsed.schoolId },
       include: {
-        user: { select: { firstName: true, lastName: true, externalRef: true } },
+        user: { select: { firstName: true, lastName: true } },
         grade: { select: { name: true } },
         section: { select: { name: true } },
       },
@@ -957,70 +957,41 @@ export class AcademicsService implements OnModuleInit {
     });
     if (!year) throw new NotFoundException('Report card not found');
 
-    const term = await this.prisma.academicTerm.findFirst({
-      where: { id: parsed.termId, schoolId: parsed.schoolId },
-      select: { name: true },
-    });
-
-    const bands = await this.getBands(parsed.schoolId);
-    const yearTerms = await this.prisma.academicTerm.findMany({
-      where: { schoolId: parsed.schoolId, academicYearId: parsed.academicYearId },
-      orderBy: { sortOrder: 'asc' },
-    });
-
-    const classSubjects = await this.prisma.classSubject.findMany({
+    const enrollment = await this.prisma.studentEnrollment.findUnique({
       where: {
-        schoolId: parsed.schoolId,
-        gradeId: profile.gradeId,
-        academicYearId: parsed.academicYearId,
-        ...(profile.sectionId ? { sectionId: profile.sectionId } : {}),
+        studentProfileId_academicYearId: {
+          studentProfileId: parsed.studentProfileId,
+          academicYearId: parsed.academicYearId,
+        },
       },
-      include: { subject: true },
-      orderBy: { subject: { name: 'asc' } },
+      include: {
+        grade: { select: { name: true } },
+        section: { select: { name: true } },
+      },
     });
-    const subjects = classSubjects.map((cs) => cs.subject.name);
-    const termAverages: Array<Array<number | null>> = [];
-    for (const yt of yearTerms) {
-      const results = await this.computeSubjectResults(
-        parsed.schoolId,
-        parsed.studentProfileId,
-        yt.id,
-        profile.gradeId,
-        profile.sectionId,
-        parsed.academicYearId,
-        bands,
-      );
-      const bySubject = new Map(results.map((r) => [r.subject, r.average]));
-      termAverages.push(subjects.map((name) => bySubject.get(name) ?? null));
-    }
-    const subjectRows = buildSubjectRows(subjects, termAverages, bands);
-    const avgs = subjectRows
-      .map((r) => r.average)
-      .filter((v): v is number => v != null && !Number.isNaN(v));
-    const overallAverage =
-      avgs.length > 0
-        ? Math.round((avgs.reduce((a, b) => a + b, 0) / avgs.length) * 10) / 10
-        : null;
+
+    // Public verification: identity + context only — no marks, DOB, or private details.
+    const first = profile.user.firstName?.trim() || '';
+    const last = profile.user.lastName?.trim() || '';
+    const maskedName =
+      first && last
+        ? `${first} ${last.charAt(0).toUpperCase()}.`
+        : first || 'Student';
 
     return {
       valid: true,
+      reportType: 'yearly',
       school: {
         name: school.name,
         logoUrl: school.logoUrl,
       },
       student: {
-        name: `${profile.user.firstName} ${profile.user.lastName}`,
-        number: profile.user.externalRef ?? profile.cardCode ?? null,
-        grade: profile.grade.name,
-        section: profile.section?.name ?? null,
+        name: maskedName,
+        grade: enrollment?.grade.name ?? profile.grade.name,
+        section: enrollment?.section?.name ?? profile.section?.name ?? null,
       },
       academicYear: year.name,
-      termName: term?.name ?? null,
-      termCount: yearTerms.length,
-      overallAverage,
-      overallLetter:
-        overallAverage != null ? scoreToLetter(overallAverage, bands) : null,
-      subjectCount: subjectRows.length,
+      issued: true,
       verifiedAt: new Date().toISOString(),
       platform: { name: 'Chora', nameAm: 'ጮራ' },
     };
@@ -1066,25 +1037,33 @@ export class AcademicsService implements OnModuleInit {
     });
     if (!profile) throw new NotFoundException('Student not found');
 
-    const school = (await this.prisma.school.findUnique({
+    const school = await this.prisma.school.findUnique({
       where: { id: schoolId },
-    })) as {
-      name: string;
-      logoUrl: string | null;
-      authorizedSignatureUrl?: string | null;
-      authorizedSignatureLabel?: string | null;
-      address: string | null;
-      email: string | null;
-      phone: string | null;
-      reportCardTitle?: string | null;
-      reportCardTagline?: string | null;
-    } | null;
+    });
 
     const term = await this.prisma.academicTerm.findFirst({
       where: { id: termId, schoolId },
       include: { academicYear: true },
     });
     if (!term) throw new NotFoundException('Term not found');
+
+    const enrollment = await this.prisma.studentEnrollment.findUnique({
+      where: {
+        studentProfileId_academicYearId: {
+          studentProfileId,
+          academicYearId: term.academicYearId,
+        },
+      },
+      include: {
+        grade: { select: { id: true, name: true } },
+        section: { select: { name: true } },
+      },
+    });
+
+    const reportGradeId = enrollment?.gradeId ?? profile.gradeId;
+    const reportSectionId = enrollment?.sectionId ?? profile.sectionId;
+    const reportSectionName =
+      enrollment?.section?.name ?? profile.section?.name ?? null;
 
     const bands = await this.getBands(schoolId);
     const yearTerms = await this.prisma.academicTerm.findMany({
@@ -1101,14 +1080,43 @@ export class AcademicsService implements OnModuleInit {
     const classSubjects = await this.prisma.classSubject.findMany({
       where: {
         schoolId,
-        gradeId: profile.gradeId,
+        gradeId: reportGradeId,
         academicYearId: term.academicYearId,
-        ...(profile.sectionId ? { sectionId: profile.sectionId } : {}),
+        ...(reportSectionId ? { sectionId: reportSectionId } : {}),
       },
       include: { subject: true },
       orderBy: { subject: { name: 'asc' } },
     });
     const subjects = classSubjects.map((cs) => cs.subject.name);
+
+    const assessmentTemplate =
+      (await this.prisma.assessmentTemplate.findFirst({
+        where: {
+          schoolId,
+          gradeLinks: { some: { gradeId: reportGradeId } },
+        },
+        include: {
+          components: { orderBy: { sortOrder: 'asc' } },
+        },
+        orderBy: { isDefault: 'desc' },
+      })) ??
+      (await this.prisma.assessmentTemplate.findFirst({
+        where: { schoolId, isDefault: true },
+        include: {
+          components: { orderBy: { sortOrder: 'asc' } },
+        },
+      }));
+    const assessmentComponents =
+      assessmentTemplate?.components.map((c) => ({
+        name: c.name,
+        weightPercent: c.weightPercent,
+      })) ?? [];
+    const assessmentWeightSum = assessmentComponents.reduce(
+      (s, c) => s + c.weightPercent,
+      0,
+    );
+    const assessmentWeightsValid =
+      assessmentComponents.length > 0 && assessmentWeightSum === 100;
 
     const termAverages: Array<Array<number | null>> = [];
     for (const yt of yearTerms) {
@@ -1116,8 +1124,8 @@ export class AcademicsService implements OnModuleInit {
         schoolId,
         studentProfileId,
         yt.id,
-        profile.gradeId,
-        profile.sectionId,
+        reportGradeId,
+        reportSectionId,
         term.academicYearId,
         bands,
       );
@@ -1251,15 +1259,25 @@ export class AcademicsService implements OnModuleInit {
       remarkSource?.teacherComment ??
       null;
 
-    const enrollment = await this.prisma.studentEnrollment.findUnique({
-      where: {
-        studentProfileId_academicYearId: {
-          studentProfileId,
-          academicYearId: term.academicYearId,
-        },
-      },
-      include: { grade: { select: { name: true } } },
-    });
+    const mid = Math.ceil(yearTerms.length / 2) || 1;
+    const firstHalfTerms = yearTerms.slice(0, mid);
+    const secondHalfTerms = yearTerms.slice(mid);
+    const semester1Remark =
+      [...firstHalfTerms]
+        .reverse()
+        .map((t) => commentByTerm.get(t.id)?.teacherComment?.trim())
+        .find((c) => c) ?? null;
+    const semester2Remark =
+      [...secondHalfTerms]
+        .reverse()
+        .map((t) => commentByTerm.get(t.id)?.teacherComment?.trim())
+        .find((c) => c) ??
+      lastTermComment?.teacherComment?.trim() ??
+      null;
+    const yearlyRemark =
+      report.principalComment?.trim() ||
+      lastTermComment?.principalComment?.trim() ||
+      generalRemark;
 
     const nextEnrollment = await this.prisma.studentEnrollment.findFirst({
       where: {
@@ -1359,6 +1377,12 @@ export class AcademicsService implements OnModuleInit {
         phone: school?.phone ?? null,
         headerTitle: school?.reportCardTitle ?? null,
         headerTagline: school?.reportCardTagline ?? null,
+        nameAm: school?.nameAm ?? null,
+        stampUrl: school?.stampUrl ?? null,
+        coverImageUrl: school?.reportCoverImageUrl ?? null,
+        primaryColor: school?.primaryColor ?? null,
+        reportShowRank: school?.reportShowRank ?? true,
+        reportShowAttendance: school?.reportShowAttendance ?? true,
       },
       student: {
         name: report.student.name,
@@ -1373,12 +1397,18 @@ export class AcademicsService implements OnModuleInit {
         age: ageFromDateOfBirth(profile.dateOfBirth),
         gradeLabel: buildGradeSectionLabel(
           enrollment?.grade.name ?? profile.grade.name,
-          profile.section?.name ?? null,
+          reportSectionName,
         ),
-        section: profile.section?.name ?? null,
+        section: reportSectionName,
         academicYear: term.academicYear.name,
         cardCode,
         photoUrl: profile.photoUrl ?? null,
+      },
+      assessmentComponents,
+      assessmentWeightsValid,
+      semesterLabels: {
+        first: 'First Semester',
+        second: 'Second Semester',
       },
       terms: printTerms,
       termName: term.name,
@@ -1402,6 +1432,9 @@ export class AcademicsService implements OnModuleInit {
         principal:
           report.principalComment ?? remarkSource?.principalComment ?? null,
         general: generalRemark,
+        semester1: semester1Remark,
+        semester2: semester2Remark,
+        yearly: yearlyRemark,
       },
       verification: {
         qrPayload,

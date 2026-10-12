@@ -27,6 +27,11 @@ export type PlatformDashboard = {
     paid: number;
   };
   users: { students: number; teachers: number };
+  alerts?: {
+    openAttendanceConcerns: number;
+    pendingPaymentProofs: number;
+    openSupportTickets: number;
+  };
 };
 
 export type PlatformSchoolRow = {

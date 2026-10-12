@@ -9,6 +9,7 @@ import { AttendancePermissionReview } from "@/components/attendance/attendance-p
 import { AttendanceScanner } from "@/components/attendance/attendance-scanner";
 import { DashIcon } from "@/components/dashboard/dash-icons";
 import { AUTH_ROLE_KEY, AUTH_TOKEN_KEY } from "@/lib/auth";
+import { getAttendanceConcernsSummary } from "@/lib/attendance-concerns";
 import { getMyTeacherProfile } from "@/lib/teachers";
 
 type Tab = "scan" | "manual" | "requests";
@@ -25,6 +26,8 @@ export default function TeacherAttendancePage() {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("scan");
   const [allowed, setAllowed] = useState<boolean | null>(null);
+  const [openConcerns, setOpenConcerns] = useState(0);
+  const [todayConcerns, setTodayConcerns] = useState(0);
 
   useEffect(() => {
     if (!localStorage.getItem(AUTH_TOKEN_KEY)) {
@@ -51,6 +54,19 @@ export default function TeacherAttendancePage() {
       .catch(() => router.replace("/teacher"));
   }, [router]);
 
+  useEffect(() => {
+    if (allowed !== true) return;
+    void getAttendanceConcernsSummary()
+      .then((s) => {
+        setOpenConcerns(s.open);
+        setTodayConcerns(s.today);
+      })
+      .catch(() => {
+        setOpenConcerns(0);
+        setTodayConcerns(0);
+      });
+  }, [allowed]);
+
   if (allowed !== true) {
     return (
       <DashboardPage role="teacher" title="Attendance">
@@ -75,10 +91,25 @@ export default function TeacherAttendancePage() {
                 Scan student ID cards with your camera, or switch to manual marking.
               </p>
               <span className="att-v4__tag">Homeroom</span>
+              {openConcerns > 0 ? (
+                <Link
+                  href="/teacher/attendance/concerns"
+                  className="att-concern__hero-badge"
+                >
+                  {todayConcerns > 0
+                    ? `${todayConcerns} concern${todayConcerns === 1 ? "" : "s"} today`
+                    : `${openConcerns} open concern${openConcerns === 1 ? "" : "s"}`}
+                </Link>
+              ) : null}
             </div>
-            <Link href="/teacher" className="att-v4__back">
-              ← Back to overview
-            </Link>
+            <div className="att-v4__hero-links">
+              <Link href="/teacher/attendance/concerns" className="att-v4__back">
+                Attendance concerns →
+              </Link>
+              <Link href="/teacher" className="att-v4__back">
+                ← Back to overview
+              </Link>
+            </div>
           </div>
         </header>
 

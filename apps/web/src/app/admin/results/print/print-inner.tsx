@@ -79,7 +79,7 @@ export function ReportCardPrintInner() {
         <p>
           <strong>Student report card</strong>
           {mode === "annual"
-            ? " — A4 landscape duplex. Scroll to see Front (results + grading scale) and Back (attendance, conduct, rank, signatures, QR)."
+            ? " — A4 landscape duplex (2 pages). Front: grading | cover. Back: student info & QR | results. Use short-edge flip for duplex."
             : " — A4 landscape term card (front only). Each report is half a page so two term reports fit on one sheet."}{" "}
           Print → Save as PDF.
         </p>

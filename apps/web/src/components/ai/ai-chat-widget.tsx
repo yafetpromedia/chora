@@ -451,8 +451,8 @@ export function AiChatWidget(props: Props) {
           <header className="ai-chat__head">
             <div className="ai-chat__brand">
               <BrandMark className="ai-chat__logo" />
-              <div>
-                <strong>{BRAND_NAME} Assistant</strong>
+            <div>
+              <strong>{BRAND_NAME} Assistant</strong>
                 <span>Ask anything · attach screenshots</span>
               </div>
             </div>
@@ -491,17 +491,17 @@ export function AiChatWidget(props: Props) {
                   />
                 </svg>
               </button>
-              <button
-                type="button"
-                className="ai-chat__close"
-                aria-label="Close assistant"
+            <button
+              type="button"
+              className="ai-chat__close"
+              aria-label="Close assistant"
                 onClick={() => {
                   setOpen(false);
                   setHistoryOpen(false);
                 }}
-              >
-                ×
-              </button>
+            >
+              ×
+            </button>
             </div>
           </header>
 
@@ -777,15 +777,15 @@ export function AiChatWidget(props: Props) {
               <input
                 ref={inputRef}
                 type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
                 placeholder={
                   pendingImages.length
                     ? "Add a caption (optional)…"
                     : "Ask a question or attach a screenshot…"
                 }
-                disabled={busy || configured !== true}
-              />
+              disabled={busy || configured !== true}
+            />
             </div>
             <button type="submit" className="ai-chat__send" disabled={!canSend}>
               Send

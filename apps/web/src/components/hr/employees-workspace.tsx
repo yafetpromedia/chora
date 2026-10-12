@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AppToast } from "@/components/ui/app-toast";
 import {
   listHrDepartments,
@@ -14,6 +14,7 @@ import { hasPermission, Permission } from "@/lib/permissions";
 
 export function EmployeesWorkspace() {
   const canManage = hasPermission(Permission.HR_EMPLOYEES_MANAGE);
+  const canViewPayroll = hasPermission(Permission.PAYROLL_VIEW);
   const [rows, setRows] = useState<EmployeeListItem[]>([]);
   const [departments, setDepartments] = useState<HrOrgUnit[]>([]);
   const [positions, setPositions] = useState<HrOrgUnit[]>([]);
@@ -22,6 +23,17 @@ export function EmployeesWorkspace() {
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+
+  const activeCount = useMemo(
+    () =>
+      rows.filter((r) => (r.profile?.employmentStatus ?? "ACTIVE") === "ACTIVE")
+        .length,
+    [rows],
+  );
+  const assignedDeptCount = useMemo(
+    () => rows.filter((r) => Boolean(r.profile?.departmentName)).length,
+    [rows],
+  );
 
   async function load() {
     setLoading(true);
@@ -55,26 +67,51 @@ export function EmployeesWorkspace() {
   return (
     <div className="hr-page">
       <AppToast message={error} tone="error" onDismiss={() => setError("")} />
-      <header className="hr-hero">
-        <div>
-          <p className="hr-hero__eyebrow">People</p>
-          <h2 className="hr-hero__title">Employees</h2>
-          <p className="hr-hero__sub">
-            School workforce directory — teachers, office staff, and support roles.
-          </p>
-        </div>
-        <div className="hr-hero__actions">
-          <Link href="/admin/hr/departments" className="sa-btn sa-btn--ghost">
-            Departments
-          </Link>
-          <Link href="/admin/hr/positions" className="sa-btn sa-btn--ghost">
-            Positions
-          </Link>
-          {hasPermission(Permission.PAYROLL_VIEW) ? (
-            <Link href="/admin/payroll" className="sa-btn sa-btn--primary">
-              Payroll
-            </Link>
-          ) : null}
+      <header className="tch-v2__hero">
+        <div className="tch-v2__hero-glow" aria-hidden />
+        <div className="tch-v2__hero-inner">
+          <div className="tch-v2__hero-main">
+            <span className="tch-v2__chip">People</span>
+            <h2 className="tch-v2__hero-title">Employees</h2>
+            <p className="tch-v2__hero-sub">
+              School workforce directory — teachers, office staff, and support
+              roles. Manage org units on{" "}
+              <Link href="/admin/hr/departments" className="tch-v2__hero-link">
+                Departments
+              </Link>
+              {" · "}
+              <Link href="/admin/hr/positions" className="tch-v2__hero-link">
+                Positions
+              </Link>
+              {canViewPayroll ? (
+                <>
+                  {" · "}
+                  <Link href="/admin/payroll" className="tch-v2__hero-link">
+                    Payroll
+                  </Link>
+                </>
+              ) : null}
+              .
+            </p>
+          </div>
+          <div className="tch-v2__hero-stats">
+            <div className="tch-v2__stat">
+              <strong>{loading ? "—" : rows.length}</strong>
+              <span>Employees</span>
+            </div>
+            <div className="tch-v2__stat">
+              <strong>{loading ? "—" : activeCount}</strong>
+              <span>Active</span>
+            </div>
+            <div className="tch-v2__stat">
+              <strong>{loading ? "—" : assignedDeptCount}</strong>
+              <span>In dept</span>
+            </div>
+            <div className="tch-v2__stat tch-v2__stat--accent">
+              <strong>{loading ? "—" : departments.length}</strong>
+              <span>Departments</span>
+            </div>
+          </div>
         </div>
       </header>
 

@@ -37,6 +37,11 @@ export type SchoolRecord = {
   paymentInstructions: string | null;
   reportCardTitle: string | null;
   reportCardTagline: string | null;
+  nameAm: string | null;
+  stampUrl: string | null;
+  reportCoverImageUrl: string | null;
+  reportShowRank: boolean;
+  reportShowAttendance: boolean;
 };
 
 @Injectable()
@@ -239,6 +244,11 @@ export class SchoolsService implements OnModuleInit {
       paymentInstructions?: string | null;
       reportCardTitle?: string | null;
       reportCardTagline?: string | null;
+      nameAm?: string | null;
+      stampUrl?: string | null;
+      reportCoverImageUrl?: string | null;
+      reportShowRank?: boolean;
+      reportShowAttendance?: boolean;
     },
   ): Promise<SchoolRecord> {
     const existing = await this.prisma.school.findUnique({ where: { id: schoolId } });
@@ -311,6 +321,21 @@ export class SchoolsService implements OnModuleInit {
     }
     if (input.reportCardTagline !== undefined) {
       data.reportCardTagline = input.reportCardTagline?.trim() || null;
+    }
+    if (input.nameAm !== undefined) {
+      data.nameAm = input.nameAm?.trim() || null;
+    }
+    if (input.stampUrl !== undefined) {
+      data.stampUrl = input.stampUrl?.trim() || null;
+    }
+    if (input.reportCoverImageUrl !== undefined) {
+      data.reportCoverImageUrl = input.reportCoverImageUrl?.trim() || null;
+    }
+    if (input.reportShowRank !== undefined) {
+      data.reportShowRank = input.reportShowRank;
+    }
+    if (input.reportShowAttendance !== undefined) {
+      data.reportShowAttendance = input.reportShowAttendance;
     }
 
     const school = await this.prisma.school.update({
@@ -387,6 +412,11 @@ export class SchoolsService implements OnModuleInit {
     paymentInstructions: string | null;
     reportCardTitle?: string | null;
     reportCardTagline?: string | null;
+    nameAm?: string | null;
+    stampUrl?: string | null;
+    reportCoverImageUrl?: string | null;
+    reportShowRank?: boolean;
+    reportShowAttendance?: boolean;
   }): SchoolRecord {
     return {
       id: school.id,
@@ -417,6 +447,11 @@ export class SchoolsService implements OnModuleInit {
       paymentInstructions: school.paymentInstructions,
       reportCardTitle: school.reportCardTitle ?? null,
       reportCardTagline: school.reportCardTagline ?? null,
+      nameAm: school.nameAm ?? null,
+      stampUrl: school.stampUrl ?? null,
+      reportCoverImageUrl: school.reportCoverImageUrl ?? null,
+      reportShowRank: school.reportShowRank ?? true,
+      reportShowAttendance: school.reportShowAttendance ?? true,
     };
   }
 }

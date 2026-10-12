@@ -13,6 +13,7 @@ import { canAccessPlatformSection } from "@/lib/platform-access";
 import { AiChatWidget } from "@/components/ai/ai-chat-widget";
 import { BrandMark } from "@/components/brand-mark";
 import { BRAND_NAME } from "@/lib/brand";
+import { PlatformNotifyBell } from "./platform-notify-bell";
 import {
   SECTION_META,
   type PlatformSection,
@@ -170,14 +171,23 @@ export function PlatformShell({
             <h1 className="dash-topbar-title">{meta.title}</h1>
             <p className="dash-topbar-sub">{meta.subtitle}</p>
           </div>
-          <button
-            type="button"
-            onClick={logout}
-            className="dash-logout dash-logout--pro"
-          >
-            <DashIcon name="logout" className="dash-icon--sm" />
-            <span>Log out</span>
-          </button>
+          <div className="dash-topbar-actions">
+            <PlatformNotifyBell
+              user={user}
+              onOpenSection={(next) => {
+                onSectionChange(next);
+                setMobileNav(false);
+              }}
+            />
+            <button
+              type="button"
+              onClick={logout}
+              className="dash-logout dash-logout--pro"
+            >
+              <DashIcon name="logout" className="dash-icon--sm" />
+              <span>Log out</span>
+            </button>
+          </div>
         </header>
         <div className="dash-content dash-content--pro">{children}</div>
       </div>

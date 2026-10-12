@@ -19,15 +19,39 @@ export function MyPayslipsPanel({ role }: { role: "admin" | "teacher" }) {
       );
   }, []);
 
+  const latestNet = rows[0]?.snapshot.netCents ?? 0;
+
   return (
     <div className="hr-page">
       <AppToast message={error} tone="error" onDismiss={() => setError("")} />
-      <header className="hr-hero">
-        <div>
-          <h2 className="hr-hero__title">My Payslips</h2>
-          <p className="hr-hero__sub">
-            View and open your personal payslip history.
-          </p>
+      <header className="tch-v2__hero">
+        <div className="tch-v2__hero-glow" aria-hidden />
+        <div className="tch-v2__hero-inner">
+          <div className="tch-v2__hero-main">
+            <span className="tch-v2__chip">Compensation</span>
+            <h2 className="tch-v2__hero-title">My Payslips</h2>
+            <p className="tch-v2__hero-sub">
+              View and open your personal payslip history.
+            </p>
+          </div>
+          <div className="tch-v2__hero-stats">
+            <div className="tch-v2__stat">
+              <strong>{rows.length}</strong>
+              <span>Payslips</span>
+            </div>
+            <div className="tch-v2__stat">
+              <strong>
+                {rows[0] ? String(rows[0].payDate).slice(0, 7) : "—"}
+              </strong>
+              <span>Latest</span>
+            </div>
+            <div className="tch-v2__stat tch-v2__stat--accent">
+              <strong>
+                {rows.length ? <EtbAmount cents={latestNet} /> : "—"}
+              </strong>
+              <span>Net</span>
+            </div>
+          </div>
         </div>
       </header>
 

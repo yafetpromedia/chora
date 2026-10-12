@@ -57,33 +57,52 @@ export function HrOrgWorkspace({ kind }: { kind: "departments" | "positions" }) 
   }
 
   const title = kind === "departments" ? "Departments" : "Positions";
+  const activeCount = rows.filter((r) => r.active).length;
+  const otherHref =
+    kind === "departments" ? "/admin/hr/positions" : "/admin/hr/departments";
+  const otherLabel = kind === "departments" ? "Positions" : "Departments";
 
   return (
     <div className="hr-page">
       <AppToast message={error} tone="error" onDismiss={() => setError("")} />
       <AppToast message={toast} tone="success" onDismiss={() => setToast("")} />
-      <header className="hr-hero">
-        <div>
-          <h2 className="hr-hero__title">{title}</h2>
-          <p className="hr-hero__sub">
-            HR org chart units for this school (separate from curriculum
-            departments).
-          </p>
-        </div>
-        <div className="hr-hero__actions">
-          <Link href="/admin/hr/employees" className="sa-btn sa-btn--ghost">
-            Employees
-          </Link>
-          <Link
-            href={
-              kind === "departments"
-                ? "/admin/hr/positions"
-                : "/admin/hr/departments"
-            }
-            className="sa-btn sa-btn--ghost"
-          >
-            {kind === "departments" ? "Positions" : "Departments"}
-          </Link>
+      <header className="tch-v2__hero">
+        <div className="tch-v2__hero-glow" aria-hidden />
+        <div className="tch-v2__hero-inner">
+          <div className="tch-v2__hero-main">
+            <span className="tch-v2__chip">People</span>
+            <h2 className="tch-v2__hero-title">{title}</h2>
+            <p className="tch-v2__hero-sub">
+              HR org chart units for this school (separate from curriculum
+              departments). Open{" "}
+              <Link href="/admin/hr/employees" className="tch-v2__hero-link">
+                Employees
+              </Link>
+              {" · "}
+              <Link href={otherHref} className="tch-v2__hero-link">
+                {otherLabel}
+              </Link>
+              .
+            </p>
+          </div>
+          <div className="tch-v2__hero-stats">
+            <div className="tch-v2__stat">
+              <strong>{rows.length}</strong>
+              <span>Total</span>
+            </div>
+            <div className="tch-v2__stat">
+              <strong>{activeCount}</strong>
+              <span>Active</span>
+            </div>
+            <div className="tch-v2__stat">
+              <strong>{rows.length - activeCount}</strong>
+              <span>Inactive</span>
+            </div>
+            <div className="tch-v2__stat tch-v2__stat--accent">
+              <strong>{canManage ? "Edit" : "View"}</strong>
+              <span>Access</span>
+            </div>
+          </div>
         </div>
       </header>
 

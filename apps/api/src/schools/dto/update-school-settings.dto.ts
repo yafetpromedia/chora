@@ -1,5 +1,6 @@
 import { AttendanceMode, SchoolType } from '@prisma/client';
 import {
+  IsBoolean,
   IsEmail,
   IsEnum,
   IsOptional,
@@ -99,4 +100,24 @@ export class UpdateSchoolSettingsDto {
   @IsString()
   @IsOptional()
   reportCardTagline?: string;
+
+  @IsString()
+  @IsOptional()
+  nameAm?: string;
+
+  @IsString()
+  @IsOptional()
+  stampUrl?: string;
+
+  @IsString()
+  @IsOptional()
+  reportCoverImageUrl?: string;
+
+  @IsBoolean()
+  @IsOptional()
+  reportShowRank?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  reportShowAttendance?: boolean;
 }

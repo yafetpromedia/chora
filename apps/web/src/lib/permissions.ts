@@ -20,6 +20,8 @@ export const Permission = {
   ATTENDANCE_READ: "attendance.read",
   ATTENDANCE_MANAGE: "attendance.manage",
   ATTENDANCE_ANALYTICS: "attendance.analytics",
+  ATTENDANCE_CONCERNS_REPORT: "attendance.concerns.report",
+  ATTENDANCE_CONCERNS_REVIEW: "attendance.concerns.review",
   STAFF_ATTENDANCE_READ: "staff_attendance.read",
   STAFF_ATTENDANCE_MANAGE: "staff_attendance.manage",
   STAFF_ATTENDANCE_ANALYTICS: "staff_attendance.analytics",

@@ -20,6 +20,7 @@ import type { PlatformSection } from "./platform-types";
 import { AppToast } from "@/components/ui/app-toast";
 import { DemoVideoSettings } from "@/components/platform/demo-video-settings";
 import { LandingHeroUpload } from "@/components/platform/landing-hero-upload";
+import { ProductDocsSettings } from "@/components/platform/product-docs-settings";
 import { BRAND_NAME } from "@/lib/brand";
 import { SOCIAL_LINK_DEFS } from "@/lib/social-links";
 
@@ -143,6 +144,7 @@ function applySettings(s: SettingsRow) {
     landingHeroImageUrl: s.landingHeroImageUrl ?? "",
     demoVideoUrl: s.demoVideoUrl ?? "",
     demoVideoThumbnailUrl: s.demoVideoThumbnailUrl ?? "",
+    productDocsUrl: s.productDocsUrl ?? "",
     bankName: s.bankName ?? "",
     bankAccountHolder: s.bankAccountHolder ?? "",
     bankAccountNumber: s.bankAccountNumber ?? "",
@@ -244,6 +246,7 @@ export function PlatformSettings({ user, onOpenProfile, onNavigate }: Props) {
         landingHeroImageUrl: draft.landingHeroImageUrl.trim(),
         demoVideoUrl: draft.demoVideoUrl.trim(),
         demoVideoThumbnailUrl: draft.demoVideoThumbnailUrl.trim(),
+        productDocsUrl: draft.productDocsUrl.trim(),
         bankName: draft.bankName.trim(),
         bankAccountHolder: draft.bankAccountHolder.trim(),
         bankAccountNumber: draft.bankAccountNumber.trim(),
@@ -486,6 +489,16 @@ export function PlatformSettings({ user, onOpenProfile, onNavigate }: Props) {
                   setSettings(updated);
                   setDraft(applySettings(updated));
                   setToast("Demo video uploaded.");
+                }}
+                disabled={!isOwner}
+              />
+              <ProductDocsSettings
+                docsUrl={draft.productDocsUrl}
+                onDocsUrlChange={(url) => patch("productDocsUrl", url)}
+                onUploaded={(updated) => {
+                  setSettings(updated);
+                  setDraft(applySettings(updated));
+                  setToast("Product documentation uploaded.");
                 }}
                 disabled={!isOwner}
               />

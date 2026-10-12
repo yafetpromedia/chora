@@ -18,6 +18,13 @@ import {
   SCHOOL_BRAND_UPDATED_EVENT,
 } from "@/lib/school-brand";
 import { BRAND_NAME } from "@/lib/brand";
+import {
+  listStaffNotifications,
+  markAllStaffNotificationsRead,
+  markStaffNotificationRead,
+  staffNotificationsUnreadCount,
+  type StaffNotification,
+} from "@/lib/staff-notifications";
 import { SchoolBrandLockup } from "./school-brand-lockup";
 import { DashIcon } from "./dash-icons";
 import { getMyTeacherProfile } from "@/lib/teachers";
@@ -33,9 +40,56 @@ import { AiChatWidget } from "@/components/ai/ai-chat-widget";
 import { TrialPaywall } from "@/components/trial-paywall";
 
 const ACTION_ALERT_DISMISS_KEY = "campusone.actionAlerts.dismissed";
+const NAV_EXPANDED_KEY = "campusone.dashNav.expanded";
+const NAV_MODULES_KEY = "campusone.dashNav.enabledModules";
 
 function todayKey() {
   return new Date().toISOString().slice(0, 10);
+}
+
+function readCachedModules(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = sessionStorage.getItem(NAV_MODULES_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    return Array.isArray(parsed)
+      ? parsed.filter((m): m is string => typeof m === "string")
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeCachedModules(modules: string[]) {
+  try {
+    sessionStorage.setItem(NAV_MODULES_KEY, JSON.stringify(modules));
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
+
+function readExpandedNav(role: UserRole): Record<string, boolean> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = sessionStorage.getItem(`${NAV_EXPANDED_KEY}.${role}`);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    if (!parsed || typeof parsed !== "object") return {};
+    return Object.fromEntries(
+      Object.entries(parsed).filter(([, v]) => typeof v === "boolean"),
+    ) as Record<string, boolean>;
+  } catch {
+    return {};
+  }
+}
+
+function writeExpandedNav(role: UserRole, value: Record<string, boolean>) {
+  try {
+    sessionStorage.setItem(`${NAV_EXPANDED_KEY}.${role}`, JSON.stringify(value));
+  } catch {
+    /* ignore quota / private mode */
+  }
 }
 
 function readDismissedActionAlerts(): Set<string> {
@@ -80,17 +134,26 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
   const [mobileNav, setMobileNav] = useState(false);
   const [navRole, setNavRole] = useState<UserRole>(role);
   const [nav, setNav] = useState<NavItem[]>([]);
+  const [enabledModules, setEnabledModules] = useState<string[]>(() =>
+    readCachedModules(),
+  );
+  const [canTakeAttendance, setCanTakeAttendance] = useState(false);
   const [shellReady, setShellReady] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [staffUnreadCount, setStaffUnreadCount] = useState(0);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState<Announcement[]>([]);
+  const [staffNotifications, setStaffNotifications] = useState<StaffNotification[]>([]);
   const [notifyLoading, setNotifyLoading] = useState(false);
   const [showAllNotifications, setShowAllNotifications] = useState(false);
   const [actionAlerts, setActionAlerts] = useState<AdminDayOverview["alerts"]["items"]>([]);
   const [dismissedActionTypes, setDismissedActionTypes] = useState<Set<string>>(() => new Set());
-  const [expandedNav, setExpandedNav] = useState<Record<string, boolean>>({});
+  const [expandedNav, setExpandedNav] = useState<Record<string, boolean>>(() =>
+    readExpandedNav(role),
+  );
   const [subscription, setSubscription] = useState<SubscriptionStatus | null>(null);
   const notifyRef = useRef<HTMLDivElement | null>(null);
+  const navListRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     setDismissedActionTypes(readDismissedActionAlerts());
@@ -114,31 +177,36 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
     setNavRole(effectiveRole);
 
     async function loadNav() {
-      // Fail closed for billable modules: empty until subscription is verified.
-      let enabledModules: string[] = [];
+      // Prefer last-known entitlements while / until subscription is verified.
+      let modules = readCachedModules();
       try {
         const sub = await getSchoolSubscription();
-        enabledModules = sub.enabledModules ?? [];
+        modules = sub.enabledModules ?? [];
+        writeCachedModules(modules);
         setSubscription(sub);
+        setEnabledModules(modules);
       } catch {
-        enabledModules = [];
+        // Keep cached modules so People / Payroll / Attendance don't vanish on remount.
+        setEnabledModules(modules);
       }
 
+      let attendanceOk = false;
       if (effectiveRole === "teacher") {
         try {
           const profile = await getMyTeacherProfile();
-          setNav(
-            navForRole(effectiveRole, {
-              canTakeAttendance: profile.canTakeAttendance,
-              enabledModules,
-            }),
-          );
+          attendanceOk = Boolean(profile.canTakeAttendance);
         } catch {
-          setNav(navForRole(effectiveRole, { enabledModules }));
+          attendanceOk = false;
         }
-      } else {
-        setNav(navForRole(effectiveRole, { enabledModules }));
       }
+      setCanTakeAttendance(attendanceOk);
+      setNav(
+        navForRole(effectiveRole, {
+          canTakeAttendance: attendanceOk,
+          enabledModules: modules,
+        }),
+      );
+      setShellReady(true);
     }
 
     void loadNav();
@@ -168,16 +236,41 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
       .then((res) => setUnreadCount(res.count ?? 0))
       .catch(() => setUnreadCount(0));
 
-    void getSchoolSubscription()
-      .then(setSubscription)
-      .catch(() => setSubscription(null));
+    if (role === "admin" || role === "staff" || role === "teacher") {
+      void staffNotificationsUnreadCount()
+        .then((res) => setStaffUnreadCount(res.count ?? 0))
+        .catch(() => setStaffUnreadCount(0));
+    }
 
     if (role === "admin" || role === "staff") {
       void loadActionAlerts();
     }
-
-    setShellReady(true);
   }, [role, router]);
+
+  useEffect(() => {
+    if (!shellReady) return;
+    setNav(
+      navForRole(navRole, {
+        canTakeAttendance,
+        enabledModules,
+      }),
+    );
+  }, [shellReady, navRole, canTakeAttendance, enabledModules]);
+
+  useEffect(() => {
+    if (!subscription?.enabledModules) return;
+    const next = subscription.enabledModules;
+    writeCachedModules(next);
+    setEnabledModules((prev) => {
+      if (
+        prev.length === next.length &&
+        prev.every((m, i) => m === next[i])
+      ) {
+        return prev;
+      }
+      return next;
+    });
+  }, [subscription]);
 
   useEffect(() => {
     if (!notificationsOpen) return;
@@ -196,6 +289,11 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
       void apiFetch<{ count: number }>("/announcements/unread-count")
         .then((res) => setUnreadCount(res.count ?? 0))
         .catch(() => undefined);
+      if (role === "admin" || role === "staff" || role === "teacher") {
+        void staffNotificationsUnreadCount()
+          .then((res) => setStaffUnreadCount(res.count ?? 0))
+          .catch(() => undefined);
+      }
       if (role === "admin" || role === "staff") {
         void loadActionAlerts();
       }
@@ -222,14 +320,53 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
       let changed = false;
       const next = { ...prev };
       for (const item of nav) {
-        if (item.children?.length && isNavActive(pathname, item.href) && !next[item.href]) {
-          next[item.href] = true;
+        if (!item.children?.length) continue;
+        const groupActive = item.children.some((child) =>
+          isNavChildActive(pathname, child.href),
+        );
+        // Open the active section; close others when you leave (e.g. Results).
+        if (groupActive) {
+          if (!next[item.href]) {
+            next[item.href] = true;
+            changed = true;
+          }
+        } else if (next[item.href]) {
+          next[item.href] = false;
           changed = true;
         }
       }
       return changed ? next : prev;
     });
   }, [pathname, nav]);
+
+  useEffect(() => {
+    writeExpandedNav(navRole, expandedNav);
+  }, [expandedNav, navRole]);
+
+  /* Pages remount DashboardShell on route change — keep the active item in view. */
+  useEffect(() => {
+    if (!shellReady) return;
+    const root = navListRef.current;
+    if (!root) return;
+
+    const active =
+      root.querySelector<HTMLElement>(".dash-nav-sub-item--active") ??
+      root.querySelector<HTMLElement>(".dash-nav-group--active > .dash-nav-item--branch") ??
+      root.querySelector<HTMLElement>(".dash-nav-item--active");
+    if (!active) return;
+
+    let cancelled = false;
+    const frame = window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        if (cancelled) return;
+        active.scrollIntoView({ block: "nearest", inline: "nearest" });
+      });
+    });
+    return () => {
+      cancelled = true;
+      window.cancelAnimationFrame(frame);
+    };
+  }, [shellReady, pathname, nav, expandedNav]);
 
   function logout() {
     clearSessionStorage();
@@ -261,6 +398,13 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
           setNotifications(rows.filter((row) => !row.isRead));
         }),
       ];
+      if (role === "admin" || role === "staff" || role === "teacher") {
+        tasks.push(
+          listStaffNotifications().then((rows) => {
+            setStaffNotifications(rows.filter((row) => !row.readAt));
+          }),
+        );
+      }
       if (role === "admin" || role === "staff") {
         tasks.push(loadActionAlerts());
       }
@@ -304,11 +448,44 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
   }
 
   async function markAllNotificationsRead() {
-    if (unreadCount === 0) return;
+    if (unreadCount === 0 && staffUnreadCount === 0) return;
     try {
-      await apiPost<{ updated: number }>("/announcements/read-all", {});
+      const jobs: Promise<unknown>[] = [];
+      if (unreadCount > 0) {
+        jobs.push(apiPost<{ updated: number }>("/announcements/read-all", {}));
+      }
+      if (staffUnreadCount > 0) {
+        jobs.push(markAllStaffNotificationsRead());
+      }
+      await Promise.all(jobs);
       setNotifications([]);
+      setStaffNotifications([]);
       setUnreadCount(0);
+      setStaffUnreadCount(0);
+    } catch {
+      /* no-op */
+    }
+  }
+
+  async function openStaffNotification(item: StaffNotification) {
+    setNotificationsOpen(false);
+    try {
+      await markStaffNotificationRead(item.id);
+      setStaffUnreadCount((prev) => Math.max(0, prev - 1));
+      setStaffNotifications((prev) => prev.filter((n) => n.id !== item.id));
+    } catch {
+      /* still navigate */
+    }
+    if (item.link) router.push(item.link);
+  }
+
+  async function dismissStaffNotification(item: StaffNotification, event: MouseEvent) {
+    event.preventDefault();
+    event.stopPropagation();
+    try {
+      await markStaffNotificationRead(item.id);
+      setStaffUnreadCount((prev) => Math.max(0, prev - 1));
+      setStaffNotifications((prev) => prev.filter((n) => n.id !== item.id));
     } catch {
       /* no-op */
     }
@@ -350,10 +527,17 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
   });
   const actionAlertCount = visibleActionAlerts.length;
   const unreadNotifications = notifications.filter((n) => !n.isRead);
+  const unreadStaff = staffNotifications.filter((n) => !n.readAt);
   const visibleNotifications = showAllNotifications
     ? unreadNotifications
     : unreadNotifications.slice(0, 8);
-  const notifyBadgeCount = unreadCount + (isAdminWorkspace ? actionAlertCount : 0);
+  const visibleStaffNotifications = showAllNotifications
+    ? unreadStaff
+    : unreadStaff.slice(0, 8);
+  const notifyBadgeCount =
+    unreadCount +
+    staffUnreadCount +
+    (isAdminWorkspace ? actionAlertCount : 0);
   const pageTitle = title ?? (isAdminWorkspace ? "Dashboard" : `${roleLabel} dashboard`);
   const mobileTabs = mobilePrimaryNav(nav, navRole);
   const moreActive = isMobileMoreActive(pathname, mobileTabs);
@@ -375,14 +559,16 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
           />
         </div>
 
-        <nav className="dash-nav dash-nav--pro">
+        <nav ref={navListRef} className="dash-nav dash-nav--pro">
           {!shellReady
             ? Array.from({ length: 6 }).map((_, i) => (
                 <div key={i} className="dash-nav-item dash-nav-item--pro dash-nav-item--skeleton" />
               ))
             : nav.map((item) => {
-                const active = isNavActive(pathname, item.href);
                 const hasChildren = !!item.children?.length;
+                const active = hasChildren
+                  ? item.children!.some((child) => isNavChildActive(pathname, child.href))
+                  : isNavActive(pathname, item.href);
                 const groupOpen = hasChildren
                   ? (expandedNav[item.href] ?? active)
                   : false;
@@ -515,14 +701,16 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
                       type="button"
                       className="dash-notify-mark-all"
                       onClick={() => void markAllNotificationsRead()}
-                      disabled={unreadCount === 0}
+                      disabled={unreadCount === 0 && staffUnreadCount === 0}
                     >
                       Mark all read
                     </button>
                   </header>
                   {notifyLoading ? (
                     <p className="dash-notify-empty">Loading…</p>
-                  ) : visibleActionAlerts.length === 0 && unreadNotifications.length === 0 ? (
+                  ) : visibleActionAlerts.length === 0 &&
+                    unreadNotifications.length === 0 &&
+                    unreadStaff.length === 0 ? (
                     <p className="dash-notify-empty">No notifications yet.</p>
                   ) : (
                     <>
@@ -558,9 +746,43 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
                           </ul>
                         </>
                       ) : null}
+                      {unreadStaff.length > 0 ? (
+                        <>
+                          <p className="dash-notify-section">Attendance & alerts</p>
+                          <ul className="dash-notify-list">
+                            {visibleStaffNotifications.map((item) => (
+                              <li key={item.id} className="dash-notify-row">
+                                <button
+                                  type="button"
+                                  className="dash-notify-item dash-notify-item--unread"
+                                  onClick={() => void openStaffNotification(item)}
+                                >
+                                  <p className="dash-notify-title">{item.title}</p>
+                                  {item.body ? (
+                                    <p className="dash-notify-body">{item.body}</p>
+                                  ) : null}
+                                  <p className="dash-notify-time">
+                                    {item.link ? "Tap to open · " : ""}
+                                    {new Date(item.createdAt).toLocaleString()}
+                                  </p>
+                                </button>
+                                <button
+                                  type="button"
+                                  className="dash-notify-dismiss"
+                                  aria-label={`Dismiss ${item.title}`}
+                                  title="Dismiss"
+                                  onClick={(e) => void dismissStaffNotification(item, e)}
+                                >
+                                  ×
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        </>
+                      ) : null}
                       {unreadNotifications.length > 0 ? (
                         <>
-                          {visibleActionAlerts.length > 0 ? (
+                          {visibleActionAlerts.length > 0 || unreadStaff.length > 0 ? (
                             <p className="dash-notify-section">Announcements</p>
                           ) : null}
                           <ul className="dash-notify-list">
@@ -598,7 +820,7 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
                         </>
                       ) : null}
                       <footer className="dash-notify-foot">
-                        {unreadNotifications.length > 8 ? (
+                        {unreadNotifications.length + unreadStaff.length > 8 ? (
                           <button
                             type="button"
                             className="dash-notify-view-all"
@@ -606,11 +828,11 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
                           >
                             {showAllNotifications
                               ? "Show less"
-                              : `View all (${unreadNotifications.length})`}
+                              : `View all (${unreadNotifications.length + unreadStaff.length})`}
                           </button>
                         ) : (
                           <span className="dash-notify-count">
-                            {unreadCount} unread
+                            {unreadCount + staffUnreadCount} unread
                             {actionAlertCount > 0
                               ? ` · ${actionAlertCount} action${actionAlertCount === 1 ? "" : "s"}`
                               : ""}

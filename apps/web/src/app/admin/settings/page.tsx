@@ -104,6 +104,11 @@ export default function AdminSettingsPage() {
   const [paymentInstructions, setPaymentInstructions] = useState("");
   const [reportCardTitle, setReportCardTitle] = useState("");
   const [reportCardTagline, setReportCardTagline] = useState("");
+  const [nameAm, setNameAm] = useState("");
+  const [stampUrl, setStampUrl] = useState("");
+  const [reportCoverImageUrl, setReportCoverImageUrl] = useState("");
+  const [reportShowRank, setReportShowRank] = useState(true);
+  const [reportShowAttendance, setReportShowAttendance] = useState(true);
   const [attendanceMode, setAttendanceMode] = useState<AttendanceMode>("DAILY");
 
   function applySchool(s: SchoolSettings) {
@@ -128,6 +133,11 @@ export default function AdminSettingsPage() {
     setPaymentInstructions(s.paymentInstructions ?? "");
     setReportCardTitle(s.reportCardTitle ?? "");
     setReportCardTagline(s.reportCardTagline ?? "");
+    setNameAm(s.nameAm ?? "");
+    setStampUrl(s.stampUrl ?? "");
+    setReportCoverImageUrl(s.reportCoverImageUrl ?? "");
+    setReportShowRank(s.reportShowRank ?? true);
+    setReportShowAttendance(s.reportShowAttendance ?? true);
     setAttendanceMode(s.attendanceMode);
   }
 
@@ -182,6 +192,11 @@ export default function AdminSettingsPage() {
         paymentInstructions: paymentInstructions.trim(),
         reportCardTitle: reportCardTitle.trim(),
         reportCardTagline: reportCardTagline.trim(),
+        nameAm: nameAm.trim(),
+        stampUrl: stampUrl.trim(),
+        reportCoverImageUrl: reportCoverImageUrl.trim(),
+        reportShowRank,
+        reportShowAttendance,
       });
       applySchool(updated);
       persistSchoolBrand({
@@ -454,6 +469,57 @@ export default function AdminSettingsPage() {
                   onChange={(e) => setReportCardTagline(e.target.value)}
                   placeholder="Excellence · Integrity · Service"
                 />
+              </div>
+              <div className="cfg-field">
+                <label htmlFor="cfg-name-am">School name (Amharic)</label>
+                <input
+                  id="cfg-name-am"
+                  value={nameAm}
+                  onChange={(e) => setNameAm(e.target.value)}
+                  placeholder="Optional Amharic name for yearly report cards"
+                />
+              </div>
+              <div className="cfg-field">
+                <label htmlFor="cfg-cover">Yearly report cover image URL</label>
+                <input
+                  id="cfg-cover"
+                  value={reportCoverImageUrl}
+                  onChange={(e) => setReportCoverImageUrl(e.target.value)}
+                  placeholder="Campus photograph URL or data URL"
+                />
+                <p className="cfg-hint">
+                  Used on the front-right cover of the yearly report. Leave blank for a brand abstract background.
+                </p>
+              </div>
+              <div className="cfg-field">
+                <label htmlFor="cfg-stamp">School stamp image URL</label>
+                <input
+                  id="cfg-stamp"
+                  value={stampUrl}
+                  onChange={(e) => setStampUrl(e.target.value)}
+                  placeholder="Official stamp URL or data URL"
+                />
+                <p className="cfg-hint">
+                  Shown on the yearly report when authorized. Leave blank for a physical stamp area.
+                </p>
+              </div>
+              <div className="cfg-field" style={{ display: "flex", gap: "1.25rem", flexWrap: "wrap" }}>
+                <label style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                  <input
+                    type="checkbox"
+                    checked={reportShowRank}
+                    onChange={(e) => setReportShowRank(e.target.checked)}
+                  />
+                  Show class rank on yearly report
+                </label>
+                <label style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                  <input
+                    type="checkbox"
+                    checked={reportShowAttendance}
+                    onChange={(e) => setReportShowAttendance(e.target.checked)}
+                  />
+                  Show attendance on yearly report
+                </label>
               </div>
 
               <div className="cfg-theme">
