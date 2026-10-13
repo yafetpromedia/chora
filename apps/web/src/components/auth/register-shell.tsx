@@ -3,7 +3,10 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
-import { RegisterVisualPanel } from "@/components/auth/register-visual-panel";
+import {
+  RegisterVisualPanel,
+  TRIAL_HIGHLIGHTS,
+} from "@/components/auth/register-visual-panel";
 import { useLandingHeroImage } from "@/hooks/use-landing-hero-image";
 import { BrandMark } from "@/components/brand-mark";
 import { BRAND_NAME } from "@/lib/brand";
@@ -66,6 +69,11 @@ export function RegisterShell({
                 Two short steps. Add staff and students from the dashboard after
                 you launch.
               </p>
+              <ul className="reg-trial-features" aria-label="Included in the free trial">
+                {TRIAL_HIGHLIGHTS.map((item) => (
+                  <li key={item.title}>{item.title}</li>
+                ))}
+              </ul>
             </div>
 
             <div className="reg-progress" aria-label="Registration progress">

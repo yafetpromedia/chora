@@ -19,7 +19,7 @@ const FAQS = [
   },
   {
     q: "What happens when the trial ends?",
-    a: "You choose Starter, Professional, or talk to us for Enterprise. Until then, core modules stay available during the 14-day trial within trial limits.",
+    a: "You choose a school size, then keep the modules you need — including attendance, results, yearly report cards, and HR & payroll. Until then, every module stays available for 14 days, up to 50 students.",
   },
   {
     q: "Is our data isolated from other schools?",

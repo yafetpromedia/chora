@@ -12,7 +12,22 @@ const STEP_COPY = [
   {
     eyebrow: "Step 2 · Admin",
     title: "Your secure admin login",
-    body: "Create the account you’ll use to manage the school. Add teachers and students later from admin.",
+    body: "Create the account you’ll use to manage attendance, report cards, leave, and payroll.",
+  },
+] as const;
+
+export const TRIAL_HIGHLIGHTS = [
+  {
+    title: "Attendance concerns",
+    desc: "Review a mark before it stays on the record",
+  },
+  {
+    title: "Yearly report cards",
+    desc: "Print the full year and let families verify it",
+  },
+  {
+    title: "HR, leave & payroll",
+    desc: "Staff check-in, leave approvals, and payslips",
   },
 ] as const;
 
@@ -46,6 +61,15 @@ export function RegisterVisualPanel({ activeStep }: Props) {
           <h2 className="reg-visual__title">{copy.title}</h2>
           <p className="reg-visual__body">{copy.body}</p>
         </motion.div>
+
+        <ul className="reg-visual__features">
+          {TRIAL_HIGHLIGHTS.map((item) => (
+            <li key={item.title}>
+              <strong>{item.title}</strong>
+              <span>{item.desc}</span>
+            </li>
+          ))}
+        </ul>
       </div>
     </div>
   );

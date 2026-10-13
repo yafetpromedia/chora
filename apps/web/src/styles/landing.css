@@ -1372,9 +1372,16 @@
 }
 
 .lp3-bento__card--grades .lp3-bento__icon,
-.lp3-bento__card--finance .lp3-bento__icon {
+.lp3-bento__card--finance .lp3-bento__icon,
+.lp3-bento__card--yearly .lp3-bento__icon {
   color: var(--brand-teal-dark);
   background: linear-gradient(135deg, #ecfdf5, #d1fae5);
+}
+
+.lp3-bento__card--hr .lp3-bento__icon {
+  color: #1d4ed8;
+  background: linear-gradient(135deg, #eff6ff, #dbeafe);
+  border-color: rgba(29, 78, 216, 0.16);
 }
 
 .lp3-bento__card--library .lp3-bento__icon {

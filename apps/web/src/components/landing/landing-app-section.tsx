@@ -12,7 +12,7 @@ import { BRAND_NAME } from "@/lib/brand";
 const PERKS = [
   "Real-time attendance alerts for parents",
   "Digital campus ID with QR check-in",
-  "Fees, results, and notices in one feed",
+  "Fees, yearly reports, and notices in one feed",
   "Same login as web — school code + username",
 ];
 

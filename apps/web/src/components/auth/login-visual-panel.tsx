@@ -8,7 +8,7 @@ import { BRAND_NAME } from "@/lib/brand";
 const FEATURES = [
   {
     title: "Attendance",
-    desc: "Daily tracking & reports",
+    desc: "Roll call & concerns",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" aria-hidden>
         <path
@@ -43,7 +43,7 @@ const FEATURES = [
   },
   {
     title: "Results",
-    desc: "Grades & report cards",
+    desc: "Term & yearly cards",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" aria-hidden>
         <path

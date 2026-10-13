@@ -18,9 +18,11 @@ import {
   IconAttendance,
   IconFinance,
   IconGrades,
+  IconHr,
   IconLibrary,
   IconSecurity,
   IconTimetable,
+  IconYearlyReport,
 } from "@/components/feature-icons";
 import { useLandingHeroImage } from "@/hooks/use-landing-hero-image";
 import type { ReactNode } from "react";
@@ -39,7 +41,7 @@ const STEPS = [
   {
     n: "03",
     title: "Run daily operations",
-    desc: "Mark attendance, enter results, bill fees, and publish announcements.",
+    desc: "Mark attendance, publish report cards, approve leave, and run payroll.",
   },
 ];
 
@@ -52,22 +54,34 @@ const FEATURES: {
 }[] = [
   {
     title: "Attendance parents trust",
-    desc: "Daily or period roll call, QR campus cards, and same-day alerts on web and mobile.",
+    desc: "Daily or period roll call, QR campus cards, staff check-in, and a concern inbox when a mark needs review.",
     icon: <IconAttendance />,
     wide: true,
     tone: "attendance",
   },
   {
     title: "Results & report cards",
-    desc: "Assessment templates, teacher score sheets, approvals, and printable report cards.",
+    desc: "Assessment templates, teacher score sheets, approvals, and printable term report cards.",
     icon: <IconGrades />,
     tone: "grades",
+  },
+  {
+    title: "Yearly report cards",
+    desc: "A full-year booklet in your school branding, with a QR families can scan to verify.",
+    icon: <IconYearlyReport />,
+    tone: "yearly",
   },
   {
     title: "Fees in ETB",
     desc: "Fee schedules, partial payments, parent submissions, and finance exports.",
     icon: <IconFinance />,
     tone: "finance",
+  },
+  {
+    title: "HR, leave & payroll",
+    desc: "Employee profiles, leave approvals, and payslips your finance team can run in ETB.",
+    icon: <IconHr />,
+    tone: "hr",
   },
   {
     title: "eLibrary & AI study help",
@@ -108,8 +122,8 @@ const PORTALS = [
     role: "Admin",
     glyph: "AD",
     tagline: "School operations",
-    highlights: ["Enrollment", "Billing", "Reports"],
-    desc: "Enrollment, billing, academics setup, and school-wide reports",
+    highlights: ["Enrollment", "Payroll", "Reports"],
+    desc: "Enrollment, HR and payroll, academics setup, and school-wide reports",
     href: "/login",
     tone: "admin",
     icon: <IconAdmin />,
@@ -119,8 +133,8 @@ const PORTALS = [
     role: "Teacher",
     glyph: "TC",
     tagline: "Classroom daily",
-    highlights: ["Attendance", "Grades", "Timetable"],
-    desc: "Attendance, grade entry, classwork, timetable, and eLibrary",
+    highlights: ["Attendance", "Concerns", "Grades"],
+    desc: "Attendance, concern reviews, grades, classwork, and payslips",
     href: "/login",
     tone: "teacher",
     icon: <IconTimetable />,
@@ -131,7 +145,7 @@ const PORTALS = [
     glyph: "ST",
     tagline: "Campus life",
     highlights: ["Campus ID", "Results", "Fees"],
-    desc: "Campus ID, results, assignments, fees, and digital library",
+    desc: "Campus ID, term and yearly results, assignments, fees, and digital library",
     href: "/login",
     tone: "student",
     icon: <IconGrades />,
@@ -141,8 +155,8 @@ const PORTALS = [
     role: "Parent",
     glyph: "PR",
     tagline: "Family updates",
-    highlights: ["Attendance", "Payments", "Notices"],
-    desc: "Child attendance, fee payments, results, and school notices",
+    highlights: ["Attendance", "Reports", "Payments"],
+    desc: "Child attendance, yearly report cards, fee payments, and school notices",
     href: "/login",
     tone: "parent",
     icon: <IconAttendance />,
@@ -169,8 +183,8 @@ export function LandingPage() {
                 <span className="lp3-hero__title-accent">one place</span>
               </h1>
               <p className="lp3-hero__lead">
-                Attendance, results, fees, and parent updates — without spreadsheets or chat
-                groups.
+                Attendance, yearly report cards, fees, payroll, and parent updates — without
+                spreadsheets or chat groups.
               </p>
               <div className="lp3-hero__actions">
                 <Link href="/register" className="lp3-btn lp3-btn--primary">

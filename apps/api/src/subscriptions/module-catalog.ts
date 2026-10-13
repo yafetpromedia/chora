@@ -54,14 +54,14 @@ export const SCHOOL_MODULE_CATALOG: SchoolModuleDef[] = [
   {
     key: 'attendance',
     label: 'Attendance',
-    description: 'Take and track daily attendance',
+    description: 'Student and staff attendance, leave, and concern reviews',
     etbMonthly: 1500,
     usdMonthly: usdFromEtb(1500),
   },
   {
     key: 'results',
     label: 'Results',
-    description: 'Grades, assessments, and report cards',
+    description: 'Grades, term report cards, and yearly reports',
     etbMonthly: 2500,
     usdMonthly: usdFromEtb(2500),
   },
@@ -110,7 +110,7 @@ export const SCHOOL_MODULE_CATALOG: SchoolModuleDef[] = [
   {
     key: 'payroll',
     label: 'HR & Payroll',
-    description: 'Employee HR, compensation, and payroll',
+    description: 'Employee profiles, compensation, and payslips',
     etbMonthly: 2500,
     usdMonthly: usdFromEtb(2500),
   },

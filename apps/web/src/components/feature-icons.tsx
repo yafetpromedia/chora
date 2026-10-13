@@ -99,3 +99,24 @@ export function IconSecurity() {
     </svg>
   );
 }
+
+export function IconYearlyReport() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" {...stroke}>
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <path d="M14 2v6h6" />
+      <path d="M8 13h8" />
+      <path d="M8 17h5" />
+    </svg>
+  );
+}
+
+export function IconHr() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" {...stroke}>
+      <rect x="3" y="7" width="18" height="13" rx="2" />
+      <path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+      <path d="M3 12h18" />
+    </svg>
+  );
+}
