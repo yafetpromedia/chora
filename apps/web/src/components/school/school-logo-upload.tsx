@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { SchoolBrandLockup } from "@/components/dashboard/school-brand-lockup";
-import { fileToPhotoDataUrl } from "@/lib/student-photo";
+import { fileToSchoolLogoDataUrl } from "@/lib/student-photo";
 import { AppToast } from "@/components/ui/app-toast";
 import { BRAND_NAME } from "@/lib/brand";
 
@@ -20,7 +20,7 @@ export function SchoolLogoUpload({ schoolName, value, onChange }: Props) {
     if (!file) return;
     setError("");
     try {
-      const dataUrl = await fileToPhotoDataUrl(file);
+      const dataUrl = await fileToSchoolLogoDataUrl(file);
       onChange(dataUrl);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Invalid image");

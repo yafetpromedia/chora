@@ -5,7 +5,17 @@ const path = require("path");
 const ROOT = path.join(__dirname, "..");
 const MARK = path.join(ROOT, "apps/web/public/brand/chora-mark.png");
 
-/** Solid teal pad — no transparency (browsers handle this better as favicons). */
+/** ~22% corner radius — soft squircle look without going fully circular. */
+function roundedMask(size) {
+  const r = Math.max(2, Math.round(size * 0.22));
+  return Buffer.from(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}">` +
+      `<rect width="${size}" height="${size}" rx="${r}" ry="${r}" fill="#fff"/>` +
+      `</svg>`,
+  );
+}
+
+/** Teal pad with rounded corners (transparent outside the curve). */
 async function makeSolidLogo(size) {
   const teal = { r: 15, g: 118, b: 110, alpha: 1 };
   const inset = Math.max(1, Math.round(size * 0.06));
@@ -24,7 +34,10 @@ async function makeSolidLogo(size) {
       background: teal,
     },
   })
-    .composite([{ input: logo, left: inset, top: inset }])
+    .composite([
+      { input: logo, left: inset, top: inset },
+      { input: roundedMask(size), blend: "dest-in" },
+    ])
     .png()
     .toBuffer();
 }
@@ -76,7 +89,7 @@ async function pngToIco(pngBuffers) {
 
   console.log("favicon.ico", ico.length);
   console.log("icon.png 192", (await makeSolidLogo(192)).length);
-  console.log("done — solid Chora favicons");
+  console.log("done — rounded Chora favicons");
 })().catch((e) => {
   console.error(e);
   process.exit(1);

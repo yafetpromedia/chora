@@ -10,8 +10,27 @@ type CorsOriginCallback = (
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bodyParser: false });
-  app.use(json({ limit: '10mb' }));
-  app.use(urlencoded({ extended: true, limit: '10mb' }));
+  // School settings can include several image data-URLs (logo, signature, stamp, cover).
+  app.use(json({ limit: '40mb' }));
+  app.use(urlencoded({ extended: true, limit: '40mb' }));
+  app.use(
+    (
+      err: { type?: string; status?: number; message?: string },
+      _req: unknown,
+      res: { status: (code: number) => { json: (body: unknown) => void } },
+      next: (error?: unknown) => void,
+    ) => {
+      if (err?.type === 'entity.too.large' || err?.status === 413) {
+        res.status(413).json({
+          statusCode: 413,
+          message:
+            'Upload is too large. Use smaller images for logo, signature, stamp, or cover.',
+        });
+        return;
+      }
+      next(err);
+    },
+  );
   const staticOrigins = [
     'http://localhost:3000',
     'http://localhost:3002',

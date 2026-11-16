@@ -33,6 +33,20 @@ export function getApiBaseUrl(): string {
     : `http://localhost:${API_PORT}`;
 }
 
+/**
+ * Direct API origin for large multipart uploads.
+ * Next’s `/backend` rewrite buffers bodies (~10MB default) and aborts bigger files.
+ */
+export function getUploadApiBaseUrl(): string {
+  if (typeof window !== "undefined") {
+    const { hostname, protocol } = window.location;
+    if (isLocalDevHost(hostname) && process.env.NODE_ENV !== "production") {
+      return `${protocol}//${hostname}:${API_PORT}`;
+    }
+  }
+  return getApiBaseUrl();
+}
+
 const NETWORK_RETRIES = 2;
 const NETWORK_RETRY_MS = 700;
 
@@ -136,6 +150,8 @@ export type CreateStudentPayload = {
   woreda?: string;
   address?: string;
   phone?: string;
+  /** Optional — saved to health record at registration */
+  bloodType?: string;
 };
 
 export type CreateStudentResult = {
@@ -762,7 +778,7 @@ export async function apiUpload<T>(path: string, file: File): Promise<T> {
   const form = new FormData();
   form.append("file", file);
 
-  const base = getApiBaseUrl();
+  const base = getUploadApiBaseUrl();
   let response: Response;
   try {
     response = await fetchWithRetry(`${base}${path}`, {

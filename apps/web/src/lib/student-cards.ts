@@ -20,13 +20,18 @@ export type StudentIdCard = {
   dateOfBirth: string | null;
   age: number | null;
   phone: string | null;
+  bloodType: string | null;
   schoolName: string;
   schoolLogoUrl: string | null;
   schoolSignatureUrl: string | null;
   schoolSignatureLabel: string | null;
+  schoolStampUrl: string | null;
+  /** School motto / values line (from report-card tagline settings). */
+  schoolMotto: string | null;
   schoolJoinCode: string;
   schoolPhone: string | null;
   schoolAddress: string | null;
+  schoolPostalBox: string | null;
   schoolEmail: string | null;
   schoolPrimaryColor?: string | null;
   schoolAccentColor?: string | null;

@@ -26,8 +26,8 @@ export const DEMO_CHAPTERS: DemoChapter[] = [
   { time: "04:00", seconds: 240, title: "Student Experience" },
   { time: "06:00", seconds: 360, title: "AI & eLearning" },
   { time: "08:00", seconds: 480, title: "Assessments & Grade 12 Preparation" },
-  { time: "10:00", seconds: 600, title: "Attendance & QR" },
-  { time: "11:30", seconds: 690, title: "Fees & Payments" },
+  { time: "10:00", seconds: 600, title: "Attendance, QR & concerns" },
+  { time: "11:30", seconds: 690, title: "Fees, leave & payroll" },
   { time: "13:00", seconds: 780, title: "Parent Experience" },
   { time: "14:00", seconds: 840, title: "Mobile Experience" },
   { time: "15:00", seconds: 900, title: "Getting Started" },
@@ -37,22 +37,22 @@ export const DEMO_STORY_POINTS: DemoStoryPoint[] = [
   {
     n: "01",
     title: "Manage",
-    desc: "Students, teachers, attendance, fees and academic records.",
+    desc: "Students, staff attendance, leave, payroll, fees, and academic records.",
   },
   {
     n: "02",
     title: "Teach",
-    desc: "Teachers manage classes, assignments, assessments and communication.",
+    desc: "Teachers handle classes, concerns, assessments, and communication.",
   },
   {
     n: "03",
     title: "Learn",
-    desc: "Students access references, eLearning, AI assistance, practice and model exams.",
+    desc: "Students access results, yearly report cards, eLearning, and AI help.",
   },
   {
     n: "04",
     title: "Connect",
-    desc: "Parents stay informed about attendance, results, payments and announcements.",
+    desc: "Parents stay informed about attendance, reports, payments, and notices.",
   },
 ];
 

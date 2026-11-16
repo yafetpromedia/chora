@@ -48,6 +48,7 @@ const DEFAULTS = {
   demoVideoUrl: null as string | null,
   demoVideoThumbnailUrl: null as string | null,
   productDocsUrl: null as string | null,
+  productDocsThumbnailUrl: null as string | null,
   bankName: null as string | null,
   bankAccountHolder: null as string | null,
   bankAccountNumber: null as string | null,
@@ -172,6 +173,9 @@ export class PlatformSettingsService {
           .demoVideoThumbnailUrl ?? null,
       productDocsUrl:
         (row as { productDocsUrl?: string | null }).productDocsUrl ?? null,
+      productDocsThumbnailUrl:
+        (row as { productDocsThumbnailUrl?: string | null })
+          .productDocsThumbnailUrl ?? null,
       aiEnabled: Boolean((row as { aiEnabled?: boolean }).aiEnabled),
       aiProvider: normalizeProvider(
         (row as { aiProvider?: string | null }).aiProvider,
@@ -352,6 +356,12 @@ export class PlatformSettingsService {
         : {}),
       ...(dto.productDocsUrl !== undefined
         ? { productDocsUrl: dto.productDocsUrl.trim() || null }
+        : {}),
+      ...(dto.productDocsThumbnailUrl !== undefined
+        ? {
+            productDocsThumbnailUrl:
+              dto.productDocsThumbnailUrl.trim() || null,
+          }
         : {}),
       ...(dto.bankName !== undefined
         ? { bankName: dto.bankName.trim() || null }

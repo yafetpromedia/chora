@@ -21,6 +21,7 @@ import {
   UpdateStudentStatusDto,
 } from './dto/student-records.dto';
 import { StudentDocumentType } from '@prisma/client';
+import { normalizeBloodType } from '../common/validators/blood-type';
 
 function parseGradeNumber(name: string): number | null {
   const m = name.match(/(\d+)/);
@@ -44,6 +45,10 @@ export class StudentRecordsService {
     private readonly academics: AcademicsService,
     private readonly finance: FinanceService,
   ) {}
+
+  async assertStudentFileAccess(schoolId: string, studentProfileId: string) {
+    await this.assertStudent(schoolId, studentProfileId);
+  }
 
   private async assertStudent(schoolId: string, studentProfileId: string) {
     const profile = await this.prisma.studentProfile.findFirst({
@@ -446,11 +451,15 @@ export class StudentRecordsService {
     dto: UpdateHealthRecordDto,
   ) {
     await this.assertStudent(schoolId, studentProfileId);
+    const bloodType =
+      dto.bloodType !== undefined
+        ? normalizeBloodType(dto.bloodType)
+        : undefined;
     return this.prisma.studentHealthRecord.upsert({
       where: { studentProfileId },
       create: {
         studentProfileId,
-        bloodType: dto.bloodType?.trim() ?? null,
+        bloodType: bloodType ?? null,
         emergencyContactName: dto.emergencyContactName?.trim() ?? null,
         emergencyContactPhone: dto.emergencyContactPhone?.trim() ?? null,
         allergies: dto.allergies?.trim() ?? null,
@@ -458,9 +467,7 @@ export class StudentRecordsService {
         medicationNotes: dto.medicationNotes?.trim() ?? null,
       },
       update: {
-        ...(dto.bloodType !== undefined
-          ? { bloodType: dto.bloodType?.trim() || null }
-          : {}),
+        ...(bloodType !== undefined ? { bloodType } : {}),
         ...(dto.emergencyContactName !== undefined
           ? { emergencyContactName: dto.emergencyContactName?.trim() || null }
           : {}),

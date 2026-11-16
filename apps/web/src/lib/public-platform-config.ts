@@ -14,6 +14,7 @@ export type PublicPlatformConfig = {
   demoVideoUrl: string | null;
   demoVideoThumbnailUrl: string | null;
   productDocsUrl: string | null;
+  productDocsThumbnailUrl: string | null;
   socialInstagramUrl: string | null;
   socialFacebookUrl: string | null;
   socialLinkedinUrl: string | null;

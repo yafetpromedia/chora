@@ -137,6 +137,11 @@ export class UpdatePlatformSettingsDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(4_000_000)
+  productDocsThumbnailUrl?: string;
+
+  @IsOptional()
+  @IsString()
   @MaxLength(120)
   bankName?: string;
 

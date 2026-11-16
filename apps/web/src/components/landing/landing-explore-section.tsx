@@ -29,33 +29,41 @@ function CheckIcon() {
   );
 }
 
-function DocumentCoverMockup() {
+function DocumentCoverMockup({ thumbnailSrc }: { thumbnailSrc?: string | null }) {
   return (
     <div className="lp3-explore-doc__stack" aria-hidden>
       <div className="lp3-explore-doc__sheet lp3-explore-doc__sheet--back" />
       <div className="lp3-explore-doc__sheet lp3-explore-doc__sheet--mid" />
-      <div className="lp3-explore-doc__cover">
-        <div className="lp3-explore-doc__cover-top">
+      {thumbnailSrc ? (
+        <div className="lp3-explore-doc__cover lp3-explore-doc__cover--photo">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={BRAND_LOGO_SRC} alt="" width={36} height={36} />
-          <span>{BRAND_NAME}</span>
+          <img src={thumbnailSrc} alt="" className="lp3-explore-doc__cover-img" />
         </div>
-        <p className="lp3-explore-doc__cover-kicker">School Management &amp; Learning Platform</p>
-        <h3 className="lp3-explore-doc__cover-title">Product Documentation</h3>
-        <p className="lp3-explore-doc__cover-sub">
-          Features · Roles · Workflows · Implementation · Security
-        </p>
-        <div className="lp3-explore-doc__cover-foot">
-          <span>Awud Digitals</span>
-          <span>2026</span>
+      ) : (
+        <div className="lp3-explore-doc__cover">
+          <div className="lp3-explore-doc__cover-top">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={BRAND_LOGO_SRC} alt="" width={36} height={36} />
+            <span>{BRAND_NAME}</span>
+          </div>
+          <p className="lp3-explore-doc__cover-kicker">School Management &amp; Learning Platform</p>
+          <h3 className="lp3-explore-doc__cover-title">Product Documentation</h3>
+          <p className="lp3-explore-doc__cover-sub">
+            Attendance · Report cards · HR &amp; payroll · Portals
+          </p>
+          <div className="lp3-explore-doc__cover-foot">
+            <span>Awud Digitals</span>
+            <span>2026</span>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
 
 export function LandingExploreSection() {
   const [docsUrl, setDocsUrl] = useState(PRODUCT_DOCS_FALLBACK_PATH);
+  const [docsThumb, setDocsThumb] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -63,6 +71,7 @@ export function LandingExploreSection() {
       .then((cfg) => {
         if (cancelled) return;
         setDocsUrl(resolveProductDocsUrl(cfg.productDocsUrl));
+        setDocsThumb(cfg.productDocsThumbnailUrl?.trim() || null);
       })
       .catch(() => {
         /* keep fallback */
@@ -85,8 +94,8 @@ export function LandingExploreSection() {
               Explore Chora before you get started.
             </h2>
             <p className="lp3-lead lp3-lead--center">
-              Watch the platform in action or download the complete guide to see how Chora can fit
-              your school&apos;s workflow.
+              Watch the walkthrough or download the guide covering attendance, report cards, HR &amp;
+              payroll, and the rest of your school workflow.
             </p>
           </div>
         </Reveal>
@@ -97,8 +106,8 @@ export function LandingExploreSection() {
               <div className="lp3-explore-card__copy">
                 <h3>See Chora in Action</h3>
                 <p>
-                  See how Chora connects administration, teaching, learning, assessment, payments,
-                  and parents in one platform.
+                  From attendance concerns and yearly report cards to fees, leave, and payroll —
+                  see how the whole campus stays in sync.
                 </p>
               </div>
               <DemoVideoPlayer variant="showcase" showChapters={false} />
@@ -107,12 +116,12 @@ export function LandingExploreSection() {
 
           <StaggerItem>
             <article className="lp3-explore-card lp3-explore-card--docs">
-              <DocumentCoverMockup />
+              <DocumentCoverMockup thumbnailSrc={docsThumb} />
               <div className="lp3-explore-card__copy">
                 <h3>Chora Product Documentation</h3>
                 <p>
-                  Explore the complete Chora platform, including features, user roles, workflows,
-                  implementation, security, support, and future roadmap.
+                  Full guide to modules, roles, and workflows — including attendance concerns,
+                  yearly report cards, staff leave, and HR &amp; payroll.
                 </p>
                 <ul className="lp3-explore-meta" aria-label="Documentation details">
                   <li>{PRODUCT_DOCS_META.pages}</li>

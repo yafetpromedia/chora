@@ -6,11 +6,13 @@ import {
   IsOptional,
   IsString,
   Matches,
+  MaxLength,
   MinLength,
   ValidateIf,
 } from 'class-validator';
 
 const HEX_COLOR = /^#[0-9A-Fa-f]{6}$/;
+const MAX_IMAGE_FIELD_CHARS = 3_000_000;
 
 export class UpdateSchoolSettingsDto {
   @IsString()
@@ -26,6 +28,11 @@ export class UpdateSchoolSettingsDto {
   @IsOptional()
   address?: string;
 
+  @IsString()
+  @IsOptional()
+  postalBox?: string;
+
+  @ValidateIf((_, v) => v !== null && v !== undefined && v !== '')
   @IsEmail()
   @IsOptional()
   email?: string;
@@ -40,10 +47,12 @@ export class UpdateSchoolSettingsDto {
 
   @IsString()
   @IsOptional()
+  @MaxLength(MAX_IMAGE_FIELD_CHARS)
   logoUrl?: string;
 
   @IsString()
   @IsOptional()
+  @MaxLength(MAX_IMAGE_FIELD_CHARS)
   authorizedSignatureUrl?: string;
 
   @IsString()
@@ -107,10 +116,16 @@ export class UpdateSchoolSettingsDto {
 
   @IsString()
   @IsOptional()
+  @MaxLength(MAX_IMAGE_FIELD_CHARS)
   stampUrl?: string;
+
+  @IsBoolean()
+  @IsOptional()
+  idCardShowStamp?: boolean;
 
   @IsString()
   @IsOptional()
+  @MaxLength(MAX_IMAGE_FIELD_CHARS)
   reportCoverImageUrl?: string;
 
   @IsBoolean()

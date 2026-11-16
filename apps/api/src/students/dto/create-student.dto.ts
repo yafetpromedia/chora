@@ -2,11 +2,14 @@ import { Gender } from '@prisma/client';
 import {
   IsEmail,
   IsEnum,
+  IsIn,
   IsISO8601,
   IsOptional,
   IsString,
   MinLength,
+  ValidateIf,
 } from 'class-validator';
+import { ALLOWED_BLOOD_TYPES } from '../../common/validators/blood-type';
 
 export class CreateStudentDto {
   @IsString()
@@ -118,4 +121,10 @@ export class CreateStudentDto {
   @IsString()
   @IsOptional()
   phone?: string;
+
+  /** Optional at registration — stored on StudentHealthRecord */
+  @IsOptional()
+  @ValidateIf((_, v) => v !== undefined && String(v).trim() !== '')
+  @IsIn([...ALLOWED_BLOOD_TYPES])
+  bloodType?: string;
 }

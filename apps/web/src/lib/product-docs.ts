@@ -18,9 +18,9 @@ export const PRODUCT_DOCS_META = {
 } as const;
 
 export const PRODUCT_DOCS_BENEFITS = [
-  "Platform overview",
-  "Features & workflows",
-  "Implementation & support",
+  "Attendance, results & yearly reports",
+  "HR, leave & payroll workflows",
+  "Roles, portals & implementation",
 ] as const;
 
 /** Resolve platform-uploaded or static docs URL for the marketing site. */

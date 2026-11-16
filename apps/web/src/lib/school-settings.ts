@@ -14,6 +14,7 @@ export type SchoolSettings = {
   accentDeep: string | null;
   schoolType: SchoolType | null;
   address: string | null;
+  postalBox: string | null;
   email: string | null;
   country: string | null;
   phone: string | null;
@@ -31,6 +32,7 @@ export type SchoolSettings = {
   reportCardTagline: string | null;
   nameAm: string | null;
   stampUrl: string | null;
+  idCardShowStamp: boolean;
   reportCoverImageUrl: string | null;
   reportShowRank: boolean;
   reportShowAttendance: boolean;
@@ -69,6 +71,7 @@ export type UpdateSchoolSettingsPayload = {
   nameAm?: string;
   stampUrl?: string;
   reportCoverImageUrl?: string;
+  idCardShowStamp?: boolean;
   reportShowRank?: boolean;
   reportShowAttendance?: boolean;
 };

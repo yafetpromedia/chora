@@ -1,4 +1,4 @@
-import { getApiBaseUrl } from "@/lib/api";
+import { getApiBaseUrl, getUploadApiBaseUrl } from "@/lib/api";
 
 export const PLATFORM_TOKEN_KEY = "campusone_platform_token";
 export const PLATFORM_USER_KEY = "campusone_platform_user";
@@ -29,8 +29,12 @@ export async function platformLogin(
     body: JSON.stringify({ email, password }),
   });
   if (!res.ok) {
-    const data = (await res.json().catch(() => null)) as { message?: string } | null;
-    throw new Error(data?.message ?? "Login failed");
+    const data = (await res.json().catch(() => null)) as {
+      message?: string | string[];
+    } | null;
+    const raw = data?.message;
+    const message = Array.isArray(raw) ? raw[0] : raw;
+    throw new Error(message || `Login failed (${res.status})`);
   }
   return res.json();
 }
@@ -100,11 +104,19 @@ export async function platformUpload<T>(path: string, file: File): Promise<T> {
   const form = new FormData();
   form.append("file", file);
 
-  const res = await fetch(`${getApiBaseUrl()}${path}`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
-    body: form,
-  });
+  let res: Response;
+  try {
+    // Bypass Next `/backend` rewrite — it truncates bodies over ~10MB.
+    res = await fetch(`${getUploadApiBaseUrl()}${path}`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: form,
+    });
+  } catch {
+    throw new Error(
+      "Upload failed — could not reach the API. Confirm the API is running, then try again.",
+    );
+  }
 
   if (!res.ok) {
     const data = (await res.json().catch(() => null)) as { message?: string } | null;

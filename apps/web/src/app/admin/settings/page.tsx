@@ -17,6 +17,7 @@ import type { SchoolType } from "@/lib/api";
 import { getSchoolSubscription, type SubscriptionStatus } from "@/lib/api";
 import { SchoolLogoUpload } from "@/components/school/school-logo-upload";
 import { SchoolSignatureUpload } from "@/components/school/school-signature-upload";
+import { SchoolStampUpload } from "@/components/school/school-stamp-upload";
 import { AppToast } from "@/components/ui/app-toast";
 import {
   AUTH_ROLE_KEY,
@@ -81,6 +82,7 @@ export default function AdminSettingsPage() {
   const [name, setName] = useState("");
   const [schoolType, setSchoolType] = useState<SchoolType>("MIXED");
   const [address, setAddress] = useState("");
+  const [postalBox, setPostalBox] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [country, setCountry] = useState("Ethiopia");
@@ -106,6 +108,7 @@ export default function AdminSettingsPage() {
   const [reportCardTagline, setReportCardTagline] = useState("");
   const [nameAm, setNameAm] = useState("");
   const [stampUrl, setStampUrl] = useState("");
+  const [idCardShowStamp, setIdCardShowStamp] = useState(false);
   const [reportCoverImageUrl, setReportCoverImageUrl] = useState("");
   const [reportShowRank, setReportShowRank] = useState(true);
   const [reportShowAttendance, setReportShowAttendance] = useState(true);
@@ -116,6 +119,7 @@ export default function AdminSettingsPage() {
     setName(s.name);
     setSchoolType((s.schoolType as SchoolType) ?? "MIXED");
     setAddress(s.address ?? "");
+    setPostalBox(s.postalBox ?? "");
     setEmail(s.email ?? "");
     setPhone(s.phone ?? "");
     setCountry(s.country ?? "Ethiopia");
@@ -135,6 +139,7 @@ export default function AdminSettingsPage() {
     setReportCardTagline(s.reportCardTagline ?? "");
     setNameAm(s.nameAm ?? "");
     setStampUrl(s.stampUrl ?? "");
+    setIdCardShowStamp(s.idCardShowStamp ?? false);
     setReportCoverImageUrl(s.reportCoverImageUrl ?? "");
     setReportShowRank(s.reportShowRank ?? true);
     setReportShowAttendance(s.reportShowAttendance ?? true);
@@ -175,6 +180,7 @@ export default function AdminSettingsPage() {
         name: name.trim(),
         schoolType,
         address: address.trim(),
+        postalBox: postalBox.trim(),
         email: email.trim() || undefined,
         phone: phone.trim(),
         country: country.trim(),
@@ -194,6 +200,7 @@ export default function AdminSettingsPage() {
         reportCardTagline: reportCardTagline.trim(),
         nameAm: nameAm.trim(),
         stampUrl: stampUrl.trim(),
+        idCardShowStamp,
         reportCoverImageUrl: reportCoverImageUrl.trim(),
         reportShowRank,
         reportShowAttendance,
@@ -357,14 +364,25 @@ export default function AdminSettingsPage() {
                   />
                 </div>
               </div>
-              <div className="cfg-field">
-                <label htmlFor="cfg-address">Address</label>
-                <textarea
-                  id="cfg-address"
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  placeholder="City, sub-city, woreda…"
-                />
+              <div className="cfg-form-row">
+                <div className="cfg-field">
+                  <label htmlFor="cfg-address">Address</label>
+                  <textarea
+                    id="cfg-address"
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    placeholder="City, sub-city, woreda…"
+                  />
+                </div>
+                <div className="cfg-field">
+                  <label htmlFor="cfg-postal">P.O. Box</label>
+                  <input
+                    id="cfg-postal"
+                    value={postalBox}
+                    onChange={(e) => setPostalBox(e.target.value)}
+                    placeholder="1234"
+                  />
+                </div>
               </div>
               <div className="cfg-form-row">
                 <div className="cfg-field">
@@ -491,19 +509,17 @@ export default function AdminSettingsPage() {
                   Used on the front-right cover of the yearly report. Leave blank for a brand abstract background.
                 </p>
               </div>
-              <div className="cfg-field">
-                <label htmlFor="cfg-stamp">School stamp image URL</label>
-                <input
-                  id="cfg-stamp"
-                  value={stampUrl}
-                  onChange={(e) => setStampUrl(e.target.value)}
-                  placeholder="Official stamp URL or data URL"
-                />
-                <p className="cfg-hint">
-                  Shown on the yearly report when authorized. Leave blank for a physical stamp area.
-                </p>
-              </div>
+              <SchoolStampUpload value={stampUrl} onChange={setStampUrl} />
               <div className="cfg-field" style={{ display: "flex", gap: "1.25rem", flexWrap: "wrap" }}>
+                <label style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                  <input
+                    type="checkbox"
+                    checked={idCardShowStamp}
+                    onChange={(e) => setIdCardShowStamp(e.target.checked)}
+                    disabled={!stampUrl.trim()}
+                  />
+                  Show stamp on student ID cards
+                </label>
                 <label style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
                   <input
                     type="checkbox"

@@ -1,4 +1,10 @@
-import { ConflictException, Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+  OnModuleInit,
+} from '@nestjs/common';
+import { sanitizeSchoolImageUrl } from '../common/validators/school-image-url';
 import { AttendanceMode, GradePreset, Plan, SchoolStatus, SchoolType } from '@prisma/client';
 import { gradeNamesForPreset } from '../grades/grade-presets';
 import { randomBytes } from 'crypto';
@@ -21,6 +27,7 @@ export type SchoolRecord = {
   accentDeep: string | null;
   schoolType: string | null;
   address: string | null;
+  postalBox: string | null;
   email: string | null;
   country: string | null;
   phone: string | null;
@@ -39,6 +46,7 @@ export type SchoolRecord = {
   reportCardTagline: string | null;
   nameAm: string | null;
   stampUrl: string | null;
+  idCardShowStamp: boolean;
   reportCoverImageUrl: string | null;
   reportShowRank: boolean;
   reportShowAttendance: boolean;
@@ -208,7 +216,21 @@ export class SchoolsService implements OnModuleInit {
 
   async findById(id: string): Promise<SchoolRecord | null> {
     const school = await this.prisma.school.findUnique({ where: { id } });
-    return school ? this.toRecord(school) : null;
+    if (!school) return null;
+    return this.toRecord(school, await this.readIdCardShowStamp(id));
+  }
+
+  /** Works even when Prisma client has not been regenerated after the migration. */
+  private async readIdCardShowStamp(schoolId: string): Promise<boolean> {
+    try {
+      const rows = await this.prisma.$queryRawUnsafe<Array<{ v: boolean | null }>>(
+        `SELECT "idCardShowStamp" AS v FROM "School" WHERE id = $1 LIMIT 1`,
+        schoolId,
+      );
+      return rows[0]?.v === true;
+    } catch {
+      return false;
+    }
   }
 
   async updateAttendanceMode(schoolId: string, mode: AttendanceMode) {
@@ -226,6 +248,7 @@ export class SchoolsService implements OnModuleInit {
       name?: string;
       schoolType?: string;
       address?: string;
+      postalBox?: string;
       email?: string;
       phone?: string;
       country?: string;
@@ -247,6 +270,7 @@ export class SchoolsService implements OnModuleInit {
       nameAm?: string | null;
       stampUrl?: string | null;
       reportCoverImageUrl?: string | null;
+      idCardShowStamp?: boolean;
       reportShowRank?: boolean;
       reportShowAttendance?: boolean;
     },
@@ -267,6 +291,9 @@ export class SchoolsService implements OnModuleInit {
     if (input.address !== undefined) {
       data.address = input.address.trim() || null;
     }
+    if (input.postalBox !== undefined) {
+      data.postalBox = input.postalBox.trim() || null;
+    }
     if (input.email !== undefined) {
       data.email = input.email.trim() || null;
     }
@@ -277,10 +304,13 @@ export class SchoolsService implements OnModuleInit {
       data.country = input.country.trim() || null;
     }
     if (input.logoUrl !== undefined) {
-      data.logoUrl = input.logoUrl?.trim() || null;
+      data.logoUrl = sanitizeSchoolImageUrl('Logo', input.logoUrl);
     }
     if (input.authorizedSignatureUrl !== undefined) {
-      data.authorizedSignatureUrl = input.authorizedSignatureUrl?.trim() || null;
+      data.authorizedSignatureUrl = sanitizeSchoolImageUrl(
+        'Signature',
+        input.authorizedSignatureUrl,
+      );
     }
     if (input.authorizedSignatureLabel !== undefined) {
       data.authorizedSignatureLabel =
@@ -326,10 +356,13 @@ export class SchoolsService implements OnModuleInit {
       data.nameAm = input.nameAm?.trim() || null;
     }
     if (input.stampUrl !== undefined) {
-      data.stampUrl = input.stampUrl?.trim() || null;
+      data.stampUrl = sanitizeSchoolImageUrl('Stamp', input.stampUrl);
     }
     if (input.reportCoverImageUrl !== undefined) {
-      data.reportCoverImageUrl = input.reportCoverImageUrl?.trim() || null;
+      data.reportCoverImageUrl = sanitizeSchoolImageUrl(
+        'Report cover',
+        input.reportCoverImageUrl,
+      );
     }
     if (input.reportShowRank !== undefined) {
       data.reportShowRank = input.reportShowRank;
@@ -343,7 +376,41 @@ export class SchoolsService implements OnModuleInit {
       data,
     });
 
-    return this.toRecord(school);
+    const stampAvailable = Boolean(
+      (data.stampUrl as string | null | undefined) ?? existing.stampUrl,
+    );
+    let idCardShowStampValue = await this.readIdCardShowStamp(schoolId);
+
+    if (input.idCardShowStamp !== undefined) {
+      idCardShowStampValue =
+        input.idCardShowStamp === true && stampAvailable;
+      try {
+        await this.prisma.$executeRawUnsafe(
+          `UPDATE "School" SET "idCardShowStamp" = $1::boolean WHERE id = $2`,
+          idCardShowStampValue,
+          schoolId,
+        );
+      } catch {
+        // Ignore if column/client lag; stamp stays off on ID cards by default.
+      }
+    } else if (
+      input.stampUrl !== undefined &&
+      !stampAvailable &&
+      idCardShowStampValue
+    ) {
+      idCardShowStampValue = false;
+      try {
+        await this.prisma.$executeRawUnsafe(
+          `UPDATE "School" SET "idCardShowStamp" = $1::boolean WHERE id = $2`,
+          false,
+          schoolId,
+        );
+      } catch {
+        /* ignore */
+      }
+    }
+
+    return this.toRecord(school, idCardShowStampValue);
   }
 
   private async generateUniqueJoinCode(): Promise<string> {
@@ -397,6 +464,7 @@ export class SchoolsService implements OnModuleInit {
     schoolType: string | null;
     address: string | null;
     email: string | null;
+    postalBox?: string | null;
     country: string | null;
     phone: string | null;
     setupComplete: boolean;
@@ -415,9 +483,16 @@ export class SchoolsService implements OnModuleInit {
     nameAm?: string | null;
     stampUrl?: string | null;
     reportCoverImageUrl?: string | null;
+    idCardShowStamp?: boolean;
     reportShowRank?: boolean;
     reportShowAttendance?: boolean;
-  }): SchoolRecord {
+  },
+    idCardShowStampOverride?: boolean,
+  ): SchoolRecord {
+    const stampFlag =
+      idCardShowStampOverride ??
+      (school as { idCardShowStamp?: boolean }).idCardShowStamp ??
+      false;
     return {
       id: school.id,
       name: school.name,
@@ -431,6 +506,7 @@ export class SchoolsService implements OnModuleInit {
       accentDeep: school.accentDeep ?? null,
       schoolType: school.schoolType,
       address: school.address,
+      postalBox: school.postalBox ?? null,
       email: school.email,
       country: school.country,
       phone: school.phone,
@@ -449,6 +525,7 @@ export class SchoolsService implements OnModuleInit {
       reportCardTagline: school.reportCardTagline ?? null,
       nameAm: school.nameAm ?? null,
       stampUrl: school.stampUrl ?? null,
+      idCardShowStamp: stampFlag,
       reportCoverImageUrl: school.reportCoverImageUrl ?? null,
       reportShowRank: school.reportShowRank ?? true,
       reportShowAttendance: school.reportShowAttendance ?? true,

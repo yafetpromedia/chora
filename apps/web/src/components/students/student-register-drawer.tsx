@@ -67,6 +67,7 @@ export function StudentRegisterDrawer({ grades, onClose, onSuccess }: Props) {
   const [motherPhone, setMotherPhone] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
+  const [bloodType, setBloodType] = useState("");
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -206,6 +207,7 @@ export function StudentRegisterDrawer({ grades, onClose, onSuccess }: Props) {
         motherPhone: motherPhone.trim(),
         phone: phone.trim() || undefined,
         address: address.trim() || undefined,
+        bloodType: bloodType.trim() || undefined,
         photoUrl: photoUrl ?? undefined,
         fayedaVerificationToken: fayedaProfile?.verificationToken,
       });
@@ -456,6 +458,25 @@ export function StudentRegisterDrawer({ grades, onClose, onSuccess }: Props) {
                   <p className="stu-field-hint">Age: {age} years</p>
                 ) : null}
               </div>
+            </div>
+
+            <div className="stu-field">
+              <label htmlFor="reg-blood">Blood type</label>
+              <select
+                id="reg-blood"
+                value={bloodType}
+                onChange={(e) => setBloodType(e.target.value)}
+              >
+                <option value="">Optional — select blood group</option>
+                {["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"].map((bg) => (
+                  <option key={bg} value={bg}>
+                    {bg}
+                  </option>
+                ))}
+              </select>
+              <p className="stu-field-hint">
+                Saved to the health record and shown on the student ID card.
+              </p>
             </div>
 
             <h3>Parents / guardians</h3>

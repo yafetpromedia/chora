@@ -1,10 +1,13 @@
 import {
   IsDateString,
   IsEnum,
+  IsIn,
   IsOptional,
   IsString,
   MaxLength,
+  ValidateIf,
 } from 'class-validator';
+import { ALLOWED_BLOOD_TYPES } from '../../common/validators/blood-type';
 import {
   BehaviorRecordType,
   StudentCertificateType,
@@ -27,7 +30,8 @@ export class CreateBehaviorRecordDto {
 
 export class UpdateHealthRecordDto {
   @IsOptional()
-  @IsString()
+  @ValidateIf((_, v) => v !== undefined && String(v).trim() !== '')
+  @IsIn([...ALLOWED_BLOOD_TYPES])
   @MaxLength(16)
   bloodType?: string;
 

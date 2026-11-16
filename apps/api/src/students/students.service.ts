@@ -18,6 +18,7 @@ import {
   generateSchoolStudentId,
   generateStudentCardCode,
 } from './student-card.util';
+import { normalizeBloodType } from '../common/validators/blood-type';
 import { FayedaService } from '../fayeda/fayeda.service';
 import { AcademicEnrollmentService } from '../results/academic-enrollment.service';
 import { UsersService } from '../users/users.service';
@@ -59,6 +60,13 @@ export class StudentsService {
     },
     grade: { select: { id: true, name: true } },
     section: { select: { id: true, name: true } },
+    healthRecord: {
+      select: {
+        bloodType: true,
+        emergencyContactName: true,
+        emergencyContactPhone: true,
+      },
+    },
     parents: {
       orderBy: { id: 'asc' },
       include: {
@@ -605,6 +613,18 @@ export class StudentsService {
           portalTempPassword: tempPassword,
         },
       });
+
+      const bloodType = normalizeBloodType(dto.bloodType);
+      if (bloodType) {
+        await tx.studentHealthRecord.create({
+          data: {
+            studentProfileId: profile.id,
+            bloodType,
+            emergencyContactName: fatherName || null,
+            emergencyContactPhone: fatherPhone || null,
+          },
+        });
+      }
 
       const father = await this.linkParent(
         tx,
@@ -1316,7 +1336,11 @@ export class StudentsService {
     studentProfileId: string,
   ) {
     const link = await this.prisma.parentStudent.findFirst({
-      where: { parentId: parentUserId, studentId: studentProfileId },
+      where: {
+        parentId: parentUserId,
+        studentId: studentProfileId,
+        student: { schoolId },
+      },
     });
     if (!link) {
       throw new NotFoundException('Student not linked to this parent');
@@ -1352,19 +1376,25 @@ export class StudentsService {
     take?: number,
   ) {
     await this.ensureCardCodes(schoolId);
+    const skipN =
+      skip !== undefined ? Math.max(0, Math.floor(skip)) : undefined;
+    const takeN =
+      take !== undefined
+        ? Math.min(200, Math.max(1, Math.floor(take)))
+        : undefined;
     const profiles = await this.prisma.studentProfile.findMany({
       where: this.idCardListWhere(schoolId, gradeId, sectionId),
       include: this.studentInclude,
       orderBy: [{ grade: { sortOrder: 'asc' } }, { user: { firstName: 'asc' } }],
-      ...(skip !== undefined ? { skip } : {}),
-      ...(take !== undefined ? { take } : {}),
+      ...(skipN !== undefined ? { skip: skipN } : {}),
+      ...(takeN !== undefined ? { take: takeN } : {}),
     });
     const school = await this.loadSchoolForCard(schoolId);
     return profiles.map((p) => this.formatIdCardPayload(p, school));
   }
 
   private async loadSchoolForCard(schoolId: string) {
-    const [school, currentYear] = await Promise.all([
+    const [school, currentYear, idCardShowStamp] = await Promise.all([
       this.prisma.school.findUnique({
         where: { id: schoolId },
         select: {
@@ -1372,16 +1402,20 @@ export class StudentsService {
           logoUrl: true,
           authorizedSignatureUrl: true,
           authorizedSignatureLabel: true,
+          stampUrl: true,
           joinCode: true,
           phone: true,
           address: true,
+          postalBox: true,
           email: true,
           primaryColor: true,
           accentColor: true,
           accentDeep: true,
+          reportCardTagline: true,
         },
       }),
       this.enrollment.getCurrentYear(schoolId),
+      this.readIdCardShowStamp(schoolId),
     ]);
     const year = new Date().getFullYear();
     return {
@@ -1389,15 +1423,32 @@ export class StudentsService {
       logoUrl: school?.logoUrl ?? null,
       authorizedSignatureUrl: school?.authorizedSignatureUrl ?? null,
       authorizedSignatureLabel: school?.authorizedSignatureLabel ?? null,
+      stampUrl: school?.stampUrl ?? null,
+      idCardShowStamp,
       joinCode: school?.joinCode ?? '',
       phone: school?.phone ?? null,
       address: school?.address ?? null,
+      postalBox: school?.postalBox ?? null,
       email: school?.email ?? null,
       primaryColor: school?.primaryColor ?? null,
       accentColor: school?.accentColor ?? null,
       accentDeep: school?.accentDeep ?? null,
+      reportCardTagline: school?.reportCardTagline ?? null,
       academicYearName: currentYear?.name ?? String(year),
     };
+  }
+
+  /** Defaults off; tolerates DB before the idCardShowStamp migration. */
+  private async readIdCardShowStamp(schoolId: string): Promise<boolean> {
+    try {
+      const rows = await this.prisma.$queryRawUnsafe<Array<{ v: boolean | null }>>(
+        `SELECT "idCardShowStamp" AS v FROM "School" WHERE id = $1 LIMIT 1`,
+        schoolId,
+      );
+      return rows[0]?.v === true;
+    } catch {
+      return false;
+    }
   }
 
   private async ensureProfileCardCode(
@@ -1452,6 +1503,11 @@ export class StudentsService {
       parents?: {
         parent: { firstName: string; lastName: string; phone: string | null };
       }[];
+      healthRecord?: {
+        bloodType: string | null;
+        emergencyContactName: string | null;
+        emergencyContactPhone: string | null;
+      } | null;
     },
     school: {
       name: string;
@@ -1461,10 +1517,14 @@ export class StudentsService {
       joinCode: string;
       phone: string | null;
       address: string | null;
+      postalBox: string | null;
       email: string | null;
+      stampUrl: string | null;
+      idCardShowStamp: boolean;
       primaryColor: string | null;
       accentColor: string | null;
       accentDeep: string | null;
+      reportCardTagline: string | null;
       academicYearName: string;
     },
   ) {
@@ -1499,8 +1559,13 @@ export class StudentsService {
       ? `${mother.firstName} ${mother.lastName}`.trim()
       : null;
     const motherPhone = mother?.phone ?? null;
-    const emergencyName = fatherName ?? motherName;
-    const emergencyPhone = fatherPhone ?? motherPhone;
+    const health = profile.healthRecord;
+    const bloodType = health?.bloodType?.trim() || null;
+    const emergencyName =
+      health?.emergencyContactName?.trim() || fatherName || motherName;
+    const emergencyPhone =
+      health?.emergencyContactPhone?.trim() || fatherPhone || motherPhone;
+    const schoolMotto = school.reportCardTagline?.trim() || null;
 
     return {
       studentProfileId: profile.id,
@@ -1520,13 +1585,17 @@ export class StudentsService {
       dateOfBirth: profile.dateOfBirth ?? null,
       age,
       phone: profile.phone ?? null,
+      bloodType,
       schoolName: school.name,
       schoolLogoUrl: school.logoUrl,
       schoolSignatureUrl: school.authorizedSignatureUrl,
       schoolSignatureLabel: school.authorizedSignatureLabel,
+      schoolStampUrl: school.idCardShowStamp ? school.stampUrl : null,
+      schoolMotto,
       schoolJoinCode: school.joinCode,
       schoolPhone: school.phone,
       schoolAddress: school.address,
+      schoolPostalBox: school.postalBox,
       schoolEmail: school.email,
       schoolPrimaryColor: school.primaryColor,
       schoolAccentColor: school.accentColor,

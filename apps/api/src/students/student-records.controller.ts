@@ -34,6 +34,7 @@ import {
 import { StudentRecordsService } from './student-records.service';
 import { createReadStream, existsSync } from 'fs';
 import { join } from 'path';
+import { assertSafeUploadedFilename } from '../common/validators/safe-filename';
 
 type UploadedDocFile = { buffer: Buffer; originalname: string };
 
@@ -198,19 +199,32 @@ export class StudentRecordsController {
   }
 
   @Get('files/:schoolId/:studentProfileId/:filename')
-  serveFile(
+  async serveFile(
+    @CurrentUser() user: AuthUser,
     @Param('schoolId') schoolId: string,
     @Param('studentProfileId') studentProfileId: string,
     @Param('filename') filename: string,
     @Res() res: Response,
   ) {
+    let safeName: string;
+    try {
+      safeName = assertSafeUploadedFilename(filename);
+    } catch {
+      res.status(400).send('Invalid filename');
+      return;
+    }
+    await this.records.assertStudentFileAccess(user.schoolId, studentProfileId);
+    if (schoolId !== user.schoolId) {
+      res.status(404).send('Not found');
+      return;
+    }
     const path = join(
       process.cwd(),
       'uploads',
       'student-documents',
       schoolId,
       studentProfileId,
-      filename,
+      safeName,
     );
     if (!existsSync(path)) {
       res.status(404).send('Not found');

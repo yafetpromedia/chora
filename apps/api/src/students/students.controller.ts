@@ -63,6 +63,7 @@ export class StudentsController {
   }
 
   @Get(':id/card')
+  @RequirePermissions(SchoolPermission.STUDENTS_CARDS)
   getCard(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.studentsService.getIdCard(user.schoolId, id);
   }

@@ -67,6 +67,8 @@ export function StudentAcademicRecord({ profileId }: { profileId: string }) {
   const [health, setHealth] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [healthSaving, setHealthSaving] = useState(false);
+  const [healthSaved, setHealthSaved] = useState(false);
   const [docType, setDocType] = useState<string>("BIRTH_CERTIFICATE");
   const [gradPreview, setGradPreview] = useState<{
     ready: boolean;
@@ -87,6 +89,16 @@ export function StudentAcademicRecord({ profileId }: { profileId: string }) {
       setEnrollments(enr);
       setTranscript(tr);
       setTerms(t.map((x) => ({ id: x.id, name: x.name, isCurrent: x.isCurrent })));
+      if (s.health) {
+        setHealth({
+          bloodType: s.health.bloodType ?? "",
+          emergencyContactName: s.health.emergencyContactName ?? "",
+          emergencyContactPhone: s.health.emergencyContactPhone ?? "",
+          allergies: s.health.allergies ?? "",
+          medicalConditions: s.health.medicalConditions ?? "",
+          medicationNotes: s.health.medicationNotes ?? "",
+        });
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Load failed");
     } finally {
@@ -126,8 +138,20 @@ export function StudentAcademicRecord({ profileId }: { profileId: string }) {
 
   async function onSaveHealth(e: FormEvent) {
     e.preventDefault();
-    await updateHealth(profileId, health);
+    setHealthSaving(true);
+    setHealthSaved(false);
     setError("");
+    try {
+      await updateHealth(profileId, health);
+      const s = await getStudentRecordsSummary(profileId);
+      setSummary(s);
+      setHealthSaved(true);
+      window.setTimeout(() => setHealthSaved(false), 2500);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save health record");
+    } finally {
+      setHealthSaving(false);
+    }
   }
 
   async function onUploadDoc(e: FormEvent<HTMLFormElement>) {
@@ -171,31 +195,70 @@ export function StudentAcademicRecord({ profileId }: { profileId: string }) {
     return <p className="auth-alert auth-alert--error">{error || "Student not found"}</p>;
   }
 
+  const bloodChip =
+    health.bloodType?.trim() ||
+    summary.health?.bloodType?.trim() ||
+    null;
+  const enrollmentYears = Math.max(
+    enrollments.length,
+    summary.counts.enrollments ?? 0,
+  );
+
   return (
     <div className="stu-rec">
       {error ? <p className="auth-alert auth-alert--error">{error}</p> : null}
 
       <header className="stu-rec-hero">
-        <div>
+        <div className="stu-rec-hero__main">
           <Link href="/admin/students" className="stu-rec-back">
             ← Students
           </Link>
-          <h1>{summary.student.name}</h1>
-          <p className="stu-rec-meta">
-            {summary.student.studentId ?? "—"} · {summary.student.grade}
-            {summary.student.section ? ` · ${summary.student.section}` : ""} ·{" "}
-            <span className={`stu-rec-status stu-rec-status--${summary.student.status.toLowerCase()}`}>
-              {summary.student.status}
-            </span>
-          </p>
+          <div className="stu-rec-hero__identity">
+            {summary.student.photoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={summary.student.photoUrl}
+                alt=""
+                className="stu-rec-hero__photo"
+              />
+            ) : (
+              <div className="stu-rec-hero__photo stu-rec-hero__photo--empty" aria-hidden>
+                {summary.student.name.trim().slice(0, 1).toUpperCase()}
+              </div>
+            )}
+            <div className="stu-rec-hero__text">
+              <h1>{summary.student.name}</h1>
+              <div className="stu-rec-meta">
+                <span className="stu-rec-chip">{summary.student.studentId ?? "—"}</span>
+                <span className="stu-rec-chip">{summary.student.grade}</span>
+                {summary.student.section ? (
+                  <span className="stu-rec-chip">{summary.student.section}</span>
+                ) : null}
+                <span
+                  className={`stu-rec-chip stu-rec-chip--status stu-rec-status--${summary.student.status.toLowerCase()}`}
+                >
+                  {summary.student.status}
+                </span>
+                {bloodChip ? (
+                  <span className="stu-rec-chip stu-rec-chip--blood">
+                    Blood {bloodChip}
+                  </span>
+                ) : null}
+              </div>
+            </div>
+          </div>
         </div>
         <div className="stu-rec-hero-actions">
-          <button type="button" className="plat-btn plat-btn--ghost" onClick={() => void load()}>
+          <button
+            type="button"
+            className="stu-rec-btn stu-rec-btn--ghost"
+            onClick={() => void load()}
+          >
             Refresh
           </button>
           <button
             type="button"
-            className="plat-btn plat-btn--primary"
+            className="stu-rec-btn stu-rec-btn--primary"
             onClick={() => openTranscriptPrint(profileId)}
           >
             Print transcript
@@ -205,18 +268,24 @@ export function StudentAcademicRecord({ profileId }: { profileId: string }) {
 
       <div className="stu-rec-kpis">
         <div className="stu-rec-kpi">
+          <span className="stu-rec-kpi__label">Attendance</span>
           <strong>{summary.attendance.rate ?? "—"}%</strong>
-          <span>Attendance rate</span>
+          <span className="stu-rec-kpi__hint">
+            {summary.attendance.present}/{summary.attendance.total} present
+          </span>
         </div>
         <div className="stu-rec-kpi">
-          <strong>{enrollments.length}</strong>
-          <span>Enrollment years</span>
+          <span className="stu-rec-kpi__label">Enrollment</span>
+          <strong>{enrollmentYears}</strong>
+          <span className="stu-rec-kpi__hint">Academic years</span>
         </div>
         <div className="stu-rec-kpi">
+          <span className="stu-rec-kpi__label">Documents</span>
           <strong>{summary.counts.documents}</strong>
-          <span>Documents</span>
+          <span className="stu-rec-kpi__hint">On file</span>
         </div>
         <div className="stu-rec-kpi">
+          <span className="stu-rec-kpi__label">Fees due</span>
           <strong>
             {summary.finance ? (
               <EtbAmount cents={summary.finance.outstandingCents} maximumFractionDigits={0} />
@@ -224,7 +293,7 @@ export function StudentAcademicRecord({ profileId }: { profileId: string }) {
               "—"
             )}
           </strong>
-          <span>Outstanding fees</span>
+          <span className="stu-rec-kpi__hint">Outstanding</span>
         </div>
       </div>
 
@@ -245,55 +314,196 @@ export function StudentAcademicRecord({ profileId }: { profileId: string }) {
       <div className="stu-rec-panel">
         {tab === "overview" ? (
           <div className="stu-rec-overview">
-            <h2>Promotion history</h2>
-            <ul className="stu-rec-timeline">
-              {enrollments.map((e) => (
-                <li key={e.id}>
-                  <strong>{e.academicYear.name}</strong> — {e.grade.name}
-                  {e.section ? ` (${e.section.name})` : ""}
-                  <span className="stu-rec-pill">{e.promotionOutcome}</span>
-                  {e.isCurrent ? <span className="stu-rec-pill stu-rec-pill--current">Current</span> : null}
-                </li>
-              ))}
-            </ul>
+            <section className="stu-rec-card">
+              <header className="stu-rec-card__head">
+                <div>
+                  <h2 className="stu-rec-card__title">Promotion history</h2>
+                  <p className="stu-rec-card__lead">
+                    Year-by-year grade path for this student.
+                  </p>
+                </div>
+                <span className="stu-rec-card__count">
+                  {enrollments.length}{" "}
+                  {enrollments.length === 1 ? "year" : "years"}
+                </span>
+              </header>
+              {enrollments.length === 0 ? (
+                <p className="stu-rec-empty">No enrollment years recorded yet.</p>
+              ) : (
+                <ol className="stu-rec-timeline">
+                  {enrollments.map((e, index) => (
+                    <li
+                      key={e.id}
+                      className={`stu-rec-timeline__item${e.isCurrent ? " stu-rec-timeline__item--current" : ""}`}
+                    >
+                      <span className="stu-rec-timeline__rail" aria-hidden>
+                        <span className="stu-rec-timeline__dot" />
+                        {index < enrollments.length - 1 ? (
+                          <span className="stu-rec-timeline__line" />
+                        ) : null}
+                      </span>
+                      <div className="stu-rec-timeline__body">
+                        <div className="stu-rec-timeline__top">
+                          <strong className="stu-rec-timeline__year">
+                            {e.academicYear.name}
+                          </strong>
+                          <div className="stu-rec-timeline__tags">
+                            {e.isCurrent ? (
+                              <span className="stu-rec-pill stu-rec-pill--current">
+                                Current
+                              </span>
+                            ) : null}
+                            {e.promotionOutcome ? (
+                              <span className="stu-rec-pill">
+                                {e.promotionOutcome}
+                              </span>
+                            ) : null}
+                          </div>
+                        </div>
+                        <p className="stu-rec-timeline__grade">
+                          {e.grade.name}
+                          {e.section ? (
+                            <span className="stu-rec-timeline__section">
+                              {" "}
+                              · {e.section.name}
+                            </span>
+                          ) : null}
+                        </p>
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </section>
+
             {gradPreview ? (
-              <section className="stu-rec-grad">
-                <h2>Graduation readiness</h2>
-                <ul>
+              <section className="stu-rec-card stu-rec-card--grad">
+                <header className="stu-rec-card__head">
+                  <div>
+                    <h2 className="stu-rec-card__title">Graduation readiness</h2>
+                    <p className="stu-rec-card__lead">
+                      Checklist before marking the student graduated.
+                    </p>
+                  </div>
+                  {(() => {
+                    const met = gradPreview.requirements.filter((r) => r.met).length;
+                    const total = gradPreview.requirements.length || 1;
+                    const pct = Math.round((met / total) * 100);
+                    return (
+                      <div
+                        className={`stu-rec-progress${gradPreview.ready ? " stu-rec-progress--ready" : ""}`}
+                        style={{ ["--stu-rec-pct" as string]: `${pct}%` }}
+                        aria-label={`${met} of ${total} requirements met`}
+                      >
+                        <span className="stu-rec-progress__ring" aria-hidden />
+                        <span className="stu-rec-progress__val">
+                          {met}/{total}
+                        </span>
+                      </div>
+                    );
+                  })()}
+                </header>
+                <ul className="stu-rec-checks">
                   {gradPreview.requirements.map((r) => (
-                    <li key={r.label} className={r.met ? "stu-rec-met" : "stu-rec-unmet"}>
-                      {r.met ? "✓" : "○"} {r.label}
+                    <li
+                      key={r.label}
+                      className={`stu-rec-check${r.met ? " stu-rec-check--met" : " stu-rec-check--unmet"}`}
+                    >
+                      <span className="stu-rec-check__icon" aria-hidden>
+                        {r.met ? (
+                          <svg viewBox="0 0 20 20" width="16" height="16">
+                            <path
+                              fill="currentColor"
+                              d="M8.2 13.6 4.9 10.3l1.4-1.4 1.9 1.9 5.5-5.5 1.4 1.4z"
+                            />
+                          </svg>
+                        ) : (
+                          <svg viewBox="0 0 20 20" width="16" height="16">
+                            <circle
+                              cx="10"
+                              cy="10"
+                              r="6.5"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="1.6"
+                            />
+                          </svg>
+                        )}
+                      </span>
+                      <span className="stu-rec-check__label">{r.label}</span>
+                      <span className="stu-rec-check__state">
+                        {r.met ? "Met" : "Pending"}
+                      </span>
                     </li>
                   ))}
                 </ul>
                 {gradPreview.ready && summary.student.status === "ACTIVE" ? (
-                  <button type="button" className="plat-btn plat-btn--primary" onClick={() => void onGraduate()}>
-                    Graduate student
-                  </button>
-                ) : null}
+                  <div className="stu-rec-grad-actions">
+                    <button
+                      type="button"
+                      className="plat-btn plat-btn--primary"
+                      onClick={() => void onGraduate()}
+                    >
+                      Graduate student
+                    </button>
+                  </div>
+                ) : (
+                  <p className="stu-rec-grad-note">
+                    Complete the pending items to unlock graduation.
+                  </p>
+                )}
               </section>
             ) : null}
           </div>
         ) : null}
 
         {tab === "attendance" ? (
-          <p className="stu-rec-hint">
-            Present {summary.attendance.present} of {summary.attendance.total} daily records (
-            {summary.attendance.rate ?? 0}%).
-          </p>
+          <section className="stu-rec-section">
+            <header className="stu-rec-section__head">
+              <div>
+                <h2 className="stu-rec-section__title">Attendance</h2>
+                <p className="stu-rec-section__lead">Daily presence summary for this student.</p>
+              </div>
+            </header>
+            <div className="stu-rec-stat-grid">
+              <div className="stu-rec-stat">
+                <span>Rate</span>
+                <strong>{summary.attendance.rate ?? 0}%</strong>
+              </div>
+              <div className="stu-rec-stat">
+                <span>Present</span>
+                <strong>{summary.attendance.present}</strong>
+              </div>
+              <div className="stu-rec-stat">
+                <span>Records</span>
+                <strong>{summary.attendance.total}</strong>
+              </div>
+            </div>
+          </section>
         ) : null}
 
         {tab === "results" ? (
-          <div>
-            <p className="stu-rec-hint">Open report cards per term (published results).</p>
-            <ul className="stu-rec-list">
+          <section className="stu-rec-section">
+            <header className="stu-rec-section__head">
+              <div>
+                <h2 className="stu-rec-section__title">Report cards</h2>
+                <p className="stu-rec-section__lead">
+                  Open published term report cards for this student.
+                </p>
+              </div>
+            </header>
+            <ul className="stu-rec-rows">
               {terms.map((t) => (
-                <li key={t.id}>
-                  {t.name}
-                  {t.isCurrent ? " (current)" : ""}
+                <li key={t.id} className="stu-rec-row">
+                  <div>
+                    <strong>{t.name}</strong>
+                    {t.isCurrent ? (
+                      <span className="stu-rec-pill stu-rec-pill--current">Current</span>
+                    ) : null}
+                  </div>
                   <button
                     type="button"
-                    className="dash-copy-btn"
+                    className="plat-btn plat-btn--ghost plat-btn--xs"
                     onClick={() => openReportCardPrint(profileId, t.id)}
                   >
                     Report card
@@ -301,36 +511,58 @@ export function StudentAcademicRecord({ profileId }: { profileId: string }) {
                 </li>
               ))}
             </ul>
-          </div>
+          </section>
         ) : null}
 
         {tab === "fees" ? (
-          <div>
+          <section className="stu-rec-section">
+            <header className="stu-rec-section__head">
+              <div>
+                <h2 className="stu-rec-section__title">Fees</h2>
+                <p className="stu-rec-section__lead">Billing snapshot for this student.</p>
+              </div>
+              <Link href="/admin/finance" className="plat-btn plat-btn--ghost plat-btn--xs">
+                Open finance
+              </Link>
+            </header>
             {summary.finance ? (
-              <ul className="stu-rec-list">
-                <li>
-                  Total due: <EtbAmount cents={summary.finance.totalDueCents} maximumFractionDigits={0} />
-                </li>
-                <li>
-                  Paid: <EtbAmount cents={summary.finance.totalPaidCents} maximumFractionDigits={0} />
-                </li>
-                <li>
-                  Outstanding:{" "}
-                  <EtbAmount cents={summary.finance.outstandingCents} maximumFractionDigits={0} />
-                </li>
-              </ul>
+              <div className="stu-rec-stat-grid">
+                <div className="stu-rec-stat">
+                  <span>Total due</span>
+                  <strong>
+                    <EtbAmount cents={summary.finance.totalDueCents} maximumFractionDigits={0} />
+                  </strong>
+                </div>
+                <div className="stu-rec-stat">
+                  <span>Paid</span>
+                  <strong>
+                    <EtbAmount cents={summary.finance.totalPaidCents} maximumFractionDigits={0} />
+                  </strong>
+                </div>
+                <div className="stu-rec-stat">
+                  <span>Outstanding</span>
+                  <strong>
+                    <EtbAmount cents={summary.finance.outstandingCents} maximumFractionDigits={0} />
+                  </strong>
+                </div>
+              </div>
             ) : (
-              <p className="stu-rec-hint">No finance data.</p>
+              <p className="stu-rec-empty">No finance data yet.</p>
             )}
-            <Link href="/admin/finance" className="plat-btn plat-btn--ghost plat-btn--xs">
-              Open finance module
-            </Link>
-          </div>
+          </section>
         ) : null}
 
         {tab === "documents" ? (
-          <div>
-            <form className="stu-rec-form" onSubmit={(e) => void onUploadDoc(e)}>
+          <section className="stu-rec-section">
+            <header className="stu-rec-section__head">
+              <div>
+                <h2 className="stu-rec-section__title">Documents</h2>
+                <p className="stu-rec-section__lead">
+                  Upload and open permanent student files.
+                </p>
+              </div>
+            </header>
+            <form className="stu-rec-form stu-rec-form--modern" onSubmit={(e) => void onUploadDoc(e)}>
               <select value={docType} onChange={(e) => setDocType(e.target.value)}>
                 {DOC_TYPES.map((t) => (
                   <option key={t} value={t}>
@@ -343,65 +575,94 @@ export function StudentAcademicRecord({ profileId }: { profileId: string }) {
                 Upload
               </button>
             </form>
-            <ul className="stu-rec-list">
-              {documents.map((d) => (
-                <li key={d.id}>
-                  {d.title ?? d.type} —{" "}
-                  <button
-                    type="button"
-                    className="dash-copy-btn"
-                    onClick={() => void openStudentDocument(d.fileUrl)}
-                  >
-                    Open
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
+            {documents.length === 0 ? (
+              <p className="stu-rec-empty">No documents uploaded yet.</p>
+            ) : (
+              <ul className="stu-rec-rows">
+                {documents.map((d) => (
+                  <li key={d.id} className="stu-rec-row">
+                    <div>
+                      <strong>{d.title ?? d.type.replace(/_/g, " ")}</strong>
+                      <span className="stu-rec-row__meta">{d.type.replace(/_/g, " ")}</span>
+                    </div>
+                    <button
+                      type="button"
+                      className="plat-btn plat-btn--ghost plat-btn--xs"
+                      onClick={() => void openStudentDocument(d.fileUrl)}
+                    >
+                      Open
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
         ) : null}
 
         {tab === "transcript" && transcript ? (
-          <div className="stu-rec-transcript">
-            <p>
-              Overall average: <strong>{transcript.overallAverage ?? "—"}%</strong> · GPA:{" "}
-              <strong>{transcript.overallGpa ?? "—"}</strong>
-            </p>
-            {transcript.years.map((y) => (
-              <section key={y.academicYear} className="stu-rec-year">
-                <h3>
-                  {y.academicYear} — {y.grade}
-                  {y.yearAverage != null ? ` (${y.yearAverage}%)` : ""}
-                </h3>
-                {y.terms.map((t) => (
-                  <div key={t.termId}>
-                    <h4>{t.termName}</h4>
-                    <table className="stu-rec-table">
-                      <thead>
-                        <tr>
-                          <th>Subject</th>
-                          <th>Avg</th>
-                          <th>Grade</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {t.subjects.map((s) => (
-                          <tr key={s.subject}>
-                            <td>{s.subject}</td>
-                            <td>{s.average}%</td>
-                            <td>{s.letter}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+          <section className="stu-rec-section">
+            <header className="stu-rec-section__head">
+              <div>
+                <h2 className="stu-rec-section__title">Transcript</h2>
+                <p className="stu-rec-section__lead">Cumulative academic performance.</p>
+              </div>
+              <div className="stu-rec-transcript-score">
+                <span>
+                  Avg <strong>{transcript.overallAverage ?? "—"}%</strong>
+                </span>
+                <span>
+                  GPA <strong>{transcript.overallGpa ?? "—"}</strong>
+                </span>
+              </div>
+            </header>
+            {transcript.years.length === 0 ? (
+              <p className="stu-rec-empty">No transcript years yet.</p>
+            ) : (
+              <div className="stu-rec-transcript">
+                {transcript.years.map((y) => (
+                  <section key={y.academicYear} className="stu-rec-year">
+                    <h3>
+                      {y.academicYear} — {y.grade}
+                      {y.yearAverage != null ? ` (${y.yearAverage}%)` : ""}
+                    </h3>
+                    {y.terms.map((t) => (
+                      <div key={t.termId} className="stu-rec-term">
+                        <h4>{t.termName}</h4>
+                        <table className="stu-rec-table">
+                          <thead>
+                            <tr>
+                              <th>Subject</th>
+                              <th>Avg</th>
+                              <th>Grade</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {t.subjects.map((s) => (
+                              <tr key={s.subject}>
+                                <td>{s.subject}</td>
+                                <td>{s.average}%</td>
+                                <td>{s.letter}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ))}
+                  </section>
                 ))}
-              </section>
-            ))}
-          </div>
+              </div>
+            )}
+          </section>
         ) : null}
 
         {tab === "certificates" ? (
-          <div>
+          <section className="stu-rec-section">
+            <header className="stu-rec-section__head">
+              <div>
+                <h2 className="stu-rec-section__title">Certificates</h2>
+                <p className="stu-rec-section__lead">Issue and print official certificates.</p>
+              </div>
+            </header>
             <div className="stu-rec-cert-actions">
               {CERT_TYPES.map((c) => (
                 <button
@@ -414,64 +675,135 @@ export function StudentAcademicRecord({ profileId }: { profileId: string }) {
                 </button>
               ))}
             </div>
-            <ul className="stu-rec-list">
-              {certificates.map((c) => (
-                <li key={c.id}>
-                  {c.type} — {c.certificateNumber}
-                  <button
-                    type="button"
-                    className="dash-copy-btn"
-                    onClick={() => openCertificatePrint(profileId, c.id)}
-                  >
-                    Print
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
+            {certificates.length === 0 ? (
+              <p className="stu-rec-empty">No certificates issued yet.</p>
+            ) : (
+              <ul className="stu-rec-rows">
+                {certificates.map((c) => (
+                  <li key={c.id} className="stu-rec-row">
+                    <div>
+                      <strong>{c.type}</strong>
+                      <span className="stu-rec-row__meta">{c.certificateNumber}</span>
+                    </div>
+                    <button
+                      type="button"
+                      className="plat-btn plat-btn--ghost plat-btn--xs"
+                      onClick={() => openCertificatePrint(profileId, c.id)}
+                    >
+                      Print
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
         ) : null}
 
         {tab === "health" ? (
-          <form className="stu-rec-health" onSubmit={(e) => void onSaveHealth(e)}>
-            <label>
-              Blood type
-              <input value={health.bloodType ?? ""} onChange={(e) => setHealth({ ...health, bloodType: e.target.value })} />
-            </label>
-            <label>
-              Emergency contact
-              <input
-                value={health.emergencyContactName ?? ""}
-                onChange={(e) => setHealth({ ...health, emergencyContactName: e.target.value })}
-              />
-            </label>
-            <label>
-              Emergency phone
-              <input
-                value={health.emergencyContactPhone ?? ""}
-                onChange={(e) => setHealth({ ...health, emergencyContactPhone: e.target.value })}
-              />
-            </label>
-            <label>
-              Allergies
-              <textarea value={health.allergies ?? ""} onChange={(e) => setHealth({ ...health, allergies: e.target.value })} />
-            </label>
-            <label>
-              Medical conditions
-              <textarea
-                value={health.medicalConditions ?? ""}
-                onChange={(e) => setHealth({ ...health, medicalConditions: e.target.value })}
-              />
-            </label>
-            <label>
-              Medication notes
-              <textarea
-                value={health.medicationNotes ?? ""}
-                onChange={(e) => setHealth({ ...health, medicationNotes: e.target.value })}
-              />
-            </label>
-            <button type="submit" className="plat-btn plat-btn--primary">
-              Save health record
-            </button>
+          <form className="stu-rec-health stu-rec-section" onSubmit={(e) => void onSaveHealth(e)}>
+            <header className="stu-rec-section__head">
+              <div>
+                <h2 className="stu-rec-section__title">Health record</h2>
+                <p className="stu-rec-section__lead">
+                  Blood group and medical notes for ID cards and emergencies.
+                </p>
+              </div>
+              <div className="stu-rec-health-actions">
+                {healthSaved ? (
+                  <span className="stu-rec-health-saved" role="status">
+                    Saved
+                  </span>
+                ) : null}
+                <button
+                  type="submit"
+                  className="stu-rec-btn stu-rec-btn--primary"
+                  disabled={healthSaving}
+                >
+                  {healthSaving ? "Saving…" : "Save health record"}
+                </button>
+              </div>
+            </header>
+            <div className="stu-rec-health__grid">
+              <label>
+                Blood type
+                <select
+                  value={health.bloodType ?? ""}
+                  onChange={(e) => {
+                    setHealthSaved(false);
+                    setHealth({ ...health, bloodType: e.target.value });
+                  }}
+                >
+                  <option value="">Select blood group</option>
+                  {["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"].map((bg) => (
+                    <option key={bg} value={bg}>
+                      {bg}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Emergency contact
+                <input
+                  value={health.emergencyContactName ?? ""}
+                  onChange={(e) => {
+                    setHealthSaved(false);
+                    setHealth({ ...health, emergencyContactName: e.target.value });
+                  }}
+                />
+              </label>
+              <label>
+                Emergency phone
+                <input
+                  value={health.emergencyContactPhone ?? ""}
+                  onChange={(e) => {
+                    setHealthSaved(false);
+                    setHealth({ ...health, emergencyContactPhone: e.target.value });
+                  }}
+                />
+              </label>
+              <label>
+                Allergies
+                <textarea
+                  value={health.allergies ?? ""}
+                  onChange={(e) => {
+                    setHealthSaved(false);
+                    setHealth({ ...health, allergies: e.target.value });
+                  }}
+                />
+              </label>
+              <label>
+                Medical conditions
+                <textarea
+                  value={health.medicalConditions ?? ""}
+                  onChange={(e) => {
+                    setHealthSaved(false);
+                    setHealth({ ...health, medicalConditions: e.target.value });
+                  }}
+                />
+              </label>
+              <label>
+                Medication notes
+                <textarea
+                  value={health.medicationNotes ?? ""}
+                  onChange={(e) => {
+                    setHealthSaved(false);
+                    setHealth({ ...health, medicationNotes: e.target.value });
+                  }}
+                />
+              </label>
+            </div>
+            <div className="stu-rec-health-footer">
+              <button
+                type="submit"
+                className="stu-rec-btn stu-rec-btn--primary"
+                disabled={healthSaving}
+              >
+                {healthSaving ? "Saving…" : "Save health record"}
+              </button>
+              <p className="stu-rec-section__lead">
+                Choose blood type, then click Save. It appears on the ID card after saving.
+              </p>
+            </div>
           </form>
         ) : null}
       </div>

@@ -3106,6 +3106,8 @@
 .dash-shell--pro {
   background: #f0f4f4;
   min-height: 100dvh;
+  max-width: 100vw;
+  overflow-x: clip;
 }
 
 @media (min-width: 1024px) {
@@ -4634,25 +4636,29 @@
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
-/* Mobile dashboard: no horizontal crop */
+/* Mobile dashboard: readable type, stack cards, no horizontal crop */
 @media (max-width: 767px) {
-  .dash-admin {
-    gap: 1rem;
+  .dash-admin,
+  .dash-admin--modern {
+    gap: 1.1rem;
+    max-width: 100%;
+    min-width: 0;
   }
 
   .dash-admin-hero,
   .dash-admin-hero--modern {
-    padding: 1.1rem 1rem;
+    padding: 1.15rem 1rem;
     border-radius: 1rem;
     gap: 0.75rem;
   }
 
   .dash-admin-hero__title {
-    font-size: 1.2rem;
+    font-size: 1.35rem;
+    line-height: 1.2;
   }
 
   .dash-admin-hero__sub {
-    font-size: 0.82rem;
+    font-size: 0.9rem;
     margin-top: 0.35rem;
   }
 
@@ -4665,22 +4671,23 @@
 
   .dash-admin-hero__chip {
     max-width: 100%;
-    font-size: 0.72rem;
-    padding: 0.4rem 0.7rem;
+    font-size: 0.78rem;
+    padding: 0.45rem 0.75rem;
   }
 
   .dash-admin-kpis,
   .dash-admin-kpis--modern {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.55rem;
+    gap: 0.65rem;
   }
 
   .dash-admin-kpi,
   .dash-admin-kpi--modern {
     flex-direction: column;
-    gap: 0.45rem;
-    padding: 0.85rem 0.8rem;
-    border-radius: 0.85rem;
+    gap: 0.5rem;
+    padding: 0.95rem 0.9rem;
+    border-radius: 0.9rem;
+    min-width: 0;
   }
 
   .dash-admin-kpi--modern:hover {
@@ -4688,26 +4695,26 @@
   }
 
   .dash-admin-kpi__icon {
-    width: 2.1rem;
-    height: 2.1rem;
-    border-radius: 0.55rem;
+    width: 2.35rem;
+    height: 2.35rem;
+    border-radius: 0.65rem;
   }
 
   .dash-admin-kpi__icon .dash-icon {
-    width: 1.1rem;
-    height: 1.1rem;
+    width: 1.2rem;
+    height: 1.2rem;
   }
 
   .dash-admin-kpi__label {
-    font-size: 0.62rem;
+    font-size: 0.72rem;
   }
 
   .dash-admin-kpi__value {
-    font-size: 1.15rem;
+    font-size: 1.3rem;
   }
 
   .dash-admin-kpi__hint {
-    font-size: 0.68rem;
+    font-size: 0.75rem;
   }
 
   .dash-admin-quick {
@@ -4724,6 +4731,68 @@
   .dash-admin-panel {
     padding: 1rem;
     min-width: 0;
+  }
+
+  .da-analytics__grid {
+    gap: 0.9rem;
+  }
+
+  .da-card {
+    padding: 1.05rem 1rem;
+    border-radius: 1rem;
+    min-width: 0;
+  }
+
+  .da-card__head {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.65rem;
+    margin-bottom: 0.95rem;
+  }
+
+  .da-card__title {
+    font-size: 1.05rem;
+  }
+
+  .da-card__sub {
+    font-size: 0.85rem;
+  }
+
+  .da-card__link {
+    align-self: flex-start;
+    min-height: 2.25rem;
+    padding: 0.45rem 0.85rem;
+    font-size: 0.82rem;
+  }
+
+  .da-today,
+  .da-finance {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 1rem;
+  }
+
+  .da-today__stats,
+  .da-finance__legend {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .da-finance__legend {
+    text-align: left;
+  }
+
+  .da-finance__legend li {
+    justify-content: flex-start;
+  }
+
+  .da-enroll__head {
+    font-size: 0.9rem;
+  }
+
+  .dash-tabbar__label {
+    font-size: 0.68rem;
   }
 }
 
@@ -5053,8 +5122,8 @@
   list-style: none;
   margin: 0;
   padding: 0;
-  flex: 1;
-  min-width: 160px;
+  flex: 1 1 10rem;
+  min-width: 0;
   font-size: 0.85rem;
   color: var(--brand-muted);
 }

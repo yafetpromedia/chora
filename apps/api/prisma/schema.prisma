@@ -219,6 +219,8 @@ model School {
   accentDeep    String?
   schoolType    SchoolType?
   address       String?
+  /// School P.O. Box (shown on ID cards and stationery)
+  postalBox     String?
   email         String?
   country       String?
   phone         String?
@@ -230,6 +232,8 @@ model School {
   nameAm            String?
   /// Official school stamp image (URL or data URL) for yearly report cards
   stampUrl          String?
+  /// When true, school stamp is also printed on student ID card backs
+  idCardShowStamp   Boolean        @default(false)
   /// Campus / cover photograph for the yearly report front-right column
   reportCoverImageUrl String?
   /// When false, class rank is omitted from yearly report cards
@@ -1951,6 +1955,8 @@ model PlatformSettings {
   demoVideoThumbnailUrl String?          @db.Text
   /// Public product documentation PDF (uploaded file URL).
   productDocsUrl        String?          @db.Text
+  /// Optional cover / thumbnail for the Explore docs card (URL or data URL).
+  productDocsThumbnailUrl String?        @db.Text
   /// Where schools send SaaS subscription payments (Telebirr / CBE).
   bankName              String?
   bankAccountHolder     String?

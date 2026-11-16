@@ -20,8 +20,12 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: turbopackRoot,
   },
-  // Required in Next 16 when opening dev from http://192.168.x.x:3000 (phone / other PC)
+  // Required in Next 16 when opening from http://192.168.x.x:3000 (phone / other PC)
   allowedDevOrigins: LAN_DEV_ORIGINS.flatMap(lanOriginVariants),
+  // Dev rewrite proxy otherwise truncates multipart bodies at 10MB (product docs / demo video).
+  experimental: {
+    proxyClientMaxBodySize: "260mb",
+  },
   async rewrites() {
     if (process.env.NODE_ENV !== "development") return [];
     const apiPort = process.env.API_PORT?.trim() || "3001";

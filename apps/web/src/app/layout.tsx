@@ -1,5 +1,5 @@
-import type { Metadata } from "next";
-import { Figtree } from "next/font/google";
+import type { Metadata, Viewport } from "next";
+import { Figtree, Noto_Sans_Ethiopic } from "next/font/google";
 import { PlatformAdminShortcut } from "@/components/platform-admin-shortcut";
 import "./globals.css";
 import "../styles/landing.css";
@@ -48,18 +48,31 @@ const figtree = Figtree({
   display: "swap",
 });
 
+const notoEthiopic = Noto_Sans_Ethiopic({
+  subsets: ["ethiopic"],
+  variable: "--font-noto-ethiopic",
+  weight: ["500", "600", "700"],
+  display: "swap",
+});
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+};
+
 export const metadata: Metadata = {
   title: "Chora (ጮራ) — School management for admins, teachers & parents",
   description:
     "Run attendance, results, fees, and family communication on one platform. 14-day free trial. Plans in USD and ETB for Ethiopian and international schools.",
   icons: {
     icon: [
-      { url: "/brand/chora-favicon.png?v=20260904", type: "image/png", sizes: "64x64" },
-      { url: "/brand/favicon.png?v=20260904", type: "image/png", sizes: "512x512" },
-      { url: "/favicon.ico?v=20260904", sizes: "any" },
+      { url: "/brand/chora-favicon.png?v=20261116", type: "image/png", sizes: "64x64" },
+      { url: "/brand/favicon.png?v=20261116", type: "image/png", sizes: "512x512" },
+      { url: "/favicon.ico?v=20261116", sizes: "any" },
     ],
-    apple: [{ url: "/brand/favicon.png?v=20260904", type: "image/png", sizes: "180x180" }],
-    shortcut: "/favicon.ico?v=20260904",
+    apple: [{ url: "/brand/favicon.png?v=20261116", type: "image/png", sizes: "180x180" }],
+    shortcut: "/favicon.ico?v=20261116",
   },
 };
 
@@ -69,7 +82,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={figtree.variable}>
+    <html lang="en" className={`${figtree.variable} ${notoEthiopic.variable}`}>
       <body className={`${figtree.className} antialiased`}>
         <PlatformAdminShortcut />
         {children}

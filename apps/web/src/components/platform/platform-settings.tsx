@@ -145,6 +145,7 @@ function applySettings(s: SettingsRow) {
     demoVideoUrl: s.demoVideoUrl ?? "",
     demoVideoThumbnailUrl: s.demoVideoThumbnailUrl ?? "",
     productDocsUrl: s.productDocsUrl ?? "",
+    productDocsThumbnailUrl: s.productDocsThumbnailUrl ?? "",
     bankName: s.bankName ?? "",
     bankAccountHolder: s.bankAccountHolder ?? "",
     bankAccountNumber: s.bankAccountNumber ?? "",
@@ -247,6 +248,7 @@ export function PlatformSettings({ user, onOpenProfile, onNavigate }: Props) {
         demoVideoUrl: draft.demoVideoUrl.trim(),
         demoVideoThumbnailUrl: draft.demoVideoThumbnailUrl.trim(),
         productDocsUrl: draft.productDocsUrl.trim(),
+        productDocsThumbnailUrl: draft.productDocsThumbnailUrl.trim(),
         bankName: draft.bankName.trim(),
         bankAccountHolder: draft.bankAccountHolder.trim(),
         bankAccountNumber: draft.bankAccountNumber.trim(),
@@ -494,7 +496,11 @@ export function PlatformSettings({ user, onOpenProfile, onNavigate }: Props) {
               />
               <ProductDocsSettings
                 docsUrl={draft.productDocsUrl}
+                thumbnailUrl={draft.productDocsThumbnailUrl}
                 onDocsUrlChange={(url) => patch("productDocsUrl", url)}
+                onThumbnailUrlChange={(url) =>
+                  patch("productDocsThumbnailUrl", url)
+                }
                 onUploaded={(updated) => {
                   setSettings(updated);
                   setDraft(applySettings(updated));
