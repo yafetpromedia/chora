@@ -1,8 +1,4 @@
--- AlterTable
-ALTER TABLE "Announcement" ADD COLUMN "recipientUserId" TEXT;
-
--- CreateIndex
-CREATE INDEX "Announcement_recipientUserId_createdAt_idx" ON "Announcement"("recipientUserId", "createdAt");
-
--- AddForeignKey
-ALTER TABLE "Announcement" ADD CONSTRAINT "Announcement_recipientUserId_fkey" FOREIGN KEY ("recipientUserId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+-- Intentionally empty.
+-- This migration is superseded by 20260530170000_schema_catchup, which already
+-- creates the full remaining schema to match prisma/schema.prisma.
+-- Kept as a no-op so existing migration folder names remain stable.

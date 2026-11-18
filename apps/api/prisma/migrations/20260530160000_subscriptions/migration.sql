@@ -22,16 +22,3 @@ CREATE INDEX "Subscription_plan_isActive_idx" ON "Subscription"("plan", "isActiv
 
 -- AddForeignKey
 ALTER TABLE "Subscription" ADD CONSTRAINT "Subscription_schoolId_fkey" FOREIGN KEY ("schoolId") REFERENCES "School"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- Trial for existing demo school
-INSERT INTO "Subscription" ("id", "schoolId", "plan", "trialEndsAt", "isActive", "createdAt", "updatedAt")
-VALUES (
-  'sub_demo_addis',
-  'school-addis',
-  'STARTER',
-  NULL,
-  true,
-  CURRENT_TIMESTAMP,
-  CURRENT_TIMESTAMP
-)
-ON CONFLICT ("schoolId") DO NOTHING;

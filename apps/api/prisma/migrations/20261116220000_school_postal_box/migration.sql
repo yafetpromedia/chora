@@ -1,2 +1,4 @@
--- AlterTable
-ALTER TABLE "School" ADD COLUMN "postalBox" TEXT;
+-- Intentionally empty.
+-- This migration is superseded by 20260530170000_schema_catchup, which already
+-- creates the full remaining schema to match prisma/schema.prisma.
+-- Kept as a no-op so existing migration folder names remain stable.

@@ -1,6 +1,4 @@
--- AlterTable
-ALTER TABLE "School" ADD COLUMN IF NOT EXISTS "nameAm" TEXT;
-ALTER TABLE "School" ADD COLUMN IF NOT EXISTS "stampUrl" TEXT;
-ALTER TABLE "School" ADD COLUMN IF NOT EXISTS "reportCoverImageUrl" TEXT;
-ALTER TABLE "School" ADD COLUMN IF NOT EXISTS "reportShowRank" BOOLEAN NOT NULL DEFAULT true;
-ALTER TABLE "School" ADD COLUMN IF NOT EXISTS "reportShowAttendance" BOOLEAN NOT NULL DEFAULT true;
+-- Intentionally empty.
+-- This migration is superseded by 20260530170000_schema_catchup, which already
+-- creates the full remaining schema to match prisma/schema.prisma.
+-- Kept as a no-op so existing migration folder names remain stable.
