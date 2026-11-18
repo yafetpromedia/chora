@@ -37,11 +37,8 @@ export class PermissionsService implements OnModuleInit {
           category: meta.category,
           description: meta.description,
         },
-        update: {
-          label: meta.label,
-          category: meta.category,
-          description: meta.description,
-        },
+        // Preserve operator-customized metadata on existing rows.
+        update: {},
       });
     }
   }
@@ -78,17 +75,17 @@ export class PermissionsService implements OnModuleInit {
           },
         }));
 
-      await this.prisma.roleTemplatePermission.deleteMany({
-        where: { roleTemplateId: template.id },
-      });
-
-      await this.prisma.roleTemplatePermission.createMany({
-        data: patterns.map((permissionKey) => ({
-          roleTemplateId: template.id,
-          permissionKey,
-        })),
-        skipDuplicates: true,
-      });
+      // Only seed permissions for newly created system templates.
+      // Do not wipe customized role-template permission sets on every boot.
+      if (!existing) {
+        await this.prisma.roleTemplatePermission.createMany({
+          data: patterns.map((permissionKey) => ({
+            roleTemplateId: template.id,
+            permissionKey,
+          })),
+          skipDuplicates: true,
+        });
+      }
     }
   }
 

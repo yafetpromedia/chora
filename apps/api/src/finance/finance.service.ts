@@ -44,7 +44,7 @@ export class FinanceService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    await this.seedDemoFinance('school-addis');
+    // Do not auto-seed demo finance records for a hardcoded school.
   }
 
   async seedDemoFinance(schoolId: string) {

@@ -21,22 +21,30 @@ export class PlatformAuthService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    const email = 'platform@campusone.local';
+    // Optional bootstrap only when explicitly configured — never hardcode credentials.
+    const email = this.configService.get<string>('PLATFORM_OWNER_EMAIL')?.trim().toLowerCase();
+    const password = this.configService.get<string>('PLATFORM_OWNER_PASSWORD');
+    if (!email || !password) {
+      return;
+    }
+
     const existing = await this.prisma.platformUser.findUnique({
       where: { email },
     });
-    if (!existing) {
-      await this.prisma.platformUser.create({
-        data: {
-          email,
-          passwordHash: hashSync('Passw0rd!', 10),
-          firstName: 'Chora',
-          lastName: 'Platform',
-          role: 'OWNER',
-          isActive: true,
-        },
-      });
+    if (existing) {
+      return;
     }
+
+    await this.prisma.platformUser.create({
+      data: {
+        email,
+        passwordHash: hashSync(password, 10),
+        firstName: this.configService.get<string>('PLATFORM_OWNER_FIRST_NAME')?.trim() || 'Platform',
+        lastName: this.configService.get<string>('PLATFORM_OWNER_LAST_NAME')?.trim() || 'Owner',
+        role: 'OWNER',
+        isActive: true,
+      },
+    });
   }
 
   async login(email: string, password: string) {

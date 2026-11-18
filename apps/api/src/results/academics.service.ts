@@ -72,7 +72,7 @@ export class AcademicsService implements OnModuleInit {
   }
 
   async onModuleInit() {
-    await this.seedDemoAcademics('school-addis');
+    // Do not auto-seed demo academics for a hardcoded school.
   }
 
   async seedDemoAcademics(schoolId: string) {

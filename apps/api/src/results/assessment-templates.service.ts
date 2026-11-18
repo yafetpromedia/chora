@@ -36,12 +36,8 @@ export class AssessmentTemplatesService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    const schools = await this.prisma.school.findMany({
-      select: { id: true },
-    });
-    for (const school of schools) {
-      await this.seedDemoTemplates(school.id);
-    }
+    // Do not auto-create assessment templates for every school on boot.
+    // Templates are created during school provisioning or by admins.
   }
 
   async seedDemoTemplates(schoolId: string) {

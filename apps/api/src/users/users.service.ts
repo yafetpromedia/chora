@@ -43,85 +43,8 @@ export class UsersService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    // SchoolsModule may init after UsersModule — ensure the demo school exists
-    // before role templates / users so FK constraints succeed.
-    await this.prisma.school.upsert({
-      where: { id: 'school-addis' },
-      create: {
-        id: 'school-addis',
-        name: 'Bright Side International School',
-        slug: 'bright-side',
-        joinCode: 'BRIGHT1',
-        country: 'Ethiopia',
-      },
-      update: {},
-    });
-
-    const passwordHash = hashSync('Passw0rd!', 10);
-    const users = [
-      this.makeUserSeed(
-        '1',
-        'school-addis',
-        'admin',
-        'admin',
-        'admin@eduos.local',
-        passwordHash,
-      ),
-      this.makeUserSeed(
-        '2',
-        'school-addis',
-        'teacher',
-        'teacher',
-        'teacher@eduos.local',
-        passwordHash,
-      ),
-      this.makeUserSeed(
-        '3',
-        'school-addis',
-        'student',
-        'student',
-        'student@eduos.local',
-        passwordHash,
-      ),
-      this.makeUserSeed(
-        '4',
-        'school-addis',
-        'parent',
-        'parent',
-        'parent@eduos.local',
-        passwordHash,
-      ),
-    ];
-
-    for (const user of users) {
-      await this.permissionsService.ensureSchoolRoleTemplates(user.schoolId);
-      const templateSlug =
-        user.role === 'teacher' ? 'homeroom_teacher' : DEFAULT_TEMPLATE_BY_ROLE[user.role];
-      const template = templateSlug
-        ? await this.prisma.roleTemplate.findFirst({
-            where: { schoolId: user.schoolId, slug: templateSlug },
-          })
-        : null;
-
-      await this.prisma.user.upsert({
-        where: { email: user.email },
-        create: {
-          ...user,
-          roleTemplateId: template?.id ?? null,
-        },
-        update: {
-          schoolId: user.schoolId,
-          role: user.role,
-          username: user.username,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          roleTemplateId: template?.id ?? undefined,
-        },
-      });
-      if (user.role === 'teacher') {
-        await this.ensureTeacherProfile(user.id, user.schoolId);
-      }
-    }
+    // Intentionally empty: do not auto-create demo school users or passwords.
+    // Users are created through invites, admin provisioning, and auth flows.
   }
 
   private async ensureTeacherProfile(userId: string, schoolId: string) {
