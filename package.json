@@ -15,6 +15,8 @@
     "test": "npm run test --workspace apps/api",
     "test:e2e": "npm run test:e2e --workspace apps/api",
     "db:sync": "npm run db:sync --workspace apps/api",
+    "prisma:generate": "npm run prisma:generate --workspace apps/api",
+    "prisma:validate": "npm exec --workspace apps/api -- prisma validate",
     "health": "powershell -NoProfile -Command \"try { (Invoke-WebRequest -UseBasicParsing http://localhost:3001/health).Content } catch { Write-Error 'API not running on :3001' }\""
   },
   "keywords": [],
