@@ -5,7 +5,7 @@
  * unless an operator has reviewed docs/PRODUCTION_STARTUP_SAFETY.md and
  * intentionally set the allow flag for a disposable or approved target.
  *
- * Usage:
+ * Usage (from apps/api or repo root via npm workspace):
  *   CHORA_ALLOW_RUNTIME_BOOTSTRAP=1 DATABASE_URL=postgresql://… \
  *     node ./scripts/runtime-bootstrap.mjs
  *
@@ -13,10 +13,19 @@
  *   PLATFORM_OWNER_EMAIL / PLATFORM_OWNER_PASSWORD
  */
 import { spawnSync } from 'node:child_process';
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const apiRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+const distRoot = path.join(apiRoot, 'dist');
+
+const modulePaths = {
+  appModule: path.join(distRoot, 'app.module.js'),
+  permissions: path.join(distRoot, 'permissions', 'permissions.service.js'),
+  planCatalog: path.join(distRoot, 'subscriptions', 'plan-catalog.service.js'),
+  platformAuth: path.join(distRoot, 'platform', 'platform-auth.service.js'),
+};
 
 if (process.env.CHORA_ALLOW_RUNTIME_BOOTSTRAP !== '1') {
   console.error(
@@ -30,28 +39,52 @@ if (!process.env.DATABASE_URL?.trim()) {
   process.exit(1);
 }
 
+for (const [label, filePath] of Object.entries(modulePaths)) {
+  if (!fs.existsSync(filePath)) {
+    console.error(
+      `Refusing to run: missing built module (${label}) at ${filePath}. Run API build first.`,
+    );
+    process.exit(1);
+  }
+}
+
 const dbName = (() => {
   try {
-    return new URL(process.env.DATABASE_URL).pathname.replace(/^\//, '').split('?')[0];
+    return new URL(process.env.DATABASE_URL)
+      .pathname.replace(/^\//, '')
+      .split('?')[0];
   } catch {
     return '(unparseable)';
   }
 })();
 
 console.log(`Runtime bootstrap target database name: ${dbName}`);
-console.log('This will upsert permission catalog rows, ensure school role templates,');
-console.log('migrate legacy staff roles, seed PlanCatalog if empty, and optionally');
+console.log(
+  'This will upsert permission catalog rows, ensure school role templates,',
+);
+console.log(
+  'migrate legacy staff roles, seed PlanCatalog if empty, and optionally',
+);
 console.log('create a platform owner from PLATFORM_OWNER_* env vars.');
 
+// Embed absolute paths so nested requires never depend on cwd-relative ../dist.
+const abs = Object.fromEntries(
+  Object.entries(modulePaths).map(([k, v]) => [k, path.resolve(v)]),
+);
+
 const runner = `
-const { NestFactory } = require('@nestjs/core');
-const { AppModule } = require('../dist/app.module');
-const { PermissionsService } = require('../dist/permissions/permissions.service');
-const { PlanCatalogService } = require('../dist/subscriptions/plan-catalog.service');
-const { PlatformAuthService } = require('../dist/platform/platform-auth.service');
+const { createRequire } = require('module');
+const requireFromApi = createRequire(${JSON.stringify(path.join(apiRoot, 'package.json'))});
+const { NestFactory } = requireFromApi('@nestjs/core');
+const { AppModule } = require(${JSON.stringify(abs.appModule)});
+const { PermissionsService } = require(${JSON.stringify(abs.permissions)});
+const { PlanCatalogService } = require(${JSON.stringify(abs.planCatalog)});
+const { PlatformAuthService } = require(${JSON.stringify(abs.platformAuth)});
 
 (async () => {
-  const app = await NestFactory.createApplicationContext(AppModule, { logger: ['error', 'warn', 'log'] });
+  const app = await NestFactory.createApplicationContext(AppModule, {
+    logger: ['error', 'warn', 'log'],
+  });
   try {
     const permissions = app.get(PermissionsService);
     const plans = app.get(PlanCatalogService);
