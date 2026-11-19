@@ -3,7 +3,10 @@
 import { childClassLabel, type ParentChildOption } from "@/lib/parent-child";
 
 type Props = {
-  children: ParentChildOption[];
+  /** Preferred: list of linked children. */
+  options?: ParentChildOption[];
+  /** @deprecated Use `options` (passing children as a prop trips react/no-children-prop). */
+  children?: ParentChildOption[];
   selectedId: string;
   onChange: (profileId: string) => void;
   label?: string;
@@ -12,13 +15,15 @@ type Props = {
 };
 
 export function ParentChildBar({
-  children: kids,
+  options,
+  children,
   selectedId,
   onChange,
   label = "Viewing",
   loading = false,
   className = "",
 }: Props) {
+  const kids = options ?? children ?? [];
   if (loading) {
     return (
       <div className={`par-child-bar par-child-bar--loading ${className}`.trim()}>

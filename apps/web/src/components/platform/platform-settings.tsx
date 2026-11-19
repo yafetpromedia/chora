@@ -199,9 +199,11 @@ export function PlatformSettings({ user, onOpenProfile, onNavigate }: Props) {
   }, []);
 
   useEffect(() => {
-    void load()
-      .catch((err) => fail(err, "Failed to load settings"))
-      .finally(() => setLoading(false));
+    queueMicrotask(() => {
+      void load()
+        .catch((err) => fail(err, "Failed to load settings"))
+        .finally(() => setLoading(false));
+    });
   }, [load, router]);
 
   const heroStats = useMemo(() => {

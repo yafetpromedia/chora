@@ -33,19 +33,29 @@ export function StudentIdCardPrintDialog({
   const [duplex, setDuplex] = useState(true);
   const [perPage, setPerPage] = useState<BulkPrintLayout>("6");
   const [count, setCount] = useState<number | null>(null);
-  const [countLoading, setCountLoading] = useState(false);
+  const [countLoading, setCountLoading] = useState(open);
 
   const selectedGrade = grades.find((g) => g.id === gradeId);
 
-  useEffect(() => {
-    if (!open) return;
-    setGradeId(initialGradeId);
-    setSectionId(initialSectionId);
-  }, [open, initialGradeId, initialSectionId]);
+  const initialKey = open ? `${initialGradeId}|${initialSectionId}` : "";
+  const [prevInitialKey, setPrevInitialKey] = useState(initialKey);
+  if (initialKey !== prevInitialKey) {
+    setPrevInitialKey(initialKey);
+    if (open) {
+      setGradeId(initialGradeId);
+      setSectionId(initialSectionId);
+    }
+  }
+
+  const countKey = open ? `${gradeId}|${sectionId}` : "";
+  const [prevCountKey, setPrevCountKey] = useState(countKey);
+  if (countKey !== prevCountKey) {
+    setPrevCountKey(countKey);
+    if (open) setCountLoading(true);
+  }
 
   useEffect(() => {
     if (!open) return;
-    setCountLoading(true);
     void countStudentIdCards({
       gradeId: gradeId || undefined,
       sectionId: sectionId || undefined,

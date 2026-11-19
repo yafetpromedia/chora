@@ -50,7 +50,7 @@ export function getUploadApiBaseUrl(): string {
 const NETWORK_RETRIES = 2;
 const NETWORK_RETRY_MS = 700;
 
-function networkErrorMessage(base: string): string {
+function networkErrorMessage(): string {
   return `Could not reach the server. Check that the API is running, then try again.`;
 }
 
@@ -448,7 +448,7 @@ async function authPost<T = LoginResponse>(path: string, body: unknown): Promise
     });
   } catch (err) {
     throw new Error(
-      err instanceof TypeError ? networkErrorMessage(getApiBaseUrl()) : "API is unavailable",
+      err instanceof TypeError ? networkErrorMessage() : "API is unavailable",
     );
   }
 
@@ -484,7 +484,7 @@ export async function validateSchoolCode(
     );
   } catch (err) {
     throw new Error(
-      err instanceof TypeError ? networkErrorMessage(getApiBaseUrl()) : "API is unavailable",
+      err instanceof TypeError ? networkErrorMessage() : "API is unavailable",
     );
   }
   if (!response.ok) {
@@ -714,7 +714,7 @@ async function authedFetch<T>(
   try {
     response = await fetchWithRetry(`${base}${path}`, { ...init, headers });
   } catch (err) {
-    throw new Error(err instanceof TypeError ? networkErrorMessage(base) : "API is unavailable");
+    throw new Error(err instanceof TypeError ? networkErrorMessage() : "API is unavailable");
   }
 
   if (response.status === 401) {
@@ -727,7 +727,7 @@ async function authedFetch<T>(
     try {
       retryResponse = await fetchWithRetry(`${base}${path}`, { ...init, headers });
     } catch (err) {
-      throw new Error(err instanceof TypeError ? networkErrorMessage(base) : "API is unavailable");
+      throw new Error(err instanceof TypeError ? networkErrorMessage() : "API is unavailable");
     }
     if (!retryResponse.ok) {
       throw new Error(`Request failed: ${retryResponse.status}`);
@@ -788,7 +788,7 @@ export async function apiUpload<T>(path: string, file: File): Promise<T> {
     });
   } catch (err) {
     throw new Error(
-      err instanceof TypeError ? networkErrorMessage(base) : "Upload failed — API unavailable",
+      err instanceof TypeError ? networkErrorMessage() : "Upload failed — API unavailable",
     );
   }
 
@@ -806,7 +806,7 @@ export async function apiUpload<T>(path: string, file: File): Promise<T> {
       });
     } catch (err) {
       throw new Error(
-        err instanceof TypeError ? networkErrorMessage(base) : "Upload failed — API unavailable",
+        err instanceof TypeError ? networkErrorMessage() : "Upload failed — API unavailable",
       );
     }
   }

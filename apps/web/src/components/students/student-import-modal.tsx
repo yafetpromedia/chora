@@ -37,17 +37,20 @@ export function StudentImportModal({ open, onClose, onImported }: Props) {
   const [result, setResult] = useState<ImportStudentsResult | null>(null);
   const [dragOver, setDragOver] = useState(false);
 
-  useEffect(() => {
-    if (!open) return;
-    setFile(null);
-    setRowEstimate(null);
-    setPhase("idle");
-    setProgress(0);
-    setStatus("Choose a CSV file to begin.");
-    setError("");
-    setResult(null);
-    setDragOver(false);
-  }, [open]);
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (open !== prevOpen) {
+    setPrevOpen(open);
+    if (open) {
+      setFile(null);
+      setRowEstimate(null);
+      setPhase("idle");
+      setProgress(0);
+      setStatus("Choose a CSV file to begin.");
+      setError("");
+      setResult(null);
+      setDragOver(false);
+    }
+  }
 
   useEffect(() => {
     if (phase !== "uploading") return;

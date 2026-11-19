@@ -71,8 +71,10 @@ export default function RegisterSchoolPage() {
   }, []);
 
   useEffect(() => {
-    const pending = readPendingSchoolWelcome();
-    if (pending) setWelcome(pending);
+    void (async () => {
+      const pending = readPendingSchoolWelcome();
+      if (pending) setWelcome(pending);
+    })();
   }, []);
 
   function validateStep(index: number): string | null {

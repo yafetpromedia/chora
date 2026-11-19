@@ -4,7 +4,6 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { randomBytes } from 'crypto';
-import { UserRole as PrismaUserRole } from '@prisma/client';
 import type { JoinRole } from '../auth/dto/join-school.dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
@@ -60,7 +59,7 @@ export class InvitesService {
       data: {
         schoolId,
         token,
-        role: dto.role as PrismaUserRole,
+        role: dto.role,
         label: dto.label?.trim() || null,
         expiresAt,
         maxUses: dto.maxUses ?? null,
@@ -140,7 +139,9 @@ export class InvitesService {
     });
 
     if (!invite || !this.isInviteValid(invite)) {
-      throw new BadRequestException('This invitation is invalid or has expired');
+      throw new BadRequestException(
+        'This invitation is invalid or has expired',
+      );
     }
 
     if (invite.role === 'admin') {

@@ -1,6 +1,9 @@
 /** Integer-cent money helpers — never use floating point for stored payroll. */
 
-export function percentOfCents(amountCents: number, basisPoints: number): number {
+export function percentOfCents(
+  amountCents: number,
+  basisPoints: number,
+): number {
   // basisPoints: 10000 = 100%
   return Math.round((amountCents * basisPoints) / 10_000);
 }
@@ -19,7 +22,10 @@ export function minutesToHourCents(
   return Math.round((minutes * rate) / 60);
 }
 
-export function dailyFromMonthly(basicCents: number, workingDays: number): number {
+export function dailyFromMonthly(
+  basicCents: number,
+  workingDays: number,
+): number {
   if (workingDays <= 0) return 0;
   return Math.round(basicCents / workingDays);
 }

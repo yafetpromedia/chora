@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import type { GradeWithSections } from "@/lib/api";
 import { getMyTeacherProfile } from "@/lib/teachers";
@@ -102,34 +102,6 @@ function AttendanceMarkPanelInner() {
 
   const selectedGrade = grades.find((g) => g.id === gradeId);
 
-  const loadRoster = useCallback(async () => {
-    if (!gradeId) return;
-    setLoading(true);
-    setError("");
-    setSaved(false);
-    try {
-      const period = sessionType === "daily" ? 0 : periodNumber;
-      const roster = await getAttendanceRoster({
-        gradeId,
-        sectionId: sectionId || undefined,
-        date,
-        periodNumber: period,
-      });
-      setStudents(
-        roster.map((s) => ({
-          ...s,
-          localStatus: s.status ?? "present",
-          localReason: s.reason,
-        })),
-      );
-      setSelected(new Set());
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load class");
-    } finally {
-      setLoading(false);
-    }
-  }, [gradeId, sectionId, date, sessionType, periodNumber]);
-
   useEffect(() => {
     void Promise.all([
       listGradesForAttendance(),
@@ -161,8 +133,42 @@ function AttendanceMarkPanelInner() {
   }, [initialGradeId, initialSectionId]);
 
   useEffect(() => {
-    if (gradeId) void loadRoster();
-  }, [gradeId, sectionId, date, sessionType, periodNumber, loadRoster]);
+    if (!gradeId) return;
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setLoading(true);
+      setError("");
+      setSaved(false);
+    });
+    void (async () => {
+      try {
+        const period = sessionType === "daily" ? 0 : periodNumber;
+        const roster = await getAttendanceRoster({
+          gradeId,
+          sectionId: sectionId || undefined,
+          date,
+          periodNumber: period,
+        });
+        if (cancelled) return;
+        setStudents(
+          roster.map((s) => ({
+            ...s,
+            localStatus: s.status ?? "present",
+            localReason: s.reason,
+          })),
+        );
+        setSelected(new Set());
+      } catch (err) {
+        if (!cancelled) setError(err instanceof Error ? err.message : "Could not load class");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [gradeId, sectionId, date, sessionType, periodNumber]);
 
   const counts = useMemo(() => {
     const c = { present: 0, absent: 0, late: 0, excused: 0 };

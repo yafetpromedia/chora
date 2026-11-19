@@ -113,22 +113,24 @@ export function PlatformPermissions({ user }: Props) {
   }
 
   useEffect(() => {
-    setLoading(true);
-    void getPlatformAccessControl()
-      .then(async (payload) => {
-        applyPayload(payload);
-        if (user?.role === "OWNER") {
-          try {
-            setAudit(await getPlatformAccessAudit(40));
-          } catch {
-            /* ignore */
+    queueMicrotask(() => {
+      setLoading(true);
+      void getPlatformAccessControl()
+        .then(async (payload) => {
+          applyPayload(payload);
+          if (user?.role === "OWNER") {
+            try {
+              setAudit(await getPlatformAccessAudit(40));
+            } catch {
+              /* ignore */
+            }
           }
-        }
-      })
-      .catch((err) =>
-        setError(err instanceof Error ? err.message : "Could not load access control"),
-      )
-      .finally(() => setLoading(false));
+        })
+        .catch((err) =>
+          setError(err instanceof Error ? err.message : "Could not load access control"),
+        )
+        .finally(() => setLoading(false));
+    });
   }, [user?.role]);
 
   const dirty = useMemo(() => {

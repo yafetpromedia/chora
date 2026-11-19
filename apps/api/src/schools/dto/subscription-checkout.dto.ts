@@ -1,11 +1,5 @@
 import { Plan } from '@prisma/client';
-import {
-  IsArray,
-  IsEnum,
-  IsIn,
-  IsOptional,
-  IsString,
-} from 'class-validator';
+import { IsArray, IsEnum, IsIn, IsOptional, IsString } from 'class-validator';
 
 export class SubscriptionCheckoutDto {
   @IsEnum(Plan)

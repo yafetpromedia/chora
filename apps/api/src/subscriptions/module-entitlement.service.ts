@@ -1,5 +1,4 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   allSchoolModules,
@@ -75,17 +74,14 @@ export class ModuleEntitlementService {
       await this.prisma.subscription.update({
         where: { schoolId },
         data: {
-          enabledModules: allSchoolModules() as unknown as Prisma.InputJsonValue,
+          enabledModules: allSchoolModules(),
           billingBundle: 'full',
         },
       });
     }
   }
 
-  normalizeSelection(input: {
-    modules?: string[];
-    bundleId?: string | null;
-  }): {
+  normalizeSelection(input: { modules?: string[]; bundleId?: string | null }): {
     modules: SchoolModuleKey[];
     billingBundle: BillingBundleId | 'base' | null;
   } {

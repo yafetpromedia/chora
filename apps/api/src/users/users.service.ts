@@ -93,7 +93,7 @@ export class UsersService {
         take: 2,
       });
       if (matches.length === 1) {
-        return this.toUserRecord(matches[0]!);
+        return this.toUserRecord(matches[0]);
       }
       if (matches.length > 1) {
         throw new BadRequestException(
@@ -224,8 +224,7 @@ export class UsersService {
     }
 
     const email = (
-      input.email?.trim() ||
-      buildContactEmail(joinCode, username)
+      input.email?.trim() || buildContactEmail(joinCode, username)
     ).toLowerCase();
 
     const existingEmail = await this.findByEmail(email);
@@ -253,7 +252,9 @@ export class UsersService {
     }
 
     const template = roleTemplateId
-      ? await this.prisma.roleTemplate.findUnique({ where: { id: roleTemplateId } })
+      ? await this.prisma.roleTemplate.findUnique({
+          where: { id: roleTemplateId },
+        })
       : null;
 
     const passwordHash = hashSync(
@@ -297,7 +298,7 @@ export class UsersService {
     return {
       id: user.id,
       schoolId: user.schoolId,
-      role: user.role as UserRole,
+      role: user.role,
       roleTemplateId: user.roleTemplateId,
       username: user.username,
       email: user.email,

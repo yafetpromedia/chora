@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useRef, useState, type MouseEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { apiFetch, apiPost, getSchoolSubscription, type Announcement, type SchoolInfo, type SubscriptionStatus } from "@/lib/api";
 import type { AdminDayOverview } from "@/lib/dashboard-day";
 import {
@@ -133,10 +133,11 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
   const [schoolLogoUrl, setSchoolLogoUrl] = useState<string | null>(null);
   const [mobileNav, setMobileNav] = useState(false);
   const [navRole, setNavRole] = useState<UserRole>(role);
-  const [nav, setNav] = useState<NavItem[]>([]);
-  const [enabledModules, setEnabledModules] = useState<string[]>(() =>
+  const [subscription, setSubscription] = useState<SubscriptionStatus | null>(null);
+  const [cachedEnabledModules, setEnabledModules] = useState<string[]>(() =>
     readCachedModules(),
   );
+  const enabledModules = subscription?.enabledModules ?? cachedEnabledModules;
   const [canTakeAttendance, setCanTakeAttendance] = useState(false);
   const [shellReady, setShellReady] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -151,12 +152,17 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
   const [expandedNav, setExpandedNav] = useState<Record<string, boolean>>(() =>
     readExpandedNav(role),
   );
-  const [subscription, setSubscription] = useState<SubscriptionStatus | null>(null);
   const notifyRef = useRef<HTMLDivElement | null>(null);
   const navListRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
-    setDismissedActionTypes(readDismissedActionAlerts());
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) setDismissedActionTypes(readDismissedActionAlerts());
+    });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -174,7 +180,7 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
       return;
     }
     const effectiveRole = stored ?? role;
-    setNavRole(effectiveRole);
+    queueMicrotask(() => setNavRole(effectiveRole));
 
     async function loadNav() {
       // Prefer last-known entitlements while / until subscription is verified.
@@ -200,19 +206,15 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
         }
       }
       setCanTakeAttendance(attendanceOk);
-      setNav(
-        navForRole(effectiveRole, {
-          canTakeAttendance: attendanceOk,
-          enabledModules: modules,
-        }),
-      );
       setShellReady(true);
     }
 
     void loadNav();
     const brand = readSchoolBrand();
-    setSchoolName(brand.name);
-    setSchoolLogoUrl(brand.logoUrl);
+    queueMicrotask(() => {
+      setSchoolName(brand.name);
+      setSchoolLogoUrl(brand.logoUrl);
+    });
     applySchoolTheme(brand);
 
     void apiFetch<{ school: SchoolInfo | null }>("/schools/me")
@@ -247,29 +249,20 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
     }
   }, [role, router]);
 
-  useEffect(() => {
-    if (!shellReady) return;
-    setNav(
-      navForRole(navRole, {
-        canTakeAttendance,
-        enabledModules,
-      }),
-    );
-  }, [shellReady, navRole, canTakeAttendance, enabledModules]);
+  const nav = useMemo<NavItem[]>(
+    () =>
+      shellReady
+        ? navForRole(navRole, {
+            canTakeAttendance,
+            enabledModules,
+          })
+        : [],
+    [shellReady, navRole, canTakeAttendance, enabledModules],
+  );
 
   useEffect(() => {
     if (!subscription?.enabledModules) return;
-    const next = subscription.enabledModules;
-    writeCachedModules(next);
-    setEnabledModules((prev) => {
-      if (
-        prev.length === next.length &&
-        prev.every((m, i) => m === next[i])
-      ) {
-        return prev;
-      }
-      return next;
-    });
+    writeCachedModules(subscription.enabledModules);
   }, [subscription]);
 
   useEffect(() => {
@@ -316,26 +309,28 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
   }, []);
 
   useEffect(() => {
-    setExpandedNav((prev) => {
-      let changed = false;
-      const next = { ...prev };
-      for (const item of nav) {
-        if (!item.children?.length) continue;
-        const groupActive = item.children.some((child) =>
-          isNavChildActive(pathname, child.href),
-        );
-        // Open the active section; close others when you leave (e.g. Results).
-        if (groupActive) {
-          if (!next[item.href]) {
-            next[item.href] = true;
+    queueMicrotask(() => {
+      setExpandedNav((prev) => {
+        let changed = false;
+        const next = { ...prev };
+        for (const item of nav) {
+          if (!item.children?.length) continue;
+          const groupActive = item.children.some((child) =>
+            isNavChildActive(pathname, child.href),
+          );
+          // Open the active section; close others when you leave (e.g. Results).
+          if (groupActive) {
+            if (!next[item.href]) {
+              next[item.href] = true;
+              changed = true;
+            }
+          } else if (next[item.href]) {
+            next[item.href] = false;
             changed = true;
           }
-        } else if (next[item.href]) {
-          next[item.href] = false;
-          changed = true;
         }
-      }
-      return changed ? next : prev;
+        return changed ? next : prev;
+      });
     });
   }, [pathname, nav]);
 

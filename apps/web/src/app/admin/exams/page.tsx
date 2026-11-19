@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { useClientSnapshot } from "@/lib/use-client-snapshot";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { DashboardPage } from "@/components/dashboard/dashboard-page";
@@ -18,7 +19,10 @@ import {
 
 export default function AdminExamSchedulesPage() {
   const router = useRouter();
-  const [canEdit, setCanEdit] = useState(false);
+  const canEdit = useClientSnapshot(
+    () => hasPermission(Permission.TIMETABLE_MANAGE),
+    false,
+  );
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -32,10 +36,6 @@ export default function AdminExamSchedulesPage() {
   const [shiftLabel, setShiftLabel] = useState("");
   const [termId, setTermId] = useState("");
   const [deleteId, setDeleteId] = useState<string | null>(null);
-
-  useEffect(() => {
-    setCanEdit(hasPermission(Permission.TIMETABLE_MANAGE));
-  }, []);
 
   useEffect(() => {
     if (

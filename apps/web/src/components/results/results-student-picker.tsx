@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useHydrated } from "@/lib/use-client-snapshot";
 import { DashIcon } from "@/components/dashboard/dash-icons";
 
 export type ResultsStudentOption = {
@@ -61,10 +62,10 @@ export function ResultsStudentPicker({
 }: Props) {
   const searchRef = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false);
-  const [mounted, setMounted] = useState(false);
+  const mounted = useHydrated();
   const [query, setQuery] = useState("");
   const [gradeFilter, setGradeFilter] = useState("");
-  const [sectionFilter, setSectionFilter] = useState("");
+  const [sectionFilterState, setSectionFilter] = useState("");
 
   const selected = students.find((s) => s.id === value) ?? null;
 
@@ -94,6 +95,10 @@ export function ResultsStudentPicker({
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [students, gradeFilter]);
 
+  const sectionFilter = sections.some((s) => s.id === sectionFilterState)
+    ? sectionFilterState
+    : "";
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return students
@@ -117,10 +122,6 @@ export function ResultsStudentPicker({
   }, [students, query, gradeFilter, sectionFilter]);
 
   useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
     if (!open) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -135,12 +136,6 @@ export function ResultsStudentPicker({
       window.clearTimeout(t);
     };
   }, [open]);
-
-  useEffect(() => {
-    if (sectionFilter && !sections.some((s) => s.id === sectionFilter)) {
-      setSectionFilter("");
-    }
-  }, [sections, sectionFilter]);
 
   function close() {
     setOpen(false);
@@ -228,7 +223,7 @@ export function ResultsStudentPicker({
                             sectionFilter === s.id ? " is-on" : ""
                           }`}
                           onClick={() =>
-                            setSectionFilter((prev) => (prev === s.id ? "" : s.id))
+                            setSectionFilter(sectionFilter === s.id ? "" : s.id)
                           }
                         >
                           Sec {s.name}

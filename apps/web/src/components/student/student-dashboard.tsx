@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
+import { useHydrated } from "@/lib/use-client-snapshot";
 import { Announcement, AttendanceRecord, ResultRecord } from "@/lib/api";
 import { DashIcon } from "@/components/dashboard/dash-icons";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
@@ -202,28 +203,22 @@ export function StudentDashboard({
   studentResources,
   error,
 }: Props) {
-  const [mounted, setMounted] = useState(false);
-  const [today, setToday] = useState("");
-  const [todayShort, setTodayShort] = useState("");
-
-  useEffect(() => {
-    setMounted(true);
-    const now = new Date();
-    setToday(
-      now.toLocaleDateString(undefined, {
+  const mounted = useHydrated();
+  const now = mounted ? new Date() : null;
+  const today = now
+    ? now.toLocaleDateString(undefined, {
         weekday: "long",
         month: "long",
         day: "numeric",
-      }),
-    );
-    setTodayShort(
-      now.toLocaleDateString(undefined, {
+      })
+    : "";
+  const todayShort = now
+    ? now.toLocaleDateString(undefined, {
         weekday: "short",
         month: "short",
         day: "numeric",
-      }),
-    );
-  }, []);
+      })
+    : "";
 
   const attendanceRate =
     typeof dashboard?.attendanceRate === "number"

@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import {
   AttendanceConcernStatus,
   Plan,
@@ -65,7 +69,9 @@ export class PlatformService {
   }
 
   async updateSchoolPlan(schoolId: string, dto: UpdateSchoolPlanDto) {
-    const school = await this.prisma.school.findUnique({ where: { id: schoolId } });
+    const school = await this.prisma.school.findUnique({
+      where: { id: schoolId },
+    });
     if (!school) throw new NotFoundException('School not found');
 
     const sub = await this.subscriptionsService.adminSetSchoolPlan(schoolId, {
@@ -126,7 +132,9 @@ export class PlatformService {
       }),
     ]);
 
-    const trialSchools = subscriptions.filter((s) => s.plan === Plan.TRIAL).length;
+    const trialSchools = subscriptions.filter(
+      (s) => s.plan === Plan.TRIAL,
+    ).length;
     const paidSchools = subscriptions.filter(
       (s) => s.plan !== Plan.TRIAL && s.isActive,
     ).length;
@@ -218,7 +226,9 @@ export class PlatformService {
         description: row.description,
         subjectName: row.subjectNameSnapshot,
         periodLabel: row.periodLabel,
-        classLabel: [row.grade.name, row.section?.name].filter(Boolean).join(' · '),
+        classLabel: [row.grade.name, row.section?.name]
+          .filter(Boolean)
+          .join(' · '),
         date: row.date.toISOString().slice(0, 10),
         createdAt: row.createdAt.toISOString(),
       })),
@@ -373,8 +383,10 @@ export class PlatformService {
     });
 
     const adminUsername =
-      dto.adminEmail.split('@')[0]?.toLowerCase().replace(/[^a-z0-9._-]/g, '') ||
-      'admin';
+      dto.adminEmail
+        .split('@')[0]
+        ?.toLowerCase()
+        .replace(/[^a-z0-9._-]/g, '') || 'admin';
     const admin = await this.usersService.createUser({
       username: adminUsername,
       email: dto.adminEmail,

@@ -86,8 +86,12 @@ export function AdminConcernsWorkspace() {
   }, []);
 
   useEffect(() => {
-    setLoading(true);
-    setError("");
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setLoading(true);
+      setError("");
+    });
     void listAttendanceConcerns({
       date: date || undefined,
       status: status || undefined,
@@ -96,11 +100,19 @@ export function AdminConcernsWorkspace() {
       sectionId: sectionId || undefined,
     })
       .then((res) => {
+        if (cancelled) return;
         setItems(res.items);
         setTotal(res.total);
       })
-      .catch((e: Error) => setError(e.message))
-      .finally(() => setLoading(false));
+      .catch((e: Error) => {
+        if (!cancelled) setError(e.message);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [date, status, concernType, gradeId, sectionId]);
 
   const sections = grades.find((g) => g.id === gradeId)?.sections ?? [];

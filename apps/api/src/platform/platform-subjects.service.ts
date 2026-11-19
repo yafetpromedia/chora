@@ -1,12 +1,14 @@
 import {
-  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CURRICULUM_PACKAGE_DEFINITIONS } from '../provisioning/curriculum-packages.data';
-import { CreatePlatformSubjectDto, UpdatePlatformSubjectDto } from './dto/platform-subject.dto';
+import {
+  CreatePlatformSubjectDto,
+  UpdatePlatformSubjectDto,
+} from './dto/platform-subject.dto';
 
 @Injectable()
 export class PlatformSubjectsService {
@@ -14,7 +16,10 @@ export class PlatformSubjectsService {
 
   /** Seed / refresh master subjects from code-defined packages (idempotent). */
   async syncFromPackageDefinitions() {
-    const seen = new Map<string, { name: string; level?: string; curriculum?: string }>();
+    const seen = new Map<
+      string,
+      { name: string; level?: string; curriculum?: string }
+    >();
 
     for (const pkg of CURRICULUM_PACKAGE_DEFINITIONS) {
       for (const s of pkg.subjects) {
@@ -51,7 +56,8 @@ export class PlatformSubjectsService {
     const platformByCode = await this.prisma.platformSubject.findMany();
     const codeToId = new Map(platformByCode.map((p) => [p.code, p.id]));
 
-    const packageSubjects = await this.prisma.curriculumPackageSubject.findMany();
+    const packageSubjects =
+      await this.prisma.curriculumPackageSubject.findMany();
     for (const row of packageSubjects) {
       const platformId = codeToId.get(row.code);
       if (platformId && !row.platformSubjectId) {
@@ -128,7 +134,9 @@ export class PlatformSubjectsService {
         ...(dto.curriculum !== undefined
           ? { curriculum: dto.curriculum?.trim() || null }
           : {}),
-        ...(dto.level !== undefined ? { level: dto.level?.trim() || null } : {}),
+        ...(dto.level !== undefined
+          ? { level: dto.level?.trim() || null }
+          : {}),
         ...(dto.gradeMin !== undefined ? { gradeMin: dto.gradeMin } : {}),
         ...(dto.gradeMax !== undefined ? { gradeMax: dto.gradeMax } : {}),
         ...(dto.isArchived !== undefined ? { isArchived: dto.isArchived } : {}),

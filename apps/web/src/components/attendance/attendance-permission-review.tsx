@@ -89,8 +89,34 @@ export function AttendancePermissionReview() {
   }, []);
 
   useEffect(() => {
-    if (gradeId) void load();
-  }, [gradeId, sectionId, filter, load]);
+    if (!gradeId) return;
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setLoading(true);
+      setError("");
+    });
+    void (async () => {
+      try {
+        const rows = await listAttendancePermissionRequests({
+          gradeId,
+          sectionId: sectionId || undefined,
+          status: filter === "PENDING" ? "PENDING" : undefined,
+        });
+        if (cancelled) return;
+        setRequests(rows);
+      } catch (err) {
+        if (cancelled) return;
+        setError(err instanceof Error ? err.message : "Could not load requests");
+        setRequests([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [gradeId, sectionId, filter]);
 
   async function onReview(id: string, status: "APPROVED" | "REJECTED") {
     setBusyId(id);

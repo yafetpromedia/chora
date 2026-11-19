@@ -8,6 +8,10 @@ import {
 } from '@prisma/client';
 import { AttendanceConcernsService } from './attendance-concerns.service';
 
+type ConcernFindArgs = {
+  where?: { id?: string; reportedByUserId?: string; status?: unknown };
+};
+
 describe('AttendanceConcernsService', () => {
   const prisma = {
     academicYear: { findFirst: jest.fn() },
@@ -40,7 +44,14 @@ describe('AttendanceConcernsService', () => {
     sectionId: 'section-1',
     subjectId: 'subject-1',
     teacherUserId: 'teacher-b',
-    period: { id: 'p1', number: 2, label: 'Period 2', startTime: '10:00', endTime: '10:45', sortOrder: 2 },
+    period: {
+      id: 'p1',
+      number: 2,
+      label: 'Period 2',
+      startTime: '10:00',
+      endTime: '10:45',
+      sortOrder: 2,
+    },
     subject: { id: 'subject-1', name: 'Physics', code: 'PHY' },
     grade: { id: 'grade-1', name: 'Grade 11' },
     section: { id: 'section-1', name: 'Natural Science A' },
@@ -74,82 +85,90 @@ describe('AttendanceConcernsService', () => {
     ]);
     prisma.staffNotification.createMany.mockResolvedValue({ count: 1 });
     prisma.attendanceConcernAuditEvent.create.mockResolvedValue({});
-    prisma.attendanceConcern.create.mockImplementation(async ({ data }) => ({
-      id: 'concern-1',
-      ...data,
-      category: 'ATTENDANCE',
-      status: AttendanceConcernStatus.OPEN,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      reviewedAt: null,
-      resolvedAt: null,
-      resolvedByUserId: null,
-      resolution: null,
-      resolutionNote: null,
-    }));
-    prisma.attendanceConcern.findFirst.mockImplementation(async (args) => {
-      if (args?.where?.id === 'concern-1' || args?.where?.reportedByUserId) {
-        if (args?.where?.reportedByUserId && args?.where?.status) {
-          return null; // duplicate check
+    prisma.attendanceConcern.create.mockImplementation(
+      ({ data }: { data: Record<string, unknown> }) =>
+        Promise.resolve({
+          id: 'concern-1',
+          ...data,
+          category: 'ATTENDANCE',
+          status: AttendanceConcernStatus.OPEN,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          reviewedAt: null,
+          resolvedAt: null,
+          resolvedByUserId: null,
+          resolution: null,
+          resolutionNote: null,
+        }),
+    );
+    prisma.attendanceConcern.findFirst.mockImplementation(
+      (args?: ConcernFindArgs) => {
+        if (args?.where?.id === 'concern-1' || args?.where?.reportedByUserId) {
+          if (args?.where?.reportedByUserId && args?.where?.status) {
+            return Promise.resolve(null); // duplicate check
+          }
+          if (args?.where?.id) {
+            return Promise.resolve({
+              id: 'concern-1',
+              schoolId: 'school-a',
+              category: 'ATTENDANCE',
+              date: new Date('2026-10-08'),
+              gradeId: 'grade-1',
+              sectionId: 'section-1',
+              subjectId: 'subject-1',
+              timetableEntryId: 'entry-1',
+              periodNumber: 2,
+              periodLabel: 'Period 2',
+              subjectNameSnapshot: 'Physics',
+              reportedByUserId: 'teacher-b',
+              officialPresentCount: 36,
+              officialAbsentCount: 4,
+              officialLateCount: 0,
+              officialExcusedCount: 0,
+              officialSubmitted: true,
+              totalStudents: 40,
+              observedPresentCount: null,
+              observedAbsentCount: 5,
+              difference: 1,
+              concernType: AttendanceConcernType.COUNT_MISMATCH,
+              studentProfileId: null,
+              officialStudentStatus: null,
+              observedStudentStatus: null,
+              description: 'I counted five students missing',
+              status: AttendanceConcernStatus.OPEN,
+              resolution: null,
+              resolutionNote: null,
+              resolvedByUserId: null,
+              reviewedAt: null,
+              resolvedAt: null,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+              grade: { id: 'grade-1', name: 'Grade 11' },
+              section: { id: 'section-1', name: 'Natural Science A' },
+              subject: { id: 'subject-1', name: 'Physics', code: 'PHY' },
+              reportedBy: { id: 'teacher-b', firstName: 'Mr', lastName: 'X' },
+              resolvedBy: null,
+              studentProfile: null,
+            });
+          }
         }
-        if (args?.where?.id) {
-          return {
-            id: 'concern-1',
-            schoolId: 'school-a',
-            category: 'ATTENDANCE',
-            date: new Date('2026-10-08'),
-            gradeId: 'grade-1',
-            sectionId: 'section-1',
-            subjectId: 'subject-1',
-            timetableEntryId: 'entry-1',
-            periodNumber: 2,
-            periodLabel: 'Period 2',
-            subjectNameSnapshot: 'Physics',
-            reportedByUserId: 'teacher-b',
-            officialPresentCount: 36,
-            officialAbsentCount: 4,
-            officialLateCount: 0,
-            officialExcusedCount: 0,
-            officialSubmitted: true,
-            totalStudents: 40,
-            observedPresentCount: null,
-            observedAbsentCount: 5,
-            difference: 1,
-            concernType: AttendanceConcernType.COUNT_MISMATCH,
-            studentProfileId: null,
-            officialStudentStatus: null,
-            observedStudentStatus: null,
-            description: 'I counted five students missing',
-            status: AttendanceConcernStatus.OPEN,
-            resolution: null,
-            resolutionNote: null,
-            resolvedByUserId: null,
-            reviewedAt: null,
-            resolvedAt: null,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-            grade: { id: 'grade-1', name: 'Grade 11' },
-            section: { id: 'section-1', name: 'Natural Science A' },
-            subject: { id: 'subject-1', name: 'Physics', code: 'PHY' },
-            reportedBy: { id: 'teacher-b', firstName: 'Mr', lastName: 'X' },
-            resolvedBy: null,
-            studentProfile: null,
-          };
-        }
-      }
-      return null;
-    });
+        return Promise.resolve(null);
+      },
+    );
     prisma.attendancePermissionRequest.findMany.mockResolvedValue([]);
   });
 
   it('creates count discrepancy without mutating AttendanceRecord', async () => {
     const updateSpy = jest.fn();
-    (prisma as { attendanceRecord: { update?: jest.Mock } }).attendanceRecord.update =
-      updateSpy;
-    (prisma as { attendanceRecord: { create?: jest.Mock } }).attendanceRecord.create =
-      jest.fn();
-    (prisma as { attendanceRecord: { upsert?: jest.Mock } }).attendanceRecord.upsert =
-      jest.fn();
+    (
+      prisma as { attendanceRecord: { update?: jest.Mock } }
+    ).attendanceRecord.update = updateSpy;
+    (
+      prisma as { attendanceRecord: { create?: jest.Mock } }
+    ).attendanceRecord.create = jest.fn();
+    (
+      prisma as { attendanceRecord: { upsert?: jest.Mock } }
+    ).attendanceRecord.upsert = jest.fn();
 
     const result = await service.createConcern(
       'school-a',
@@ -176,7 +195,7 @@ describe('AttendanceConcernsService', () => {
     expect(prisma.staffNotification.createMany).toHaveBeenCalled();
     expect(prisma.attendanceConcernAuditEvent.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ action: 'created' }),
+        data: expect.objectContaining({ action: 'created' }) as unknown,
       }),
     );
   });
@@ -226,7 +245,7 @@ describe('AttendanceConcernsService', () => {
           studentProfileId: 'stu-e',
           officialStudentStatus: AttendanceStatus.present,
           observedStudentStatus: ObservedAttendanceStatus.MISSING,
-        }),
+        }) as unknown,
       }),
     );
   });
@@ -262,55 +281,57 @@ describe('AttendanceConcernsService', () => {
       status: AttendanceConcernStatus.RESOLVED,
     });
     // getConcern after resolve
-    prisma.attendanceConcern.findFirst.mockResolvedValueOnce({
-      id: 'concern-1',
-      schoolId: 'school-a',
-      gradeId: 'grade-1',
-      sectionId: 'section-1',
-      status: AttendanceConcernStatus.OPEN,
-      reviewedAt: null,
-    }).mockResolvedValueOnce({
-      id: 'concern-1',
-      schoolId: 'school-a',
-      category: 'ATTENDANCE',
-      date: new Date('2026-10-08'),
-      gradeId: 'grade-1',
-      sectionId: 'section-1',
-      subjectId: 'subject-1',
-      timetableEntryId: 'entry-1',
-      periodNumber: 2,
-      periodLabel: 'Period 2',
-      subjectNameSnapshot: 'Physics',
-      reportedByUserId: 'teacher-b',
-      officialPresentCount: 36,
-      officialAbsentCount: 4,
-      officialLateCount: 0,
-      officialExcusedCount: 0,
-      officialSubmitted: true,
-      totalStudents: 40,
-      observedPresentCount: null,
-      observedAbsentCount: 5,
-      difference: 1,
-      concernType: AttendanceConcernType.COUNT_MISMATCH,
-      studentProfileId: null,
-      officialStudentStatus: null,
-      observedStudentStatus: null,
-      description: null,
-      status: AttendanceConcernStatus.RESOLVED,
-      resolution: 'AUTHORIZED_ABSENCE',
-      resolutionNote: 'Approved activity',
-      resolvedByUserId: 'teacher-a',
-      reviewedAt: new Date(),
-      resolvedAt: new Date(),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      grade: { id: 'grade-1', name: 'Grade 11' },
-      section: { id: 'section-1', name: 'Natural Science A' },
-      subject: { id: 'subject-1', name: 'Physics', code: 'PHY' },
-      reportedBy: { id: 'teacher-b', firstName: 'Mr', lastName: 'X' },
-      resolvedBy: { id: 'teacher-a', firstName: 'Teacher', lastName: 'A' },
-      studentProfile: null,
-    });
+    prisma.attendanceConcern.findFirst
+      .mockResolvedValueOnce({
+        id: 'concern-1',
+        schoolId: 'school-a',
+        gradeId: 'grade-1',
+        sectionId: 'section-1',
+        status: AttendanceConcernStatus.OPEN,
+        reviewedAt: null,
+      })
+      .mockResolvedValueOnce({
+        id: 'concern-1',
+        schoolId: 'school-a',
+        category: 'ATTENDANCE',
+        date: new Date('2026-10-08'),
+        gradeId: 'grade-1',
+        sectionId: 'section-1',
+        subjectId: 'subject-1',
+        timetableEntryId: 'entry-1',
+        periodNumber: 2,
+        periodLabel: 'Period 2',
+        subjectNameSnapshot: 'Physics',
+        reportedByUserId: 'teacher-b',
+        officialPresentCount: 36,
+        officialAbsentCount: 4,
+        officialLateCount: 0,
+        officialExcusedCount: 0,
+        officialSubmitted: true,
+        totalStudents: 40,
+        observedPresentCount: null,
+        observedAbsentCount: 5,
+        difference: 1,
+        concernType: AttendanceConcernType.COUNT_MISMATCH,
+        studentProfileId: null,
+        officialStudentStatus: null,
+        observedStudentStatus: null,
+        description: null,
+        status: AttendanceConcernStatus.RESOLVED,
+        resolution: 'AUTHORIZED_ABSENCE',
+        resolutionNote: 'Approved activity',
+        resolvedByUserId: 'teacher-a',
+        reviewedAt: new Date(),
+        resolvedAt: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        grade: { id: 'grade-1', name: 'Grade 11' },
+        section: { id: 'section-1', name: 'Natural Science A' },
+        subject: { id: 'subject-1', name: 'Physics', code: 'PHY' },
+        reportedBy: { id: 'teacher-b', firstName: 'Mr', lastName: 'X' },
+        resolvedBy: { id: 'teacher-a', firstName: 'Teacher', lastName: 'A' },
+        studentProfile: null,
+      });
 
     const result = await service.resolve(
       'school-a',
@@ -318,7 +339,7 @@ describe('AttendanceConcernsService', () => {
       UserRole.teacher,
       'concern-1',
       {
-        resolution: 'AUTHORIZED_ABSENCE' as never,
+        resolution: 'AUTHORIZED_ABSENCE',
         resolutionNote: 'Approved activity',
       },
     );
@@ -328,7 +349,7 @@ describe('AttendanceConcernsService', () => {
         data: expect.objectContaining({
           status: AttendanceConcernStatus.RESOLVED,
           resolvedByUserId: 'teacher-a',
-        }),
+        }) as unknown,
       }),
     );
     expect(result.status).toBe(AttendanceConcernStatus.RESOLVED);

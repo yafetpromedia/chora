@@ -34,8 +34,26 @@ export function HrOrgWorkspace({ kind }: { kind: "departments" | "positions" }) 
   }
 
   useEffect(() => {
-    void load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    let cancelled = false;
+    void (async () => {
+      try {
+        const data =
+          kind === "departments"
+            ? await listHrDepartments()
+            : await listHrPositions();
+        if (!cancelled) {
+          setError("");
+          setRows(data);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Failed to load");
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [kind]);
 
   async function onCreate(e: FormEvent) {

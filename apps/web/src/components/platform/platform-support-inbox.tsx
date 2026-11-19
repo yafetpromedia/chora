@@ -65,10 +65,12 @@ export function PlatformSupportInbox() {
   }, [statusFilter]);
 
   useEffect(() => {
-    setLoading(true);
-    void load()
-      .catch((e) => fail(e, "Failed to load support tickets"))
-      .finally(() => setLoading(false));
+    queueMicrotask(() => {
+      setLoading(true);
+      void load()
+        .catch((e) => fail(e, "Failed to load support tickets"))
+        .finally(() => setLoading(false));
+    });
   }, [load, router]);
 
   const stats = useMemo(() => {
@@ -105,11 +107,14 @@ export function PlatformSupportInbox() {
 
   const selected = tickets.find((t) => t.id === selectedId) ?? null;
 
-  useEffect(() => {
-    if (!selected) return;
-    setNoteDraft(selected.platformNote ?? "");
-    setStatusDraft(selected.status);
-  }, [selected]);
+  const [syncedSelected, setSyncedSelected] = useState<typeof selected>(null);
+  if (selected !== syncedSelected) {
+    setSyncedSelected(selected);
+    if (selected) {
+      setNoteDraft(selected.platformNote ?? "");
+      setStatusDraft(selected.status);
+    }
+  }
 
   async function saveSelected() {
     if (!selected) return;

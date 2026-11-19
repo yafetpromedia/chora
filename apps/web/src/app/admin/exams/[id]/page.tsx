@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useClientSnapshot } from "@/lib/use-client-snapshot";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { DashboardPage } from "@/components/dashboard/dashboard-page";
@@ -95,7 +96,10 @@ export default function AdminExamScheduleDetailPage() {
   const params = useParams<{ id: string }>();
   const id = params.id;
 
-  const [canEdit, setCanEdit] = useState(false);
+  const canEdit = useClientSnapshot(
+    () => hasPermission(Permission.TIMETABLE_MANAGE),
+    false,
+  );
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -109,10 +113,6 @@ export default function AdminExamScheduleDetailPage() {
   const [shiftLabel, setShiftLabel] = useState("");
   const [tab, setTab] = useState<"edit" | "board" | "seating">("edit");
   const [printTarget, setPrintTarget] = useState<"board" | "seating">("board");
-
-  useEffect(() => {
-    setCanEdit(hasPermission(Permission.TIMETABLE_MANAGE));
-  }, []);
 
   useEffect(() => {
     if (

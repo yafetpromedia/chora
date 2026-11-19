@@ -1,9 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { GradePreset } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import {
-  CURRICULUM_PACKAGE_DEFINITIONS,
-} from '../provisioning/curriculum-packages.data';
+import { CURRICULUM_PACKAGE_DEFINITIONS } from '../provisioning/curriculum-packages.data';
 import { DEFAULT_LIBRARY_CATEGORIES } from '../library/library.constants';
 
 const ACADEMIC_STRUCTURES = [
@@ -37,7 +35,12 @@ const PLATFORM_ASSESSMENT_TEMPLATES = [
     components: [
       { name: 'Activity', weightPercent: 10, maxScore: 10, sortOrder: 0 },
       { name: 'Worksheet', weightPercent: 10, maxScore: 10, sortOrder: 1 },
-      { name: 'Class Participation', weightPercent: 10, maxScore: 10, sortOrder: 2 },
+      {
+        name: 'Class Participation',
+        weightPercent: 10,
+        maxScore: 10,
+        sortOrder: 2,
+      },
       { name: 'Mid Exam', weightPercent: 20, maxScore: 20, sortOrder: 3 },
       { name: 'Final Exam', weightPercent: 50, maxScore: 50, sortOrder: 4 },
     ],
@@ -215,7 +218,9 @@ export class PlatformContentSyncService {
 
   async linkPackagesToPlatformContent() {
     const structures = await this.prisma.platformAcademicStructure.findMany();
-    const structureByPreset = new Map(structures.map((s) => [s.gradePreset, s.id]));
+    const structureByPreset = new Map(
+      structures.map((s) => [s.gradePreset, s.id]),
+    );
 
     const platformSubjects = await this.prisma.platformSubject.findMany();
     const subjectByCode = new Map(platformSubjects.map((s) => [s.code, s.id]));
@@ -227,12 +232,15 @@ export class PlatformContentSyncService {
       platformLibrary.map((r) => [`${r.category.slug}:${r.title}`, r.id]),
     );
 
-    const platformMessages = await this.prisma.platformMessageTemplate.findMany();
+    const platformMessages =
+      await this.prisma.platformMessageTemplate.findMany();
     const messageByKey = new Map(platformMessages.map((m) => [m.key, m.id]));
 
     const platformAssessments =
       await this.prisma.platformAssessmentTemplate.findMany();
-    const assessmentByKey = new Map(platformAssessments.map((a) => [a.key, a.id]));
+    const assessmentByKey = new Map(
+      platformAssessments.map((a) => [a.key, a.id]),
+    );
 
     for (const def of CURRICULUM_PACKAGE_DEFINITIONS) {
       const pkg = await this.prisma.curriculumPackage.findUnique({
@@ -241,7 +249,7 @@ export class PlatformContentSyncService {
       if (!pkg) continue;
 
       const structureId = def.gradePreset
-        ? structureByPreset.get(def.gradePreset) ?? null
+        ? (structureByPreset.get(def.gradePreset) ?? null)
         : null;
       if (structureId && !pkg.academicStructureId) {
         await this.prisma.curriculumPackage.update({
@@ -250,9 +258,10 @@ export class PlatformContentSyncService {
         });
       }
 
-      const packageSubjects = await this.prisma.curriculumPackageSubject.findMany({
-        where: { packageId: pkg.id },
-      });
+      const packageSubjects =
+        await this.prisma.curriculumPackageSubject.findMany({
+          where: { packageId: pkg.id },
+        });
       for (const row of packageSubjects) {
         const platformId = subjectByCode.get(row.code);
         if (platformId && !row.platformSubjectId) {
@@ -263,9 +272,10 @@ export class PlatformContentSyncService {
         }
       }
 
-      const packageLibrary = await this.prisma.curriculumPackageLibraryItem.findMany({
-        where: { packageId: pkg.id },
-      });
+      const packageLibrary =
+        await this.prisma.curriculumPackageLibraryItem.findMany({
+          where: { packageId: pkg.id },
+        });
       for (const row of packageLibrary) {
         const platformId = libraryByTitle.get(
           `${row.categorySlug}:${row.title}`,
@@ -278,9 +288,10 @@ export class PlatformContentSyncService {
         }
       }
 
-      const packageTemplates = await this.prisma.curriculumPackageTemplate.findMany({
-        where: { packageId: pkg.id },
-      });
+      const packageTemplates =
+        await this.prisma.curriculumPackageTemplate.findMany({
+          where: { packageId: pkg.id },
+        });
       for (const row of packageTemplates) {
         const platformId = messageByKey.get(row.key);
         if (platformId && !row.platformMessageTemplateId) {

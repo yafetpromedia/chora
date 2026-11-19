@@ -32,34 +32,32 @@ export function StudentIdCardPanel({
   title = "Student ID card",
   subtitle,
 }: Props) {
-  const [card, setCard] = useState<StudentIdCard | null>(staticCard ?? null);
-  const [loading, setLoading] = useState(source !== "static" && !staticCard);
-  const [error, setError] = useState("");
+  const [fetchedCard, setCard] = useState<StudentIdCard | null>(null);
+  const [loadingState, setLoading] = useState(source !== "static");
+  const [errorState, setError] = useState("");
+  const missingProfile = (source === "profile" || source === "child") && !profileId;
+  const card =
+    source === "static" ? (staticCard ?? null) : missingProfile ? null : fetchedCard;
+  const loading = source !== "static" && !missingProfile && loadingState;
+  const error = missingProfile
+    ? source === "child"
+      ? "Missing child profile."
+      : "Missing student profile."
+    : errorState;
   const [modalOpen, setModalOpen] = useState(false);
 
+  const fetchKey = source === "static" || missingProfile ? "" : `${source}|${profileId ?? ""}`;
+  const [prevFetchKey, setPrevFetchKey] = useState(fetchKey);
+  if (fetchKey !== prevFetchKey) {
+    setPrevFetchKey(fetchKey);
+    if (fetchKey) {
+      setLoading(true);
+      setError("");
+    }
+  }
+
   useEffect(() => {
-    if (source === "static") {
-      setCard(staticCard ?? null);
-      setLoading(false);
-      return;
-    }
-
-    if (source === "profile" && !profileId) {
-      setCard(null);
-      setLoading(false);
-      setError("Missing student profile.");
-      return;
-    }
-
-    if (source === "child" && !profileId) {
-      setCard(null);
-      setLoading(false);
-      setError("Missing child profile.");
-      return;
-    }
-
-    setLoading(true);
-    setError("");
+    if (source === "static" || missingProfile) return;
 
     const fetcher =
       source === "me"
@@ -72,7 +70,7 @@ export function StudentIdCardPanel({
       .then(setCard)
       .catch((err) => setError(err instanceof Error ? err.message : "Could not load ID card"))
       .finally(() => setLoading(false));
-  }, [source, profileId, staticCard]);
+  }, [source, profileId, missingProfile]);
 
   return (
     <section className={`sid-my-panel dash-panel dash-panel--flat ${className}`.trim()}>

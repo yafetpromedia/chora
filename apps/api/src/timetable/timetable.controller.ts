@@ -80,7 +80,10 @@ export class TimetableController {
   @Post('rooms')
   @Roles('admin', 'staff')
   @RequirePermissions(SchoolPermission.TIMETABLE_MANAGE)
-  createRoom(@CurrentUser() user: AuthUser, @Body() dto: CreateTimetableRoomDto) {
+  createRoom(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: CreateTimetableRoomDto,
+  ) {
     return this.timetableService.createRoom(user.schoolId, dto);
   }
 
@@ -150,10 +153,7 @@ export class TimetableController {
 
   @Get('me/today')
   @Roles('teacher', 'student', 'parent')
-  myToday(
-    @CurrentUser() user: AuthUser,
-    @Query('weekday') weekday?: Weekday,
-  ) {
+  myToday(@CurrentUser() user: AuthUser, @Query('weekday') weekday?: Weekday) {
     return this.timetableService.getScheduleForUser(
       user.schoolId,
       user.id,

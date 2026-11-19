@@ -3,6 +3,7 @@
 import { useEffect, useId, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { BRAND_NAME } from "@/lib/brand";
+import { useHydrated } from "@/lib/use-client-snapshot";
 
 type Variant = "light" | "dark";
 type StoreKind = "play" | "apple";
@@ -69,11 +70,7 @@ function ComingSoonDialog({
 }) {
   const titleId = useId();
   const descId = useId();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const mounted = useHydrated();
 
   useEffect(() => {
     if (!open) return;

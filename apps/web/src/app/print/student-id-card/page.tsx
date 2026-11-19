@@ -22,18 +22,26 @@ function PrintStudentIdCardInner() {
       router.replace("/login");
       return;
     }
-    if (!studentProfileId) {
-      setError("Missing student.");
-      return;
-    }
-    void getStudentIdCard(studentProfileId)
-      .then((data) => {
+    let cancelled = false;
+    void (async () => {
+      if (!studentProfileId) {
+        setError("Missing student.");
+        return;
+      }
+      try {
+        const data = await getStudentIdCard(studentProfileId);
+        if (cancelled) return;
         setCard(data);
         setReady(true);
-      })
-      .catch((err) => {
-        setError(err instanceof Error ? err.message : "Could not load card");
-      });
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Could not load card");
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [studentProfileId, router]);
 
   useEffect(() => {

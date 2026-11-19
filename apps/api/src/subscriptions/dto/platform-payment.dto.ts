@@ -1,4 +1,11 @@
-import { IsIn, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import {
+  IsIn,
+  IsOptional,
+  IsString,
+  Matches,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
 
 export class SubmitPlatformPaymentDto {
   @IsIn(['TELEBIRR', 'BANK_TRANSFER'])

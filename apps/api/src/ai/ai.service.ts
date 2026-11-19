@@ -15,7 +15,7 @@ import {
   type AiRuntimeConfig,
   PlatformSettingsService,
 } from '../platform/platform-settings.service';
-import type { AiChatMessageDto } from './dto/ai-chat.dto';
+import { AiChatRole, type AiChatMessageDto } from './dto/ai-chat.dto';
 import type { TestPlatformAiDto } from './dto/test-platform-ai.dto';
 import { ReportCommentKind } from './dto/report-comment.dto';
 import { StudyAssistAction } from './dto/study-assist.dto';
@@ -173,7 +173,12 @@ export class AiService {
 
       const last = contents[contents.length - 1];
       // Only merge plain text turns — never fold image turns together.
-      if (last && last.role === role && images.length === 0 && !m.images?.length) {
+      if (
+        last &&
+        last.role === role &&
+        images.length === 0 &&
+        !m.images?.length
+      ) {
         const first = last.parts[0];
         if (first && 'text' in first) {
           first.text += `\n\n${text}`;
@@ -212,7 +217,10 @@ export class AiService {
     const url = `${this.geminiNativeBase(runtime)}/models/${encodeURIComponent(model)}:generateContent`;
     const { systemInstruction, contents } = this.toGeminiContents(messages);
     // Thinking models count reasoning against maxOutputTokens — keep headroom.
-    const outputCap = Math.max(maxTokens, this.isGemini3Family(model) ? 2048 : maxTokens);
+    const outputCap = Math.max(
+      maxTokens,
+      this.isGemini3Family(model) ? 2048 : maxTokens,
+    );
 
     const generationConfig: Record<string, unknown> = {
       maxOutputTokens: outputCap,
@@ -249,9 +257,7 @@ export class AiService {
         /* ignore */
       }
       // Google often returns 404 "use models/gemini-3.8-flash" for retired IDs.
-      const suggested = detail.match(
-        /models\/(gemini-[a-z0-9.-]+)/i,
-      )?.[1];
+      const suggested = detail.match(/models\/(gemini-[a-z0-9.-]+)/i)?.[1];
       if (
         response.status === 404 &&
         suggested &&
@@ -259,7 +265,7 @@ export class AiService {
       ) {
         return this.completeGeminiNative(
           { ...runtime, model: suggested.replace(/^models\//, '') },
-        messages,
+          messages,
           maxTokens,
           temperature,
         );
@@ -277,10 +283,7 @@ export class AiService {
         );
       }
       // 503 / high demand — brief retry, then try a lighter Flash model once.
-      if (
-        (response.status === 503 || response.status === 429) &&
-        attempt < 2
-      ) {
+      if ((response.status === 503 || response.status === 429) && attempt < 2) {
         await new Promise((r) => setTimeout(r, 800 * (attempt + 1)));
         return this.completeGeminiNative(
           runtime,
@@ -428,12 +431,7 @@ export class AiService {
       );
     }
 
-    return this.completeOpenAiCompat(
-      runtime,
-      messages,
-      maxTokens,
-      temperature,
-    );
+    return this.completeOpenAiCompat(runtime, messages, maxTokens, temperature);
   }
 
   private async complete(
@@ -507,10 +505,10 @@ export class AiService {
     context: StudyContext = {},
   ): Promise<{ content: string; model: string }> {
     const trimmed = text.trim();
-    const heading = [context.title, context.subject].filter(Boolean).join(' · ');
-    const material = heading
-      ? `Resource: ${heading}\n\n${trimmed}`
-      : trimmed;
+    const heading = [context.title, context.subject]
+      .filter(Boolean)
+      .join(' · ');
+    const material = heading ? `Resource: ${heading}\n\n${trimmed}` : trimmed;
 
     const systemPrompt =
       'You are a helpful K-12 study assistant for Ethiopian schools using Chora eLibrary. ' +
@@ -587,10 +585,14 @@ export class AiService {
       return { title, body, model: result.model };
     } catch {
       const lines = result.content.split('\n').filter(Boolean);
-      const title = lines[0]?.replace(/^title:\s*/i, '').trim() || 'School announcement';
+      const title =
+        lines[0]?.replace(/^title:\s*/i, '').trim() || 'School announcement';
       const body =
-        lines.slice(1).join('\n').replace(/^body:\s*/i, '').trim() ||
-        result.content;
+        lines
+          .slice(1)
+          .join('\n')
+          .replace(/^body:\s*/i, '')
+          .trim() || result.content;
       return { title, body, model: result.model };
     }
   }
@@ -601,7 +603,9 @@ export class AiService {
     meta: { studentName?: string; termName?: string } = {},
   ): Promise<{ content: string; model: string }> {
     const who =
-      kind === ReportCommentKind.PRINCIPAL ? 'school principal' : 'homeroom teacher';
+      kind === ReportCommentKind.PRINCIPAL
+        ? 'school principal'
+        : 'homeroom teacher';
     const label = [meta.studentName, meta.termName].filter(Boolean).join(' · ');
 
     return this.complete(
@@ -631,7 +635,7 @@ export class AiService {
     user: AuthUser,
   ): Promise<{ content: string; model: string }> {
     const userTexts = messages
-      .filter((m) => m.role === 'user')
+      .filter((m) => m.role === AiChatRole.USER)
       .map((m) => (m.content ?? '').trim())
       .filter(Boolean);
     const latestUserText = userTexts[userTexts.length - 1] ?? '';
@@ -674,7 +678,7 @@ export class AiService {
     const history: ChatMessage[] = [
       { role: 'system', content: system },
       ...messages.map((m) => ({
-        role: m.role as 'user' | 'assistant',
+        role: m.role,
         content:
           (m.content ?? '').trim() ||
           (m.images?.length ? 'Please look at the attached image(s).' : ''),
@@ -694,7 +698,7 @@ export class AiService {
     user: PlatformAuthUser,
   ): Promise<{ content: string; model: string }> {
     const userTexts = messages
-      .filter((m) => m.role === 'user')
+      .filter((m) => m.role === AiChatRole.USER)
       .map((m) => (m.content ?? '').trim())
       .filter(Boolean);
     const latestUserText = userTexts[userTexts.length - 1] ?? '';
@@ -728,7 +732,7 @@ export class AiService {
     const history: ChatMessage[] = [
       { role: 'system', content: system },
       ...messages.map((m) => ({
-        role: m.role as 'user' | 'assistant',
+        role: m.role,
         content:
           (m.content ?? '').trim() ||
           (m.images?.length ? 'Please look at the attached image(s).' : ''),
@@ -742,10 +746,7 @@ export class AiService {
     return this.complete(history, 2048, 0.45);
   }
 
-  private platformCan(
-    user: PlatformAuthUser,
-    permission: string,
-  ): boolean {
+  private platformCan(user: PlatformAuthUser, permission: string): boolean {
     if (user.role === 'OWNER') return true;
     return (user.permissions ?? []).includes(permission as never);
   }
@@ -757,14 +758,21 @@ export class AiService {
   ): Promise<string> {
     const q = `${latestText}\n${conversationText}`.toLowerCase();
     const canSchools = this.platformCan(user, PlatformPermission.SCHOOLS_VIEW);
-    const canBilling = this.platformCan(user, PlatformPermission.BILLING_MANAGE);
-    const canSupport = this.platformCan(user, PlatformPermission.SUPPORT_MANAGE);
+    const canBilling = this.platformCan(
+      user,
+      PlatformPermission.BILLING_MANAGE,
+    );
+    const canSupport = this.platformCan(
+      user,
+      PlatformPermission.SUPPORT_MANAGE,
+    );
     const wantsSchools =
       canSchools &&
       (/\b(school|tenant|tenants|academy|trial|suspend)/i.test(q) ||
         q.trim().length < 40);
     const wantsBilling =
-      canBilling && /\b(bill|invoice|plan|coupon|revenue|paid|etb|usd)\b/i.test(q);
+      canBilling &&
+      /\b(bill|invoice|plan|coupon|revenue|paid|etb|usd)\b/i.test(q);
     const wantsSupport =
       canSupport && /\b(support|ticket|inbox|issue)\b/i.test(q);
 
@@ -866,7 +874,7 @@ export class AiService {
           ]);
           if (school) {
             const modules = Array.isArray(school.subscription?.enabledModules)
-              ? (school.subscription!.enabledModules as string[])
+              ? (school.subscription.enabledModules as string[])
               : [];
             lines.push(
               ...[
@@ -1081,7 +1089,9 @@ export class AiService {
       nums.add(match[1]);
     }
     // Longest-first so "11" wins over bare "1" if both somehow appear.
-    return [...nums].sort((a, b) => b.length - a.length || Number(b) - Number(a));
+    return [...nums].sort(
+      (a, b) => b.length - a.length || Number(b) - Number(a),
+    );
   }
 
   private matchGradeNames(
@@ -1103,7 +1113,11 @@ export class AiService {
     const matched = grades.filter((g) => {
       const name = g.name.toLowerCase().replace(/\s+/g, ' ').trim();
       if (!name) return false;
-      if (new RegExp(`(^|[^a-z0-9])${this.escapeRegExp(name)}([^a-z0-9]|$)`).test(q)) {
+      if (
+        new RegExp(`(^|[^a-z0-9])${this.escapeRegExp(name)}([^a-z0-9]|$)`).test(
+          q,
+        )
+      ) {
         return true;
       }
       return false;
@@ -1201,7 +1215,12 @@ export class AiService {
       // Also match "LAST FIRST" / loose token order when both names appear near each other
       const first = s.user.firstName.trim().toLowerCase();
       const last = s.user.lastName.trim().toLowerCase();
-      if (first.length >= 2 && last.length >= 2 && q.includes(first) && q.includes(last)) {
+      if (
+        first.length >= 2 &&
+        last.length >= 2 &&
+        q.includes(first) &&
+        q.includes(last)
+      ) {
         const i1 = q.indexOf(first);
         const i2 = q.indexOf(last);
         if (Math.abs(i1 - i2) <= 40) {
@@ -1240,7 +1259,10 @@ export class AiService {
     user: AuthUser,
     studentProfileId: string,
   ): Promise<boolean> {
-    if (user.role === 'admin' || this.canAccess(user, PermissionCatalog.STUDENTS_READ)) {
+    if (
+      user.role === 'admin' ||
+      this.canAccess(user, PermissionCatalog.STUDENTS_READ)
+    ) {
       const exists = await this.prisma.studentProfile.findFirst({
         where: { id: studentProfileId, schoolId: user.schoolId },
         select: { id: true },
@@ -1339,9 +1361,9 @@ export class AiService {
     });
     if (!profile) return [];
 
-    const fullName = `${profile.user.firstName} ${profile.user.lastName}`.trim();
-    const isOwnChildOrSelf =
-      user.role === 'parent' || user.role === 'student';
+    const fullName =
+      `${profile.user.firstName} ${profile.user.lastName}`.trim();
+    const isOwnChildOrSelf = user.role === 'parent' || user.role === 'student';
     const lines: string[] = [
       `Focused student dossier for ${fullName} (authorized for ${user.role} — use these details):`,
       `- Name: ${fullName}${profile.middleName ? ` (middle: ${profile.middleName})` : ''}`,
@@ -1383,7 +1405,9 @@ export class AiService {
         `- Linked parents: ${profile.parents
           .map((p) => {
             const n = `${p.parent.firstName} ${p.parent.lastName}`.trim();
-            return [n, p.parent.email, p.parent.phone].filter(Boolean).join(' · ');
+            return [n, p.parent.email, p.parent.phone]
+              .filter(Boolean)
+              .join(' · ');
           })
           .join('; ')}`,
       );
@@ -1431,7 +1455,10 @@ export class AiService {
       lines.push('- Attendance: not authorized');
     }
 
-    const canSeeFees = access.canReadFinance || user.role === 'parent' || user.role === 'student';
+    const canSeeFees =
+      access.canReadFinance ||
+      user.role === 'parent' ||
+      user.role === 'student';
     if (canSeeFees) {
       const fees = await this.prisma.studentFee.findMany({
         where: { schoolId: user.schoolId, studentProfileId },
@@ -1566,7 +1593,9 @@ export class AiService {
       const self = teachers.find((t) => t.userId === user.id);
       if (
         self &&
-        (/\b(me|myself|my profile|my assignments|about me)\b/i.test(conversationText) ||
+        (/\b(me|myself|my profile|my assignments|about me)\b/i.test(
+          conversationText,
+        ) ||
           q.includes(`${user.firstName} ${user.lastName}`.toLowerCase()))
       ) {
         return { id: self.id };
@@ -1576,7 +1605,9 @@ export class AiService {
 
     const hits: Array<{ id: string; index: number }> = [];
     for (const t of teachers) {
-      const full = `${t.user.firstName} ${t.user.lastName}`.trim().toLowerCase();
+      const full = `${t.user.firstName} ${t.user.lastName}`
+        .trim()
+        .toLowerCase();
       if (full.length < 3) continue;
       const idx = q.indexOf(full);
       if (idx >= 0) hits.push({ id: t.id, index: idx });
@@ -1632,7 +1663,9 @@ export class AiService {
     const lines: string[] = [
       `Focused teacher dossier for ${name} (authorized for ${user.role}):`,
       `- Name: ${name}`,
-      access.canReadTeachers || isSelf ? `- Email: ${teacher.user.email}` : null,
+      access.canReadTeachers || isSelf
+        ? `- Email: ${teacher.user.email}`
+        : null,
       (access.canReadTeachers || isSelf) && teacher.user.phone
         ? `- Phone: ${teacher.user.phone}`
         : null,
@@ -1653,7 +1686,9 @@ export class AiService {
                 a.section?.name,
                 a.subject?.name,
                 a.isHomeroom ? 'homeroom' : null,
-                a.academicYear?.isCurrent ? 'current year' : a.academicYear?.name,
+                a.academicYear?.isCurrent
+                  ? 'current year'
+                  : a.academicYear?.name,
               ]
                 .filter(Boolean)
                 .join(' · '),
@@ -1670,8 +1705,7 @@ export class AiService {
   ): Promise<string[]> {
     if (!gradeIds.length) return [];
     const access = this.getAiDataAccess(user);
-    const canRoster =
-      access.canReadStudents || user.role === 'teacher';
+    const canRoster = access.canReadStudents || user.role === 'teacher';
     if (!canRoster && user.role !== 'admin') return [];
 
     // Teachers: only grades they teach
@@ -1704,9 +1738,7 @@ export class AiService {
         sections: { select: { name: true }, orderBy: { name: 'asc' } },
       },
     });
-    const lines: string[] = [
-      'Focused grade dossier (authorized):',
-    ];
+    const lines: string[] = ['Focused grade dossier (authorized):'];
 
     for (const g of grades) {
       const studentCount = await this.prisma.studentProfile.count({
@@ -1859,7 +1891,9 @@ export class AiService {
             return `${name}: ${row._count._all}`;
           })
           .join('; ');
-        lines.push('- Student counts by grade (ACTIVE): ' + (countLines || 'none'));
+        lines.push(
+          '- Student counts by grade (ACTIVE): ' + (countLines || 'none'),
+        );
 
         // When a grade is named, fetch that grade's roster directly (per grade)
         // so a popular Grade 1 never crowds out the single Grade 11 student.
@@ -1915,7 +1949,8 @@ export class AiService {
               '- Sample students: ' +
                 sampleStudents
                   .map((s) => {
-                    const name = `${s.user.firstName} ${s.user.lastName}`.trim();
+                    const name =
+                      `${s.user.firstName} ${s.user.lastName}`.trim();
                     const cls = [s.grade.name, s.section?.name]
                       .filter(Boolean)
                       .join(' / ');
@@ -1953,7 +1988,9 @@ export class AiService {
         ];
         const targetGradeIds =
           matchedGrades.length > 0
-            ? matchedGrades.map((g) => g.id).filter((id) => gradeIds.includes(id))
+            ? matchedGrades
+                .map((g) => g.id)
+                .filter((id) => gradeIds.includes(id))
             : gradeIds;
         if (!targetGradeIds.length) {
           lines.push(
@@ -1979,7 +2016,8 @@ export class AiService {
               roster.length
                 ? roster
                     .map((s) => {
-                      const name = `${s.user.firstName} ${s.user.lastName}`.trim();
+                      const name =
+                        `${s.user.firstName} ${s.user.lastName}`.trim();
                       const cls = [s.grade.name, s.section?.name]
                         .filter(Boolean)
                         .join(' / ');
@@ -2035,9 +2073,7 @@ export class AiService {
               : 'none'
           }`,
         );
-        lines.push(
-          '- Other students: not available for parent role (privacy)',
-        );
+        lines.push('- Other students: not available for parent role (privacy)');
       } else {
         lines.push('- Students: not authorized for this role/permission');
       }
@@ -2065,7 +2101,10 @@ export class AiService {
         if (dossier.length) {
           lines.push('', ...dossier);
         }
-      } else if (wantsPersonDetail && (canReadStudents || user.role === 'teacher')) {
+      } else if (
+        wantsPersonDetail &&
+        (canReadStudents || user.role === 'teacher')
+      ) {
         lines.push(
           '- Focused student: could not resolve which student “him/her” refers to — ask for the full name',
         );
@@ -2073,7 +2112,10 @@ export class AiService {
     }
 
     // --- Focused grade dossier ---
-    if (matchedGrades.length && (canReadStudents || user.role === 'teacher' || canReadFinance)) {
+    if (
+      matchedGrades.length &&
+      (canReadStudents || user.role === 'teacher' || canReadFinance)
+    ) {
       const gradeDossier = await this.buildFocusedGradeDossier(
         user,
         matchedGrades.map((g) => g.id),
@@ -2116,7 +2158,8 @@ export class AiService {
             teachers.length
               ? teachers
                   .map((t) => {
-                    const name = `${t.user.firstName} ${t.user.lastName}`.trim();
+                    const name =
+                      `${t.user.firstName} ${t.user.lastName}`.trim();
                     const hr = t.homeroomGrade
                       ? `homeroom ${t.homeroomGrade.name}${t.homeroomSection?.name ? `/${t.homeroomSection.name}` : ''}`
                       : 'no homeroom';
@@ -2129,7 +2172,9 @@ export class AiService {
       } else if (user.role === 'teacher') {
         lines.push(`- Teacher self: ${user.firstName} ${user.lastName}`);
       } else {
-        lines.push('- Teachers directory: not authorized for this role/permission');
+        lines.push(
+          '- Teachers directory: not authorized for this role/permission',
+        );
       }
     }
 
@@ -2196,7 +2241,8 @@ export class AiService {
               fees.length
                 ? fees
                     .map((f) => {
-                      const who = `${f.studentProfile.user.firstName} ${f.studentProfile.user.lastName}`.trim();
+                      const who =
+                        `${f.studentProfile.user.firstName} ${f.studentProfile.user.lastName}`.trim();
                       const bal = Math.max(
                         0,
                         f.amountDueCents - f.paidAmountCents,
@@ -2238,7 +2284,9 @@ export class AiService {
             ].filter(Boolean) as string[],
           ),
         ];
-        studentScope = gradeIds.length ? { gradeId: { in: gradeIds } } : undefined;
+        studentScope = gradeIds.length
+          ? { gradeId: { in: gradeIds } }
+          : undefined;
       }
       const today = await this.prisma.attendanceRecord.groupBy({
         by: ['status'],
@@ -2286,7 +2334,12 @@ export class AiService {
     }
 
     // --- Results (light) ---
-    if (wantsResults && canReadResults && user.role !== 'student' && user.role !== 'parent') {
+    if (
+      wantsResults &&
+      canReadResults &&
+      user.role !== 'student' &&
+      user.role !== 'parent'
+    ) {
       const term = await this.prisma.academicTerm.findFirst({
         where: { schoolId: user.schoolId, isCurrent: true },
         select: { id: true, name: true },
@@ -2301,7 +2354,10 @@ export class AiService {
       } else {
         lines.push('- Results: no current term set');
       }
-    } else if (wantsResults && (user.role === 'student' || user.role === 'parent')) {
+    } else if (
+      wantsResults &&
+      (user.role === 'student' || user.role === 'parent')
+    ) {
       lines.push(
         '- Results detail: open Results / Report card in your portal for full scores (assistant shows navigation + high-level context)',
       );
@@ -2620,7 +2676,11 @@ export class AiService {
     );
 
     const termLines = yearTerms.map((t) => {
-      const flag = t.isCurrent ? 'current' : t.academicYear.isCurrent ? 'this year' : '';
+      const flag = t.isCurrent
+        ? 'current'
+        : t.academicYear.isCurrent
+          ? 'this year'
+          : '';
       return `${t.academicYear.name} / ${t.name}${flag ? ` (${flag})` : ''}`;
     });
 
@@ -2677,7 +2737,9 @@ export class AiService {
       `- Username: ${user.username}`,
       `- Email: ${user.email}`,
       `- Role: ${user.role}`,
-      user.roleTemplateName ? `- Role template: ${user.roleTemplateName}` : null,
+      user.roleTemplateName
+        ? `- Role template: ${user.roleTemplateName}`
+        : null,
       user.permissions?.length
         ? `- Permissions: ${user.permissions.slice(0, 40).join(', ')}${user.permissions.length > 40 ? '…' : ''}`
         : '- Permissions: (none listed / role defaults)',
@@ -2753,7 +2815,9 @@ export class AiService {
       subjectLines.length
         ? `- Subjects: ${subjectLines.join('; ')}`
         : '- Subjects: none yet',
-      (access.canReadFinance || user.role === 'parent' || user.role === 'student') &&
+      (access.canReadFinance ||
+        user.role === 'parent' ||
+        user.role === 'student') &&
       feeTypes.length
         ? `- Active fee types: ${feeTypes.map((f) => f.name).join('; ')}`
         : access.canReadFinance

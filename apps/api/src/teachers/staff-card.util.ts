@@ -8,7 +8,7 @@ const CARD_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 export function generateSchoolTeacherId(): string {
   let suffix = '';
   for (let i = 0; i < TEACHER_ID_RANDOM_LEN; i++) {
-    suffix += CARD_CHARS[randomBytes(1)[0]! % CARD_CHARS.length];
+    suffix += CARD_CHARS[randomBytes(1)[0] % CARD_CHARS.length];
   }
   return `${TEACHER_ID_PREFIX}${suffix}`;
 }

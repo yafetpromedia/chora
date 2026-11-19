@@ -6,6 +6,7 @@ import { DashIcon } from "@/components/dashboard/dash-icons";
 import { AppToast } from "@/components/ui/app-toast";
 import type { PlanType } from "@/lib/api";
 import { platformFetch } from "@/lib/platform-auth";
+import { useHydrated } from "@/lib/use-client-snapshot";
 import { setSchoolPlan } from "@/lib/platform-plans";
 import type { PlatformSchoolDetail, PlatformSchoolRow } from "./platform-types";
 
@@ -65,7 +66,7 @@ export function SchoolDetailDrawer({
   canDelete,
 }: Props) {
   const [detail, setDetail] = useState<PlatformSchoolDetail | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(school !== null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [tab, setTab] = useState<Tab>("overview");
@@ -76,11 +77,7 @@ export function SchoolDetailDrawer({
   const [planMessage, setPlanMessage] = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState("");
   const [deleting, setDeleting] = useState(false);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const mounted = useHydrated();
 
   useEffect(() => {
     if (!school) return;
@@ -91,15 +88,22 @@ export function SchoolDetailDrawer({
     };
   }, [school]);
 
-  useEffect(() => {
+  // Reset local state when the selected school changes (adjusted during render).
+  const [prevSchool, setPrevSchool] = useState(school);
+  if (school !== prevSchool) {
+    setPrevSchool(school);
     if (!school) {
       setDetail(null);
       setTab("overview");
       setDeleteConfirm("");
-      return;
+    } else {
+      setLoading(true);
+      setError("");
     }
-    setLoading(true);
-    setError("");
+  }
+
+  useEffect(() => {
+    if (!school) return;
     void platformFetch<PlatformSchoolDetail>(`/platform/schools/${school.id}`)
       .then(setDetail)
       .catch((err) =>
@@ -110,11 +114,16 @@ export function SchoolDetailDrawer({
 
   const sub = school ? (detail?.subscription ?? school.subscription) : null;
 
-  useEffect(() => {
-    if (!school || !sub?.plan) return;
-    setPlanDraft(sub.plan as PlanType);
-    setPlanActive(sub.isActive ?? true);
-  }, [school, sub?.plan, sub?.isActive]);
+  const planSyncKey =
+    school && sub?.plan ? `${school.id}:${sub.plan}:${String(sub.isActive)}` : null;
+  const [prevPlanSyncKey, setPrevPlanSyncKey] = useState<string | null>(null);
+  if (planSyncKey !== prevPlanSyncKey) {
+    setPrevPlanSyncKey(planSyncKey);
+    if (sub?.plan) {
+      setPlanDraft(sub.plan as PlanType);
+      setPlanActive(sub.isActive ?? true);
+    }
+  }
 
   if (!school || !mounted) return null;
 

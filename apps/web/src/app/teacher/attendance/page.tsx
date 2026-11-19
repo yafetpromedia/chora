@@ -39,32 +39,46 @@ export default function TeacherAttendancePage() {
       router.replace(`/${role ?? "login"}`);
       return;
     }
-    if (role === "admin") {
-      setAllowed(true);
-      return;
-    }
-    void getMyTeacherProfile()
-      .then((profile) => {
+    let cancelled = false;
+    void (async () => {
+      if (role === "admin") {
+        setAllowed(true);
+        return;
+      }
+      try {
+        const profile = await getMyTeacherProfile();
+        if (cancelled) return;
         if (!profile.canTakeAttendance) {
           router.replace("/teacher");
           return;
         }
         setAllowed(true);
-      })
-      .catch(() => router.replace("/teacher"));
+      } catch {
+        if (!cancelled) router.replace("/teacher");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [router]);
 
   useEffect(() => {
     if (allowed !== true) return;
+    let cancelled = false;
     void getAttendanceConcernsSummary()
       .then((s) => {
+        if (cancelled) return;
         setOpenConcerns(s.open);
         setTodayConcerns(s.today);
       })
       .catch(() => {
+        if (cancelled) return;
         setOpenConcerns(0);
         setTodayConcerns(0);
       });
+    return () => {
+      cancelled = true;
+    };
   }, [allowed]);
 
   if (allowed !== true) {

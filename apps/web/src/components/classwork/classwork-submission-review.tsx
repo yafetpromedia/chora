@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   gradeSubmission,
   type ClassworkAssignment,
@@ -47,29 +47,39 @@ function StatusBadge({ status }: { status: string }) {
 
 const QUICK_PRESETS = [100, 90, 80, 70, 50, 0];
 
+function draftsFromSubmissions(
+  submissions: Props["submissions"],
+): Record<string, DraftGrade> {
+  const next: Record<string, DraftGrade> = {};
+  for (const s of submissions) {
+    next[s.id] = {
+      score: s.score != null ? String(s.score) : "",
+      feedback: s.feedback ?? "",
+    };
+  }
+  return next;
+}
+
 export function ClassworkSubmissionReview({
   assignment,
   submissions,
   mode,
   onGraded,
 }: Props) {
-  const [drafts, setDrafts] = useState<Record<string, DraftGrade>>({});
+  const [drafts, setDrafts] = useState<Record<string, DraftGrade>>(() =>
+    draftsFromSubmissions(submissions),
+  );
+  const [prevSubmissions, setPrevSubmissions] = useState(submissions);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [savedId, setSavedId] = useState<string | null>(null);
   const [error, setError] = useState("");
 
   const maxScore = assignment.maxScore;
 
-  useEffect(() => {
-    const next: Record<string, DraftGrade> = {};
-    for (const s of submissions) {
-      next[s.id] = {
-        score: s.score != null ? String(s.score) : "",
-        feedback: s.feedback ?? "",
-      };
-    }
-    setDrafts(next);
-  }, [submissions]);
+  if (prevSubmissions !== submissions) {
+    setPrevSubmissions(submissions);
+    setDrafts(draftsFromSubmissions(submissions));
+  }
 
   const stats = useMemo(() => {
     const submitted = submissions.filter((s) => s.status !== "PENDING").length;

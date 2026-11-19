@@ -60,7 +60,9 @@ export class ScoreCorrectionsService {
     dto: CreateScoreCorrectionDto,
   ) {
     if (role !== 'student' && role !== 'parent') {
-      throw new ForbiddenException('Only students or parents can report scores');
+      throw new ForbiddenException(
+        'Only students or parents can report scores',
+      );
     }
 
     const studentProfileId = await this.academics.resolveProfileId(
@@ -219,9 +221,7 @@ export class ScoreCorrectionsService {
         proposedScore: dto.proposedScore,
         status: ScoreCorrectionStatus.PROPOSED,
         teacherId: row.teacherId ?? userId,
-        ...(dto.replyNote?.trim()
-          ? { reviewNote: dto.replyNote.trim() }
-          : {}),
+        ...(dto.replyNote?.trim() ? { reviewNote: dto.replyNote.trim() } : {}),
       },
       include: correctionInclude,
     });
@@ -242,7 +242,9 @@ export class ScoreCorrectionsService {
 
     const row = await this.findOwned(schoolId, id);
     if (row.status !== ScoreCorrectionStatus.PROPOSED) {
-      throw new BadRequestException('Only proposed corrections can be approved');
+      throw new BadRequestException(
+        'Only proposed corrections can be approved',
+      );
     }
     if (row.proposedScore == null) {
       throw new BadRequestException('Proposed score is missing');

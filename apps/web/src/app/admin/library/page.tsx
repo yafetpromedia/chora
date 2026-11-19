@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
+import { useClientSnapshot } from "@/lib/use-client-snapshot";
 import { useRouter } from "next/navigation";
 import { DashboardPage } from "@/components/dashboard/dashboard-page";
 import { LibraryHubView } from "@/components/library/library-hub";
@@ -9,8 +10,16 @@ import { hasPermission, Permission } from "@/lib/permissions";
 
 export default function AdminLibraryPage() {
   const router = useRouter();
-  const [canManage, setCanManage] = useState(false);
-  const [canUpload, setCanUpload] = useState(false);
+  const canManage = useClientSnapshot(
+    () => hasPermission(Permission.LIBRARY_MANAGE),
+    false,
+  );
+  const canUpload = useClientSnapshot(
+    () =>
+      hasPermission(Permission.LIBRARY_UPLOAD) ||
+      hasPermission(Permission.LIBRARY_MANAGE),
+    false,
+  );
 
   useEffect(() => {
     if (
@@ -18,13 +27,7 @@ export default function AdminLibraryPage() {
       !isSchoolWorkspaceRole(localStorage.getItem(AUTH_ROLE_KEY))
     ) {
       router.replace("/login");
-      return;
     }
-    setCanManage(hasPermission(Permission.LIBRARY_MANAGE));
-    setCanUpload(
-      hasPermission(Permission.LIBRARY_UPLOAD) ||
-        hasPermission(Permission.LIBRARY_MANAGE),
-    );
   }, [router]);
 
   return (

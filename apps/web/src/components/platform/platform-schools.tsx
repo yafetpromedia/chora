@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { DashIcon } from "@/components/dashboard/dash-icons";
 import type { PlatformUser } from "@/lib/platform-auth";
 import { hasPlatformPermission } from "@/lib/platform-access";
@@ -51,14 +51,11 @@ export function PlatformSchools({
 }: Props) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<StatusFilter>("ALL");
-  const [selected, setSelected] = useState<PlatformSchoolRow | null>(null);
+  const [selectedRow, setSelected] = useState<PlatformSchoolRow | null>(null);
+  const selected = selectedRow
+    ? (schools.find((s) => s.id === selectedRow.id) ?? selectedRow)
+    : null;
   const [createOpen, setCreateOpen] = useState(false);
-
-  useEffect(() => {
-    if (!selected) return;
-    const next = schools.find((s) => s.id === selected.id);
-    if (next) setSelected(next);
-  }, [schools, selected]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();

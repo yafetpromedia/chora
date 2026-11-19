@@ -6,7 +6,13 @@ import {
 } from '@nestjs/common';
 import { GradePreset } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { gradeNamesForPreset, gradeNamesForRange, presetForGradeNames, EARLY_CHILDHOOD_GRADES, GRADE_PRESET_OPTIONS } from './grade-presets';
+import {
+  gradeNamesForPreset,
+  gradeNamesForRange,
+  presetForGradeNames,
+  EARLY_CHILDHOOD_GRADES,
+  GRADE_PRESET_OPTIONS,
+} from './grade-presets';
 import type { SetupGradesDto } from './dto/setup-grades.dto';
 
 @Injectable()
@@ -28,7 +34,10 @@ export class GradesService {
     });
   }
 
-  async setupGrades(schoolId: string, presetOrDto: GradePreset | SetupGradesDto) {
+  async setupGrades(
+    schoolId: string,
+    presetOrDto: GradePreset | SetupGradesDto,
+  ) {
     const existing = await this.prisma.grade.count({ where: { schoolId } });
     if (existing > 0) {
       throw new ConflictException(
@@ -36,10 +45,16 @@ export class GradesService {
       );
     }
 
-    return this.createGradesFromInput(schoolId, this.normalizeSetupInput(presetOrDto));
+    return this.createGradesFromInput(
+      schoolId,
+      this.normalizeSetupInput(presetOrDto),
+    );
   }
 
-  async resetGrades(schoolId: string, presetOrDto: GradePreset | SetupGradesDto) {
+  async resetGrades(
+    schoolId: string,
+    presetOrDto: GradePreset | SetupGradesDto,
+  ) {
     const input = this.normalizeSetupInput(presetOrDto);
     const names = this.resolveGradeNames(input);
     const [studentCount, current] = await Promise.all([
@@ -58,7 +73,8 @@ export class GradesService {
     }
 
     const same =
-      current.length === names.length && current.every((g, i) => g.name === names[i]);
+      current.length === names.length &&
+      current.every((g, i) => g.name === names[i]);
     if (same) {
       return { replaced: false, grades: await this.listGrades(schoolId) };
     }
@@ -68,11 +84,7 @@ export class GradesService {
     return { replaced: true, grades };
   }
 
-  async addGrade(
-    schoolId: string,
-    name: string,
-    sections: string[] = [],
-  ) {
+  async addGrade(schoolId: string, name: string, sections: string[] = []) {
     const trimmed = name.trim();
     if (!trimmed) throw new BadRequestException('Grade name is required');
     const existing = await this.prisma.grade.findFirst({
@@ -93,7 +105,11 @@ export class GradesService {
         sortOrder: (last?.sortOrder ?? -1) + 1,
         sections:
           uniqueSections.length > 0
-            ? { create: uniqueSections.map((sectionName) => ({ name: sectionName })) }
+            ? {
+                create: uniqueSections.map((sectionName) => ({
+                  name: sectionName,
+                })),
+              }
             : undefined,
       },
     });
@@ -104,7 +120,9 @@ export class GradesService {
     return this.listGrades(schoolId);
   }
 
-  private normalizeSetupInput(presetOrDto: GradePreset | SetupGradesDto): SetupGradesDto {
+  private normalizeSetupInput(
+    presetOrDto: GradePreset | SetupGradesDto,
+  ): SetupGradesDto {
     if (typeof presetOrDto === 'string') return { preset: presetOrDto };
     return presetOrDto;
   }
@@ -126,7 +144,9 @@ export class GradesService {
   private resolveGradeNames(input: SetupGradesDto): string[] {
     if (input.fromGrade != null && input.toGrade != null) {
       if (input.fromGrade > input.toGrade) {
-        throw new BadRequestException('Start grade must be less than or equal to end grade');
+        throw new BadRequestException(
+          'Start grade must be less than or equal to end grade',
+        );
       }
       const names = gradeNamesForRange(
         input.fromGrade,
@@ -157,7 +177,11 @@ export class GradesService {
             sortOrder: index,
             sections:
               sections.length > 0
-                ? { create: sections.map((sectionName) => ({ name: sectionName })) }
+                ? {
+                    create: sections.map((sectionName) => ({
+                      name: sectionName,
+                    })),
+                  }
                 : undefined,
           },
         }),

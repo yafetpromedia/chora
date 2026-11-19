@@ -103,9 +103,8 @@ export class AuthService {
         createdAt: user.createdAt,
       },
       school,
-      student:
-        user.studentProfile ?
-          {
+      student: user.studentProfile
+        ? {
             grade: user.studentProfile.grade.name,
             section: user.studentProfile.section?.name ?? null,
             fan: user.studentProfile.fan,
@@ -113,9 +112,8 @@ export class AuthService {
             parentsCanViewResults: user.studentProfile.parentsCanViewResults,
           }
         : null,
-      teacher:
-        user.teacherProfile ?
-          {
+      teacher: user.teacherProfile
+        ? {
             homeroomGrade: user.teacherProfile.homeroomGrade?.name ?? null,
             homeroomSection: user.teacherProfile.homeroomSection?.name ?? null,
           }
@@ -286,8 +284,14 @@ export class AuthService {
       dto.inviteToken,
     );
 
-    if (role === 'student' && !dto.externalRef?.trim() && !dto.username?.trim()) {
-      throw new BadRequestException('Student ID is required for student accounts');
+    if (
+      role === 'student' &&
+      !dto.externalRef?.trim() &&
+      !dto.username?.trim()
+    ) {
+      throw new BadRequestException(
+        'Student ID is required for student accounts',
+      );
     }
 
     const school = await this.schoolsService.findById(schoolId);
@@ -337,7 +341,9 @@ export class AuthService {
     const school = await this.schoolsService.findByJoinCode(dto.schoolCode);
     const studentId = dto.externalRef?.trim();
     if (!studentId) {
-      throw new BadRequestException('Student ID is required for student accounts');
+      throw new BadRequestException(
+        'Student ID is required for student accounts',
+      );
     }
 
     await this.verifyEnrolledStudent(
@@ -491,12 +497,12 @@ export class AuthService {
       'JWT_REFRESH_SECRET',
       'dev-refresh-secret',
     );
-    const payload = await this.jwtService.verifyAsync<{ id: string; scope?: string }>(
-      dto.refreshToken,
-      {
-        secret: refreshSecret,
-      },
-    );
+    const payload = await this.jwtService.verifyAsync<{
+      id: string;
+      scope?: string;
+    }>(dto.refreshToken, {
+      secret: refreshSecret,
+    });
 
     if (payload.scope === 'platform') {
       throw new UnauthorizedException('Use platform refresh endpoint');
@@ -582,4 +588,3 @@ export class AuthService {
     };
   }
 }
-

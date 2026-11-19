@@ -68,21 +68,31 @@ export class LibraryController {
     @Query('status') status?: LibraryResourceStatus,
     @Query('limit') limit?: string,
   ) {
-    return this.libraryService.listResources(user.schoolId, user.id, user.role, {
-      q: q?.trim() || undefined,
-      categoryId,
-      resourceType,
-      gradeId,
-      status:
-        user.role === 'admin' || user.role === 'staff' ? status : undefined,
-      limit: limit ? Number(limit) : undefined,
-    });
+    return this.libraryService.listResources(
+      user.schoolId,
+      user.id,
+      user.role,
+      {
+        q: q?.trim() || undefined,
+        categoryId,
+        resourceType,
+        gradeId,
+        status:
+          user.role === 'admin' || user.role === 'staff' ? status : undefined,
+        limit: limit ? Number(limit) : undefined,
+      },
+    );
   }
 
   @Get('resources/:id')
   @Roles('admin', 'staff', 'teacher', 'student', 'parent')
   getOne(@CurrentUser() user: AuthUser, @Param('id') id: string) {
-    return this.libraryService.getResource(user.schoolId, user.id, user.role, id);
+    return this.libraryService.getResource(
+      user.schoolId,
+      user.id,
+      user.role,
+      id,
+    );
   }
 
   @Post('resources')
@@ -172,11 +182,6 @@ export class LibraryController {
     @Param('id') id: string,
     @Body() dto: UpdateReadingProgressDto,
   ) {
-    return this.libraryService.updateProgress(
-      user.schoolId,
-      user.id,
-      id,
-      dto,
-    );
+    return this.libraryService.updateProgress(user.schoolId, user.id, id, dto);
   }
 }

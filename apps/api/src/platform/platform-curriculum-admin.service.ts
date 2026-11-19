@@ -94,7 +94,9 @@ export class PlatformCurriculumAdminService {
     });
     if (!pkg) throw new NotFoundException('Curriculum package not found');
     if (pkg.isBlank) {
-      throw new BadRequestException('Cannot add library items to blank package');
+      throw new BadRequestException(
+        'Cannot add library items to blank package',
+      );
     }
 
     const resource = await this.prisma.platformLibraryResource.findUnique({
@@ -246,7 +248,9 @@ export class PlatformCurriculumAdminService {
       where: { id: row.id },
       data: {
         ...(dto.name != null ? { name: dto.name.trim() } : {}),
-        ...(dto.channel != null ? { channel: dto.channel.trim().toUpperCase() } : {}),
+        ...(dto.channel != null
+          ? { channel: dto.channel.trim().toUpperCase() }
+          : {}),
         ...(dto.body != null ? { body: dto.body.trim() } : {}),
       },
     });
@@ -283,7 +287,9 @@ export class PlatformCurriculumAdminService {
       where: { packageId_name: { packageId: pkg.id, name } },
     });
     if (existing) {
-      throw new BadRequestException(`Department "${name}" is already in this package`);
+      throw new BadRequestException(
+        `Department "${name}" is already in this package`,
+      );
     }
 
     const maxOrder = await this.prisma.curriculumPackageDepartment.aggregate({

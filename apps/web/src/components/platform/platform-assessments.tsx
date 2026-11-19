@@ -56,7 +56,8 @@ export function PlatformAssessments({ schools }: { schools: PlatformSchoolRow[] 
   const [catalog, setCatalog] = useState<CatalogRow[]>([]);
   const [catalogQ, setCatalogQ] = useState("");
   const [catalogLoading, setCatalogLoading] = useState(true);
-  const [schoolId, setSchoolId] = useState("");
+  const [pickedSchoolId, setSchoolId] = useState("");
+  const schoolId = pickedSchoolId || schools[0]?.id || "";
   const [templates, setTemplates] = useState<TemplateRow[]>([]);
   const [name, setName] = useState("School default template");
   const [components, setComponents] = useState(DEFAULT_COMPONENTS);
@@ -72,12 +73,6 @@ export function PlatformAssessments({ schools }: { schools: PlatformSchoolRow[] 
     }
     setError(err instanceof Error ? err.message : fallback);
   }
-
-  useEffect(() => {
-    if (!schoolId && schools[0]) {
-      setSchoolId(schools[0].id);
-    }
-  }, [schoolId, schools]);
 
   const loadCatalog = useCallback(async () => {
     setCatalogLoading(true);
@@ -95,7 +90,7 @@ export function PlatformAssessments({ schools }: { schools: PlatformSchoolRow[] 
   }, [router]);
 
   useEffect(() => {
-    void loadCatalog();
+    queueMicrotask(() => void loadCatalog());
   }, [loadCatalog]);
 
   async function loadTemplates(targetSchoolId: string) {
@@ -115,7 +110,8 @@ export function PlatformAssessments({ schools }: { schools: PlatformSchoolRow[] 
   }
 
   useEffect(() => {
-    void loadTemplates(schoolId);
+    queueMicrotask(() => void loadTemplates(schoolId));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [schoolId]);
 
   const selectedSchool = useMemo(

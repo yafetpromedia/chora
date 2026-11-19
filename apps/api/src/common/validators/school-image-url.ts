@@ -3,8 +3,7 @@ import { BadRequestException } from '@nestjs/common';
 const MAX_DATA_URL_CHARS = 3_000_000;
 const MAX_HTTPS_URL_CHARS = 2048;
 
-const DATA_IMAGE =
-  /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/]+=*$/;
+const DATA_IMAGE = /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/]+=*$/;
 const HTTPS_URL = /^https:\/\/[^\s<>"']+$/i;
 
 /**

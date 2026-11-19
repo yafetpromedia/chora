@@ -70,10 +70,16 @@ export function StudentManageDrawer({
   const [photoUrl, setPhotoUrl] = useState<string | null>(student.photoUrl);
   const [gradeId, setGradeId] = useState(student.grade.id);
   const [sectionId, setSectionId] = useState(student.section?.id ?? "");
-  const [fatherName, setFatherName] = useState("");
-  const [fatherPhone, setFatherPhone] = useState("");
-  const [motherName, setMotherName] = useState("");
-  const [motherPhone, setMotherPhone] = useState("");
+  const [fatherName, setFatherName] = useState(() => {
+    const father = student.parents[0]?.parent;
+    return father ? `${father.firstName} ${father.lastName}`.trim() : "";
+  });
+  const [fatherPhone, setFatherPhone] = useState(student.parents[0]?.parent?.phone ?? "");
+  const [motherName, setMotherName] = useState(() => {
+    const mother = student.parents[1]?.parent;
+    return mother ? `${mother.firstName} ${mother.lastName}`.trim() : "";
+  });
+  const [motherPhone, setMotherPhone] = useState(student.parents[1]?.parent?.phone ?? "");
   const [saving, setSaving] = useState(false);
   const [portalTempPassword, setPortalTempPassword] = useState(
     student.portalTempPassword,
@@ -85,7 +91,9 @@ export function StudentManageDrawer({
   const age = dateOfBirth ? ageFromDob(dateOfBirth) : null;
   const displayName = studentName(student);
 
-  useEffect(() => {
+  const [prevStudent, setPrevStudent] = useState(student);
+  if (student !== prevStudent) {
+    setPrevStudent(student);
     const father = student.parents[0]?.parent;
     const mother = student.parents[1]?.parent;
     setFatherName(father ? `${father.firstName} ${father.lastName}`.trim() : "");
@@ -95,7 +103,7 @@ export function StudentManageDrawer({
     setAddress(student.address ?? "");
     setPortalTempPassword(student.portalTempPassword);
     setTab("contact");
-  }, [student]);
+  }
 
   const contactPreview = useMemo(
     () => ({
@@ -116,9 +124,15 @@ export function StudentManageDrawer({
     { id: "idcard", label: "ID card" },
   ];
 
+  const idCardKey = tab === "idcard" ? student.id : "";
+  const [prevIdCardKey, setPrevIdCardKey] = useState("");
+  if (idCardKey !== prevIdCardKey) {
+    setPrevIdCardKey(idCardKey);
+    if (idCardKey) setIdCardLoading(true);
+  }
+
   useEffect(() => {
     if (tab !== "idcard") return;
-    setIdCardLoading(true);
     void getStudentIdCard(student.id)
       .then(setIdCard)
       .catch(() => setIdCard(null))

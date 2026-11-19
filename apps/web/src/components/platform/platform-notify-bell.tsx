@@ -165,7 +165,7 @@ export function PlatformNotifyBell({ user, onOpenSection }: Props) {
 
   useEffect(() => {
     if (!user || !canNotify) return;
-    void loadAlerts();
+    queueMicrotask(() => void loadAlerts());
     const timer = window.setInterval(() => void loadAlerts(), 60_000);
     return () => window.clearInterval(timer);
   }, [user, canNotify, loadAlerts]);

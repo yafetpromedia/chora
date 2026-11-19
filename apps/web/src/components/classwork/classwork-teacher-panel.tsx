@@ -245,13 +245,35 @@ export function ClassworkTeacherPanel({ mode }: Props) {
 
     if (loading) return;
 
-    void loadItems().catch((err) =>
+    let cancelled = false;
 
-      setError(err instanceof Error ? err.message : "Load failed"),
+    void listTeacherAssignments({
 
-    );
+      classSubjectId: classSubjectId || undefined,
 
-  }, [loading, loadItems]);
+      type: mode,
+
+    })
+
+      .then((rows) => {
+
+        if (!cancelled) setItems(rows);
+
+      })
+
+      .catch((err) => {
+
+        if (!cancelled) setError(err instanceof Error ? err.message : "Load failed");
+
+      });
+
+    return () => {
+
+      cancelled = true;
+
+    };
+
+  }, [loading, classSubjectId, mode]);
 
 
 

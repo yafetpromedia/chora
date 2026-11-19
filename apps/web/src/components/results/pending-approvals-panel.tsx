@@ -32,7 +32,8 @@ export function PendingApprovalsPanel({
   onError,
   onCountChange,
 }: Props) {
-  const [termId, setTermId] = useState(defaultTermId ?? "");
+  const [termIdState, setTermId] = useState(defaultTermId ?? "");
+  const termId = termIdState || defaultTermId || "";
   const [pending, setPending] = useState<PendingWorkflowItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -59,13 +60,35 @@ export function PendingApprovalsPanel({
     }
   }, [termId, onError, onCountChange]);
 
-  useEffect(() => {
-    if (defaultTermId && !termId) setTermId(defaultTermId);
-  }, [defaultTermId, termId]);
+  const [prevTermId, setPrevTermId] = useState(termId);
+  if (termId !== prevTermId) {
+    setPrevTermId(termId);
+    setLoading(true);
+  }
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    let cancelled = false;
+    void (async () => {
+      try {
+        const rows = await listPendingWorkflow(
+          termId ? { termId, status: "SUBMITTED" } : { status: "SUBMITTED" },
+        );
+        if (cancelled) return;
+        setPending(rows);
+        onCountChange?.(rows.length);
+        setSelected(new Set());
+        setPage(0);
+      } catch (err) {
+        if (cancelled) return;
+        onError?.(err instanceof Error ? err.message : "Could not load approvals");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [termId, onError, onCountChange]);
 
   const pageCount = Math.max(1, Math.ceil(pending.length / PAGE_SIZE));
   const pageItems = useMemo(

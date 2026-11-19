@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AUTH_TOKEN_KEY } from "@/lib/auth";
 import { reportCardPrintUrl, type ReportCardPrintMode } from "@/lib/results";
@@ -16,29 +16,34 @@ export function ReportCardPrintInner() {
   const mode: ReportCardPrintMode =
     searchParams.get("mode") === "annual" ? "annual" : "term";
 
-  const load = useCallback(async () => {
+  useEffect(() => {
     const token = localStorage.getItem(AUTH_TOKEN_KEY);
     if (!token || !studentProfileId || !termId) {
       router.replace("/login");
       return;
     }
-    setError("");
-    try {
-      const res = await fetch(reportCardPrintUrl(studentProfileId, termId, mode), {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error("Could not load report");
-      setHtml(await res.text());
-    } catch {
-      setError(
-        "Report card is not available. Publish results for all class subjects first.",
-      );
-    }
+    let cancelled = false;
+    void (async () => {
+      if (!cancelled) setError("");
+      try {
+        const res = await fetch(reportCardPrintUrl(studentProfileId, termId, mode), {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) throw new Error("Could not load report");
+        const text = await res.text();
+        if (!cancelled) setHtml(text);
+      } catch {
+        if (!cancelled) {
+          setError(
+            "Report card is not available. Publish results for all class subjects first.",
+          );
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [studentProfileId, termId, mode, router]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
 
   function onPrint() {
     const frameWindow = frameRef.current?.contentWindow;

@@ -160,7 +160,11 @@ export class PermissionsService implements OnModuleInit {
     });
 
     if (!user) {
-      return { permissions: [], roleTemplateSlug: null, roleTemplateName: null };
+      return {
+        permissions: [],
+        roleTemplateSlug: null,
+        roleTemplateName: null,
+      };
     }
 
     const set = new Set<PermissionKey>();
@@ -214,11 +218,15 @@ export class PermissionsService implements OnModuleInit {
     }));
   }
 
-  async listCatalog() {
-    return PERMISSION_META;
+  listCatalog() {
+    return Promise.resolve(PERMISSION_META);
   }
 
-  async assignTemplate(userId: string, schoolId: string, roleTemplateId: string) {
+  async assignTemplate(
+    userId: string,
+    schoolId: string,
+    roleTemplateId: string,
+  ) {
     const template = await this.prisma.roleTemplate.findFirst({
       where: { id: roleTemplateId, schoolId },
     });

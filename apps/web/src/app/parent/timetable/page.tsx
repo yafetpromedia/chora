@@ -72,7 +72,7 @@ export default function ParentTimetablePage() {
     >
       <div className="par-portal-stack">
         <ParentChildBar
-          children={children}
+          options={children}
           selectedId={selectedId}
           onChange={selectChild}
           loading={childrenLoading}

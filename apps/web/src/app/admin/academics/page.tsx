@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { DashboardPage } from "@/components/dashboard/dashboard-page";
 import {
@@ -207,7 +208,7 @@ export default function AcademicsSetupPage() {
               <a href="/admin/results">Results</a>
               <a href="/admin/report-cards">Report cards</a>
               <a href="/admin/results/templates">Assessment templates</a>
-              <a href="/admin/students">Students</a>
+              <Link href="/admin/students">Students</Link>
               <a href="/admin/timetable">Timetable</a>
             </nav>
           </>

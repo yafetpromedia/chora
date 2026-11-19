@@ -65,10 +65,12 @@ export function PlatformPaymentProofs({ onReviewed }: Props) {
   }, [filter]);
 
   useEffect(() => {
-    setLoading(true);
-    void load()
-      .catch((e) => fail(e, "Failed to load payment receipts"))
-      .finally(() => setLoading(false));
+    queueMicrotask(() => {
+      setLoading(true);
+      void load()
+        .catch((e) => fail(e, "Failed to load payment receipts"))
+        .finally(() => setLoading(false));
+    });
   }, [load, router]);
 
   const pendingCount = useMemo(

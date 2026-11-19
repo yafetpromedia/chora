@@ -195,11 +195,7 @@ export class ResultWorkflowService {
     return this.formatSheet(updated);
   }
 
-  async reopen(
-    schoolId: string,
-    termId: string,
-    classSubjectId: string,
-  ) {
+  async reopen(schoolId: string, termId: string, classSubjectId: string) {
     const sheet = await this.getOrCreateSheet(schoolId, termId, classSubjectId);
     const updated = await this.prisma.classSubjectTermSheet.update({
       where: { id: sheet.id },
@@ -284,47 +280,48 @@ export class ResultWorkflowService {
     const now = new Date();
     const publishableIds = publishable.map((s) => s.id);
 
-    const [fromApproved, fromSubmitted, fromDraft] = await this.prisma.$transaction([
-      this.prisma.classSubjectTermSheet.updateMany({
-        where: {
-          id: { in: publishableIds },
-          status: ResultWorkflowStatus.APPROVED,
-        },
-        data: {
-          status: ResultWorkflowStatus.PUBLISHED,
-          publishedBy: userId,
-          publishedAt: now,
-        },
-      }),
-      this.prisma.classSubjectTermSheet.updateMany({
-        where: {
-          id: { in: publishableIds },
-          status: ResultWorkflowStatus.SUBMITTED,
-        },
-        data: {
-          status: ResultWorkflowStatus.PUBLISHED,
-          publishedBy: userId,
-          publishedAt: now,
-          approvedBy: userId,
-          approvedAt: now,
-        },
-      }),
-      this.prisma.classSubjectTermSheet.updateMany({
-        where: {
-          id: { in: publishableIds },
-          status: ResultWorkflowStatus.DRAFT,
-        },
-        data: {
-          status: ResultWorkflowStatus.PUBLISHED,
-          publishedBy: userId,
-          publishedAt: now,
-          submittedBy: userId,
-          submittedAt: now,
-          approvedBy: userId,
-          approvedAt: now,
-        },
-      }),
-    ]);
+    const [fromApproved, fromSubmitted, fromDraft] =
+      await this.prisma.$transaction([
+        this.prisma.classSubjectTermSheet.updateMany({
+          where: {
+            id: { in: publishableIds },
+            status: ResultWorkflowStatus.APPROVED,
+          },
+          data: {
+            status: ResultWorkflowStatus.PUBLISHED,
+            publishedBy: userId,
+            publishedAt: now,
+          },
+        }),
+        this.prisma.classSubjectTermSheet.updateMany({
+          where: {
+            id: { in: publishableIds },
+            status: ResultWorkflowStatus.SUBMITTED,
+          },
+          data: {
+            status: ResultWorkflowStatus.PUBLISHED,
+            publishedBy: userId,
+            publishedAt: now,
+            approvedBy: userId,
+            approvedAt: now,
+          },
+        }),
+        this.prisma.classSubjectTermSheet.updateMany({
+          where: {
+            id: { in: publishableIds },
+            status: ResultWorkflowStatus.DRAFT,
+          },
+          data: {
+            status: ResultWorkflowStatus.PUBLISHED,
+            publishedBy: userId,
+            publishedAt: now,
+            submittedBy: userId,
+            submittedAt: now,
+            approvedBy: userId,
+            approvedAt: now,
+          },
+        }),
+      ]);
 
     await this.notifyParentsOfBulkPublish(schoolId, publishable);
 
@@ -591,11 +588,7 @@ export class ResultWorkflowService {
     termId: string,
     classSubjectId: string,
   ) {
-    const count = await this.countSheetScores(
-      schoolId,
-      termId,
-      classSubjectId,
-    );
+    const count = await this.countSheetScores(schoolId, termId, classSubjectId);
     if (count === 0) {
       throw new BadRequestException(
         'Cannot publish — no scores have been entered for this class',

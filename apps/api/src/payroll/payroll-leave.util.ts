@@ -1,9 +1,7 @@
 /** Calendar helpers for payroll leave / absence — integer day counts only. */
 
 export function toUtcDateKey(d: Date): string {
-  return new Date(
-    Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()),
-  )
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()))
     .toISOString()
     .slice(0, 10);
 }
@@ -40,8 +38,7 @@ export function leaveDaysInPeriod(
   periodStart: Date,
   periodEnd: Date,
 ): string[] {
-  const start =
-    leaveStart > periodStart ? leaveStart : periodStart;
+  const start = leaveStart > periodStart ? leaveStart : periodStart;
   const end = leaveEnd < periodEnd ? leaveEnd : periodEnd;
   return eachUtcDateKey(start, end);
 }

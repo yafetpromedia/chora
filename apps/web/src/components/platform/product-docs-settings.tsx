@@ -46,24 +46,28 @@ export function ProductDocsSettings({
   const thumbInputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState("");
   const [uploading, setUploading] = useState(false);
-  const [probe, setProbe] = useState<"idle" | "ok" | "missing">("idle");
+  const [probeResult, setProbeResult] = useState<{
+    url: string;
+    status: "ok" | "missing";
+  } | null>(null);
 
   const hasUploaded = Boolean(docsUrl.trim());
   const resolved = resolveProductDocsUrl(docsUrl);
+  const probe: "idle" | "ok" | "missing" =
+    probeResult && probeResult.url === resolved ? probeResult.status : "idle";
   const downloadHref = productDocsDownloadUrl(resolved);
   const usingFallback = !hasUploaded;
   const thumbPreview = resolvePreviewUrl(thumbnailUrl);
 
   useEffect(() => {
     let cancelled = false;
-    setProbe("idle");
     void fetch(resolved, { method: "HEAD", cache: "no-store" })
       .then((res) => {
         if (cancelled) return;
-        setProbe(res.ok ? "ok" : "missing");
+        setProbeResult({ url: resolved, status: res.ok ? "ok" : "missing" });
       })
       .catch(() => {
-        if (!cancelled) setProbe("missing");
+        if (!cancelled) setProbeResult({ url: resolved, status: "missing" });
       });
     return () => {
       cancelled = true;

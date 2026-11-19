@@ -89,11 +89,11 @@ export function PlatformSubjects() {
   }, [loadSubjects, router]);
 
   useEffect(() => {
-    void load();
+    queueMicrotask(() => void load());
   }, [load]);
 
   useEffect(() => {
-    if (!loading) void loadSubjects();
+    if (!loading) queueMicrotask(() => void loadSubjects());
   }, [showArchived, loadSubjects, loading]);
 
   const stats = useMemo(() => {

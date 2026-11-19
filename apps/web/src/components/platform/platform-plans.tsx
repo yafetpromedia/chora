@@ -87,9 +87,11 @@ export function PlatformPlans() {
   }, []);
 
   useEffect(() => {
-    void load()
-      .catch((e) => fail(e, "Failed to load plans"))
-      .finally(() => setLoading(false));
+    queueMicrotask(() => {
+      void load()
+        .catch((e) => fail(e, "Failed to load plans"))
+        .finally(() => setLoading(false));
+    });
   }, [load, router]);
 
   const stats = useMemo(() => {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useClientSnapshot } from "@/lib/use-client-snapshot";
 import { useRouter } from "next/navigation";
 import { DashIcon } from "@/components/dashboard/dash-icons";
 import { DashboardPage } from "@/components/dashboard/dashboard-page";
@@ -99,7 +100,10 @@ function printTimetableBoard() {
 
 export default function AdminTimetablePage() {
   const router = useRouter();
-  const [canEdit, setCanEdit] = useState(false);
+  const canEdit = useClientSnapshot(
+    () => hasPermission(Permission.TIMETABLE_MANAGE),
+    false,
+  );
 
   const [grades, setGrades] = useState<GradeWithSections[]>([]);
   const [academicYearId, setAcademicYearId] = useState("");
@@ -147,18 +151,26 @@ export default function AdminTimetablePage() {
     [filteredClasses],
   );
 
-  const loadPeriods = useCallback(async () => {
-    if (!academicYearId) return;
+  const fetchPeriods = useCallback(async () => {
+    if (!academicYearId) return null;
     await ensureTimetable(academicYearId);
     const rows = await listTimetablePeriods(academicYearId);
-    setPeriods(
-      rows.map((p) => ({
-        number: p.number,
-        label: p.label,
-        startTime: p.startTime ?? "",
-        endTime: p.endTime ?? "",
-      })),
-    );
+    return rows.map((p) => ({
+      number: p.number,
+      label: p.label,
+      startTime: p.startTime ?? "",
+      endTime: p.endTime ?? "",
+    }));
+  }, [academicYearId]);
+
+  const loadPeriods = useCallback(async () => {
+    const next = await fetchPeriods();
+    if (next) setPeriods(next);
+  }, [fetchPeriods]);
+
+  const fetchOverview = useCallback(async () => {
+    await ensureTimetable(academicYearId);
+    return getTimetableOverview(academicYearId);
   }, [academicYearId]);
 
   const loadOverview = useCallback(async () => {
@@ -166,47 +178,47 @@ export default function AdminTimetablePage() {
     setBusy(true);
     setError("");
     try {
-      await ensureTimetable(academicYearId);
-      const data = await getTimetableOverview(academicYearId);
+      const data = await fetchOverview();
       setOverview(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load overview");
     } finally {
       setBusy(false);
     }
-  }, [academicYearId]);
+  }, [academicYearId, fetchOverview]);
+
+  const fetchGrid = useCallback(async () => {
+    await ensureTimetable(academicYearId);
+    const data = await getTimetableGrid(
+      academicYearId,
+      gradeId,
+      sectionId || undefined,
+    );
+    const next: Record<string, CellDraft> = {};
+    for (const e of data.entries) {
+      next[cellKey(e.weekday, e.period.number)] = {
+        subjectId: e.subject.id,
+        teacherUserId: e.teacher?.userId ?? "",
+        roomName: e.room?.name ?? "",
+      };
+    }
+    return { data, cells: next };
+  }, [academicYearId, gradeId, sectionId]);
 
   const loadGrid = useCallback(async () => {
     if (!academicYearId || !gradeId) return;
     setBusy(true);
     setError("");
     try {
-      await ensureTimetable(academicYearId);
-      const data = await getTimetableGrid(
-        academicYearId,
-        gradeId,
-        sectionId || undefined,
-      );
+      const { data, cells: next } = await fetchGrid();
       setGrid(data);
-      const next: Record<string, CellDraft> = {};
-      for (const e of data.entries) {
-        next[cellKey(e.weekday, e.period.number)] = {
-          subjectId: e.subject.id,
-          teacherUserId: e.teacher?.userId ?? "",
-          roomName: e.room?.name ?? "",
-        };
-      }
       setCells(next);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load timetable");
     } finally {
       setBusy(false);
     }
-  }, [academicYearId, gradeId, sectionId]);
-
-  useEffect(() => {
-    setCanEdit(hasPermission(Permission.TIMETABLE_MANAGE));
-  }, []);
+  }, [academicYearId, gradeId, fetchGrid]);
 
   useEffect(() => {
     if (
@@ -227,16 +239,58 @@ export default function AdminTimetablePage() {
 
   useEffect(() => {
     if (!academicYearId || loading) return;
-    void loadPeriods().catch((err) =>
-      setError(err instanceof Error ? err.message : "Could not load periods"),
-    );
-    void loadOverview();
-  }, [academicYearId, loading, loadPeriods, loadOverview]);
+    let cancelled = false;
+    void fetchPeriods()
+      .then((next) => {
+        if (!cancelled && next) setPeriods(next);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Could not load periods");
+        }
+      });
+    void (async () => {
+      setBusy(true);
+      setError("");
+      try {
+        const data = await fetchOverview();
+        if (!cancelled) setOverview(data);
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Could not load overview");
+        }
+      } finally {
+        setBusy(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [academicYearId, loading, fetchPeriods, fetchOverview]);
 
   useEffect(() => {
     if (viewMode !== "edit" || !academicYearId || !gradeId || loading) return;
-    void loadGrid();
-  }, [viewMode, academicYearId, gradeId, sectionId, loading, loadGrid]);
+    let cancelled = false;
+    void (async () => {
+      setBusy(true);
+      setError("");
+      try {
+        const { data, cells: next } = await fetchGrid();
+        if (cancelled) return;
+        setGrid(data);
+        setCells(next);
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Could not load timetable");
+        }
+      } finally {
+        setBusy(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [viewMode, academicYearId, gradeId, sectionId, loading, fetchGrid]);
 
   useEffect(() => {
     if (viewMode !== "stack" || !academicYearId || loading) return;

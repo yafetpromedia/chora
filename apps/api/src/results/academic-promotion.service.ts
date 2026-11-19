@@ -32,7 +32,9 @@ export class AcademicPromotionService {
     });
 
     const suggestedToYear =
-      otherYears.find((y) => !y.isCurrent && y.startDate > fromYear.startDate) ??
+      otherYears.find(
+        (y) => !y.isCurrent && y.startDate > fromYear.startDate,
+      ) ??
       otherYears[0] ??
       null;
 

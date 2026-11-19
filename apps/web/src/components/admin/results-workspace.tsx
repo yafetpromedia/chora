@@ -83,30 +83,37 @@ export function ResultsWorkspace({ students, onError }: Props) {
     [router, searchParams],
   );
 
-  const loadMeta = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [t, cs, corrections] = await Promise.all([
-        listTerms(),
-        listClassSubjects(),
-        listScoreCorrections({ status: "PROPOSED" }).catch(() => []),
-      ]);
-      setTerms(t);
-      setClassCount(cs.length);
-      setPendingCorrections(corrections.length);
-      const current = t.find((x) => x.isCurrent) ?? t[0];
-      if (current) setTermId((prev) => prev || current.id);
-      if (students[0]) setViewStudentId((prev) => prev || students[0].id);
-    } catch (err) {
-      setErr(err instanceof Error ? err.message : "Could not load results workspace");
-    } finally {
-      setLoading(false);
-    }
-  }, [setErr, students]);
-
   useEffect(() => {
-    void loadMeta();
-  }, [loadMeta]);
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) setLoading(true);
+    });
+    void (async () => {
+      try {
+        const [t, cs, corrections] = await Promise.all([
+          listTerms(),
+          listClassSubjects(),
+          listScoreCorrections({ status: "PROPOSED" }).catch(() => []),
+        ]);
+        if (cancelled) return;
+        setTerms(t);
+        setClassCount(cs.length);
+        setPendingCorrections(corrections.length);
+        const current = t.find((x) => x.isCurrent) ?? t[0];
+        if (current) setTermId((prev) => prev || current.id);
+        if (students[0]) setViewStudentId((prev) => prev || students[0].id);
+      } catch (err) {
+        if (!cancelled) {
+          setErr(err instanceof Error ? err.message : "Could not load results workspace");
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [setErr, students]);
 
   const currentTerm = terms.find((t) => t.isCurrent) ?? terms.find((t) => t.id === termId);
 

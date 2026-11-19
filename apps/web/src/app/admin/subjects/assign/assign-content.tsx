@@ -75,14 +75,18 @@ export function SubjectAssignmentContent() {
   const highlightTeacher = teachers.find((t) => t.userId === highlightTeacherId);
   const assignedCount = assignments.filter((a) => a.teacher?.id).length;
 
-  const loadAssignments = useCallback(async () => {
-    if (!gradeId) return;
-    if (hasSections && !sectionId) {
-      setAssignments([]);
-      return;
-    }
-    setAssignments(await listClassSubjectsByGrade(gradeId, sectionId || undefined));
+  const fetchAssignments = useCallback(async (): Promise<
+    ClassSubjectAssignment[] | null
+  > => {
+    if (!gradeId) return null;
+    if (hasSections && !sectionId) return [];
+    return listClassSubjectsByGrade(gradeId, sectionId || undefined);
   }, [gradeId, sectionId, hasSections]);
+
+  const loadAssignments = useCallback(async () => {
+    const list = await fetchAssignments();
+    if (list) setAssignments(list);
+  }, [fetchAssignments]);
 
   useEffect(() => {
     if (
@@ -131,10 +135,18 @@ export function SubjectAssignmentContent() {
 
   useEffect(() => {
     if (!gradeId || loading) return;
-    void loadAssignments().catch((err) =>
-      setError(err instanceof Error ? err.message : "Load failed"),
-    );
-  }, [gradeId, sectionId, loading, loadAssignments]);
+    let cancelled = false;
+    void fetchAssignments()
+      .then((list) => {
+        if (!cancelled && list) setAssignments(list);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : "Load failed");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [gradeId, sectionId, loading, fetchAssignments]);
 
   function selectGrade(id: string) {
     setGradeId(id);

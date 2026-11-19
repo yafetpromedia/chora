@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { DashIcon } from "@/components/dashboard/dash-icons";
 import {
   ResultsStudentPicker,
@@ -69,13 +69,17 @@ export function ReportCardCommentsPanel({
   const [error, setError] = useState("");
   const [saved, setSaved] = useState("");
 
-  useEffect(() => {
+  const [prevDefaultTermId, setPrevDefaultTermId] = useState(defaultTermId);
+  if (defaultTermId !== prevDefaultTermId) {
+    setPrevDefaultTermId(defaultTermId);
     if (defaultTermId) setTermId(defaultTermId);
-  }, [defaultTermId]);
+  }
 
-  useEffect(() => {
+  const [prevDefaultStudentId, setPrevDefaultStudentId] = useState(defaultStudentId);
+  if (defaultStudentId !== prevDefaultStudentId) {
+    setPrevDefaultStudentId(defaultStudentId);
     if (defaultStudentId) setStudentId(defaultStudentId);
-  }, [defaultStudentId]);
+  }
 
   const studentOptions = useMemo<ResultsStudentOption[]>(
     () =>
@@ -92,29 +96,41 @@ export function ReportCardCommentsPanel({
     [students],
   );
 
-  const loadReport = useCallback(async () => {
-    if (!studentId || !termId) return;
-    setLoading(true);
-    setError("");
-    setSaved("");
-    try {
-      const card = await getReportCard(studentId, termId);
-      setReport(card);
-      setTeacherComment(card.teacherComment ?? "");
-      setPrincipalComment(card.principalComment ?? "");
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Could not load report";
-      setError(message);
-      onError?.(message);
-      setReport(null);
-    } finally {
-      setLoading(false);
+  const reportKey = studentId && termId ? `${studentId}:${termId}` : "";
+  const [prevReportKey, setPrevReportKey] = useState("");
+  if (reportKey !== prevReportKey) {
+    setPrevReportKey(reportKey);
+    if (reportKey) {
+      setLoading(true);
+      setError("");
+      setSaved("");
     }
-  }, [studentId, termId, onError]);
+  }
 
   useEffect(() => {
-    if (studentId && termId) void loadReport();
-  }, [studentId, termId, loadReport]);
+    if (!studentId || !termId) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const card = await getReportCard(studentId, termId);
+        if (cancelled) return;
+        setReport(card);
+        setTeacherComment(card.teacherComment ?? "");
+        setPrincipalComment(card.principalComment ?? "");
+      } catch (err) {
+        if (cancelled) return;
+        const message = err instanceof Error ? err.message : "Could not load report";
+        setError(message);
+        onError?.(message);
+        setReport(null);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [studentId, termId, onError]);
 
   async function onSave() {
     if (!studentId || !termId) return;

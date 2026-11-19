@@ -36,7 +36,8 @@ export function ScoreCorrectionsPanel({
   onCountChange,
   onError,
 }: Props) {
-  const [termId, setTermId] = useState(defaultTermId ?? "");
+  const [termIdState, setTermId] = useState(defaultTermId ?? "");
+  const termId = termIdState || defaultTermId || "";
   const [statusFilter, setStatusFilter] = useState<ScoreCorrectionStatus | "">(
     mode === "admin" ? "PROPOSED" : "",
   );
@@ -73,13 +74,43 @@ export function ScoreCorrectionsPanel({
     }
   }, [termId, statusFilter, mode, onCountChange, onError]);
 
-  useEffect(() => {
-    if (defaultTermId && !termId) setTermId(defaultTermId);
-  }, [defaultTermId, termId]);
+  const loadKey = `${termId}|${statusFilter}`;
+  const [prevLoadKey, setPrevLoadKey] = useState(loadKey);
+  if (loadKey !== prevLoadKey) {
+    setPrevLoadKey(loadKey);
+    setLoading(true);
+  }
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    let cancelled = false;
+    void (async () => {
+      try {
+        const data = await listScoreCorrections({
+          ...(termId ? { termId } : {}),
+          ...(statusFilter ? { status: statusFilter } : {}),
+        });
+        if (cancelled) return;
+        setRows(data);
+        const pending =
+          mode === "admin"
+            ? data.filter((r) => r.status === "PROPOSED").length
+            : data.filter((r) => r.status === "OPEN" || r.status === "PROPOSED")
+                .length;
+        onCountChange?.(pending);
+      } catch (err) {
+        if (cancelled) return;
+        const msg =
+          err instanceof Error ? err.message : "Could not load score reports";
+        setError(msg);
+        onError?.(msg);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [termId, statusFilter, mode, onCountChange, onError]);
 
   const active = useMemo(
     () => rows.find((r) => r.id === activeId) ?? null,

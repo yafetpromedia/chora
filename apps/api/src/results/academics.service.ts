@@ -66,7 +66,11 @@ export class AcademicsService {
     gradeId: string,
     sectionId: string | null,
   ) {
-    const scopes = await this.teacherScope.getClassScopes(schoolId, userId, role);
+    const scopes = await this.teacherScope.getClassScopes(
+      schoolId,
+      userId,
+      role,
+    );
     this.teacherScope.assertCanAccessClass(scopes, gradeId, sectionId);
   }
 
@@ -151,7 +155,6 @@ export class AcademicsService {
         },
       });
     }
-
   }
 
   async ensureGradingScale(schoolId: string) {
@@ -194,7 +197,8 @@ export class AcademicsService {
     }));
     // Guard against broken configs (e.g. one band covering 0–100 as "A").
     const letterAt = (score: number) =>
-      bands.find((b) => score >= b.minScore && score <= b.maxScore)?.letter ?? null;
+      bands.find((b) => score >= b.minScore && score <= b.maxScore)?.letter ??
+      null;
     const high = letterAt(95);
     const mid = letterAt(54);
     const low = letterAt(40);
@@ -244,7 +248,9 @@ export class AcademicsService {
       throw new NotFoundException('Term not found');
     }
 
-    const startDate = dto.startDate ? new Date(dto.startDate) : existing.startDate;
+    const startDate = dto.startDate
+      ? new Date(dto.startDate)
+      : existing.startDate;
     const endDate = dto.endDate ? new Date(dto.endDate) : existing.endDate;
     if (startDate > endDate) {
       throw new BadRequestException('Start date must be before end date');
@@ -393,7 +399,12 @@ export class AcademicsService {
         teacherId: dto.teacherId ?? null,
         assessmentTemplateId: dto.assessmentTemplateId ?? null,
       },
-      include: { subject: true, grade: true, section: true, teacher: { select: { id: true, firstName: true, lastName: true } } },
+      include: {
+        subject: true,
+        grade: true,
+        section: true,
+        teacher: { select: { id: true, firstName: true, lastName: true } },
+      },
     });
   }
 
@@ -466,7 +477,11 @@ export class AcademicsService {
     return { deleted: true, id: classSubjectId };
   }
 
-  async listClassSubjectsByGrade(schoolId: string, gradeId: string, sectionId?: string) {
+  async listClassSubjectsByGrade(
+    schoolId: string,
+    gradeId: string,
+    sectionId?: string,
+  ) {
     const year = await this.prisma.academicYear.findFirst({
       where: { schoolId, isCurrent: true },
     });
@@ -502,7 +517,11 @@ export class AcademicsService {
         ...(classSubjectId ? { classSubjectId } : {}),
       },
       orderBy: { sortOrder: 'asc' },
-      include: { classSubject: { include: { subject: true, grade: true, section: true } } },
+      include: {
+        classSubject: {
+          include: { subject: true, grade: true, section: true },
+        },
+      },
     });
 
     if (!userId || role !== 'teacher') {
@@ -556,7 +575,9 @@ export class AcademicsService {
     const assessment = await this.prisma.assessment.findFirst({
       where: { id: assessmentId, schoolId },
       include: {
-        classSubject: { include: { grade: true, section: true, subject: true } },
+        classSubject: {
+          include: { grade: true, section: true, subject: true },
+        },
         term: true,
       },
     });
@@ -672,7 +693,9 @@ export class AcademicsService {
     const profile = await this.prisma.studentProfile.findFirst({
       where: { id: studentProfileId, schoolId },
       include: {
-        user: { select: { firstName: true, lastName: true, externalRef: true } },
+        user: {
+          select: { firstName: true, lastName: true, externalRef: true },
+        },
         grade: { select: { name: true } },
         section: { select: { name: true } },
       },
@@ -763,8 +786,7 @@ export class AcademicsService {
         bands,
       );
       if (subs.length > 0) {
-        const avg =
-          subs.reduce((s, r) => s + r.average, 0) / subs.length;
+        const avg = subs.reduce((s, r) => s + r.average, 0) / subs.length;
         classAverages.push({ id: cm.id, avg });
       }
     }
@@ -775,7 +797,12 @@ export class AcademicsService {
         : null;
 
     return {
-      school: { name: school?.name ?? 'School', logoUrl: school?.logoUrl ?? null, authorizedSignatureUrl: school?.authorizedSignatureUrl ?? null, authorizedSignatureLabel: school?.authorizedSignatureLabel ?? null },
+      school: {
+        name: school?.name ?? 'School',
+        logoUrl: school?.logoUrl ?? null,
+        authorizedSignatureUrl: school?.authorizedSignatureUrl ?? null,
+        authorizedSignatureLabel: school?.authorizedSignatureLabel ?? null,
+      },
       student: {
         profileId: profile.id,
         name: `${profile.user.firstName} ${profile.user.lastName}`,
@@ -1025,7 +1052,9 @@ export class AcademicsService {
     const profile = await this.prisma.studentProfile.findFirst({
       where: { id: studentProfileId, schoolId },
       include: {
-        user: { select: { firstName: true, lastName: true, externalRef: true } },
+        user: {
+          select: { firstName: true, lastName: true, externalRef: true },
+        },
         grade: { select: { name: true } },
         section: { select: { name: true } },
       },
@@ -1144,15 +1173,14 @@ export class AcademicsService {
               termScores: [score],
               total: score,
               average: score,
-              letter:
-                score != null ? scoreToLetter(score, bands) : null,
+              letter: score != null ? scoreToLetter(score, bands) : null,
             };
           })
         : allSubjectRows;
     const printTerms =
       mode === 'term'
         ? termColumns[selectedTermIndex]
-          ? [termColumns[selectedTermIndex]!]
+          ? [termColumns[selectedTermIndex]]
           : termColumns.slice(0, 1)
         : termColumns;
 
@@ -1203,7 +1231,7 @@ export class AcademicsService {
     const attendanceForPrint =
       mode === 'term'
         ? attendanceByTerm[selectedTermIndex]
-          ? [attendanceByTerm[selectedTermIndex]!]
+          ? [attendanceByTerm[selectedTermIndex]]
           : attendanceByTerm.slice(0, 1)
         : attendanceByTerm;
     const attendanceTotals = attendanceForPrint.reduce(
@@ -1298,12 +1326,13 @@ export class AcademicsService {
         enrollment.promotionOutcome === 'PASSED')
     ) {
       const enrolled = enrollment;
-      const outcome = enrolled.promotionOutcome as ReportCardPromotion['outcome'];
+      const outcome =
+        enrolled.promotionOutcome as ReportCardPromotion['outcome'];
       const nextGradeLabel =
         outcome === 'PROMOTED'
           ? (nextEnrollment?.grade.name ??
-              enrolled.promotionNote?.trim() ??
-              profile.grade.name)
+            enrolled.promotionNote?.trim() ??
+            profile.grade.name)
           : outcome === 'RETAINED'
             ? enrolled.grade.name
             : null;
@@ -1326,7 +1355,8 @@ export class AcademicsService {
     const overallAverage =
       scoredAverages.length > 0
         ? Math.round(
-            (scoredAverages.reduce((a, b) => a + b, 0) / scoredAverages.length) *
+            (scoredAverages.reduce((a, b) => a + b, 0) /
+              scoredAverages.length) *
               10,
           ) / 10
         : report.overallAverage;
@@ -1422,8 +1452,7 @@ export class AcademicsService {
         promotion,
       },
       remarks: {
-        teacher:
-          report.teacherComment ?? remarkSource?.teacherComment ?? null,
+        teacher: report.teacherComment ?? remarkSource?.teacherComment ?? null,
         principal:
           report.principalComment ?? remarkSource?.principalComment ?? null,
         general: generalRemark,
@@ -1511,7 +1540,11 @@ export class AcademicsService {
             : 'Good';
 
     const participation =
-      counts.late >= 3 ? 'Needs improvement' : counts.late > 0 ? 'Fair' : 'Good';
+      counts.late >= 3
+        ? 'Needs improvement'
+        : counts.late > 0
+          ? 'Fair'
+          : 'Good';
 
     const attitude =
       counts.disruptive > 0
@@ -1544,11 +1577,7 @@ export class AcademicsService {
     };
   }
 
-  async exportResultsCsv(
-    schoolId: string,
-    termId: string,
-    gradeId?: string,
-  ) {
+  async exportResultsCsv(schoolId: string, termId: string, gradeId?: string) {
     const term = await this.prisma.academicTerm.findFirst({
       where: { id: termId, schoolId },
       include: { academicYear: { select: { id: true, name: true } } },

@@ -35,27 +35,39 @@ export function PayrollSettingsPanel() {
   const [compCode, setCompCode] = useState("");
   const [compType, setCompType] = useState("EARNING");
 
+  function fetchAll() {
+    return Promise.all([
+      getPayrollSettings(),
+      listCompensationComponents(),
+      listPayrollRuleSets(),
+      listOvertimeApprovals("PENDING").catch(() => []),
+    ]);
+  }
+
+  function applyLoaded([s, c, r, o]: Awaited<ReturnType<typeof fetchAll>>) {
+    setSettings(s);
+    setComponents(c);
+    setRuleSets(r);
+    setOt(o);
+  }
+
   async function load() {
     if (!canSettings) return;
     setError("");
     try {
-      const [s, c, r, o] = await Promise.all([
-        getPayrollSettings(),
-        listCompensationComponents(),
-        listPayrollRuleSets(),
-        listOvertimeApprovals("PENDING").catch(() => []),
-      ]);
-      setSettings(s);
-      setComponents(c);
-      setRuleSets(r);
-      setOt(o);
+      applyLoaded(await fetchAll());
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load settings");
     }
   }
 
   useEffect(() => {
-    void load();
+    if (!canSettings) return;
+    void fetchAll()
+      .then(applyLoaded)
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : "Failed to load settings");
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

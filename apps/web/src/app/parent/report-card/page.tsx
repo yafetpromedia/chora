@@ -27,21 +27,29 @@ export default function ParentReportCardPage() {
   }, [router]);
 
   useEffect(() => {
-    if (!selectedId) {
-      setPrivacyLoading(false);
-      return;
-    }
-    setPrivacyLoading(true);
-    void apiFetch<{ day?: ParentDayOverview }>("/dashboards/me")
-      .then((data) => {
+    let cancelled = false;
+    void (async () => {
+      if (!selectedId) {
+        setPrivacyLoading(false);
+        return;
+      }
+      setPrivacyLoading(true);
+      try {
+        const data = await apiFetch<{ day?: ParentDayOverview }>("/dashboards/me");
         const child =
           data.day?.kind === "parent_day"
             ? data.day.children.find((c) => c.profileId === selectedId)
             : null;
-        setBlocked(child?.parentsCanViewResults === false);
-      })
-      .catch(() => setBlocked(false))
-      .finally(() => setPrivacyLoading(false));
+        if (!cancelled) setBlocked(child?.parentsCanViewResults === false);
+      } catch {
+        if (!cancelled) setBlocked(false);
+      } finally {
+        if (!cancelled) setPrivacyLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [selectedId]);
 
   return (
@@ -52,7 +60,7 @@ export default function ParentReportCardPage() {
     >
       <div className="par-portal-stack">
         <ParentChildBar
-          children={children}
+          options={children}
           selectedId={selectedId}
           onChange={selectChild}
           loading={loading}

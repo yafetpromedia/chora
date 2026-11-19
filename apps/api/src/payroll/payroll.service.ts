@@ -273,11 +273,7 @@ export class PayrollService {
     });
   }
 
-  async getEffectiveCompensation(
-    schoolId: string,
-    userId: string,
-    asOf: Date,
-  ) {
+  async getEffectiveCompensation(schoolId: string, userId: string, asOf: Date) {
     return this.prisma.employeeCompensation.findFirst({
       where: {
         schoolId,
@@ -356,7 +352,17 @@ export class PayrollService {
         },
         include: { lines: { include: { component: true } } },
       });
-      await this.audit(tx, schoolId, actorId, 'EmployeeCompensation', created.id, 'created', null, created, dto.reason);
+      await this.audit(
+        tx,
+        schoolId,
+        actorId,
+        'EmployeeCompensation',
+        created.id,
+        'created',
+        null,
+        created,
+        dto.reason,
+      );
       return created;
     });
   }
@@ -434,7 +440,9 @@ export class PayrollService {
       run.status !== PayrollRunStatus.CALCULATED &&
       run.status !== PayrollRunStatus.UNDER_REVIEW
     ) {
-      throw new BadRequestException('Payroll cannot be recalculated in this status');
+      throw new BadRequestException(
+        'Payroll cannot be recalculated in this status',
+      );
     }
 
     const settings = await this.getSettings(schoolId);
@@ -703,11 +711,13 @@ export class PayrollService {
             PayrollAdjustmentType.CORRECTION,
           ];
           const isEarn = earnTypes.includes(adj.type);
-          const bucket = isEarn && adj.amountCents >= 0 ? earningLines : deductionLines;
+          const bucket =
+            isEarn && adj.amountCents >= 0 ? earningLines : deductionLines;
           bucket.push({
-            kind: isEarn && adj.amountCents >= 0
-              ? PayrollLineKind.EARNING
-              : PayrollLineKind.DEDUCTION,
+            kind:
+              isEarn && adj.amountCents >= 0
+                ? PayrollLineKind.EARNING
+                : PayrollLineKind.DEDUCTION,
             code: `ADJ_${adj.type}`,
             label: `${adj.type}: ${adj.reason}`.slice(0, 120),
             amountCents: Math.abs(adj.amountCents),
@@ -813,7 +823,11 @@ export class PayrollService {
         runId,
         'calculated',
         null,
-        { status: 'CALCULATED', ruleSetId: rulePack.id, statutoryActive: false },
+        {
+          status: 'CALCULATED',
+          ruleSetId: rulePack.id,
+          statutoryActive: false,
+        },
         null,
       );
     });
@@ -976,7 +990,9 @@ export class PayrollService {
         notes: dto.notes,
         status: nextStatus,
         paidAt:
-          nextStatus === PayrollPaymentStatus.PAID ? new Date() : before?.paidAt,
+          nextStatus === PayrollPaymentStatus.PAID
+            ? new Date()
+            : before?.paidAt,
         recordedById: actorId,
         amountCents: snap.netCents,
       },
@@ -1131,7 +1147,13 @@ export class PayrollService {
     const run = await this.getRun(schoolId, runId);
     const byDept = new Map<
       string,
-      { department: string; count: number; gross: number; deductions: number; net: number }
+      {
+        department: string;
+        count: number;
+        gross: number;
+        deductions: number;
+        net: number;
+      }
     >();
     for (const s of run.snapshots) {
       const key = s.departmentName ?? 'Unassigned';
@@ -1203,55 +1225,67 @@ export class PayrollService {
   }
 
   dashboard(schoolId: string) {
-    return this.prisma.payrollRun.findFirst({
-      where: { schoolId, status: { not: PayrollRunStatus.CANCELLED } },
-      orderBy: { createdAt: 'desc' },
-      include: {
-        period: true,
-        snapshots: { select: { grossCents: true, deductionCents: true, netCents: true, employerCostCents: true, payment: true } },
-      },
-    }).then(async (run) => {
-      if (!run) {
+    return this.prisma.payrollRun
+      .findFirst({
+        where: { schoolId, status: { not: PayrollRunStatus.CANCELLED } },
+        orderBy: { createdAt: 'desc' },
+        include: {
+          period: true,
+          snapshots: {
+            select: {
+              grossCents: true,
+              deductionCents: true,
+              netCents: true,
+              employerCostCents: true,
+              payment: true,
+            },
+          },
+        },
+      })
+      .then((run) => {
+        if (!run) {
+          return {
+            current: null,
+            totals: {
+              employees: 0,
+              grossCents: 0,
+              deductionCents: 0,
+              netCents: 0,
+              employerCostCents: 0,
+              paidCents: 0,
+              unpaidCents: 0,
+            },
+          };
+        }
+        const paid = run.snapshots.filter(
+          (s) => s.payment?.status === PayrollPaymentStatus.PAID,
+        );
+        const unpaid = run.snapshots.filter(
+          (s) => s.payment?.status !== PayrollPaymentStatus.PAID,
+        );
         return {
-          current: null,
+          current: {
+            runId: run.id,
+            status: run.status,
+            label: run.period.label,
+            startDate: dateKey(run.period.startDate),
+            endDate: dateKey(run.period.endDate),
+          },
           totals: {
-            employees: 0,
-            grossCents: 0,
-            deductionCents: 0,
-            netCents: 0,
-            employerCostCents: 0,
-            paidCents: 0,
-            unpaidCents: 0,
+            employees: run.snapshots.length,
+            grossCents: sumCents(run.snapshots.map((s) => s.grossCents)),
+            deductionCents: sumCents(
+              run.snapshots.map((s) => s.deductionCents),
+            ),
+            netCents: sumCents(run.snapshots.map((s) => s.netCents)),
+            employerCostCents: sumCents(
+              run.snapshots.map((s) => s.employerCostCents),
+            ),
+            paidCents: sumCents(paid.map((s) => s.netCents)),
+            unpaidCents: sumCents(unpaid.map((s) => s.netCents)),
           },
         };
-      }
-      const paid = run.snapshots.filter(
-        (s) => s.payment?.status === PayrollPaymentStatus.PAID,
-      );
-      const unpaid = run.snapshots.filter(
-        (s) => s.payment?.status !== PayrollPaymentStatus.PAID,
-      );
-      return {
-        current: {
-          runId: run.id,
-          status: run.status,
-          label: run.period.label,
-          startDate: dateKey(run.period.startDate),
-          endDate: dateKey(run.period.endDate),
-        },
-        totals: {
-          employees: run.snapshots.length,
-          grossCents: sumCents(run.snapshots.map((s) => s.grossCents)),
-          deductionCents: sumCents(run.snapshots.map((s) => s.deductionCents)),
-          netCents: sumCents(run.snapshots.map((s) => s.netCents)),
-          employerCostCents: sumCents(
-            run.snapshots.map((s) => s.employerCostCents),
-          ),
-          paidCents: sumCents(paid.map((s) => s.netCents)),
-          unpaidCents: sumCents(unpaid.map((s) => s.netCents)),
-        },
-      };
-    });
+      });
   }
 
   // ── helpers ───────────────────────────────────────────────────────────

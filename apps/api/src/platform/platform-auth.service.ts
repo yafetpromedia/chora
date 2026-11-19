@@ -21,7 +21,10 @@ export class PlatformAuthService {
 
   async onModuleInit() {
     // Optional bootstrap only when explicitly configured — never hardcode credentials.
-    const email = this.configService.get<string>('PLATFORM_OWNER_EMAIL')?.trim().toLowerCase();
+    const email = this.configService
+      .get<string>('PLATFORM_OWNER_EMAIL')
+      ?.trim()
+      .toLowerCase();
     const password = this.configService.get<string>('PLATFORM_OWNER_PASSWORD');
     if (!email || !password) {
       return;
@@ -38,8 +41,12 @@ export class PlatformAuthService {
       data: {
         email,
         passwordHash: hashSync(password, 10),
-        firstName: this.configService.get<string>('PLATFORM_OWNER_FIRST_NAME')?.trim() || 'Platform',
-        lastName: this.configService.get<string>('PLATFORM_OWNER_LAST_NAME')?.trim() || 'Owner',
+        firstName:
+          this.configService.get<string>('PLATFORM_OWNER_FIRST_NAME')?.trim() ||
+          'Platform',
+        lastName:
+          this.configService.get<string>('PLATFORM_OWNER_LAST_NAME')?.trim() ||
+          'Owner',
         role: 'OWNER',
         isActive: true,
       },

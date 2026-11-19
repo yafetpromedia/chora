@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { DashboardPage } from "@/components/dashboard/dashboard-page";
 import {
@@ -22,7 +22,12 @@ type Props = {
 
 export function TeacherLibraryPage({ section }: Props) {
   const router = useRouter();
-  const [canUpload, setCanUpload] = useState(false);
+  const hydrated = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
+  const canUpload = hydrated && hasPermission(Permission.LIBRARY_UPLOAD);
 
   useEffect(() => {
     if (!localStorage.getItem(AUTH_TOKEN_KEY)) {
@@ -32,7 +37,6 @@ export function TeacherLibraryPage({ section }: Props) {
     if (localStorage.getItem(AUTH_ROLE_KEY) !== "teacher") {
       router.replace(`/${localStorage.getItem(AUTH_ROLE_KEY) ?? "login"}`);
     }
-    setCanUpload(hasPermission(Permission.LIBRARY_UPLOAD));
   }, [router]);
 
   return (

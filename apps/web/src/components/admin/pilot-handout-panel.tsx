@@ -23,8 +23,15 @@ export function PilotHandoutPanel({ schoolName, joinCode, loginUrl }: Props) {
   const [copied, setCopied] = useState<"parent" | "student" | null>(null);
 
   useEffect(() => {
-    const saved = readSavedHandoutLoginUrl(joinCode);
-    setUrlDraft(saved ?? detectedUrl);
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      const saved = readSavedHandoutLoginUrl(joinCode);
+      setUrlDraft(saved ?? detectedUrl);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [joinCode, detectedUrl]);
 
   const portalUrl = normalizeLoginUrl(urlDraft) || detectedUrl;

@@ -122,9 +122,13 @@ export function ClassworkStudentPanel({ mode }: Props) {
 
   const [items, setItems] = useState<ClassworkAssignment[]>([]);
 
-  const [selectedId, setSelectedId] = useState("");
+  const [selectedIdState, setSelectedId] = useState("");
 
-  const [detail, setDetail] = useState<ClassworkAssignment | null>(null);
+  const [detailState, setDetail] = useState<ClassworkAssignment | null>(null);
+  const selectedId = items.some((i) => i.id === selectedIdState)
+    ? selectedIdState
+    : (items[0]?.id ?? "");
+  const detail = selectedId ? detailState : null;
 
   const [note, setNote] = useState("");
 
@@ -188,26 +192,18 @@ export function ClassworkStudentPanel({ mode }: Props) {
   }, [mode]);
 
   useEffect(() => {
-    if (items.length === 0) {
-      setSelectedId("");
-      return;
-    }
-    setSelectedId((cur) => {
-      if (cur && items.some((i) => i.id === cur)) return cur;
-      return items[0]?.id ?? "";
-    });
-  }, [items]);
-
-  useEffect(() => {
-    if (!selectedId) {
-      setDetail(null);
-      return;
-    }
+    if (!selectedId) return;
+    let cancelled = false;
     void getStudentAssignment(selectedId)
-      .then(setDetail)
-      .catch((err) =>
-        setError(err instanceof Error ? err.message : "Load failed"),
-      );
+      .then((d) => {
+        if (!cancelled) setDetail(d);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : "Load failed");
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [selectedId]);
 
 

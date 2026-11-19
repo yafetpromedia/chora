@@ -18,23 +18,32 @@ const STATUS_LABEL: Record<string, string> = {
 
 export function ParentAttendancePanel() {
   const { children, selectedId, selectChild, loading, error } = useParentChild();
-  const [summary, setSummary] = useState<AttendanceSummary | null>(null);
+  const [loadedSummary, setSummary] = useState<AttendanceSummary | null>(null);
   const [busy, setBusy] = useState(false);
   const [loadError, setLoadError] = useState("");
+  const summary = selectedId ? loadedSummary : null;
 
   useEffect(() => {
-    if (!selectedId) {
-      setSummary(null);
-      return;
-    }
-    setBusy(true);
-    setLoadError("");
+    if (!selectedId) return;
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setBusy(true);
+      setLoadError("");
+    });
     void getAttendanceSummary(selectedId)
-      .then(setSummary)
-      .catch((err) =>
-        setLoadError(err instanceof Error ? err.message : "Could not load"),
-      )
-      .finally(() => setBusy(false));
+      .then((s) => {
+        if (!cancelled) setSummary(s);
+      })
+      .catch((err) => {
+        if (!cancelled) setLoadError(err instanceof Error ? err.message : "Could not load");
+      })
+      .finally(() => {
+        if (!cancelled) setBusy(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [selectedId]);
 
   return (
@@ -42,7 +51,7 @@ export function ParentAttendancePanel() {
       <AppToast message={loadError || error} tone="error" onDismiss={() => setLoadError("")} />
 
       <ParentChildBar
-        children={children}
+        options={children}
         selectedId={selectedId}
         onChange={selectChild}
         loading={loading}

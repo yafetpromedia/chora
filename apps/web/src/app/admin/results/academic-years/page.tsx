@@ -45,9 +45,20 @@ export default function AcademicYearsPage() {
       router.replace("/login");
       return;
     }
-    void load()
-      .catch((err) => setError(err instanceof Error ? err.message : "Load failed"))
-      .finally(() => setLoading(false));
+    let cancelled = false;
+    void listAcademicYears()
+      .then((list) => {
+        if (!cancelled) setYears(list);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : "Load failed");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [router]);
 
   async function onCreate(e: FormEvent) {

@@ -60,7 +60,7 @@ async function bootstrap() {
     origin:
       process.env.NODE_ENV === 'production'
         ? staticOrigins
-        : ((origin, callback) => {
+        : (((origin, callback) => {
             if (
               !origin ||
               staticOrigins.includes(origin) ||
@@ -70,7 +70,7 @@ async function bootstrap() {
               return;
             }
             callback(null, false);
-          }) satisfies CorsOriginCallback,
+          }) satisfies CorsOriginCallback),
     credentials: true,
   });
   app.useGlobalPipes(

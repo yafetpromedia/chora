@@ -29,26 +29,31 @@ function VerifyInner() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!token) {
-      setError("This verification link is incomplete.");
-      setLoading(false);
-      return;
-    }
-    void fetch(
-      `${getApiBaseUrl()}/public/report-cards/verify?t=${encodeURIComponent(token)}`,
-    )
-      .then(async (res) => {
+    let cancelled = false;
+    void (async () => {
+      if (!token) {
+        setError("This verification link is incomplete.");
+        setLoading(false);
+        return;
+      }
+      try {
+        const res = await fetch(
+          `${getApiBaseUrl()}/public/report-cards/verify?t=${encodeURIComponent(token)}`,
+        );
         if (!res.ok) throw new Error("invalid");
-        return (await res.json()) as VerifyResult;
-      })
-      .then((json) => {
+        const json = (await res.json()) as VerifyResult;
+        if (cancelled) return;
         setData(json);
         setLoading(false);
-      })
-      .catch(() => {
+      } catch {
+        if (cancelled) return;
         setError("This report card could not be verified. The link may be invalid.");
         setLoading(false);
-      });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [token]);
 
   return (

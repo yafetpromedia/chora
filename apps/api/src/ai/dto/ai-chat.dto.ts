@@ -16,7 +16,12 @@ export enum AiChatRole {
   ASSISTANT = 'assistant',
 }
 
-const IMAGE_MIME = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'] as const;
+const IMAGE_MIME = [
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+] as const;
 
 export class AiChatImageDto {
   @IsString()

@@ -30,18 +30,28 @@ export default function PlatformInviteAcceptPage() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (!token) {
-      setError("Missing invite token");
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    void getPlatformInvitePreview(token)
-      .then(setPreview)
-      .catch((err) =>
-        setError(err instanceof Error ? err.message : "Invite link is invalid"),
-      )
-      .finally(() => setLoading(false));
+    let cancelled = false;
+    void (async () => {
+      if (!token) {
+        setError("Missing invite token");
+        setLoading(false);
+        return;
+      }
+      setLoading(true);
+      try {
+        const data = await getPlatformInvitePreview(token);
+        if (!cancelled) setPreview(data);
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Invite link is invalid");
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [token]);
 
   async function onSubmit(e: FormEvent) {

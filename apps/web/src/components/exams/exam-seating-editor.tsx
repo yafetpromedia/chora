@@ -77,10 +77,13 @@ export function ExamSeatingEditor({
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    void loadList()
+    queueMicrotask(() => {
+      if (!cancelled) setLoading(true);
+    });
+    void listExamSeatingPlans(scheduleId)
       .then(async (rows) => {
         if (cancelled) return;
+        setPlans(rows);
         if (rows[0]) {
           setSelectedId(rows[0].id);
           const full = await getExamSeatingPlan(scheduleId, rows[0].id);
@@ -99,7 +102,7 @@ export function ExamSeatingEditor({
     return () => {
       cancelled = true;
     };
-  }, [scheduleId, loadList, onError]);
+  }, [scheduleId, onError]);
 
   function applyPlan(full: ExamSeatingPlan) {
     setPlan(full);

@@ -210,7 +210,10 @@ export class PlatformBillingService {
     });
   }
 
-  async listInvoices(filters?: { schoolId?: string; status?: PlatformInvoiceStatus }) {
+  async listInvoices(filters?: {
+    schoolId?: string;
+    status?: PlatformInvoiceStatus;
+  }) {
     const rows = await this.prisma.platformInvoice.findMany({
       where: {
         schoolId: filters?.schoolId,
@@ -231,9 +234,10 @@ export class PlatformBillingService {
     });
     if (!school) throw new NotFoundException('School not found');
 
-    const plan =
-      dto.plan ?? school.subscription?.plan ?? Plan.STARTER;
-    const catalogRow = (await this.planCatalog.findAll()).find((p) => p.plan === plan);
+    const plan = dto.plan ?? school.subscription?.plan ?? Plan.STARTER;
+    const catalogRow = (await this.planCatalog.findAll()).find(
+      (p) => p.plan === plan,
+    );
     const amountUsd = dto.amountUsd ?? catalogRow?.usdMonthly ?? 0;
     const amountEtb = dto.amountEtb ?? catalogRow?.etbMonthly ?? 0;
     const settings = await this.platformSettings.getSettings();
@@ -264,7 +268,9 @@ export class PlatformBillingService {
   }
 
   async updateInvoice(id: string, dto: UpdatePlatformInvoiceDto) {
-    const existing = await this.prisma.platformInvoice.findUnique({ where: { id } });
+    const existing = await this.prisma.platformInvoice.findUnique({
+      where: { id },
+    });
     if (!existing) throw new NotFoundException('Invoice not found');
 
     const status = dto.status ?? existing.status;
@@ -323,25 +329,23 @@ export class PlatformBillingService {
     return `${prefix}${String(seq).padStart(5, '0')}`;
   }
 
-  private toInvoiceDto(
-    inv: {
-      id: string;
-      schoolId: string;
-      invoiceNumber: string;
-      plan: Plan | null;
-      periodStart: Date;
-      periodEnd: Date;
-      amountUsd: number;
-      amountEtb: number;
-      currency: BillingCurrency;
-      status: PlatformInvoiceStatus;
-      issuedAt: Date;
-      dueAt: Date;
-      paidAt: Date | null;
-      notes: string | null;
-      school: { id: string; name: string; joinCode: string };
-    },
-  ) {
+  private toInvoiceDto(inv: {
+    id: string;
+    schoolId: string;
+    invoiceNumber: string;
+    plan: Plan | null;
+    periodStart: Date;
+    periodEnd: Date;
+    amountUsd: number;
+    amountEtb: number;
+    currency: BillingCurrency;
+    status: PlatformInvoiceStatus;
+    issuedAt: Date;
+    dueAt: Date;
+    paidAt: Date | null;
+    notes: string | null;
+    school: { id: string; name: string; joinCode: string };
+  }) {
     return {
       id: inv.id,
       schoolId: inv.schoolId,

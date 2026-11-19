@@ -44,7 +44,10 @@ export class AdmissionsController {
 
   @Post('cycles')
   @RequirePermissions(SchoolPermission.ADMISSIONS_MANAGE)
-  createCycle(@CurrentUser() user: AuthUser, @Body() dto: CreateAdmissionCycleDto) {
+  createCycle(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: CreateAdmissionCycleDto,
+  ) {
     return this.admissionsService.createCycle(user.schoolId, dto);
   }
 
@@ -204,10 +207,7 @@ export class AdmissionsController {
 
   @Post('cycles/:cycleId/bulk-enroll')
   @RequirePermissions(SchoolPermission.ADMISSIONS_MANAGE)
-  bulkEnroll(
-    @CurrentUser() user: AuthUser,
-    @Param('cycleId') cycleId: string,
-  ) {
+  bulkEnroll(@CurrentUser() user: AuthUser, @Param('cycleId') cycleId: string) {
     return this.admissionsService.bulkEnroll(user.schoolId, cycleId);
   }
 }

@@ -38,17 +38,17 @@ export class AdminAnalyticsService {
       totalStudents,
       trend,
     ] = await Promise.all([
-        this.attendance.getAnalytics(schoolId),
-        this.staffAttendance.summary(schoolId).catch(() => null),
-        this.finance.getAnalytics(schoolId).catch(() => null),
-        this.prisma.user.groupBy({
-          by: ['role'],
-          where: { schoolId },
-          _count: { _all: true },
-        }),
-        this.prisma.studentProfile.count({ where: { schoolId } }),
-        this.buildAttendanceTrend(schoolId, 7),
-      ]);
+      this.attendance.getAnalytics(schoolId),
+      this.staffAttendance.summary(schoolId).catch(() => null),
+      this.finance.getAnalytics(schoolId).catch(() => null),
+      this.prisma.user.groupBy({
+        by: ['role'],
+        where: { schoolId },
+        _count: { _all: true },
+      }),
+      this.prisma.studentProfile.count({ where: { schoolId } }),
+      this.buildAttendanceTrend(schoolId, 7),
+    ]);
 
     const byRole = Object.fromEntries(
       userCounts.map((r) => [r.role, r._count._all]),
@@ -138,8 +138,7 @@ export class AdminAnalyticsService {
       });
       const marked = records.length;
       const present = records.filter((r) => isPresent(r.status)).length;
-      const absent =
-        marked > 0 ? Math.max(0, totalStudents - present) : 0;
+      const absent = marked > 0 ? Math.max(0, totalStudents - present) : 0;
       out.push({
         date: d.toISOString().slice(0, 10),
         weekday: d.toLocaleDateString('en-US', { weekday: 'short' }),
@@ -178,7 +177,10 @@ export class AdminAnalyticsService {
 
     type Bucket = { present: number; enrolled: number; marked: number };
     const byGrade = new Map<string, Bucket>();
-    const bySection = new Map<string, Bucket & { grade: string; section: string | null }>();
+    const bySection = new Map<
+      string,
+      Bucket & { grade: string; section: string | null }
+    >();
 
     for (const s of students) {
       const grade = s.grade.name;
@@ -234,8 +236,7 @@ export class AdminAnalyticsService {
       list.push({
         section: b.section,
         label: b.section ? `${b.grade}-${b.section}` : b.grade,
-        rate:
-          b.enrolled > 0 ? Math.round((b.present / b.enrolled) * 100) : 0,
+        rate: b.enrolled > 0 ? Math.round((b.present / b.enrolled) * 100) : 0,
         marked: b.marked,
         enrolled: b.enrolled,
         present: b.present,
@@ -247,8 +248,7 @@ export class AdminAnalyticsService {
     for (const list of sectionsByGrade.values()) {
       list.sort(
         (a, b) =>
-          a.rate - b.rate ||
-          (a.section ?? '').localeCompare(b.section ?? ''),
+          a.rate - b.rate || (a.section ?? '').localeCompare(b.section ?? ''),
       );
     }
 
@@ -256,8 +256,7 @@ export class AdminAnalyticsService {
       .filter(([, b]) => b.marked > 0)
       .map(([grade, b]) => ({
         grade,
-        rate:
-          b.enrolled > 0 ? Math.round((b.present / b.enrolled) * 100) : 0,
+        rate: b.enrolled > 0 ? Math.round((b.present / b.enrolled) * 100) : 0,
         marked: b.marked,
         enrolled: b.enrolled,
         present: b.present,

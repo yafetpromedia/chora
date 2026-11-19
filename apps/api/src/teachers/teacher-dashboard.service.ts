@@ -41,32 +41,33 @@ export class TeacherDashboardService {
       select: { id: true, name: true },
     });
 
-    const [user, profile, grades, announcements, currentTerm] = await Promise.all([
-      this.prisma.user.findUnique({
-        where: { id: userId },
-        select: { firstName: true, lastName: true },
-      }),
-      this.prisma.teacherProfile.findUnique({
-        where: { userId },
-        include: {
-          homeroomGrade: { select: { id: true, name: true } },
-          homeroomSection: { select: { id: true, name: true } },
-          assignments: {
-            include: {
-              grade: { select: { id: true, name: true } },
-              section: { select: { id: true, name: true } },
-              subject: { select: { id: true, name: true, code: true } },
+    const [user, profile, grades, announcements, currentTerm] =
+      await Promise.all([
+        this.prisma.user.findUnique({
+          where: { id: userId },
+          select: { firstName: true, lastName: true },
+        }),
+        this.prisma.teacherProfile.findUnique({
+          where: { userId },
+          include: {
+            homeroomGrade: { select: { id: true, name: true } },
+            homeroomSection: { select: { id: true, name: true } },
+            assignments: {
+              include: {
+                grade: { select: { id: true, name: true } },
+                section: { select: { id: true, name: true } },
+                subject: { select: { id: true, name: true, code: true } },
+              },
             },
           },
-        },
-      }),
-      this.teacherScope.listGradesForTeacher(schoolId, userId),
-      this.prisma.announcement.count({ where: { schoolId } }),
-      this.prisma.academicTerm.findFirst({
-        where: { schoolId, isCurrent: true },
-        select: { id: true, name: true },
-      }),
-    ]);
+        }),
+        this.teacherScope.listGradesForTeacher(schoolId, userId),
+        this.prisma.announcement.count({ where: { schoolId } }),
+        this.prisma.academicTerm.findFirst({
+          where: { schoolId, isCurrent: true },
+          select: { id: true, name: true },
+        }),
+      ]);
 
     const classBuckets: {
       gradeId: string;
@@ -405,7 +406,10 @@ export class TeacherDashboardService {
 
     let gradingTotal = 0;
     let gradingComplete = 0;
-    let missingScores = resultsPending.reduce((s, r) => s + r.missingCount, 0);
+    const missingScores = resultsPending.reduce(
+      (s, r) => s + r.missingCount,
+      0,
+    );
 
     if (currentTerm && teachingSlots.length > 0) {
       const assessments = await this.prisma.assessment.findMany({
@@ -527,8 +531,9 @@ export class TeacherDashboardService {
         missingScores,
       },
       classwork: {
-        published: classworkRows.filter((r) => r.status === ClassworkStatus.PUBLISHED)
-          .length,
+        published: classworkRows.filter(
+          (r) => r.status === ClassworkStatus.PUBLISHED,
+        ).length,
         draft: classworkRows.filter((r) => r.status === ClassworkStatus.DRAFT)
           .length,
         submissionsToGrade: classworkRows.reduce(

@@ -24,7 +24,12 @@ const DEFAULT_LEAVE_TYPES: Array<{
   annualAllocationDays?: number;
   sortOrder: number;
 }> = [
-  { slug: 'annual', name: 'Annual Leave', annualAllocationDays: 20, sortOrder: 1 },
+  {
+    slug: 'annual',
+    name: 'Annual Leave',
+    annualAllocationDays: 20,
+    sortOrder: 1,
+  },
   { slug: 'sick', name: 'Sick Leave', annualAllocationDays: 10, sortOrder: 2 },
   { slug: 'emergency', name: 'Emergency Leave', sortOrder: 3 },
   { slug: 'maternity', name: 'Maternity Leave', sortOrder: 4 },
@@ -192,7 +197,9 @@ export class LeaveService {
       where: {
         schoolId,
         userId: targetUserId,
-        status: { in: [LeaveRequestStatus.pending, LeaveRequestStatus.approved] },
+        status: {
+          in: [LeaveRequestStatus.pending, LeaveRequestStatus.approved],
+        },
         startDate: { lte: end },
         endDate: { gte: start },
       },

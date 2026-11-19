@@ -451,8 +451,11 @@ export class TeachersService {
     const school = await this.loadSchoolForCard(schoolId);
     return users
       .filter(
-        (u): u is typeof u & { teacherProfile: NonNullable<typeof u.teacherProfile> } =>
-          !!u.teacherProfile?.cardCode,
+        (
+          u,
+        ): u is typeof u & {
+          teacherProfile: NonNullable<typeof u.teacherProfile>;
+        } => !!u.teacherProfile?.cardCode,
       )
       .map((u) => this.formatTeacherIdCard(u, school));
   }
@@ -592,30 +595,30 @@ export class TeachersService {
 
   private formatStaff(
     user: {
-    id: string;
-    email: string;
-    externalRef?: string | null;
-    firstName: string;
-    lastName: string;
-    role: string;
-    roleTemplate: { slug: string; name: string } | null;
-    teacherProfile: {
       id: string;
-      cardCode?: string | null;
-      homeroomGrade: { id: string; name: string } | null;
-      homeroomSection: { id: string; name: string } | null;
-      assignments: {
+      email: string;
+      externalRef?: string | null;
+      firstName: string;
+      lastName: string;
+      role: string;
+      roleTemplate: { slug: string; name: string } | null;
+      teacherProfile: {
         id: string;
-        gradeId: string;
-        sectionId: string | null;
-        subjectId: string | null;
-        isHomeroom: boolean;
-        grade: { id: string; name: string };
-        section: { id: string; name: string } | null;
-        subject: { id: string; name: string; code: string } | null;
-      }[];
-    } | null;
-  },
+        cardCode?: string | null;
+        homeroomGrade: { id: string; name: string } | null;
+        homeroomSection: { id: string; name: string } | null;
+        assignments: {
+          id: string;
+          gradeId: string;
+          sectionId: string | null;
+          subjectId: string | null;
+          isHomeroom: boolean;
+          grade: { id: string; name: string };
+          section: { id: string; name: string } | null;
+          subject: { id: string; name: string; code: string } | null;
+        }[];
+      } | null;
+    },
     teachingSlots: {
       gradeName: string;
       sectionName: string | null;

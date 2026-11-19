@@ -1,7 +1,10 @@
 import { Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { Plan } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { DEFAULT_PLAN_CATALOG, type PlanCatalogRow } from './plan-catalog.defaults';
+import {
+  DEFAULT_PLAN_CATALOG,
+  type PlanCatalogRow,
+} from './plan-catalog.defaults';
 import type { PlanLimits } from './plan-limits';
 
 export type PlanCatalogDto = {
@@ -95,15 +98,22 @@ export class PlanCatalogService implements OnModuleInit {
     return trial?.trialDays ?? 14;
   }
 
-  async update(plan: Plan, data: Partial<PlanCatalogRow>): Promise<PlanCatalogDto> {
-    const existing = await this.prisma.planCatalog.findUnique({ where: { plan } });
+  async update(
+    plan: Plan,
+    data: Partial<PlanCatalogRow>,
+  ): Promise<PlanCatalogDto> {
+    const existing = await this.prisma.planCatalog.findUnique({
+      where: { plan },
+    });
     if (!existing) throw new NotFoundException('Plan not found');
 
     const patch: Record<string, unknown> = {};
     if (data.label !== undefined) patch.label = data.label;
     if (data.description !== undefined) patch.description = data.description;
-    if (data.studentsLimit !== undefined) patch.studentsLimit = data.studentsLimit;
-    if (data.teachersLimit !== undefined) patch.teachersLimit = data.teachersLimit;
+    if (data.studentsLimit !== undefined)
+      patch.studentsLimit = data.studentsLimit;
+    if (data.teachersLimit !== undefined)
+      patch.teachersLimit = data.teachersLimit;
     if (data.adminsLimit !== undefined) patch.adminsLimit = data.adminsLimit;
     if (data.usdMonthly !== undefined) patch.usdMonthly = data.usdMonthly;
     if (data.etbMonthly !== undefined) patch.etbMonthly = data.etbMonthly;
@@ -160,9 +170,7 @@ export class PlanCatalogService implements OnModuleInit {
       admins: row.adminsLimit,
       usdMonthly: row.usdMonthly,
       etbMonthly: row.etbMonthly,
-      features: Array.isArray(row.features)
-        ? (row.features as string[])
-        : [],
+      features: Array.isArray(row.features) ? (row.features as string[]) : [],
       trialDays: row.trialDays,
       sortOrder: row.sortOrder,
       isListed: row.isListed,

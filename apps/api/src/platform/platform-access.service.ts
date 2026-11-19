@@ -71,14 +71,11 @@ export class PlatformAccessService implements OnModuleInit {
     return {
       catalog: PLATFORM_PERMISSION_CATALOG,
       roles: (
-        [
-          PlatformRole.OWNER,
-          PlatformRole.SUPPORT,
-          PlatformRole.SALES,
-        ] as const
+        [PlatformRole.OWNER, PlatformRole.SUPPORT, PlatformRole.SALES] as const
       ).map((id) => ({
         id,
-        title: id === 'OWNER' ? 'Owner' : id === 'SUPPORT' ? 'Support' : 'Sales',
+        title:
+          id === 'OWNER' ? 'Owner' : id === 'SUPPORT' ? 'Support' : 'Sales',
         description:
           id === 'OWNER'
             ? 'Full platform control — billing, tenants, and policy.'
@@ -98,8 +95,8 @@ export class PlatformAccessService implements OnModuleInit {
         lastLoginAt: u.lastLoginAt,
         invitePending: Boolean(
           u.inviteToken &&
-            u.inviteExpiresAt &&
-            u.inviteExpiresAt.getTime() > Date.now(),
+          u.inviteExpiresAt &&
+          u.inviteExpiresAt.getTime() > Date.now(),
         ),
         createdAt: u.createdAt,
         permissions: this.resolveForRole(u.role),
@@ -142,10 +139,10 @@ export class PlatformAccessService implements OnModuleInit {
       where: { id: 'default' },
       create: {
         id: 'default',
-        rolePermissions: next as object,
+        rolePermissions: next,
       },
       update: {
-        rolePermissions: next as object,
+        rolePermissions: next,
       },
     });
 
@@ -159,7 +156,9 @@ export class PlatformAccessService implements OnModuleInit {
 
   async updateOperatorRole(actor: Actor, userId: string, role: PlatformRole) {
     if (actor.role !== PlatformRole.OWNER) {
-      throw new ForbiddenException('Only platform owners can change operator roles');
+      throw new ForbiddenException(
+        'Only platform owners can change operator roles',
+      );
     }
 
     const target = await this.prisma.platformUser.findUnique({
@@ -178,7 +177,9 @@ export class PlatformAccessService implements OnModuleInit {
         where: { role: PlatformRole.OWNER },
       });
       if (ownerCount <= 1) {
-        throw new BadRequestException('At least one platform owner is required');
+        throw new BadRequestException(
+          'At least one platform owner is required',
+        );
       }
     }
 
@@ -188,10 +189,16 @@ export class PlatformAccessService implements OnModuleInit {
       data: { role },
     });
 
-    await this.writeAudit(actor, 'OPERATOR_ROLE_CHANGED', target.id, target.email, {
-      from: previousRole,
-      to: role,
-    });
+    await this.writeAudit(
+      actor,
+      'OPERATOR_ROLE_CHANGED',
+      target.id,
+      target.email,
+      {
+        from: previousRole,
+        to: role,
+      },
+    );
 
     return this.getAccessControl();
   }
@@ -233,9 +240,15 @@ export class PlatformAccessService implements OnModuleInit {
       },
     });
 
-    await this.writeAudit(actor, 'OPERATOR_CREATED', created.id, created.email, {
-      role: created.role,
-    });
+    await this.writeAudit(
+      actor,
+      'OPERATOR_CREATED',
+      created.id,
+      created.email,
+      {
+        role: created.role,
+      },
+    );
 
     return this.getAccessControl();
   }
@@ -291,11 +304,17 @@ export class PlatformAccessService implements OnModuleInit {
       actorName: actor.email,
     });
 
-    await this.writeAudit(actor, 'OPERATOR_INVITED', created.id, created.email, {
-      role: created.role,
-      emailSent: mailResult.sent,
-      expiresAt: inviteExpiresAt.toISOString(),
-    });
+    await this.writeAudit(
+      actor,
+      'OPERATOR_INVITED',
+      created.id,
+      created.email,
+      {
+        role: created.role,
+        emailSent: mailResult.sent,
+        expiresAt: inviteExpiresAt.toISOString(),
+      },
+    );
 
     return {
       ...(await this.getAccessControl()),
@@ -333,10 +352,16 @@ export class PlatformAccessService implements OnModuleInit {
       actorName: actor.email,
     });
 
-    await this.writeAudit(actor, 'OPERATOR_INVITE_RESENT', target.id, target.email, {
-      emailSent: mailResult.sent,
-      expiresAt: inviteExpiresAt.toISOString(),
-    });
+    await this.writeAudit(
+      actor,
+      'OPERATOR_INVITE_RESENT',
+      target.id,
+      target.email,
+      {
+        emailSent: mailResult.sent,
+        expiresAt: inviteExpiresAt.toISOString(),
+      },
+    );
 
     return {
       ...(await this.getAccessControl()),
@@ -405,7 +430,9 @@ export class PlatformAccessService implements OnModuleInit {
         where: { role: PlatformRole.OWNER },
       });
       if (ownerCount <= 1) {
-        throw new BadRequestException('At least one platform owner is required');
+        throw new BadRequestException(
+          'At least one platform owner is required',
+        );
       }
     }
 
@@ -484,7 +511,9 @@ export class PlatformAccessService implements OnModuleInit {
       },
     });
     if (activeOwners < 1) {
-      throw new BadRequestException('At least one active platform owner is required');
+      throw new BadRequestException(
+        'At least one active platform owner is required',
+      );
     }
   }
 
@@ -502,7 +531,11 @@ export class PlatformAccessService implements OnModuleInit {
     actorName: string;
   }) {
     const roleLabel =
-      input.role === 'OWNER' ? 'Owner' : input.role === 'SUPPORT' ? 'Support' : 'Sales';
+      input.role === 'OWNER'
+        ? 'Owner'
+        : input.role === 'SUPPORT'
+          ? 'Support'
+          : 'Sales';
     return this.mail.send({
       to: input.to,
       subject: 'You are invited to the Chora platform console',

@@ -149,31 +149,41 @@ export function StudentSubjectScoresPanel({
       .catch(() => setError("Could not load classes"));
   }, [loadStudentsFromClasses, studentsProp.length, initialClassSubjectId]);
 
-  useEffect(() => {
+  const [prevDefaultStudentId, setPrevDefaultStudentId] = useState(defaultStudentId);
+  if (defaultStudentId !== prevDefaultStudentId) {
+    setPrevDefaultStudentId(defaultStudentId);
     if (defaultStudentId) setStudentId(defaultStudentId);
-  }, [defaultStudentId]);
+  }
+
+  const rosterSources = useMemo<ClassSubject[]>(() => {
+    if (!loadStudentsFromClasses || studentsProp.length > 0 || !termId) {
+      return [];
+    }
+    if (classSubjectId && classSubjects.some((c) => c.id === classSubjectId)) {
+      return classSubjects.filter((c) => c.id === classSubjectId);
+    }
+    // One roster fetch per grade+section (not per subject)
+    const seen = new Set<string>();
+    const sources: ClassSubject[] = [];
+    for (const cs of classSubjects) {
+      const key = `${cs.grade.id}:${cs.section?.id ?? ""}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      sources.push(cs);
+    }
+    return sources;
+  }, [loadStudentsFromClasses, studentsProp.length, termId, classSubjectId, classSubjects]);
+
+  const [prevRosterSources, setPrevRosterSources] = useState(rosterSources);
+  if (rosterSources !== prevRosterSources) {
+    setPrevRosterSources(rosterSources);
+    if (rosterSources.length > 0) setLoadingStudents(true);
+  }
 
   useEffect(() => {
-    if (!loadStudentsFromClasses || studentsProp.length > 0 || !termId) {
-      return;
-    }
-    let sources: ClassSubject[];
-    if (classSubjectId && classSubjects.some((c) => c.id === classSubjectId)) {
-      sources = classSubjects.filter((c) => c.id === classSubjectId);
-    } else {
-      // One roster fetch per grade+section (not per subject)
-      const seen = new Set<string>();
-      sources = [];
-      for (const cs of classSubjects) {
-        const key = `${cs.grade.id}:${cs.section?.id ?? ""}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        sources.push(cs);
-      }
-    }
+    const sources = rosterSources;
     if (sources.length === 0) return;
 
-    setLoadingStudents(true);
     void Promise.all(sources.map((cs) => getScoreMatrix(termId, cs.id)))
       .then((matrices) => {
         const byId = new Map<string, StudentOption>();
@@ -203,13 +213,7 @@ export function StudentSubjectScoresPanel({
       })
       .catch((err) => setError(err instanceof Error ? err.message : "Could not load students"))
       .finally(() => setLoadingStudents(false));
-  }, [
-    loadStudentsFromClasses,
-    studentsProp.length,
-    termId,
-    classSubjectId,
-    classSubjects,
-  ]);
+  }, [rosterSources, termId]);
 
   const loadMatrix = useCallback(async () => {
     if (!termId) return;
@@ -237,9 +241,42 @@ export function StudentSubjectScoresPanel({
     }
   }, [termId, studentId, isPortalView, role, portalStudentProfileId]);
 
+  const matrixEligible =
+    Boolean(termId) &&
+    (isPortalView || Boolean(studentId)) &&
+    !(role === "parent" && !portalStudentProfileId);
+  const matrixKey = matrixEligible
+    ? `${termId}|${studentId}|${String(isPortalView)}|${role}|${portalStudentProfileId ?? ""}`
+    : "";
+  const [prevMatrixKey, setPrevMatrixKey] = useState("");
+  if (matrixKey !== prevMatrixKey) {
+    setPrevMatrixKey(matrixKey);
+    if (matrixKey) {
+      setLoading(true);
+      setError("");
+    }
+  }
+
   useEffect(() => {
-    void loadMatrix();
-  }, [loadMatrix]);
+    if (!matrixEligible) return;
+    void (async () => {
+      try {
+        const data = await getStudentSubjectMatrix(
+          termId,
+          isPortalView ? portalStudentProfileId || undefined : studentId,
+        );
+        setMatrix(data);
+        setDraft({});
+        setSaved(false);
+        if (isPortalView) setStudentId(data.student.id);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Could not load scores");
+        setMatrix(null);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [matrixEligible, termId, studentId, isPortalView, portalStudentProfileId]);
 
   const getSavedScore = useCallback(
     (classSubjectId: string, assessmentId: string) => {

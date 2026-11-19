@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { DashIcon, type DashIconName } from "@/components/dashboard/dash-icons";
 import {
   PLATFORM_TOKEN_KEY,
@@ -62,14 +62,17 @@ export function PlatformShell({
 }: Props) {
   const router = useRouter();
   const [mobileNav, setMobileNav] = useState(false);
-  const [ready, setReady] = useState(false);
+  const hydrated = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
+  const ready = hydrated && Boolean(localStorage.getItem(PLATFORM_TOKEN_KEY));
 
   useEffect(() => {
     if (!localStorage.getItem(PLATFORM_TOKEN_KEY)) {
       router.replace("/platform/login");
-      return;
     }
-    setReady(true);
   }, [router]);
 
   function logout() {
