@@ -1,7 +1,7 @@
 # Chora — Production Database Migration Audit
 
 **Audit date:** 2026-11-19  
-**Updated:** See also `docs/PRODUCTION_DATABASE_RECOVERY_PLAN.md` (empty-`chora_db` recovery strategies A/B; disposable clean-install + continue-sim results).  
+**Updated:** See `docs/PRODUCTION_DATABASE_RECOVERY_PLAN.md` for the **eight-table** production path (`resolve --rolled-back` → `deploy`). Phase D below applies **only** when schema diff is already empty — **not** to current production. Checksum mismatch on finished rows: Prisma 6.19.3 `migrate deploy`/`status` do **not** fail (validated on disposable DB).  
 **Scope:** `apps/api/prisma/migrations`, `apps/api/scripts/migrate-existing-db.mjs`, `apps/api/scripts/db-sync.*`, `docs/DATABASE_MIGRATION_RECOVERY.md`  
 **Mode:** READ-ONLY file audit. No production database was connected to, queried, backed up, or modified.
 
@@ -180,7 +180,7 @@ ALTER TABLE "User" ADD COLUMN "phone" TEXT, ... ADD COLUMN "username" TEXT NOT N
   - See `docs/PRODUCTION_STARTUP_SAFETY.md`. Catalog/owner seeding is opt-in via `apps/api/scripts/runtime-bootstrap.mjs` and must **never** run as part of a code-only production deploy.
 - **What breaks:** `prisma migrate deploy` (P3009 on failed rows; would try to run `init` if its row is absent), `migrate status`, future deployments, and any CI step running `migrate deploy`. Also `migrate dev` would detect modified-after-apply checksums and demand a reset (never run on prod).
 - **Caveat:** "schema matches Prisma" must be *proven* (empty `migrate diff`), not assumed. Subtle drift (a missing index, nullable vs NOT NULL, enum values) can exist and only appear as runtime errors.
-- **Uncertainty to verify on a restore:** whether `migrate deploy`/`status` in the installed Prisma (^6.19.3) warns about checksum mismatch on already-applied migrations. I believe `deploy` does not fail on it, but test it on a disposable restore before relying on that.
+- **Checksum mismatch (verified on disposable DB, Prisma 6.19.3):** corrupting the checksum of an already-finished migration does **not** make `migrate status` or `migrate deploy` fail, and no checksum warning appeared in CLI output. Deploy is blocked by **P3009** (failed rows), not by stale finished checksums. Do not hand-edit checksums.
 
 So the lowest-risk "make history clean" goal is a **bookkeeping-only** fix (resolve), validated on a restore, and only after proving an empty diff.
 
@@ -251,15 +251,18 @@ npx prisma migrate status
 Then handle the sim according to the state seen in B1 (decision table, §8). Re-run `migrate status` until it prints `Database schema is up to date!`, then run `npm run build` and smoke-test the API against the sim. Do this against a real `chora_db` dump, not `edu_os` (the recovery doc validated only `edu_os`).
 
 ### Phase D — Production, only if C was green and the sim steps are identical
-Decision table (state from B1 → action):
+
+**Gate:** Phase D is **history bookkeeping only**. If schema diff is **non-empty** (current eight-table `chora_db`), **STOP here** and follow `docs/PRODUCTION_DATABASE_RECOVERY_PLAN.md` §6 (`resolve --rolled-back` on failed `subscriptions`, then `migrate deploy` of the repaired chain). Do **not** `resolve --applied` to pretend missing objects exist.
+
+Decision table (state from B1 → action) — **all rows below require schema diff empty**:
 
 | `_prisma_migrations` state | Schema diff | Action |
 |---|---|---|
 | Table missing / empty (pure `db push` DB) | empty | Baseline **every** migration: `migrate resolve --applied <name>` for all 50 folders (use the loop below). Do **not** use only the single catch-up resolve. |
 | `init`…`subscriptions` applied, catch-up missing, others anything | empty | `resolve --applied 20260530170000_schema_catchup`; then resolve each remaining folder that is missing/failed (see below). |
 | Some rows **failed** (`finished_at IS NULL`) | empty | For each failed row: `migrate resolve --rolled-back <name>` (it is then re-applied as an empty file by `deploy`) **or** `--applied` — pick one consistently and rehearse it. |
-| Row exists and is `finished_at NOT NULL` with an *old checksum* | empty | Leave it. Verify on the sim that `deploy`/`status` does not reject it. Do **not** edit `_prisma_migrations` by hand. |
-| Any state | **non-empty** | **STOP.** Do not resolve anything. |
+| Row exists and is `finished_at NOT NULL` with an *old checksum* | empty | Leave it. Verified: Prisma 6.19.3 deploy/status tolerate stale finished checksums. Do **not** edit `_prisma_migrations` by hand. |
+| Any state (including failed `subscriptions`, 7 empty app tables) | **non-empty** | **STOP.** Not Phase D. Use production recovery plan §6. |
 
 Exact commands (production window, after backup and passing sim):
 ```bash
@@ -282,8 +285,8 @@ npx prisma migrate diff --from-url "$DATABASE_URL" --to-schema-datamodel prisma/
 
 ### When to use which command
 - **`migrate resolve --applied <name>`** — only when the schema objects for that migration are *already present* and the diff is empty. Bookkeeping only; changes nothing in the schema.
-- **`migrate resolve --rolled-back <name>`** — only for a *failed* row you intend to re-run; after it, `migrate deploy` will re-run the file. Safe only for the repo's no-op files; **never** for `init`, `subscriptions` or the catch-up on a populated DB (re-running them would conflict or destroy data).
-- **`migrate deploy`** — only for (a) a brand-new empty DB (fresh install), or (b) *future* additive migrations created after this baseline, once history is clean and the diff is empty. **Never** to apply `init`…`schema_catchup` on `chora_db`.
+- **`migrate resolve --rolled-back <name>`** — for a *failed* row you intend to re-run with the **current** migration file. On the eight-table empty DB, this is required for `20260530160000_subscriptions` before deploy (rehearsed: current file has no `school-addis` INSERT). **Never** re-run `init` or catch-up on a **populated** DB.
+- **`migrate deploy`** — (a) brand-new empty DB; (b) eight-table empty `chora_db` **after** `--rolled-back` on failed subscriptions (see recovery plan §6); (c) *future* additive migrations once history is clean and the diff is empty. **Never** deploy catch-up against a DB that **already** has the full schema (use Phase D resolve instead).
 - **Never on prod:** `migrate dev`, `migrate reset`, `db push`, `db:sync`, `db:setup`, `db:bootstrap`, `scripts/migrate-existing-db.mjs` (no empty-diff gate).
 
 ### Rollback
