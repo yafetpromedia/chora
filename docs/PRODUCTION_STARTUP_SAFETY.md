@@ -48,7 +48,9 @@ Actions performed when allowed:
 5. Optionally create platform owner if `PLATFORM_OWNER_EMAIL` + `PLATFORM_OWNER_PASSWORD` are set and that email does not exist.
 
 **Do not** put this script in systemd `ExecStart` / `ExecStartPre`.  
-**Do not** run it against production as part of a routine code deploy.
+**Do not** run migrations, `db push`, `db-sync`, `db-bootstrap`, or `runtime-bootstrap` against production as part of a code-only deployment.  
+**Do not** restart `awuddigitals.service`.  
+**Do not** merge or deploy without explicit human approval.
 
 ## Tests
 

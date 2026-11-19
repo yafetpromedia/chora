@@ -52,22 +52,17 @@ The migration files in the repo **no longer match what any pre-repair database r
 
 ## 2. Review of `apps/api/scripts/migrate-existing-db.mjs`
 
-What it does: (1) `prisma migrate diff --from-url $DATABASE_URL --to-schema-datamodel prisma/schema.prisma --script`; (2) `prisma migrate resolve --applied 20260530170000_schema_catchup`; (3) `prisma migrate status`.
+**Current behavior (hardened):** (1) `prisma migrate diff … --script --exit-code`; (2) **abort if exit code `2` (non-empty diff)**; (3) only then `prisma migrate resolve --applied 20260530170000_schema_catchup`; (4) `prisma migrate status`.
 
-### Exact dangers
+### Remaining dangers / limits
 
-1. **No empty-diff proof gate (the main danger).** The `run()` helper only aborts when the child exits non-zero:
-   ```js
-   if (result.status !== 0) process.exit(result.status ?? 1);
-   ```
-   `prisma migrate diff --script` exits `0` whether the diff is empty or not (only `--exit-code` makes a non-empty diff exit `2`). The script does **not** pass `--exit-code`, does not capture or parse stdout, and the only "check" is a `console.log("If the diff above is empty…")` message for a human who is not stopping the script. **It will mark catch-up as applied even if the DB is missing 100+ tables/columns.** Result: `_prisma_migrations` claims the schema is current while it is not → silent drift; later migrations/app queries fail at runtime.
-2. **Only marks one migration.** It resolves `20260530170000_schema_catchup` only. If the DB's `_prisma_migrations` lacks any other folder (e.g. a pure `db push` DB, or a DB with a failed/absent row for `init`…`subscriptions` or the 45 no-ops), `migrate status` will still show pending migrations, and a later `migrate deploy` will try to run `init`, whose first statement is `CREATE TYPE "UserRole"` — which fails on an existing schema.
-3. **Does not handle failed rows.** If a failed row exists for a migration (P3009), `migrate status` and `migrate deploy` block. The script does not inspect or resolve it.
-4. **`migrate status` at the end is only informational** (it can exit non-zero but by then the resolve has already been written). The script has no dry-run mode.
-5. **Environment trust.** It runs against whatever `DATABASE_URL` is in the process env (the repo `.env` currently points to `edu_os`). There is no database-name allow/deny check, no "type the DB name to confirm" prompt, and no backup requirement enforced in code. The final banner ("Do not use this against production until a disposable restore-test passed") is advisory only.
-6. **Uses `npx` with `shell: true`** and inherits full `env` (low risk; just note logs may echo URL on error).
+1. **Still only marks one migration.** It resolves `20260530170000_schema_catchup` only. If `_prisma_migrations` lacks other folders, `migrate status` can still show pending rows, and a later `migrate deploy` may try to run `init` (`CREATE TYPE "UserRole"`) against an existing schema.
+2. **Does not handle failed rows.** If a failed row exists (P3009), `migrate status` / `migrate deploy` block. The script does not inspect or resolve them.
+3. **`migrate status` after resolve is informational.** Operators must still baseline every missing folder before trusting `migrate deploy`.
+4. **Environment trust.** It runs against whatever `DATABASE_URL` is in the process env. There is no database-name allow/deny check and no backup requirement enforced in code.
+5. **Uses `npx` with `shell: true`** and inherits full `env` (low risk; logs may echo URL on error).
 
-The recovery doc's manual procedure (diff must be empty, then `resolve`) is sound; **the script does not enforce it**. Do not use the script on production; use the manual commands in §7.
+**Historical note:** An earlier revision lacked `--exit-code` and could mark catch-up applied on a non-empty diff. That gate is now required. Still: **do not use this script on production as part of a code-only deploy**; use the manual restore-rehearsed commands in §7.
 
 ### Related hazard: `db-sync` falls back to `db push`
 `apps/api/scripts/db-sync.mjs` / `.ps1` run `prisma migrate deploy` and, **on any failure, silently run `prisma db push`**:
@@ -175,7 +170,13 @@ ALTER TABLE "User" ADD COLUMN "phone" TEXT, ... ADD COLUMN "username" TEXT NOT N
 
 - `PrismaClient` (`apps/api/src/prisma/prisma.service.ts`, `$connect` on init) only needs tables/columns/enums that match the generated client. Migration bookkeeping is used only by `prisma migrate *` commands.
 - The API container starts with `node dist/main.js`, with no migrate step, so a dirty `_prisma_migrations` (failed rows, stale checksums, missing rows) will not stop the app.
-- Startup `onModuleInit` hooks (`PlanCatalogService`, `PermissionsService`, `PlatformAccessService`, `PlatformAuthService`) read/seed via Prisma Client against existing tables — they need the *schema*, not the history.
+- **Current startup hooks (as of `sync/production-hardening`):**
+  - `PrismaService.onModuleInit` — `$connect()` only (no writes).
+  - `PlatformAccessService.onModuleInit` — **read-only** cache refresh of platform role permissions.
+  - `PermissionsService` — **does not** seed on startup (explicit bootstrap only).
+  - `PlanCatalogService` — **does not** seed on startup; read paths use in-memory defaults when the catalog is empty (no writes).
+  - `PlatformAuthService` — **does not** create a platform owner on startup (explicit bootstrap only).
+  - See `docs/PRODUCTION_STARTUP_SAFETY.md`. Catalog/owner seeding is opt-in via `apps/api/scripts/runtime-bootstrap.mjs` and must **never** run as part of a code-only production deploy.
 - **What breaks:** `prisma migrate deploy` (P3009 on failed rows; would try to run `init` if its row is absent), `migrate status`, future deployments, and any CI step running `migrate deploy`. Also `migrate dev` would detect modified-after-apply checksums and demand a reset (never run on prod).
 - **Caveat:** "schema matches Prisma" must be *proven* (empty `migrate diff`), not assumed. Subtle drift (a missing index, nullable vs NOT NULL, enum values) can exist and only appear as runtime errors.
 - **Uncertainty to verify on a restore:** whether `migrate deploy`/`status` in the installed Prisma (^6.19.3) warns about checksum mismatch on already-applied migrations. I believe `deploy` does not fail on it, but test it on a disposable restore before relying on that.

@@ -6,6 +6,8 @@
 
 Awud Digitals owns **port 3000** (`awuddigitals.service`). Never stop, restart, or reconfigure it for Chora.
 
+**Code-only deploy rule:** never run migrations, `db push`, `db-sync`, `db-bootstrap`, or `runtime-bootstrap` against production as part of this procedure.
+
 ## Port and proxy map
 
 | Service | Bind | Public path |
@@ -198,10 +200,11 @@ Database rollback is out of scope for code-only deploys.
 
 ## Explicitly prohibited
 
-- `prisma migrate deploy` / `migrate reset` / `migrate resolve` against production without a separate approved migration plan
+- Merging PR #1 or deploying without explicit human approval
+- `prisma migrate deploy` / `migrate reset` / `migrate resolve` against production as part of a code-only deploy
 - `prisma db push`
 - `npm run db:sync` / `db:bootstrap` / `db:setup`
-- `npm run runtime:bootstrap` against production without a separate written approval
+- `npm run runtime:bootstrap` against production as part of a code-only deploy
 - Modifying `/var/www/chora`
 - Restarting `awuddigitals.service`
 - Exposing PostgreSQL publicly
