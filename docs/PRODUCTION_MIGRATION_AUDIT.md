@@ -1,7 +1,7 @@
 # Chora — Production Database Migration Audit
 
 **Audit date:** 2026-11-19  
-**Updated:** See `docs/PRODUCTION_DATABASE_RECOVERY_PLAN.md` for the **eight-table** production path (`resolve --rolled-back` → `deploy`). Phase D below applies **only** when schema diff is already empty — **not** to current production. Checksum mismatch on finished rows: Prisma 6.19.3 `migrate deploy`/`status` do **not** fail (validated on disposable DB).  
+**Updated:** See `docs/PRODUCTION_DATABASE_RECOVERY_PLAN.md` — decision **YES (empty rows only)** without DROP/recreate; five-row replica + Prisma **CLI 6.19.3** validated; `resolve --applied` proven unsafe while `Subscription` missing. Phase D below applies **only** when schema diff is already empty.  
 **Scope:** `apps/api/prisma/migrations`, `apps/api/scripts/migrate-existing-db.mjs`, `apps/api/scripts/db-sync.*`, `docs/DATABASE_MIGRATION_RECOVERY.md`  
 **Mode:** READ-ONLY file audit. No production database was connected to, queried, backed up, or modified.
 

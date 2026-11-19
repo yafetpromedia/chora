@@ -2,144 +2,131 @@
 
 **Branch:** `sync/production-hardening`  
 **Mode:** Repository audit + disposable local validation only.  
-**Production `chora_db` was not connected, modified, migrated, dumped, or reset by this work.**
+**Production `chora_db` was not connected, modified, migrated, dumped, reset, or backed up by this work.**
 
-**Do not execute this plan on production without explicit human approval.**  
-**Do not merge PR #1, deploy, restart services, create backups, or wipe schema as part of this document.**
-
-**Release decision (current):** Deployment blocked — clean install validated; existing production database not release-compatible until the eight-table recovery below is approved and executed.
+**Do not execute recovery commands on production without explicit human approval.**  
+**Do not merge, deploy, or restart services as part of this document.**
 
 ---
 
-## 0. Established production facts (from operator investigation)
+## Decision (read this first)
 
-| Fact | Detail |
+### Can existing `chora_db` reach the release schema through a tested, data-preserving recovery **without dropping or recreating the database**?
+
+| Answer | Detail |
+|--------|--------|
+| **YES — conditional** | Use `prisma migrate resolve --rolled-back 20260530160000_subscriptions` then `prisma migrate deploy` on the **current** migration files. |
+| **Hard precondition** | All seven application tables still have **zero rows** (re-confirm with read-only `COUNT(*)` immediately before execution). |
+| **Why safe when empty** | Catch-up’s `DROP COLUMN "studentId"` / `ADD … studentProfileId TEXT NOT NULL` / `User.username TEXT NOT NULL` succeed only because there is no row data to rewrite. Repaired subscriptions SQL creates `Plan` + `Subscription` and does **not** insert `school-addis`. |
+| **Why not a wipe** | Init / schools / invites objects and their `_prisma_migrations` rows are kept. The failed subscriptions attempt remains visible as a rolled-back history row. |
+| **If any application row appears** | **STOP — procedure is unsafe.** Disposable probe with seeded rows: catch-up failed `23502` (`studentProfileId` nulls); release schema was **not** reached. A different, hand-designed data migration would be required. |
+
+**Phase D / `resolve --applied` while the schema diff is non-empty: forbidden.** Proven on disposable replica: marking failed subscriptions `--applied` then `deploy` fails in catch-up (`42P01` relation `"Subscription" does not exist`).
+
+**Release status:** Deployment remains blocked until this recovery is approved and executed on production (or an alternative you choose).
+
+---
+
+## 0. Production facts this plan targets
+
+| Fact | Value |
 |------|--------|
-| Database | `chora_db` |
-| Application tables present | **7**, all **empty** (zero rows) |
-| Plus | `_prisma_migrations` → **eight** public relations total |
-| Applied / history | `init` (rolled back once, then succeeded), `schools` succeeded, `invites` succeeded, `subscriptions` **failed** |
-| Failed cause | Old SQL `INSERT … school-addis` → FK `23503` |
-| Checksum | Stored subscriptions checksum ≠ current file checksum |
-| Objects after failure | No `Subscription` table, no `Plan` enum (txn rolled back) |
-| Gap | Live schema ≪ current release (~118 models / ~60 enums) |
-| Schema diff | **Non-empty** — Phase D / `resolve --applied` **must not** run |
+| Database | `chora_db` (untouched in this investigation) |
+| Public relations | **8** = 7 empty application tables + `_prisma_migrations` |
+| Enums present | `UserRole`, `AttendanceStatus` only (no `Plan`) |
+| Application tables | `User`, `AttendanceRecord`, `ResultRecord`, `Announcement`, `AnnouncementRead`, `School`, `SchoolInvite` — **0 rows** |
+| History shape | **Five** records: `init` rolled back once, `init` succeeded, `schools` succeeded, `invites` succeeded, `subscriptions` **failed** / incomplete |
+| Failed cause | Old `INSERT … school-addis` → FK `23503` |
+| After failure | No `Subscription` table / indexes; no `Plan` enum (txn rolled back) |
+| Checksum | Stored failed subscriptions checksum ≠ current repaired file |
+| Schema vs release | Diff **non-empty** (~118 models / ~60 enums target) |
 
-Implied early tables: `User`, `AttendanceRecord`, `ResultRecord`, `Announcement`, `AnnouncementRead`, `School`, `SchoolInvite`.
-
----
-
-## 1. What clean-install proves (and what it does not)
-
-| Proven on disposable `chora_migrate_clean_install` | Not proven about production |
-|----------------------------------------------------|-----------------------------|
-| All 50 migrations apply on an **empty** database | That production already satisfies an empty schema diff |
-| Resulting schema matches `schema.prisma` (`DIFF_EXIT=0`) | That Phase D history-only reconciliation is ready |
-| Chain can create a valid **new** installation | That production history is complete |
-
-Clean-install is necessary evidence that the files work together. It is **not** a license to run Phase D on the eight-table database.
+Exact production timestamps/log text were not available in-repo; the disposable replica reproduces **structure and failure mode** (five rows, rolled-back init + failed subscriptions with old checksum, eight tables, zero app rows, no Plan/Subscription).
 
 ---
 
-## 2. Why Phase D / `resolve --applied` is blocked now
+## 1. Prisma version used for validation
 
-From `docs/PRODUCTION_MIGRATION_AUDIT.md`, Phase D requires: **schema diff empty**, then bookkeeping-only `resolve --applied`.
-
-| Requirement | Production |
-|-------------|------------|
-| Empty Prisma schema diff | **Not satisfied** |
-| All expected schema objects exist | **Not satisfied** (7 app tables only) |
-| Failed migration resolved | **Not satisfied** |
-| All migrations in history | **Not satisfied** |
-| Application row counts | **0** (empty — enables a *different* path below) |
-
-**Forbidden now:** `migrate resolve --applied` on catch-up or later folders while objects are missing. That would conceal the gap and leave the app without ~100 tables.
-
-**Also out of scope for this agent / until Chora task completion:** Phase A backups, `DROP SCHEMA`, merges, deploys, restarts, any write to production.
+| Item | Value |
+|------|--------|
+| Prisma **CLI** | **6.19.3** (`npm exec --workspace apps/api -- prisma version`) |
+| `@prisma/client` | **6.19.3** |
+| Query / schema engine hash | `c2990dca591cba766e3b7ef5d9e8a84796e47ab7` (normal companion to 6.19.3; hash alone is not the CLI version) |
+| Host | Local Windows disposable Postgres `127.0.0.1:8000` — **not** `chora_db` |
 
 ---
 
-## 3. Answers to the five recovery questions (tested)
+## 2. Disposable replica accuracy checklist
 
-Validated on disposable **`chora_migrate_prod_state`** engineered to match production:
+Validated database: `chora_migrate_prod_replica`
 
-1. Apply only `init` → `schools` → `invites`.
-2. Temporarily deploy the **historical** subscriptions SQL (with `school-addis` INSERT) → fail `P3018` / FK `23503`.
-3. Restore the **current** repaired subscriptions file (no INSERT).
-4. Observe eight relations, zero rows, no `Plan` / `Subscription`, failed history row whose checksum = old SQL, ≠ current file.
-
-| # | Question | Answer |
-|---|----------|--------|
-| **1** | Can the existing production schema be advanced with a carefully designed, data-preserving migration? | **Yes, using the existing chain — not a new one-off SQL file.** With **zero rows**, catch-up’s `DROP COLUMN` / `NOT NULL` alters do not destroy application data. After clearing P3009, `migrate deploy` applies repaired `subscriptions` → `schema_catchup` → 45 no-ops. No demo INSERTs. |
-| **2** | Can the failed migration be resolved without rerunning **unsafe** historical migrations? | **Yes.** `migrate resolve --rolled-back 20260530160000_subscriptions` then `migrate deploy` re-executes the **current** file (creates `Plan` + `Subscription` only). The `school-addis` INSERT is **not** re-run. Old failed checksum remains on the rolled-back history row. |
-| **3** | Can migration history be reconciled **after** schema reaches the expected state? | **On this path, schema and history advance together via `deploy`.** After success: diff empty, status “up to date”, 50 migrations represented. A *later* Phase D `resolve --applied` loop is **unnecessary**. Phase D remains the tool only for DBs whose schema **already** matches and need bookkeeping only — not this eight-table state. |
-| **4** | Can the procedure be reproduced on a disposable DB matching current production? | **Yes — done.** `chora_migrate_prod_state`: `PROD_STATE_EXIT=0`, `DIFF_AFTER=0`, no demo rows, init/schools/invites history retained, subscriptions shows **two** rows (rolled back + successful). |
-| **5** | Can future migrations use ordinary `prisma migrate deploy` safely? | **Yes.** Post-recovery: `migrate deploy` → “No pending migrations”; `migrate status` → up to date. New additive migrations can follow normal deploy thereafter. |
+| Requirement | Result |
+|-------------|--------|
+| Eight tables including `_prisma_migrations` | **Pass** |
+| Two enums (`UserRole`, `AttendanceStatus`) | **Pass** |
+| Seven application tables, zero rows | **Pass** |
+| Five history rows (rolled-back init + finished init/schools/invites + failed subscriptions) | **Pass** |
+| Failed subscriptions checksum = historical SQL (with `school-addis`); ≠ current file | **Pass** |
+| No `Plan` / `Subscription` after failure | **Pass** |
 
 ---
 
-## 4. Prisma 6.19.3 checksum-mismatch behavior (uncertainty resolved)
+## 3. Prisma 6.19.3 checksum + command behavior (this state)
 
-| Scenario | Result on disposable DB |
-|----------|-------------------------|
-| Failed subscriptions checksum = old SQL; file on disk = repaired | Confirmed mismatch (`2e3bc51b…` vs `ca23942b…`) |
-| Corrupt checksum on an **already-finished** migration (`init`), then `migrate status` / `migrate deploy` | **Does not fail** for checksum alone. **No** checksum warning observed in CLI output. Deploy still blocked only by **P3009** while the failed row exists. |
-| After recovery, corrupt `init` checksum again, then `status` + `deploy` | Both **exit 0**; deploy reports no pending migrations. |
+| Action | Observed on replica | Appropriate for prod eight-table state? |
+|--------|---------------------|----------------------------------------|
+| Stored failed checksum vs current file | Mismatch confirmed | Expected; do not hand-edit |
+| `migrate status` | Exit 1; lists pending; mentions failed migration indirectly via incomplete apply set | Read-only diagnostic |
+| `migrate deploy` (before resolve) | **P3009** — blocked | Not yet |
+| Corrupt checksum on a **finished** migration | `status`/`deploy` still succeed after recovery; **no** checksum warning in CLI | Leave finished checksums alone |
+| `migrate resolve --applied` on failed subscriptions (objects missing) | Marks applied, then `deploy` → catch-up **P3018** `Subscription` does not exist | **No — unsafe** |
+| `migrate resolve --rolled-back` then `deploy` (empty tables) | Applies current subscriptions + catch-up + no-ops; diff empty; 119 tables / 60 enums; no demo rows | **Yes — when zero rows** |
+| Second `migrate deploy` | “No pending migrations” | Expected |
 
-**Implication:** Do **not** hand-edit `_prisma_migrations.checksum`. Stale checksums on finished rows are **tolerated** by Prisma Migrate deploy/status in 6.19.3; they are not a reason to rewrite history. The failed-row / P3009 gate is what must be cleared via `--rolled-back` (not by forging checksums).
-
----
-
-## 5. Migration-chain audit (condensed)
-
-| # | Migration | Role | Notes |
-|---|-----------|------|-------|
-| 1 | `20260528113600_init` | Real | 5 core tables + enums. No demo INSERT. |
-| 2 | `20260530120000_schools` | Real | `School` + `User.externalRef`. |
-| 3 | `20260530140000_invites` | Real | `SchoolInvite`. |
-| 4 | `20260530160000_subscriptions` | Real (**repaired**) | `Plan` + `Subscription`. **No** `school-addis` INSERT. |
-| 5 | `20260530170000_schema_catchup` | Real (~134 KB) | Brings schema to release; needs `Subscription`; empty-table safe for NOT NULL / DROP COLUMN. |
-| 6–50 | Later folders | No-ops | History placeholders. |
-
-Catch-up hazards if **rows exist** or objects already present: non-idempotent `CREATE`, enum `ADD VALUE`, `DROP COLUMN "studentId"`. **Production currently has zero rows** — those hazards do not destroy data *today*; re-confirm counts before any production run.
-
-No migration on this branch inserts demo schools/users.
-
-**Consolidated baseline:** Not required. Eight-table continue-path works without rewriting the 50-folder chain.
+**Checksum conclusion:** For Prisma **6.19.3**, a mismatch between a **finished** row’s stored checksum and the file on disk does **not** block `migrate deploy` / `migrate status`. The gate that matters here is **P3009** (failed / unfinished subscriptions). Clearing it with `--rolled-back` causes `deploy` to run the **current** file (checksum `ca23942b…`), not the historical `school-addis` SQL.
 
 ---
 
-## 6. Recommended production recovery sequence (eight-table state)
+## 4. Data-preservation probe (counterfactual)
 
-### Preconditions (explicit approval required)
+Disposable `chora_migrate_prod_replica_data`: same history/schema as production, but with sample rows in `School` / `User` / `AttendanceRecord` / etc.
 
-1. Written approval for **database schema recovery** on `chora_db` (separate from code deploy).
-2. Read-only confirm: still **zero rows** in all seven application tables.
-3. Confirm failed migration name is `20260530160000_subscriptions` and `Plan` / `Subscription` are absent.
-4. Confirm schema diff is **non-empty** (expected) — therefore **do not** run Phase D.
-5. VPS worktree is the approved `sync/production-hardening` SHA (repaired subscriptions file present).
-6. Writers paused / maintenance window.
-7. **No** `db push`, `db-sync`, `db-bootstrap`, `runtime-bootstrap`, `migrate reset`, or schema drop in this procedure.
-8. Backups: **not** created by this agent; follow your org policy when you choose to execute (deferred until you approve).
+| Result | Detail |
+|--------|--------|
+| `resolve --rolled-back` | Succeeded |
+| `migrate deploy` | Failed in **catch-up** with `23502`: `studentProfileId` contains null values |
+| Seed `User` after failure | Still present (`user_keep_still=1`) — partial apply stopped; release schema **not** reached |
+| Verdict | Procedure is **not** data-preserving into the release schema if early-table rows exist |
 
-### Procedure — history-preserving continue (validated)
+Therefore “data-preserving” for current production means: **no application data exists to lose**, and empty-table ALTERs complete. It does **not** mean catch-up is safe on a populated early schema.
 
-**Effect:** Keeps `init` / `schools` / `invites` objects and their history rows; marks failed subscriptions as rolled back; applies **current** subscriptions + catch-up + no-ops; leaves a visible rolled-back row (failure not concealed).
+---
+
+## 5. Exact recovery sequence (future conditional — production)
+
+### Preconditions (all required)
+
+1. Explicit written approval for database recovery on `chora_db`.
+2. Read-only confirm: **0** rows in all seven application tables.
+3. Read-only confirm: failed migration is `20260530160000_subscriptions`; `Plan` / `Subscription` absent; schema diff non-empty.
+4. Approved worktree SHA of `sync/production-hardening` (repaired subscriptions file, no `school-addis` INSERT).
+5. Writers paused / maintenance window.
+6. Backups: **not** created in this investigation; take any backup your policy requires **before** you approve writes (separate human step).
+
+### Commands
 
 ```bash
-# ONLY AFTER APPROVAL — example; adjust paths/URL. NEVER use edu_os.
+# FUTURE CONDITIONAL — only after approval. Example paths/URL.
 cd /path/to/approved/chora/apps/api
 export DATABASE_URL='postgresql://…/chora_db?schema=public'
 
-# 0) Re-prove empty row counts + failed name (read-only SELECT) — operator
-
-# 1) Clear P3009 without claiming the bad SQL succeeded
+# 1) FUTURE CONDITIONAL — bookkeeping only; does not create schema objects
 npx prisma migrate resolve --rolled-back 20260530160000_subscriptions
 
-# 2) Advance schema + history together (current files only)
+# 2) FUTURE CONDITIONAL — applies current subscriptions + catch-up + no-ops
 npx prisma migrate deploy
 
-# 3) Prove release schema
+# 3) READ-ONLY proof
 npx prisma migrate diff \
   --from-url "$DATABASE_URL" \
   --to-schema-datamodel prisma/schema.prisma \
@@ -149,94 +136,116 @@ npx prisma migrate diff \
 npx prisma migrate status
 # expect: Database schema is up to date!
 
-# 4) Confirm no demo rows
-# SELECT count(*) FROM "School" WHERE id='school-addis';  -- 0
+# 4) READ-ONLY — no demo seed
+# SELECT count(*) FROM "School" WHERE id = 'school-addis';  -- expect 0
 ```
 
-**Expected history for subscriptions:** two rows — one `rolled_back_at` set / unfinished (old checksum), one finished successfully (current checksum).
+### Why each step is safe (under zero-row precondition)
 
-**Stop immediately if:** deploy errors mid-catch-up; any “already exists”; unexpected row counts; diff ≠ 0 after deploy. Do **not** `resolve --applied` to paper over a partial failure.
+| Step | Effect | Safety rationale |
+|------|--------|------------------|
+| `resolve --rolled-back` | Sets `rolled_back_at` on failed subscriptions row; clears P3009 | Does not claim success; does not run SQL; preserves failure visibility |
+| `migrate deploy` | Re-applies **current** subscriptions (no demo INSERT), then catch-up, then no-ops | Current file checksum stored on new successful row; empty tables allow NOT NULL / DROP COLUMN |
+| `migrate diff --exit-code` | Compares live DB to `schema.prisma` | Read-only verification |
+| History after | Two subscriptions rows: rolled-back (old checksum) + finished (current checksum); init rolled-back + finished retained | Failure not concealed |
 
-### Explicitly rejected for this state
+### Stop conditions
 
-| Action | Why |
-|--------|-----|
-| Phase D / `resolve --applied` while diff non-empty | Conceals missing objects |
-| `resolve --applied` on failed subscriptions without creating `Plan`/`Subscription` | Same |
-| Hand-edit checksums | Conceals / forges history; unnecessary per §4 |
-| `DROP SCHEMA public CASCADE` | Destroys migration history; not needed for empty eight-table recovery |
-| Clean-install-only thinking | Ignores existing history and failed row |
-| Demo / seed INSERTs in migrations or silent startup seeds | Forbidden; bootstrap is separate opt-in |
-
-### After schema recovery (separate approvals)
-
-- Code deploy / restart per `docs/VPS_PRODUCTION_DEPLOYMENT.md`.
-- Catalog/owner only via explicit `runtime-bootstrap` if required — never automatic on startup.
+- Any application `COUNT(*) > 0`
+- Deploy error / “already exists” / unexpected P3018
+- Diff exit ≠ 0 after deploy
+- Do **not** then run `resolve --applied` to paper over failure
 
 ---
 
-## 7. Disposable reproduction (operators / CI)
+## 6. Command classification (investigation vs production)
 
-Do **not** commit helper scripts that embed credentials. Pattern used in validation:
+### This investigation (already done / allowed)
 
-1. Create DB `chora_migrate_prod_state` on **local** Postgres only.
-2. Hide migrations after `invites`; `migrate deploy` (3 applied).
-3. Restore folders; temporarily write historical subscriptions SQL with `school-addis`; `migrate deploy` → expect fail.
-4. Restore repaired subscriptions file.
-5. Assert: 7 empty app tables + `_prisma_migrations`; no `Plan`/`Subscription`; P3009 on deploy; diff exit 2.
-6. `migrate resolve --rolled-back 20260530160000_subscriptions` → `migrate deploy` → diff 0, status clean, no demo rows, second deploy no-op.
-7. Drop disposable DB.
+| Command / action | Class |
+|------------------|--------|
+| Read repo migration files / docs | Read-only |
+| `prisma version` on local workspace | Read-only |
+| Create/drop disposable DBs `chora_migrate_*` on local Postgres | Local only |
+| Disposable `migrate deploy` / `resolve` / `diff` / `status` | Local only |
+| Update this document + push branch | Repo only |
 
-Clean-install rehearsal remains useful as a separate check (`chora_migrate_clean_install`) but does **not** replace step 1–6.
+### Production — do **not** run during investigation
 
----
+| Command / action | Class |
+|------------------|--------|
+| Any connection to `chora_db` for writes | Forbidden now |
+| `migrate resolve` / `migrate deploy` on `chora_db` | **Future conditional** (§5) |
+| `migrate resolve --applied` on incomplete schema | **Forbidden** |
+| `DROP SCHEMA` / `DROP DATABASE` / recreate | **Not required**; not recommended for this path |
+| `migrate reset`, `db push`, `db-sync`, bootstrap, runtime-bootstrap | **Forbidden** for this recovery |
+| `pg_dump` / backup creation | **Deferred** to your approval (not done here) |
+| Merge PR / deploy app / restart services | **Out of scope** |
 
-## 8. Exact SQL / schema changes (not applied to production)
-
-**No new migration file is required** for the eight-table recovery.
-
-Current subscriptions (safe form already in repo):
-
-```sql
-CREATE TYPE "Plan" AS ENUM ('TRIAL', 'STARTER', 'PROFESSIONAL', 'ENTERPRISE');
-CREATE TABLE "Subscription" ( … );
--- FK to School
--- NO INSERT of school-addis
-```
-
-Catch-up (dependency / empty-table sensitive excerpts):
+### Production — read-only diagnostics (when you choose to inspect)
 
 ```sql
-ALTER TYPE "AttendanceStatus" ADD VALUE 'excused';
-ALTER TYPE "AttendanceStatus" ADD VALUE 'medical';
-ALTER TYPE "UserRole" ADD VALUE 'staff';
--- AttendanceRecord: drop studentId, rewrite date, add studentProfileId NOT NULL (empty table only)
-ALTER TABLE "Subscription" ADD COLUMN …;
--- + CREATE TYPE / CREATE TABLE for remaining release models
-```
+-- READ-ONLY
+SELECT migration_name, checksum, finished_at, rolled_back_at, left(logs, 200)
+FROM _prisma_migrations ORDER BY started_at;
 
-Operator bookkeeping command (not schema DDL):
+SELECT
+  (SELECT count(*) FROM "User") AS users,
+  (SELECT count(*) FROM "School") AS schools,
+  (SELECT count(*) FROM "AttendanceRecord") AS attendance;
+```
 
 ```bash
-npx prisma migrate resolve --rolled-back 20260530160000_subscriptions
+# READ-ONLY (still touches prod only if DATABASE_URL points at it — prefer a replica)
+npx prisma migrate status
+npx prisma migrate diff --from-url "$DATABASE_URL" --to-schema-datamodel prisma/schema.prisma --script --exit-code
 ```
 
 ---
 
-## 9. What this agent did / did not do
+## 7. Clean-install vs eight-table path
+
+| Test | Proves | Does not prove |
+|------|--------|----------------|
+| Empty DB + all 50 migrations | Chain can create a valid new install | Production’s failed history / eight-table state |
+| Accurate five-row replica + recovery | **This** production starting state can be advanced without DROP DATABASE | Exact prod timestamps/log strings |
+
+Both were validated. Only the eight-table path answers the decision question above.
+
+---
+
+## 8. Alternatives (if precondition fails or you reject continue-path)
+
+| Alternative | When | Notes |
+|-------------|------|--------|
+| Hand-written data-preserving migration | Rows exist in early tables | Required; catch-up alone is insufficient (proven) |
+| Controlled empty re-init (`DROP SCHEMA public CASCADE` + full deploy) | Leadership accepts destroying empty objects **and** history | Cleaner checksums; **not** needed for current empty continue-path; destroys history |
+| New consolidated baseline | Policy rewrite of migration history | Unnecessary while continue-path works on empty DB |
+
+---
+
+## 9. Migration-chain notes (condensed)
+
+- 50 folders: real `init` → `schools` → `invites` → repaired `subscriptions` → `schema_catchup` → 45 no-ops.
+- No demo school/user INSERTs in current chain.
+- Catch-up depends on `Subscription` existing; non-idempotent; empty-table-sensitive.
+
+---
+
+## 10. What this agent did / did not do
 
 | Did | Did not |
 |-----|---------|
-| Audited 50 migrations | Connect to production / `chora_db` |
-| Validated clean install on disposable DB | Create backups |
-| Validated **eight-table prod-state** recovery on disposable DB | `DROP SCHEMA`, merge, deploy, restart |
-| Measured Prisma 6.19.3 checksum mismatch behavior | Run Phase D / `resolve --applied` on incomplete schema |
-| Updated this plan | Introduce demo seeds |
+| Verified Prisma **CLI 6.19.3** (not engine hash alone) | Connect to production `chora_db` |
+| Built five-row / eight-table disposable replica | Create backups |
+| Proved `--applied` unsafe; `--rolled-back`+`deploy` safe when empty | Drop/recreate production DB |
+| Proved populated early tables block catch-up | Merge, deploy, restart |
+| Updated this plan | Run §5 commands on production |
 
 ---
 
-## 10. Related docs
+## 11. Related docs
 
-- `docs/PRODUCTION_MIGRATION_AUDIT.md` — static audit; Phase D only when diff empty  
+- `docs/PRODUCTION_MIGRATION_AUDIT.md` — Phase D only when schema diff already empty  
 - `docs/PRODUCTION_STARTUP_SAFETY.md` — no silent startup seeds  
-- `docs/VPS_PRODUCTION_DEPLOYMENT.md` — code-only deploy (no migrate in systemd)
+- `docs/VPS_PRODUCTION_DEPLOYMENT.md` — code-only deploy
