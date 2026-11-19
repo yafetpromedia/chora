@@ -2,7 +2,6 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
-  OnModuleInit,
 } from '@nestjs/common';
 import { hashSync } from 'bcrypt';
 import { randomBytes } from 'crypto';
@@ -36,16 +35,11 @@ const DEFAULT_TEMPLATE_BY_ROLE: Record<string, string> = {
 };
 
 @Injectable()
-export class UsersService implements OnModuleInit {
+export class UsersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly permissionsService: PermissionsService,
   ) {}
-
-  async onModuleInit() {
-    // Intentionally empty: do not auto-create demo school users or passwords.
-    // Users are created through invites, admin provisioning, and auth flows.
-  }
 
   private async ensureTeacherProfile(userId: string, schoolId: string) {
     await this.prisma.teacherProfile.upsert({
@@ -287,26 +281,6 @@ export class UsersService implements OnModuleInit {
     }
 
     return this.toUserRecord(user);
-  }
-
-  private makeUserSeed(
-    id: string,
-    schoolId: string,
-    role: UserRole,
-    username: string,
-    email: string,
-    passwordHash: string,
-  ) {
-    return {
-      id,
-      schoolId,
-      role: role,
-      username: normalizeUsername(username),
-      email,
-      firstName: role,
-      lastName: 'user',
-      passwordHash,
-    };
   }
 
   private toUserRecord(user: {

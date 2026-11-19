@@ -27,4 +27,4 @@ if (sync.status !== 0) {
   process.exit(sync.status ?? 1);
 }
 
-console.log('Note: demo users are auto-seeded when the API starts.');
+console.log('Database schema sync completed. Demo schools and users are not created automatically.');

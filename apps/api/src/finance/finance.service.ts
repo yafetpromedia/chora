@@ -2,7 +2,6 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
-  OnModuleInit,
 } from '@nestjs/common';
 import {
   PaymentMethod,
@@ -36,16 +35,12 @@ export function formatEtb(cents: number): string {
 }
 
 @Injectable()
-export class FinanceService implements OnModuleInit {
+export class FinanceService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly subscriptionsService: SubscriptionsService,
     private readonly chapaService: ChapaService,
   ) {}
-
-  async onModuleInit() {
-    // Do not auto-seed demo finance records for a hardcoded school.
-  }
 
   async seedDemoFinance(schoolId: string) {
     const year = await this.ensureCurrentYear(schoolId);

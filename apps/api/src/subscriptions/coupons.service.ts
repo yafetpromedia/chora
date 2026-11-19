@@ -2,7 +2,6 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
-  OnModuleInit,
 } from '@nestjs/common';
 import { CouponKind, Plan } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -21,60 +20,8 @@ function addDays(from: Date, days: number) {
 }
 
 @Injectable()
-export class CouponsService implements OnModuleInit {
+export class CouponsService {
   constructor(private readonly prisma: PrismaService) {}
-
-  async onModuleInit() {
-    await this.seedDefaults();
-  }
-
-  private async seedDefaults() {
-    const defaults: Array<{
-      code: string;
-      kind: CouponKind;
-      percentOff: number;
-      extraDays: number;
-      complimentaryMonths: number;
-      plan: Plan | null;
-      notes: string;
-    }> = [
-      {
-        code: 'PILOT14',
-        kind: CouponKind.EXTRA_TRIAL_DAYS,
-        percentOff: 0,
-        extraDays: 14,
-        complimentaryMonths: 1,
-        plan: null,
-        notes: 'Adds 14 days to an expired or active trial',
-      },
-      {
-        code: 'SAVE50',
-        kind: CouponKind.PERCENT_OFF,
-        percentOff: 50,
-        extraDays: 0,
-        complimentaryMonths: 1,
-        plan: null,
-        notes: '50% off the next invoice — school still pays the rest',
-      },
-      {
-        code: 'PARTNER',
-        kind: CouponKind.COMPLIMENTARY,
-        percentOff: 100,
-        extraDays: 0,
-        complimentaryMonths: 3,
-        plan: Plan.STARTER,
-        notes: 'Complimentary Starter access for 3 months',
-      },
-    ];
-
-    for (const row of defaults) {
-      await this.prisma.coupon.upsert({
-        where: { code: row.code },
-        create: { ...row, isActive: true },
-        update: {},
-      });
-    }
-  }
 
   normalizeCode(code: string) {
     return code.trim().toUpperCase().replace(/\s+/g, '');

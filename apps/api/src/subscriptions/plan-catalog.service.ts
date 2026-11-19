@@ -27,7 +27,6 @@ export class PlanCatalogService implements OnModuleInit {
 
   async onModuleInit() {
     await this.ensureSeeded();
-    await this.syncListedPricesFromDefaults();
   }
 
   async ensureSeeded() {

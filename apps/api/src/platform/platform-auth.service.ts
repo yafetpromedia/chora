@@ -1,7 +1,6 @@
 import {
   ConflictException,
   Injectable,
-  OnModuleInit,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
@@ -12,7 +11,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { PlatformAccessService } from './platform-access.service';
 
 @Injectable()
-export class PlatformAuthService implements OnModuleInit {
+export class PlatformAuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,

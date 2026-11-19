@@ -3,7 +3,6 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
-  OnModuleInit,
 } from '@nestjs/common';
 import { ClassworkType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -28,17 +27,12 @@ function assertWeightsSumTo100(
 }
 
 @Injectable()
-export class AssessmentTemplatesService implements OnModuleInit {
+export class AssessmentTemplatesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly teacherScope: TeacherScopeService,
     private readonly workflow: ResultWorkflowService,
   ) {}
-
-  async onModuleInit() {
-    // Do not auto-create assessment templates for every school on boot.
-    // Templates are created during school provisioning or by admins.
-  }
 
   async seedDemoTemplates(schoolId: string) {
     const existing = await this.prisma.assessmentTemplate.count({

@@ -2,11 +2,9 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
-  OnModuleInit,
 } from '@nestjs/common';
 import { sanitizeSchoolImageUrl } from '../common/validators/school-image-url';
-import { AttendanceMode, GradePreset, Plan, SchoolStatus, SchoolType } from '@prisma/client';
-import { gradeNamesForPreset } from '../grades/grade-presets';
+import { AttendanceMode, GradePreset, SchoolStatus, SchoolType } from '@prisma/client';
 import { randomBytes } from 'crypto';
 import { PermissionsService } from '../permissions/permissions.service';
 import { SchoolProvisioningService } from '../provisioning/school-provisioning.service';
@@ -53,18 +51,13 @@ export type SchoolRecord = {
 };
 
 @Injectable()
-export class SchoolsService implements OnModuleInit {
+export class SchoolsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly subscriptionsService: SubscriptionsService,
     private readonly permissionsService: PermissionsService,
     private readonly provisioning: SchoolProvisioningService,
   ) {}
-
-  async onModuleInit() {
-    // Intentionally empty: do not auto-create demo schools, grades, or students.
-    // Schools are provisioned through normal platform/admin flows.
-  }
 
   async createSchool(input: {
     name: string;

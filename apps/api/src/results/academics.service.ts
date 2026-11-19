@@ -3,7 +3,6 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
-  OnModuleInit,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
@@ -52,7 +51,7 @@ const DEFAULT_SUBJECTS = [
 ];
 
 @Injectable()
-export class AcademicsService implements OnModuleInit {
+export class AcademicsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly subscriptionsService: SubscriptionsService,
@@ -69,10 +68,6 @@ export class AcademicsService implements OnModuleInit {
   ) {
     const scopes = await this.teacherScope.getClassScopes(schoolId, userId, role);
     this.teacherScope.assertCanAccessClass(scopes, gradeId, sectionId);
-  }
-
-  async onModuleInit() {
-    // Do not auto-seed demo academics for a hardcoded school.
   }
 
   async seedDemoAcademics(schoolId: string) {

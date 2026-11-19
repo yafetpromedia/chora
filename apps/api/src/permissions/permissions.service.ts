@@ -62,9 +62,8 @@ export class PermissionsService implements OnModuleInit {
         where: { schoolId, slug: tpl.slug },
       });
 
-      const template =
-        existing ??
-        (await this.prisma.roleTemplate.create({
+      if (!existing) {
+        const template = await this.prisma.roleTemplate.create({
           data: {
             schoolId,
             slug: tpl.slug,
@@ -73,11 +72,7 @@ export class PermissionsService implements OnModuleInit {
             portalRole: tpl.portalRole,
             isSystem: true,
           },
-        }));
-
-      // Only seed permissions for newly created system templates.
-      // Do not wipe customized role-template permission sets on every boot.
-      if (!existing) {
+        });
         await this.prisma.roleTemplatePermission.createMany({
           data: patterns.map((permissionKey) => ({
             roleTemplateId: template.id,
