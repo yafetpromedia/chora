@@ -30,23 +30,16 @@ See `docs/PRODUCTION_MIGRATION_AUDIT.md`.
 
 ## Safe production deploy procedure (code only)
 
-1. Confirm PR #1 review complete and migration plan approved.
-2. On the VPS app worktree (example `/var/www/chora-sync`):
+Follow **`docs/VPS_PRODUCTION_DEPLOYMENT.md`** (ports 3001/3002, nginx `/backend`, systemd units, env vars).
 
-```bash
-cd /var/www/chora-sync
-git fetch origin
-git checkout sync/production-hardening   # or the approved release SHA
-git pull --ff-only
-npm ci
-npm run prisma:generate
-npm run prisma:validate
-npm run build --workspace apps/api
-npm run build --workspace apps/web
-```
+Startup mutation rules: **`docs/PRODUCTION_STARTUP_SAFETY.md`**.
 
-3. Restart API/web processes only (PM2/systemd/docker). **Do not** run migrations in the restart script until the migration audit plan is executed on a restore rehearsal.
-4. Smoke-check: `/health` on API, login page on web, one school-scoped authenticated request.
+Summary:
+
+1. Confirm PR #1 review complete.
+2. On `/var/www/chora-sync` (not `/var/www/chora`): pull `sync/production-hardening`, `npm ci`, set `NEXT_PUBLIC_API_BASE_URL` **before** web build, `prisma:generate` / `validate`, build API + web.
+3. Restart **only** `chora-api` / `chora-web` after approval — never `awuddigitals`.
+4. Smoke-check: `GET /health` on `:3001` and via `https://chora.awuddigitals.com/backend/health`.
 
 ## Rollback
 

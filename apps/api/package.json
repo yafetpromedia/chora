@@ -31,7 +31,8 @@
     "prisma:migrate:deploy": "prisma migrate deploy",
     "prisma:migrate:reset": "prisma migrate reset --force",
     "db:bootstrap": "node ./scripts/db-bootstrap.mjs",
-    "db:bootstrap:win": "powershell -ExecutionPolicy Bypass -File ./scripts/db-bootstrap.ps1"
+    "db:bootstrap:win": "powershell -ExecutionPolicy Bypass -File ./scripts/db-bootstrap.ps1",
+    "runtime:bootstrap": "node ./scripts/runtime-bootstrap.mjs"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",

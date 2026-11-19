@@ -19,22 +19,25 @@ export class PlatformAuthService {
     private readonly platformAccess: PlatformAccessService,
   ) {}
 
-  async onModuleInit() {
-    // Optional bootstrap only when explicitly configured — never hardcode credentials.
+  /**
+   * Explicit operator bootstrap only — never called from Nest startup.
+   * Use scripts/runtime-bootstrap.mjs with CHORA_ALLOW_RUNTIME_BOOTSTRAP=1.
+   */
+  async ensurePlatformOwnerFromEnv() {
     const email = this.configService
       .get<string>('PLATFORM_OWNER_EMAIL')
       ?.trim()
       .toLowerCase();
     const password = this.configService.get<string>('PLATFORM_OWNER_PASSWORD');
     if (!email || !password) {
-      return;
+      return { created: false, reason: 'missing_env' as const };
     }
 
     const existing = await this.prisma.platformUser.findUnique({
       where: { email },
     });
     if (existing) {
-      return;
+      return { created: false, reason: 'already_exists' as const };
     }
 
     await this.prisma.platformUser.create({
@@ -51,6 +54,7 @@ export class PlatformAuthService {
         isActive: true,
       },
     });
+    return { created: true, reason: 'created' as const };
   }
 
   async login(email: string, password: string) {

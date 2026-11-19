@@ -2,7 +2,6 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
-  OnModuleInit,
 } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 import {
@@ -15,10 +14,14 @@ import { DEFAULT_ROLE_TEMPLATES } from '../common/permissions/role-template.defa
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
-export class PermissionsService implements OnModuleInit {
+export class PermissionsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async onModuleInit() {
+  /**
+   * Explicit operator bootstrap only — never called from Nest startup.
+   * Use scripts/runtime-bootstrap.mjs with CHORA_ALLOW_RUNTIME_BOOTSTRAP=1.
+   */
+  async runExplicitBootstrap() {
     await this.seedPermissionCatalog();
     const schools = await this.prisma.school.findMany({ select: { id: true } });
     for (const school of schools) {
@@ -85,7 +88,7 @@ export class PermissionsService implements OnModuleInit {
   }
 
   /** Map deprecated SchoolStaffRole enum to role templates. */
-  private async migrateLegacyStaffRoles() {
+  async migrateLegacyStaffRoles() {
     const map: Record<string, string> = {
       SCHOOL_ADMIN: 'school_admin',
       VICE_PRINCIPAL: 'academic_director',
