@@ -40,10 +40,12 @@ export function PlatformUsage() {
   }, []);
 
   useEffect(() => {
-    setLoading(true);
-    void load()
-      .catch((e) => fail(e, "Failed to load usage"))
-      .finally(() => setLoading(false));
+    queueMicrotask(() => {
+      setLoading(true);
+      void load()
+        .catch((e) => fail(e, "Failed to load usage"))
+        .finally(() => setLoading(false));
+    });
   }, [load, router]);
 
   const overCount = useMemo(

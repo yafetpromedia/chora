@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { RequirePermissions } from '../common/decorators/require-permissions.decorator';
@@ -25,7 +33,10 @@ export class ParentsController {
 
   @Post(':userId/reset-password')
   @RequirePermissions(SchoolPermission.STUDENTS_EDIT)
-  resetPassword(@CurrentUser() user: AuthUser, @Param('userId') userId: string) {
+  resetPassword(
+    @CurrentUser() user: AuthUser,
+    @Param('userId') userId: string,
+  ) {
     return this.studentsService.resetParentPassword(user.schoolId, userId);
   }
 
@@ -39,4 +50,3 @@ export class ParentsController {
     return this.studentsService.updateParentAccount(user.schoolId, userId, dto);
   }
 }
-

@@ -50,6 +50,7 @@ export type UpdateSchoolSettingsPayload = {
   name?: string;
   schoolType?: SchoolType;
   address?: string;
+  postalBox?: string;
   email?: string;
   phone?: string;
   country?: string;

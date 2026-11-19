@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useClientSnapshot } from "@/lib/use-client-snapshot";
 import { DashIcon } from "@/components/dashboard/dash-icons";
 import { AdmissionRegisterDrawer } from "@/components/admin/admission-register-drawer";
 import { AppToast } from "@/components/ui/app-toast";
@@ -70,7 +71,10 @@ function placementLabel(a: AdmissionApplication) {
 }
 
 export function AdmissionsWorkspace() {
-  const [canManage, setCanManage] = useState(false);
+  const canManage = useClientSnapshot(
+    () => hasPermission(Permission.ADMISSIONS_MANAGE),
+    false,
+  );
   const [cycles, setCycles] = useState<AdmissionCycle[]>([]);
   const [cycleId, setCycleId] = useState("");
   const [grades, setGrades] = useState<GradeWithSections[]>([]);
@@ -95,45 +99,80 @@ export function AdmissionsWorkspace() {
 
   const activeCycle = cycles.find((c) => c.id === cycleId) ?? null;
 
-  const loadData = useCallback(async (selectedCycleId?: string) => {
-    setLoading(true);
-    setError("");
-    try {
+  const fetchData = useCallback(
+    async (selectedCycleId?: string) => {
       const [cycleList, gradeList] = await Promise.all([
         listAdmissionCycles(),
         listGrades(),
       ]);
-      setGrades(gradeList);
       let list = cycleList;
       if (list.length === 0 && canManage) {
         const created = await ensureDefaultAdmissionCycle();
         list = [created];
       }
-      setCycles(list);
       const cid = selectedCycleId ?? list[0]?.id ?? "";
-      setCycleId(cid);
+      let apps: AdmissionApplication[] | null = null;
+      let ruleList: PlacementRule[] | null = null;
       if (cid) {
-        const [apps, ruleList] = await Promise.all([
+        [apps, ruleList] = await Promise.all([
           listAdmissionApplications({ cycleId: cid }),
           listPlacementRules(cid),
         ]);
-        setApplications(apps);
-        setRules(ruleList);
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load admissions");
-    } finally {
-      setLoading(false);
-    }
-  }, [canManage]);
+      return { gradeList, list, cid, apps, ruleList };
+    },
+    [canManage],
+  );
+
+  const loadData = useCallback(
+    async (selectedCycleId?: string) => {
+      setLoading(true);
+      setError("");
+      try {
+        const { gradeList, list, cid, apps, ruleList } = await fetchData(selectedCycleId);
+        setGrades(gradeList);
+        setCycles(list);
+        setCycleId(cid);
+        if (apps && ruleList) {
+          setApplications(apps);
+          setRules(ruleList);
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Could not load admissions");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [fetchData],
+  );
 
   useEffect(() => {
-    setCanManage(hasPermission(Permission.ADMISSIONS_MANAGE));
-  }, []);
-
-  useEffect(() => {
-    void loadData();
-  }, [loadData]);
+    let cancelled = false;
+    void (async () => {
+      setLoading(true);
+      setError("");
+      try {
+        const { gradeList, list, cid, apps, ruleList } = await fetchData();
+        if (cancelled) return;
+        setGrades(gradeList);
+        setCycles(list);
+        setCycleId(cid);
+        if (apps && ruleList) {
+          setApplications(apps);
+          setRules(ruleList);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Could not load admissions");
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchData]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();

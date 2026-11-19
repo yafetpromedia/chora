@@ -9,7 +9,7 @@ export class AppService {
   getHealth() {
     return {
       status: 'ok',
-      service: 'edu-os-api',
+      service: 'chora-api',
       timestamp: new Date().toISOString(),
     };
   }

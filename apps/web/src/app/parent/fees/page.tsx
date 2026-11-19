@@ -121,26 +121,26 @@ function ParentFeesPageContent() {
     const txRef = searchParams.get("tx_ref")?.trim();
     if (chapaReturn !== "1" || !txRef) return;
 
-    setPaying(true);
-    setError("");
-    void verifyChapaPayment(txRef)
-      .then((res) => {
+    void (async () => {
+      setPaying(true);
+      setError("");
+      try {
+        const res = await verifyChapaPayment(txRef);
         setMessage(`${res.message}\n\nReceipt #: ${res.receiptNumber}`);
         if (selectedId) {
-          return getParentFeesDue(selectedId).then(setDue);
+          setDue(await getParentFeesDue(selectedId));
         }
-      })
-      .catch((err) =>
+      } catch (err) {
         setError(
           err instanceof Error
             ? err.message
             : "Could not confirm Chapa payment yet. Try again in a moment.",
-        ),
-      )
-      .finally(() => {
+        );
+      } finally {
         setPaying(false);
         router.replace("/parent/fees");
-      });
+      }
+    })();
   }, [searchParams, router, selectedId]);
 
   const steps = useMemo(() => {
@@ -300,7 +300,7 @@ function ParentFeesPageContent() {
             </header>
 
             <ParentChildBar
-              children={children}
+              options={children}
               selectedId={selectedId}
               onChange={setSelectedId}
               label="Paying for"

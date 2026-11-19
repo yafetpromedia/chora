@@ -102,11 +102,11 @@ export function PlatformStructures() {
   }, [loadStructures, router]);
 
   useEffect(() => {
-    void load();
+    queueMicrotask(() => void load());
   }, [load]);
 
   useEffect(() => {
-    if (!loading) void loadStructures();
+    if (!loading) queueMicrotask(() => void loadStructures());
   }, [showArchived, loadStructures, loading]);
 
   const stats = useMemo(() => {

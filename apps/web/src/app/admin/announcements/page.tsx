@@ -48,14 +48,28 @@ export default function AdminAnnouncementsPage() {
   }
 
   useEffect(() => {
+    let cancelled = false;
     void Promise.all([
-      refresh(),
+      apiFetch<Announcement[]>("/announcements").then((data) => {
+        if (!cancelled) setItems(data);
+      }),
       getAiStatus()
-        .then((s) => setAiConfigured(s.configured))
-        .catch(() => setAiConfigured(false)),
+        .then((s) => {
+          if (!cancelled) setAiConfigured(s.configured);
+        })
+        .catch(() => {
+          if (!cancelled) setAiConfigured(false);
+        }),
     ])
-      .catch((err) => setError(err instanceof Error ? err.message : "Load failed"))
-      .finally(() => setLoading(false));
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : "Load failed");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const stats = useMemo(() => {

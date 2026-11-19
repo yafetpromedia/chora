@@ -87,15 +87,23 @@ export default function AcademicTermsPage() {
     applyFormDefaults(terms);
   }
 
-  async function load(yearFilter?: string) {
+  async function fetchTermsData(yearFilter?: string) {
     const y = await listAcademicYears();
-    setYears(y);
     const defaultYearId = y.find((x) => x.isCurrent)?.id ?? y[0]?.id ?? "";
     const yearId = yearFilter || academicYearId || defaultYearId;
-    if (yearId !== academicYearId) setAcademicYearId(yearId);
     const loadedTerms = await listTerms(yearId || undefined);
-    setTerms(loadedTerms);
-    return loadedTerms;
+    return { years: y, yearId, loadedTerms };
+  }
+
+  function applyTermsData(data: Awaited<ReturnType<typeof fetchTermsData>>) {
+    setYears(data.years);
+    if (data.yearId !== academicYearId) setAcademicYearId(data.yearId);
+    setTerms(data.loadedTerms);
+    return data.loadedTerms;
+  }
+
+  async function load(yearFilter?: string) {
+    return applyTermsData(await fetchTermsData(yearFilter));
   }
 
   useEffect(() => {
@@ -106,10 +114,21 @@ export default function AcademicTermsPage() {
       router.replace("/login");
       return;
     }
-    void load()
-      .then((loadedTerms) => applyFormDefaults(loadedTerms))
-      .catch((err) => setError(err instanceof Error ? err.message : "Load failed"))
-      .finally(() => setLoading(false));
+    let cancelled = false;
+    void fetchTermsData()
+      .then((data) => {
+        if (cancelled) return;
+        applyFormDefaults(applyTermsData(data));
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : "Load failed");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 

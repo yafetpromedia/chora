@@ -2,11 +2,14 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
-  OnModuleInit,
 } from '@nestjs/common';
 import { sanitizeSchoolImageUrl } from '../common/validators/school-image-url';
-import { AttendanceMode, GradePreset, Plan, SchoolStatus, SchoolType } from '@prisma/client';
-import { gradeNamesForPreset } from '../grades/grade-presets';
+import {
+  AttendanceMode,
+  GradePreset,
+  SchoolStatus,
+  SchoolType,
+} from '@prisma/client';
 import { randomBytes } from 'crypto';
 import { PermissionsService } from '../permissions/permissions.service';
 import { SchoolProvisioningService } from '../provisioning/school-provisioning.service';
@@ -53,18 +56,13 @@ export type SchoolRecord = {
 };
 
 @Injectable()
-export class SchoolsService implements OnModuleInit {
+export class SchoolsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly subscriptionsService: SubscriptionsService,
     private readonly permissionsService: PermissionsService,
     private readonly provisioning: SchoolProvisioningService,
   ) {}
-
-  async onModuleInit() {
-    // Intentionally empty: do not auto-create demo schools, grades, or students.
-    // Schools are provisioned through normal platform/admin flows.
-  }
 
   async createSchool(input: {
     name: string;
@@ -111,7 +109,9 @@ export class SchoolsService implements OnModuleInit {
       });
       return this.toRecord(refreshed ?? school);
     } catch {
-      throw new ConflictException('Could not create school. Try a different name.');
+      throw new ConflictException(
+        'Could not create school. Try a different name.',
+      );
     }
   }
 
@@ -134,7 +134,9 @@ export class SchoolsService implements OnModuleInit {
   /** Works even when Prisma client has not been regenerated after the migration. */
   private async readIdCardShowStamp(schoolId: string): Promise<boolean> {
     try {
-      const rows = await this.prisma.$queryRawUnsafe<Array<{ v: boolean | null }>>(
+      const rows = await this.prisma.$queryRawUnsafe<
+        Array<{ v: boolean | null }>
+      >(
         `SELECT "idCardShowStamp" AS v FROM "School" WHERE id = $1 LIMIT 1`,
         schoolId,
       );
@@ -186,7 +188,9 @@ export class SchoolsService implements OnModuleInit {
       reportShowAttendance?: boolean;
     },
   ): Promise<SchoolRecord> {
-    const existing = await this.prisma.school.findUnique({ where: { id: schoolId } });
+    const existing = await this.prisma.school.findUnique({
+      where: { id: schoolId },
+    });
     if (!existing) {
       throw new NotFoundException('School not found');
     }
@@ -293,8 +297,7 @@ export class SchoolsService implements OnModuleInit {
     let idCardShowStampValue = await this.readIdCardShowStamp(schoolId);
 
     if (input.idCardShowStamp !== undefined) {
-      idCardShowStampValue =
-        input.idCardShowStamp === true && stampAvailable;
+      idCardShowStampValue = input.idCardShowStamp === true && stampAvailable;
       try {
         await this.prisma.$executeRawUnsafe(
           `UPDATE "School" SET "idCardShowStamp" = $1::boolean WHERE id = $2`,
@@ -361,43 +364,44 @@ export class SchoolsService implements OnModuleInit {
     }
   }
 
-  private toRecord(school: {
-    id: string;
-    name: string;
-    slug: string;
-    joinCode: string;
-    logoUrl: string | null;
-    authorizedSignatureUrl?: string | null;
-    authorizedSignatureLabel?: string | null;
-    primaryColor?: string | null;
-    accentColor?: string | null;
-    accentDeep?: string | null;
-    schoolType: string | null;
-    address: string | null;
-    email: string | null;
-    postalBox?: string | null;
-    country: string | null;
-    phone: string | null;
-    setupComplete: boolean;
-    gradePreset: string | null;
-    curriculumPackageKey?: string | null;
-    attendanceMode: string;
-    status: string;
-    bankName: string | null;
-    bankAccountHolder: string | null;
-    bankAccountNumber: string | null;
-    telebirrNumber?: string | null;
-    telebirrAccountName?: string | null;
-    paymentInstructions: string | null;
-    reportCardTitle?: string | null;
-    reportCardTagline?: string | null;
-    nameAm?: string | null;
-    stampUrl?: string | null;
-    reportCoverImageUrl?: string | null;
-    idCardShowStamp?: boolean;
-    reportShowRank?: boolean;
-    reportShowAttendance?: boolean;
-  },
+  private toRecord(
+    school: {
+      id: string;
+      name: string;
+      slug: string;
+      joinCode: string;
+      logoUrl: string | null;
+      authorizedSignatureUrl?: string | null;
+      authorizedSignatureLabel?: string | null;
+      primaryColor?: string | null;
+      accentColor?: string | null;
+      accentDeep?: string | null;
+      schoolType: string | null;
+      address: string | null;
+      email: string | null;
+      postalBox?: string | null;
+      country: string | null;
+      phone: string | null;
+      setupComplete: boolean;
+      gradePreset: string | null;
+      curriculumPackageKey?: string | null;
+      attendanceMode: string;
+      status: string;
+      bankName: string | null;
+      bankAccountHolder: string | null;
+      bankAccountNumber: string | null;
+      telebirrNumber?: string | null;
+      telebirrAccountName?: string | null;
+      paymentInstructions: string | null;
+      reportCardTitle?: string | null;
+      reportCardTagline?: string | null;
+      nameAm?: string | null;
+      stampUrl?: string | null;
+      reportCoverImageUrl?: string | null;
+      idCardShowStamp?: boolean;
+      reportShowRank?: boolean;
+      reportShowAttendance?: boolean;
+    },
     idCardShowStampOverride?: boolean,
   ): SchoolRecord {
     const stampFlag =

@@ -16,14 +16,21 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
 import { createReadStream, existsSync } from 'fs';
-import { PlatformInvoiceStatus, PlatformPaymentProofStatus, PlatformRole, SupportTicketStatus } from '@prisma/client';
+import {
+  PlatformInvoiceStatus,
+  PlatformPaymentProofStatus,
+  SupportTicketStatus,
+} from '@prisma/client';
 import { UpdatePlatformProfileDto } from './dto/update-platform-profile.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentPlatformUser } from '../common/decorators/current-platform-user.decorator';
 import type { PlatformAuthUser } from '../common/auth.types';
 import { PlatformGuard } from '../common/guards/platform.guard';
 import { PlatformPermissionsGuard } from '../common/guards/platform-permissions.guard';
-import { RequirePlatformPermissions, RequirePlatformOwner } from '../common/decorators/require-platform-permissions.decorator';
+import {
+  RequirePlatformPermissions,
+  RequirePlatformOwner,
+} from '../common/decorators/require-platform-permissions.decorator';
 import { PlatformPermission } from '../common/permissions/platform-permissions';
 import { CreateTenantSchoolDto } from './dto/create-tenant-school.dto';
 import { PlatformLoginDto } from './dto/platform-login.dto';
@@ -38,7 +45,10 @@ import {
 } from './dto/platform-invoice.dto';
 import { UpdateSupportTicketDto } from '../support/dto/update-support-ticket.dto';
 import { CouponsService } from '../subscriptions/coupons.service';
-import { CreateCouponDto, UpdateCouponDto } from '../subscriptions/dto/coupon.dto';
+import {
+  CreateCouponDto,
+  UpdateCouponDto,
+} from '../subscriptions/dto/coupon.dto';
 import { ReviewPlatformPaymentDto } from '../subscriptions/dto/platform-payment.dto';
 import { PlatformAuthService } from './platform-auth.service';
 import { PlatformBillingService } from './platform-billing.service';
@@ -167,7 +177,9 @@ export class PlatformController {
   uploadDemoVideo(
     @CurrentPlatformUser() user: PlatformAuthUser,
     @UploadedFile()
-    file: { originalname: string; buffer: Buffer; mimetype: string } | undefined,
+    file:
+      | { originalname: string; buffer: Buffer; mimetype: string }
+      | undefined,
   ) {
     if (!file?.buffer) {
       throw new BadRequestException('Upload a video file');
@@ -196,7 +208,9 @@ export class PlatformController {
   uploadProductDocs(
     @CurrentPlatformUser() user: PlatformAuthUser,
     @UploadedFile()
-    file: { originalname: string; buffer: Buffer; mimetype: string } | undefined,
+    file:
+      | { originalname: string; buffer: Buffer; mimetype: string }
+      | undefined,
   ) {
     if (!file?.buffer) {
       throw new BadRequestException('Upload a PDF file');
@@ -414,7 +428,11 @@ export class PlatformController {
     @Param('packageTemplateId') packageTemplateId: string,
     @Body() dto: UpdatePackageTemplateDto,
   ) {
-    return this.curriculumAdmin.updatePackageTemplate(key, packageTemplateId, dto);
+    return this.curriculumAdmin.updatePackageTemplate(
+      key,
+      packageTemplateId,
+      dto,
+    );
   }
 
   @Post('curriculum-packages/:key/templates/:packageTemplateId/remove')
@@ -424,7 +442,10 @@ export class PlatformController {
     @Param('key') key: string,
     @Param('packageTemplateId') packageTemplateId: string,
   ) {
-    return this.curriculumAdmin.removeTemplateFromPackage(key, packageTemplateId);
+    return this.curriculumAdmin.removeTemplateFromPackage(
+      key,
+      packageTemplateId,
+    );
   }
 
   @Post('curriculum-packages/:key/departments')
@@ -571,8 +592,12 @@ export class PlatformController {
   @Get('library/resources')
   @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
   @RequirePlatformOwner()
-  listPlatformLibraryResources(@Query('includeArchived') includeArchived?: string) {
-    return this.platformContent.listLibraryResources(includeArchived === 'true');
+  listPlatformLibraryResources(
+    @Query('includeArchived') includeArchived?: string,
+  ) {
+    return this.platformContent.listLibraryResources(
+      includeArchived === 'true',
+    );
   }
 
   @Post('library/resources')
@@ -612,7 +637,9 @@ export class PlatformController {
   @UseInterceptors(FileInterceptor('file'))
   uploadPlatformLibraryFile(
     @UploadedFile()
-    file: { originalname: string; buffer: Buffer; mimetype: string } | undefined,
+    file:
+      | { originalname: string; buffer: Buffer; mimetype: string }
+      | undefined,
   ) {
     if (!file?.buffer) {
       throw new BadRequestException('Upload a file');
@@ -638,8 +665,12 @@ export class PlatformController {
   @Get('message-templates')
   @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
   @RequirePlatformOwner()
-  listPlatformMessageTemplates(@Query('includeArchived') includeArchived?: string) {
-    return this.platformContent.listMessageTemplates(includeArchived === 'true');
+  listPlatformMessageTemplates(
+    @Query('includeArchived') includeArchived?: string,
+  ) {
+    return this.platformContent.listMessageTemplates(
+      includeArchived === 'true',
+    );
   }
 
   @Post('message-templates')
@@ -669,8 +700,12 @@ export class PlatformController {
   @Get('assessment-templates/catalog')
   @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
   @RequirePlatformOwner()
-  listPlatformAssessmentCatalog(@Query('includeArchived') includeArchived?: string) {
-    return this.platformContent.listAssessmentTemplates(includeArchived === 'true');
+  listPlatformAssessmentCatalog(
+    @Query('includeArchived') includeArchived?: string,
+  ) {
+    return this.platformContent.listAssessmentTemplates(
+      includeArchived === 'true',
+    );
   }
 
   @Get('assessment-templates/catalog/:id')
@@ -821,7 +856,10 @@ export class PlatformController {
   @Patch('invoices/:id')
   @UseGuards(JwtAuthGuard, PlatformGuard, PlatformPermissionsGuard)
   @RequirePlatformPermissions(PlatformPermission.BILLING_MANAGE)
-  updateInvoice(@Param('id') id: string, @Body() dto: UpdatePlatformInvoiceDto) {
+  updateInvoice(
+    @Param('id') id: string,
+    @Body() dto: UpdatePlatformInvoiceDto,
+  ) {
     return this.platformBillingService.updateInvoice(id, dto);
   }
 

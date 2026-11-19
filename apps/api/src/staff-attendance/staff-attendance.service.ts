@@ -5,15 +5,9 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import {
-  Prisma,
-  StaffAttendanceStatus,
-  UserRole,
-} from '@prisma/client';
+import { Prisma, StaffAttendanceStatus, UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import {
-  parseTeacherCardScanPayload,
-} from '../teachers/staff-card.util';
+import { parseTeacherCardScanPayload } from '../teachers/staff-card.util';
 import {
   BulkMarkUnmarkedDto,
   CorrectStaffAttendanceDto,
@@ -517,7 +511,7 @@ export class StaffAttendanceService {
           'Staff QR not found or deactivated. Ask an admin to reissue it.',
         );
       }
-      if (!STAFF_ROLES.includes(cred.user.role as UserRole)) {
+      if (!STAFF_ROLES.includes(cred.user.role)) {
         throw new BadRequestException('Card holder is not school staff');
       }
       return cred.user;
@@ -563,7 +557,7 @@ export class StaffAttendanceService {
     });
 
     if (byCard?.user?.roleTemplateId) {
-      if (!STAFF_ROLES.includes(byCard.user.role as UserRole)) {
+      if (!STAFF_ROLES.includes(byCard.user.role)) {
         throw new BadRequestException('Card holder is not school staff');
       }
       return byCard.user;
@@ -747,7 +741,7 @@ export class StaffAttendanceService {
     const expectedCheckIn = combineDateAndTime(day, hours.checkInTime);
     const expectedCheckOut = combineDateAndTime(day, hours.checkOutTime);
 
-    const status = dto.status as StaffAttendanceStatus;
+    const status = dto.status;
     const checkInAt = dto.checkInAt
       ? resolveInstant(day, dto.checkInAt, new Date())
       : null;
@@ -882,13 +876,12 @@ export class StaffAttendanceService {
     const day = existing.date;
     const hours = await this.schoolHours(schoolId);
     const expectedCheckIn =
-      existing.expectedCheckInAt ??
-      combineDateAndTime(day, hours.checkInTime);
+      existing.expectedCheckInAt ?? combineDateAndTime(day, hours.checkInTime);
     const expectedCheckOut =
       existing.expectedCheckOutAt ??
       combineDateAndTime(day, hours.checkOutTime);
 
-    const status = dto.status as StaffAttendanceStatus;
+    const status = dto.status;
     const checkInAt =
       dto.checkInAt === null
         ? null
@@ -979,9 +972,7 @@ export class StaffAttendanceService {
   }
 
   async summary(schoolId: string, date?: string) {
-    const day = parseDateOnly(
-      date ?? new Date().toISOString().slice(0, 10),
-    );
+    const day = parseDateOnly(date ?? new Date().toISOString().slice(0, 10));
     const [totalStaff, records] = await Promise.all([
       this.prisma.user.count({
         where: {
@@ -1017,12 +1008,7 @@ export class StaffAttendanceService {
     };
   }
 
-  async exportCsv(
-    schoolId: string,
-    from: string,
-    to: string,
-    group?: string,
-  ) {
+  async exportCsv(schoolId: string, from: string, to: string, group?: string) {
     const roleFilter =
       group === 'teachers'
         ? UserRole.teacher
@@ -1058,7 +1044,10 @@ export class StaffAttendanceService {
       .map((r) => {
         const name = `${r.user.firstName} ${r.user.lastName}`.trim();
         const role = r.user.roleTemplate?.name ?? r.user.role;
-        const dept = this.departmentLabel(r.user.role, r.user.roleTemplate?.slug);
+        const dept = this.departmentLabel(
+          r.user.role,
+          r.user.roleTemplate?.slug,
+        );
         const dateStr = dateKey(r.date);
         const reason = (r.reason ?? '').replace(/"/g, '""');
         const notes = (r.notes ?? '').replace(/"/g, '""');
@@ -1320,12 +1309,10 @@ export class StaffAttendanceService {
       portalRole: record.user?.role,
       roleName: record.user?.roleTemplate?.name ?? record.user?.role,
       department: record.user
-        ? this.departmentLabel(
-            record.user.role,
-            record.user.roleTemplate?.slug,
-          )
+        ? this.departmentLabel(record.user.role, record.user.roleTemplate?.slug)
         : undefined,
-      recordedBy: `${record.recordedBy.firstName} ${record.recordedBy.lastName}`.trim(),
+      recordedBy:
+        `${record.recordedBy.firstName} ${record.recordedBy.lastName}`.trim(),
       updatedBy: record.updatedBy
         ? `${record.updatedBy.firstName} ${record.updatedBy.lastName}`.trim()
         : null,
@@ -1365,7 +1352,12 @@ export class StaffAttendanceService {
     return new Set(leaves.map((l) => l.userId));
   }
 
-  async getMeSummary(schoolId: string, userId: string, from?: string, to?: string) {
+  async getMeSummary(
+    schoolId: string,
+    userId: string,
+    from?: string,
+    to?: string,
+  ) {
     await this.assertStaffUser(schoolId, userId);
     const history = await this.getHistory(schoolId, userId, from, to);
     const counts = {
@@ -1380,13 +1372,14 @@ export class StaffAttendanceService {
     let workedMinutes = 0;
     let overtimeMinutes = 0;
     for (const r of history) {
-      counts[r.status as keyof typeof counts] += 1;
+      counts[r.status] += 1;
       lateMinutes += r.lateMinutes;
       workedMinutes += r.workedMinutes ?? 0;
       overtimeMinutes += r.overtimeMinutes ?? 0;
     }
     const expectedDays = history.filter((r) => r.status !== 'on_leave').length;
-    const attended = counts.present + counts.late + counts.half_day + counts.excused;
+    const attended =
+      counts.present + counts.late + counts.half_day + counts.excused;
     const rate =
       expectedDays > 0 ? Math.round((attended / expectedDays) * 100) : null;
     return {
@@ -1622,7 +1615,8 @@ export class StaffAttendanceService {
     const existing = await this.prisma.staffQrCredential.findFirst({
       where: { schoolId, userId },
     });
-    if (!existing) throw new NotFoundException('No QR credential for this user');
+    if (!existing)
+      throw new NotFoundException('No QR credential for this user');
     const row = await this.prisma.staffQrCredential.update({
       where: { userId },
       data: { active, rotatedAt: active ? existing.rotatedAt : new Date() },
@@ -1644,7 +1638,7 @@ export class StaffAttendanceService {
     const bytes = randomBytes(28);
     let out = '';
     for (let i = 0; i < 28; i++) {
-      out += chars[bytes[i]! % chars.length]!;
+      out += chars[bytes[i] % chars.length];
     }
     return out;
   }

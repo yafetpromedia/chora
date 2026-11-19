@@ -152,25 +152,25 @@ function SchoolPlansPageContent() {
     const txRef = searchParams.get("tx_ref")?.trim();
     if (chapaReturn !== "1" || !txRef) return;
 
-    setCheckingOut("STARTER");
-    setError("");
-    void verifySubscriptionCheckout(txRef)
-      .then(async (res) => {
+    void (async () => {
+      setCheckingOut("STARTER");
+      setError("");
+      try {
+        const res = await verifySubscriptionCheckout(txRef);
         setSuccess(res.message);
         const sub = await getSchoolSubscription();
         setSubscription(sub);
-      })
-      .catch((err) =>
+      } catch (err) {
         setError(
           err instanceof Error
             ? err.message
             : "Payment not confirmed yet. Wait a moment and refresh.",
-        ),
-      )
-      .finally(() => {
+        );
+      } finally {
         setCheckingOut(null);
         router.replace("/admin/billing/plans");
-      });
+      }
+    })();
   }, [searchParams, router]);
 
   const chapaEnabled = paymentConfig?.chapaEnabled ?? false;

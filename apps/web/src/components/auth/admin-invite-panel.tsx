@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { createSchoolInvite, listSchoolInvites, type SchoolInvite } from "@/lib/api";
 import { AppToast } from "@/components/ui/app-toast";
 
@@ -18,18 +18,20 @@ export function AdminInvitePanel() {
   const [error, setError] = useState("");
   const [copied, setCopied] = useState<string | null>(null);
 
-  const loadInvites = useCallback(async () => {
-    try {
-      const data = await listSchoolInvites();
-      setInvites(data);
-    } catch {
-      /* ignore on first load */
-    }
-  }, []);
-
   useEffect(() => {
-    void loadInvites();
-  }, [loadInvites]);
+    let cancelled = false;
+    void (async () => {
+      try {
+        const data = await listSchoolInvites();
+        if (!cancelled) setInvites(data);
+      } catch {
+        /* ignore on first load */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function onCreate(event: FormEvent) {
     event.preventDefault();

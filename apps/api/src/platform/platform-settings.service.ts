@@ -14,11 +14,7 @@ import {
   UpdatePlatformSettingsDto,
 } from './dto/update-platform-settings.dto';
 
-const DEMO_VIDEO_MIME = new Set([
-  'video/mp4',
-  'video/webm',
-  'video/quicktime',
-]);
+const DEMO_VIDEO_MIME = new Set(['video/mp4', 'video/webm', 'video/quicktime']);
 const DEMO_VIDEO_MAX_BYTES = 250 * 1024 * 1024;
 const PRODUCT_DOCS_MIME = new Set(['application/pdf']);
 const PRODUCT_DOCS_MAX_BYTES = 40 * 1024 * 1024;
@@ -77,7 +73,10 @@ export type PlatformSettingsRecord = Omit<
   updatedAt?: Date;
 };
 
-export type PlatformSettingsPublic = Omit<PlatformSettingsRecord, 'aiApiKey'> & {
+export type PlatformSettingsPublic = Omit<
+  PlatformSettingsRecord,
+  'aiApiKey'
+> & {
   aiConfigured: boolean;
   aiApiKeyMasked: string | null;
 };
@@ -239,10 +238,9 @@ export class PlatformSettingsService {
         provider: 'env',
         apiKey: envKey,
         model: env.model?.trim() || 'claude-t0',
-        baseUrl: (env.baseUrl?.trim() || 'https://api.freemodel.dev/v1').replace(
-          /\/$/,
-          '',
-        ),
+        baseUrl: (
+          env.baseUrl?.trim() || 'https://api.freemodel.dev/v1'
+        ).replace(/\/$/, ''),
       };
     }
 
@@ -359,8 +357,7 @@ export class PlatformSettingsService {
         : {}),
       ...(dto.productDocsThumbnailUrl !== undefined
         ? {
-            productDocsThumbnailUrl:
-              dto.productDocsThumbnailUrl.trim() || null,
+            productDocsThumbnailUrl: dto.productDocsThumbnailUrl.trim() || null,
           }
         : {}),
       ...(dto.bankName !== undefined
@@ -446,7 +443,8 @@ export class PlatformSettingsService {
 
   async getPayoutInstructions() {
     const settings = await this.getSettings();
-    const hasBank = !!settings.bankName?.trim() && !!settings.bankAccountNumber?.trim();
+    const hasBank =
+      !!settings.bankName?.trim() && !!settings.bankAccountNumber?.trim();
     const hasTelebirr = !!settings.telebirrNumber?.trim();
     return {
       bank: hasBank
@@ -481,7 +479,9 @@ export class PlatformSettingsService {
     actorRole: PlatformRole,
   ) {
     if (actorRole !== PlatformRole.OWNER) {
-      throw new ForbiddenException('Only platform owners can upload the demo video');
+      throw new ForbiddenException(
+        'Only platform owners can upload the demo video',
+      );
     }
     if (!file?.buffer?.length) {
       throw new BadRequestException('Upload a video file');

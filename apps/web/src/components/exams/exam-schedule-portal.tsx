@@ -8,6 +8,7 @@ import {
 import { ParentChildBar } from "@/components/parent/parent-child-bar";
 import { useParentChild } from "@/hooks/use-parent-child";
 import { AUTH_SCHOOL_NAME_KEY } from "@/lib/auth";
+import { useClientSnapshot } from "@/lib/use-client-snapshot";
 import {
   getPublishedExamSchedule,
   listPublishedExamSchedules,
@@ -27,22 +28,20 @@ export function ExamSchedulePortal({ role }: Props) {
   const [error, setError] = useState("");
   const [list, setList] = useState<ExamScheduleListItem[]>([]);
   const [selectedId, setSelectedId] = useState("");
-  const [schedule, setSchedule] = useState<PublishedExamSchedule | null>(null);
+  const [loadedSchedule, setSchedule] = useState<PublishedExamSchedule | null>(null);
   const [myGradeOnly, setMyGradeOnly] = useState(role !== "teacher");
-  const [schoolName, setSchoolName] = useState("");
+  const schoolName = useClientSnapshot(
+    () => localStorage.getItem(AUTH_SCHOOL_NAME_KEY)?.trim() ?? "",
+    "",
+  );
 
   const childId = role === "parent" ? parentChild.selectedId : undefined;
   const childrenReady =
     role !== "parent" || (!parentChild.loading && !parentChild.error);
-
-  useEffect(() => {
-    setSchoolName(localStorage.getItem(AUTH_SCHOOL_NAME_KEY)?.trim() ?? "");
-  }, []);
+  const schedule = selectedId && childrenReady ? loadedSchedule : null;
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setError("");
     void listPublishedExamSchedules()
       .then((rows) => {
         if (cancelled) return;
@@ -67,16 +66,15 @@ export function ExamSchedulePortal({ role }: Props) {
   }, []);
 
   useEffect(() => {
-    if (!selectedId || !childrenReady) {
-      setSchedule(null);
-      return;
-    }
+    if (!selectedId || !childrenReady) return;
     if (role === "parent" && !childId && parentChild.children.length > 0) {
       return;
     }
 
     let cancelled = false;
-    setError("");
+    queueMicrotask(() => {
+      if (!cancelled) setError("");
+    });
     void getPublishedExamSchedule(
       selectedId,
       role === "parent" ? childId || undefined : undefined,
@@ -152,7 +150,7 @@ export function ExamSchedulePortal({ role }: Props) {
       {role === "parent" ? (
         <div className="no-print">
           <ParentChildBar
-            children={parentChild.children}
+            options={parentChild.children}
             selectedId={parentChild.selectedId}
             onChange={parentChild.selectChild}
           />

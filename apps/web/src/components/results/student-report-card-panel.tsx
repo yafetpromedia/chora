@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { useHydrated } from "@/lib/use-client-snapshot";
 import {
   getMyReportCard,
   getMyReportCardStatus,
@@ -32,7 +33,7 @@ export function StudentReportCardPanel({
   studentProfileId,
   resultsHref,
 }: Props) {
-  const [hydrated, setHydrated] = useState(false);
+  const hydrated = useHydrated();
   const [loading, setLoading] = useState(true);
   const [terms, setTerms] = useState<AcademicTerm[]>([]);
   const [termId, setTermId] = useState("");
@@ -49,10 +50,6 @@ export function StudentReportCardPanel({
     resultsHref ?? (role === "parent" ? "/parent/results" : "/student/results");
   const printBase = role === "parent" ? "/parent" : "/student";
   const waitingForChild = role === "parent" && !studentProfileId;
-
-  useEffect(() => {
-    setHydrated(true);
-  }, []);
 
   useEffect(() => {
     void listTerms()
@@ -86,10 +83,36 @@ export function StudentReportCardPanel({
     }
   }, [termId, role, studentProfileId]);
 
+  const autoLoad = hydrated && !loading && Boolean(termId) && !waitingForChild;
+  const autoLoadKey = autoLoad ? `${termId}|${role}|${studentProfileId ?? ""}` : "";
+  const [prevAutoLoadKey, setPrevAutoLoadKey] = useState("");
+  if (autoLoadKey !== prevAutoLoadKey) {
+    setPrevAutoLoadKey(autoLoadKey);
+    if (autoLoadKey) {
+      setReportError("");
+      setReportLoading(true);
+      setReport(null);
+      setReportPublished(null);
+    }
+  }
+
   useEffect(() => {
-    if (!hydrated || loading || !termId || waitingForChild) return;
-    void loadReport();
-  }, [hydrated, loading, termId, waitingForChild, loadReport]);
+    if (!autoLoad) return;
+    void (async () => {
+      try {
+        const status = await getMyReportCardStatus(termId, studentProfileId);
+        setReportPublished(status.published);
+        if (status.published) {
+          setReport(await getMyReportCard(termId, studentProfileId));
+        }
+      } catch (err) {
+        setReportError(err instanceof Error ? err.message : "Failed to load report card");
+        setReportPublished(false);
+      } finally {
+        setReportLoading(false);
+      }
+    })();
+  }, [autoLoad, termId, studentProfileId]);
 
   return (
     <div className="stu-res stu-res--report-page">

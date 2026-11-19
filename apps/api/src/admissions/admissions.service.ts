@@ -104,24 +104,26 @@ export class AdmissionsService {
       );
     }
 
-    return this.prisma.admissionCycle.create({
-      data: {
-        schoolId,
-        academicYearId: year.id,
-        name: `${year.name} intake`,
-        isOpen: true,
-        autoPlaceOnScore: true,
-        autoAcceptOnPlace: true,
-        autoEnrollOnPlace: false,
-      },
-      include: {
-        academicYear: { select: { id: true, name: true, isCurrent: true } },
-        _count: { select: { applications: true, placementRules: true } },
-      },
-    }).then(async (cycle) => {
-      await this.autoSeedPlacementRulesForSchool(schoolId, cycle.id);
-      return cycle;
-    });
+    return this.prisma.admissionCycle
+      .create({
+        data: {
+          schoolId,
+          academicYearId: year.id,
+          name: `${year.name} intake`,
+          isOpen: true,
+          autoPlaceOnScore: true,
+          autoAcceptOnPlace: true,
+          autoEnrollOnPlace: false,
+        },
+        include: {
+          academicYear: { select: { id: true, name: true, isCurrent: true } },
+          _count: { select: { applications: true, placementRules: true } },
+        },
+      })
+      .then(async (cycle) => {
+        await this.autoSeedPlacementRulesForSchool(schoolId, cycle.id);
+        return cycle;
+      });
   }
 
   async updateCycle(
@@ -233,7 +235,10 @@ export class AdmissionsService {
       : current;
   }
 
-  async createApplication(schoolId: string, dto: CreateAdmissionApplicationDto) {
+  async createApplication(
+    schoolId: string,
+    dto: CreateAdmissionApplicationDto,
+  ) {
     const cycle = await this.prisma.admissionCycle.findFirst({
       where: { id: dto.cycleId, schoolId },
     });
@@ -329,15 +334,15 @@ export class AdmissionsService {
       dto.placedGradeId !== undefined
         ? dto.placedGradeId
         : existing.placedGradeId;
-    const placedSectionId =
-      dto.placedSectionId !== undefined
-        ? dto.placedSectionId
-        : existing.placedSectionId;
     const hasManualPlacement = Boolean(placedGradeId);
 
     let status = dto.status ?? existing.status;
     if (!dto.status) {
-      status = this.deriveStatus(existing.status, totalScore, hasManualPlacement);
+      status = this.deriveStatus(
+        existing.status,
+        totalScore,
+        hasManualPlacement,
+      );
     }
 
     const updated = await this.prisma.admissionApplication.update({
@@ -358,9 +363,7 @@ export class AdmissionsService {
               : null
             : undefined,
         idNumber:
-          dto.idNumber !== undefined
-            ? dto.idNumber?.trim() || null
-            : undefined,
+          dto.idNumber !== undefined ? dto.idNumber?.trim() || null : undefined,
         phone: dto.phone !== undefined ? dto.phone?.trim() || null : undefined,
         fatherName: dto.fatherName?.trim(),
         fatherPhone: dto.fatherPhone?.trim(),
@@ -418,7 +421,11 @@ export class AdmissionsService {
     dto: CreatePlacementRuleDto,
   ) {
     await this.assertCycle(schoolId, cycleId);
-    await this.validateRuleTargets(schoolId, dto.targetGradeId, dto.targetSectionId);
+    await this.validateRuleTargets(
+      schoolId,
+      dto.targetGradeId,
+      dto.targetSectionId,
+    );
 
     if (dto.minScore > dto.maxScore) {
       throw new BadRequestException('minScore cannot exceed maxScore');
@@ -775,13 +782,16 @@ export class AdmissionsService {
   }) {
     return Boolean(
       app.placedGradeId &&
-        app.idNumber?.trim() &&
-        app.gender &&
-        app.dateOfBirth,
+      app.idNumber?.trim() &&
+      app.gender &&
+      app.dateOfBirth,
     );
   }
 
-  private async maybeAutoProcessApplication(schoolId: string, applicationId: string) {
+  private async maybeAutoProcessApplication(
+    schoolId: string,
+    applicationId: string,
+  ) {
     const app = await this.prisma.admissionApplication.findFirst({
       where: { id: applicationId, schoolId },
       include: { cycle: true },
@@ -803,10 +813,7 @@ export class AdmissionsService {
     });
     if (!current) throw new NotFoundException('Application not found');
 
-    if (
-      cycle.autoAcceptOnPlace &&
-      current.status === AdmissionStatus.PLACED
-    ) {
+    if (cycle.autoAcceptOnPlace && current.status === AdmissionStatus.PLACED) {
       current = await this.prisma.admissionApplication.update({
         where: { id: applicationId },
         data: { status: AdmissionStatus.ACCEPTED },
@@ -837,7 +844,9 @@ export class AdmissionsService {
 
     const rules = await this.loadActiveRules(schoolId, cycleId);
     if (rules.length === 0) {
-      throw new BadRequestException('Add placement rules before running placement');
+      throw new BadRequestException(
+        'Add placement rules before running placement',
+      );
     }
 
     const statuses: AdmissionStatus[] = [

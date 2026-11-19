@@ -37,13 +37,13 @@ function CardWatermark({ security = false }: { security?: boolean }) {
 }
 
 function FittedStamp({ src }: { src: string }) {
-  const [url, setUrl] = useState(src);
+  const [trimmedStamp, setTrimmedStamp] = useState<{ src: string; url: string } | null>(null);
+  const url = trimmedStamp?.src === src ? trimmedStamp.url : src;
 
   useEffect(() => {
     let cancelled = false;
-    setUrl(src);
     void trimStampSrc(src).then((trimmed) => {
-      if (!cancelled) setUrl(trimmed);
+      if (!cancelled) setTrimmedStamp({ src, url: trimmed });
     });
     return () => {
       cancelled = true;

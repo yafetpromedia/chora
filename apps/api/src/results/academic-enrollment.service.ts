@@ -25,7 +25,13 @@ export class AcademicEnrollmentService {
 
     let synced = 0;
     for (const s of students) {
-      await this.ensureEnrollment(schoolId, s.id, year.id, s.gradeId, s.sectionId);
+      await this.ensureEnrollment(
+        schoolId,
+        s.id,
+        year.id,
+        s.gradeId,
+        s.sectionId,
+      );
       synced += 1;
     }
 

@@ -93,11 +93,11 @@ export function PlatformMessages() {
   }, [loadTemplates, router]);
 
   useEffect(() => {
-    void load();
+    queueMicrotask(() => void load());
   }, [load]);
 
   useEffect(() => {
-    if (!loading) void loadTemplates();
+    if (!loading) queueMicrotask(() => void loadTemplates());
   }, [showArchived, loadTemplates, loading]);
 
   const stats = useMemo(() => {

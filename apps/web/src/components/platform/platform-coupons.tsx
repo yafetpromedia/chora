@@ -161,10 +161,13 @@ export function PlatformCoupons() {
   }, []);
 
   useEffect(() => {
-    setLoading(true);
-    void load()
-      .catch((err) => fail(err, "Could not load coupons"))
-      .finally(() => setLoading(false));
+    queueMicrotask(() => {
+      setLoading(true);
+      void load()
+        .catch((err) => fail(err, "Could not load coupons"))
+        .finally(() => setLoading(false));
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [load, router]);
 
   const stats = useMemo(() => {

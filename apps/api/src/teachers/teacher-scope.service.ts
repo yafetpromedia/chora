@@ -229,11 +229,7 @@ export class TeacherScopeService {
     }
   }
 
-  async assertHomeroomTeacher(
-    schoolId: string,
-    userId: string,
-    role: string,
-  ) {
+  async assertHomeroomTeacher(schoolId: string, userId: string, role: string) {
     if (role !== UserRole.teacher) {
       return;
     }
@@ -274,9 +270,7 @@ export class TeacherScopeService {
     });
 
     if (!allowed) {
-      throw new ForbiddenException(
-        'You do not have access to this class',
-      );
+      throw new ForbiddenException('You do not have access to this class');
     }
   }
 
@@ -291,11 +285,7 @@ export class TeacherScopeService {
       },
     });
 
-    if (
-      !profile ||
-      profile.schoolId !== schoolId ||
-      !profile.homeroomGradeId
-    ) {
+    if (!profile || profile.schoolId !== schoolId || !profile.homeroomGradeId) {
       return [];
     }
 
@@ -351,7 +341,11 @@ export class TeacherScopeService {
   }
 
   async listGradesForTeacher(schoolId: string, userId: string) {
-    const scopes = await this.getClassScopes(schoolId, userId, UserRole.teacher);
+    const scopes = await this.getClassScopes(
+      schoolId,
+      userId,
+      UserRole.teacher,
+    );
     if (scopes === null) {
       return this.prisma.grade.findMany({
         where: { schoolId },
@@ -375,7 +369,9 @@ export class TeacherScopeService {
       const allowedSections = scopes
         .filter((s) => s.gradeId === g.id && s.sectionId)
         .map((s) => s.sectionId!);
-      const hasGradeWide = scopes.some((s) => s.gradeId === g.id && !s.sectionId);
+      const hasGradeWide = scopes.some(
+        (s) => s.gradeId === g.id && !s.sectionId,
+      );
       return {
         ...g,
         sections: hasGradeWide

@@ -1,14 +1,10 @@
-import { Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CURRICULUM_PACKAGE_DEFINITIONS } from './curriculum-packages.data';
 
 @Injectable()
-export class CurriculumCatalogService implements OnModuleInit {
+export class CurriculumCatalogService {
   constructor(private readonly prisma: PrismaService) {}
-
-  async onModuleInit() {
-    await this.ensurePackagesFromDefinitions();
-  }
 
   /**
    * Upsert package shells from code definitions.
@@ -17,6 +13,9 @@ export class CurriculumCatalogService implements OnModuleInit {
    */
   async ensurePackagesFromDefinitions() {
     for (const def of CURRICULUM_PACKAGE_DEFINITIONS) {
+      const existing = await this.prisma.curriculumPackage.findUnique({
+        where: { key: def.key },
+      });
       const pkg = await this.prisma.curriculumPackage.upsert({
         where: { key: def.key },
         create: {
@@ -29,15 +28,12 @@ export class CurriculumCatalogService implements OnModuleInit {
           isActive: true,
           sortOrder: def.sortOrder,
         },
-        update: {
-          label: def.label,
-          description: def.description,
-          gradePreset: def.gradePreset ?? null,
-          schoolType: def.schoolType ?? null,
-          isBlank: def.isBlank ?? false,
-          sortOrder: def.sortOrder,
-        },
+        update: {},
       });
+
+      // Existing packages may have intentionally edited or emptied sections.
+      // Only seed package sections during initial package creation.
+      if (existing) continue;
 
       const [subjectCount, deptCount, libraryCount, templateCount] =
         await Promise.all([

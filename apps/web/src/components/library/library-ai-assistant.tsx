@@ -72,10 +72,13 @@ export function LibraryAiAssistant({ resources, focus, hideHead }: Props) {
       .catch(() => setConfigured(false));
   }, []);
 
-  useEffect(() => {
-    if (!selected) return;
-    setText(resourceText(selected));
-  }, [selected]);
+  const [syncedSelected, setSyncedSelected] = useState<LibraryResource | null>(
+    null,
+  );
+  if (selected !== syncedSelected) {
+    setSyncedSelected(selected);
+    if (selected) setText(resourceText(selected));
+  }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();

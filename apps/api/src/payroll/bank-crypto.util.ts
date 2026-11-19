@@ -1,4 +1,9 @@
-import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'crypto';
+import {
+  createCipheriv,
+  createDecipheriv,
+  createHash,
+  randomBytes,
+} from 'crypto';
 
 const PREFIX = 'enc:v1:';
 
@@ -10,7 +15,9 @@ function keyFromEnv(): Buffer | null {
 }
 
 /** Encrypt bank account for at-rest storage. No-op (plaintext) if key unset. */
-export function encryptBankAccount(plain: string | null | undefined): string | null {
+export function encryptBankAccount(
+  plain: string | null | undefined,
+): string | null {
   if (plain == null || plain === '') return null;
   if (plain.startsWith(PREFIX)) return plain;
   const key = keyFromEnv();
@@ -22,7 +29,9 @@ export function encryptBankAccount(plain: string | null | undefined): string | n
   return `${PREFIX}${iv.toString('base64')}:${tag.toString('base64')}:${enc.toString('base64')}`;
 }
 
-export function decryptBankAccount(stored: string | null | undefined): string | null {
+export function decryptBankAccount(
+  stored: string | null | undefined,
+): string | null {
   if (stored == null || stored === '') return null;
   if (!stored.startsWith(PREFIX)) return stored;
   const key = keyFromEnv();
@@ -49,7 +58,9 @@ export function decryptBankAccount(stored: string | null | undefined): string | 
   }
 }
 
-export function maskBankAccount(stored: string | null | undefined): string | null {
+export function maskBankAccount(
+  stored: string | null | undefined,
+): string | null {
   const plain = decryptBankAccount(stored);
   if (!plain) return stored?.startsWith(PREFIX) ? '****' : null;
   if (plain.length <= 4) return '****';

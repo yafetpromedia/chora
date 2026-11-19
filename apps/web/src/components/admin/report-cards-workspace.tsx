@@ -58,7 +58,7 @@ export function ReportCardsWorkspace({ students, onError }: Props) {
   );
 
   useEffect(() => {
-    setLoading(true);
+    queueMicrotask(() => setLoading(true));
     void listTerms()
       .then((t) => {
         setTerms(t);
@@ -125,7 +125,17 @@ export function ReportCardsWorkspace({ students, onError }: Props) {
 
   useEffect(() => {
     if (!viewStudentId || !termId) return;
-    void refreshPublishStatus(viewStudentId, termId);
+    let cancelled = false;
+    getReportCardPublishStatus(viewStudentId, termId)
+      .then((status) => {
+        if (!cancelled) setPublishStatus(status);
+      })
+      .catch(() => {
+        if (!cancelled) setPublishStatus(null);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [viewStudentId, termId]);
 
   async function onPreviewReport() {

@@ -105,10 +105,9 @@ export function normalizeRoleGrants(
   return cleaned;
 }
 
-export function parseStoredRolePermissions(raw: unknown): Record<
-  PlatformRole,
-  PlatformPermissionKey[]
-> {
+export function parseStoredRolePermissions(
+  raw: unknown,
+): Record<PlatformRole, PlatformPermissionKey[]> {
   const source =
     raw && typeof raw === 'object' && !Array.isArray(raw)
       ? (raw as Record<string, unknown>)

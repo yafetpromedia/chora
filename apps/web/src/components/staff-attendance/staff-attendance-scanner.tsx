@@ -115,7 +115,6 @@ export function StaffAttendanceScanner({
     return () => {
       void stopCamera();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- unmount cleanup only
   }, []);
 
   return (

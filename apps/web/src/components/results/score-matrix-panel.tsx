@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+import { useHydrated } from "@/lib/use-client-snapshot";
 import { DashIcon } from "@/components/dashboard/dash-icons";
 import { AppToast } from "@/components/ui/app-toast";
 import type { GradeWithSections } from "@/lib/api";
@@ -236,7 +237,7 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
   /** Set only in useEffect — starts false on server and client (hydration-safe). */
   const [filtersLoaded, setFiltersLoaded] = useState(false);
   /** Avoid SSR/client mismatch on select `disabled` (React can serialize true as null). */
-  const [filtersInteractive, setFiltersInteractive] = useState(false);
+  const filtersInteractive = useHydrated();
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState("");
   const [workflowBusy, setWorkflowBusy] = useState(false);
@@ -255,10 +256,6 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
     role === "admin" || role === "staff" || (matrix?.canEditScores ?? true);
   const viewOnlyHomeroom = role === "teacher" && matrix != null && !canEditScores;
   const isSchoolAdmin = role === "admin" || role === "staff";
-
-  useEffect(() => {
-    setFiltersInteractive(true);
-  }, []);
 
   useEffect(() => {
     void Promise.all([
@@ -394,28 +391,6 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
     syncClassSubject(gradeId, subjectId, id);
   }
 
-  const loadAggregated = useCallback(async () => {
-    if (!termId || activeClassSubjects.length === 0) return;
-    setLoading(true);
-    setError("");
-    setSuccess("");
-    setMatrix(null);
-    try {
-      const results = await Promise.all(
-        activeClassSubjects.map(async (cs) => ({
-          classSubject: cs,
-          matrix: await getScoreMatrix(termId, cs.id),
-        })),
-      );
-      setAggregatedSheets(results);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load scores");
-      setAggregatedSheets([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [termId, activeClassSubjects]);
-
   const loadMatrix = useCallback(async () => {
     if (!termId || !classSubjectId) return;
     setLoading(true);
@@ -441,22 +416,80 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
     }
   }, [termId, classSubjectId]);
 
+  // Reset sheet state when the loaded sheet selection changes (adjusted during render).
+  const [prevLoadDeps, setPrevLoadDeps] = useState<{
+    termId: string;
+    classSubjectId: string;
+    isAggregated: boolean;
+    activeClassSubjects: ClassSubject[];
+  } | null>(null);
+  if (
+    prevLoadDeps === null ||
+    prevLoadDeps.termId !== termId ||
+    prevLoadDeps.classSubjectId !== classSubjectId ||
+    prevLoadDeps.isAggregated !== isAggregated ||
+    prevLoadDeps.activeClassSubjects !== activeClassSubjects
+  ) {
+    setPrevLoadDeps({ termId, classSubjectId, isAggregated, activeClassSubjects });
+    if (termId) {
+      if (isAggregated && activeClassSubjects.length > 0) {
+        setLoading(true);
+        setError("");
+        setSuccess("");
+        setMatrix(null);
+      } else if (!isAggregated && classSubjectId) {
+        setLoading(true);
+        setError("");
+        setSuccess("");
+        setAggregatedSheets([]);
+      } else {
+        setMatrix(null);
+        setAggregatedSheets([]);
+      }
+    }
+  }
+
   useEffect(() => {
     if (!termId) return;
-    if (isAggregated && activeClassSubjects.length > 0) void loadAggregated();
-    else if (!isAggregated && classSubjectId) void loadMatrix();
-    else {
-      setMatrix(null);
-      setAggregatedSheets([]);
+    if (isAggregated && activeClassSubjects.length > 0) {
+      void (async () => {
+        try {
+          const results = await Promise.all(
+            activeClassSubjects.map(async (cs) => ({
+              classSubject: cs,
+              matrix: await getScoreMatrix(termId, cs.id),
+            })),
+          );
+          setAggregatedSheets(results);
+        } catch (err) {
+          setError(err instanceof Error ? err.message : "Could not load scores");
+          setAggregatedSheets([]);
+        } finally {
+          setLoading(false);
+        }
+      })();
+    } else if (!isAggregated && classSubjectId) {
+      void (async () => {
+        try {
+          const data = await getScoreMatrix(termId, classSubjectId);
+          setMatrix(data);
+          const initial: Record<string, Record<string, number>> = {};
+          for (const st of data.students) {
+            initial[st.studentProfileId] = {};
+            for (const sc of st.scores) {
+              if (sc.score != null) initial[st.studentProfileId][sc.assessmentId] = sc.score;
+            }
+          }
+          setDraft(initial);
+        } catch (err) {
+          setError(err instanceof Error ? err.message : "Could not load scores");
+          setMatrix(null);
+        } finally {
+          setLoading(false);
+        }
+      })();
     }
-  }, [
-    termId,
-    classSubjectId,
-    isAggregated,
-    activeClassSubjects,
-    loadMatrix,
-    loadAggregated,
-  ]);
+  }, [termId, classSubjectId, isAggregated, activeClassSubjects]);
 
   function isComponentEntryLocked(assessmentId: string) {
     if (role === "admin" || role === "staff") return false;

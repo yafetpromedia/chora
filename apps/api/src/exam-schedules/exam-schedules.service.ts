@@ -3,7 +3,11 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
-import { ExamScheduleStatus, Prisma, StudentRecordStatus } from '@prisma/client';
+import {
+  ExamScheduleStatus,
+  Prisma,
+  StudentRecordStatus,
+} from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   CreateExamScheduleDto,
@@ -20,7 +24,10 @@ const dayInclude = {
       grade: { select: { id: true, name: true, sortOrder: true } },
       subject: { select: { id: true, name: true, code: true } },
     },
-    orderBy: [{ grade: { sortOrder: 'asc' as const } }, { sortOrder: 'asc' as const }],
+    orderBy: [
+      { grade: { sortOrder: 'asc' as const } },
+      { sortOrder: 'asc' as const },
+    ],
   },
 } satisfies Prisma.ExamScheduleDayInclude;
 
@@ -174,13 +181,13 @@ export class ExamSchedulesService {
         ...(dto.shiftLabel !== undefined
           ? { shiftLabel: dto.shiftLabel?.trim() || null }
           : {}),
-        ...(dto.notes !== undefined ? { notes: dto.notes?.trim() || null } : {}),
+        ...(dto.notes !== undefined
+          ? { notes: dto.notes?.trim() || null }
+          : {}),
         ...(dto.academicTermId !== undefined
           ? { academicTermId: dto.academicTermId || null }
           : {}),
-        ...(dto.status !== undefined
-          ? { status: dto.status as ExamScheduleStatus }
-          : {}),
+        ...(dto.status !== undefined ? { status: dto.status } : {}),
       },
       include: scheduleInclude,
     });
@@ -229,7 +236,9 @@ export class ExamSchedulesService {
     }
 
     await this.prisma.$transaction(async (tx) => {
-      await tx.examScheduleDay.deleteMany({ where: { scheduleId: id, schoolId } });
+      await tx.examScheduleDay.deleteMany({
+        where: { scheduleId: id, schoolId },
+      });
 
       for (let i = 0; i < dto.days.length; i++) {
         const day = dto.days[i];
@@ -384,8 +393,12 @@ export class ExamSchedulesService {
       await tx.examSeatingPlan.update({
         where: { id: planId },
         data: {
-          ...(dto.title !== undefined ? { title: dto.title.trim() || 'Exam seating' } : {}),
-          ...(dto.notes !== undefined ? { notes: dto.notes?.trim() || null } : {}),
+          ...(dto.title !== undefined
+            ? { title: dto.title.trim() || 'Exam seating' }
+            : {}),
+          ...(dto.notes !== undefined
+            ? { notes: dto.notes?.trim() || null }
+            : {}),
           sourceGradeIds,
           rooms: {
             create: rooms.map((room, i) => ({
@@ -413,7 +426,11 @@ export class ExamSchedulesService {
     });
   }
 
-  async removeSeatingPlan(schoolId: string, scheduleId: string, planId: string) {
+  async removeSeatingPlan(
+    schoolId: string,
+    scheduleId: string,
+    planId: string,
+  ) {
     await this.getSeatingPlan(schoolId, scheduleId, planId);
     await this.prisma.examSeatingPlan.delete({ where: { id: planId } });
     return { ok: true };
@@ -439,7 +456,9 @@ export class ExamSchedulesService {
   }
 
   private async validateSourceGrades(schoolId: string, gradeIds: string[]) {
-    const unique = [...new Set((gradeIds ?? []).map((id) => id.trim()).filter(Boolean))];
+    const unique = [
+      ...new Set((gradeIds ?? []).map((id) => id.trim()).filter(Boolean)),
+    ];
     if (unique.length === 0) {
       throw new BadRequestException('Select at least one source grade');
     }
@@ -476,7 +495,9 @@ export class ExamSchedulesService {
     });
 
     if (students.length === 0) {
-      throw new BadRequestException('No active students in the selected grades');
+      throw new BadRequestException(
+        'No active students in the selected grades',
+      );
     }
 
     const totalCapacity = rooms.reduce((sum, r) => sum + r.capacity, 0);

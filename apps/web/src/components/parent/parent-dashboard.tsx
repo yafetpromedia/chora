@@ -254,14 +254,16 @@ export function ParentDashboard() {
   );
 
   useEffect(() => {
-    setMounted(true);
-    setTodayShort(
-      new Date().toLocaleDateString(undefined, {
-        weekday: "short",
-        month: "short",
-        day: "numeric",
-      }),
-    );
+    queueMicrotask(() => {
+      setMounted(true);
+      setTodayShort(
+        new Date().toLocaleDateString(undefined, {
+          weekday: "short",
+          month: "short",
+          day: "numeric",
+        }),
+      );
+    });
   }, []);
 
   useEffect(() => {
@@ -383,11 +385,12 @@ export function ParentDashboard() {
         ) : null}
 
         <ParentChildBar
-          children={children}
           selectedId={selectedChildId}
           onChange={setSelectedChildId}
           label="Child"
-        />
+        >
+          {children}
+        </ParentChildBar>
 
         {selectedChild ? (
           <section className="par-home__kpis" aria-label="Family shortcuts">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   listScoreCorrections,
   type ScoreCorrectionRequest,
@@ -58,33 +58,44 @@ export function MyScoreReportsPanel({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const load = useCallback(async () => {
-    if (!termId) {
-      setRows([]);
-      setLoading(false);
-      return;
+  const loadKey = `${termId}:${refreshKey}`;
+  const [prevLoadKey, setPrevLoadKey] = useState(loadKey);
+  if (loadKey !== prevLoadKey) {
+    setPrevLoadKey(loadKey);
+    if (termId) {
+      setLoading(true);
+      setError("");
     }
-    setLoading(true);
-    setError("");
-    try {
-      const data = await listScoreCorrections({ termId });
-      setRows(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load score reports");
-      setRows([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [termId]);
+  }
 
   useEffect(() => {
-    void load();
-  }, [load, refreshKey]);
+    if (!termId) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const data = await listScoreCorrections({ termId });
+        if (cancelled) return;
+        setRows(data);
+      } catch (err) {
+        if (cancelled) return;
+        setError(err instanceof Error ? err.message : "Could not load score reports");
+        setRows([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [termId, refreshKey]);
+
+  const isLoading = Boolean(termId) && loading;
 
   const visibleRows = useMemo(() => {
-    if (!studentProfileId) return rows;
-    return rows.filter((row) => row.studentProfileId === studentProfileId);
-  }, [rows, studentProfileId]);
+    const loadedRows = termId ? rows : [];
+    if (!studentProfileId) return loadedRows;
+    return loadedRows.filter((row) => row.studentProfileId === studentProfileId);
+  }, [termId, rows, studentProfileId]);
 
   const pendingCount = useMemo(
     () =>
@@ -108,7 +119,7 @@ export function MyScoreReportsPanel({
               : "Reports you submitted about published marks. Your teacher reviews first, then the school office approves any change."}
           </p>
         </div>
-        {!loading && pendingCount > 0 ? (
+        {!isLoading && pendingCount > 0 ? (
           <span className="stu-res__reports-pending">
             {pendingCount} in progress
           </span>
@@ -117,7 +128,7 @@ export function MyScoreReportsPanel({
 
       {error ? <p className="stu-res__alert stu-res__alert--error">{error}</p> : null}
 
-      {loading ? (
+      {isLoading ? (
         <div className="stu-res__loading">
           <span className="stu-res__spinner" aria-hidden />
           <p>Loading score reports…</p>

@@ -6,7 +6,7 @@ const CARD_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 export function generateStudentCardCode(): string {
   let code = '';
   for (let i = 0; i < 8; i++) {
-    code += CARD_CHARS[randomBytes(1)[0]! % CARD_CHARS.length];
+    code += CARD_CHARS[randomBytes(1)[0] % CARD_CHARS.length];
   }
   return code;
 }
@@ -44,7 +44,7 @@ export function isSchoolStudentIdLogin(input: string): boolean {
 export function generateSchoolStudentId(): string {
   let suffix = '';
   for (let i = 0; i < STUDENT_ID_RANDOM_LEN; i++) {
-    suffix += CARD_CHARS[randomBytes(1)[0]! % CARD_CHARS.length];
+    suffix += CARD_CHARS[randomBytes(1)[0] % CARD_CHARS.length];
   }
   return `${STUDENT_ID_PREFIX}${suffix}`;
 }

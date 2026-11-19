@@ -28,20 +28,24 @@ export default function StudentCardsPage() {
 
   const selectedGrade = grades.find((g) => g.id === gradeId);
 
+  function fetchCards() {
+    return Promise.all([
+      countStudentIdCards({
+        gradeId: gradeId || undefined,
+        sectionId: sectionId || undefined,
+      }),
+      listStudentIdCards({
+        gradeId: gradeId || undefined,
+        sectionId: sectionId || undefined,
+      }),
+    ]);
+  }
+
   async function load() {
     setLoading(true);
     setError("");
     try {
-      const [{ count }, page] = await Promise.all([
-        countStudentIdCards({
-          gradeId: gradeId || undefined,
-          sectionId: sectionId || undefined,
-        }),
-        listStudentIdCards({
-          gradeId: gradeId || undefined,
-          sectionId: sectionId || undefined,
-        }),
-      ]);
+      const [{ count }, page] = await fetchCards();
       setTotal(count);
       setCards(page);
     } catch (err) {
@@ -59,14 +63,39 @@ export default function StudentCardsPage() {
       router.replace("/login");
       return;
     }
+    let cancelled = false;
     void listGrades()
-      .then((g) => setGrades(g))
+      .then((g) => {
+        if (!cancelled) setGrades(g);
+      })
       .catch(() => undefined);
-    void load();
+    return () => {
+      cancelled = true;
+    };
   }, [router]);
 
   useEffect(() => {
-    void load();
+    let cancelled = false;
+    void (async () => {
+      setLoading(true);
+      setError("");
+      try {
+        const [{ count }, page] = await fetchCards();
+        if (cancelled) return;
+        setTotal(count);
+        setCards(page);
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Could not load cards");
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gradeId, sectionId]);
 
   return (

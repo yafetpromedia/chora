@@ -70,8 +70,9 @@ export class UpdateCouponDto {
 
   @IsOptional()
   @ValidateIf((_, v) => v !== null && v !== '')
-  @Transform(({ value }) => {
-    if (value === null || value === undefined || value === '') return value === '' ? null : value;
+  @Transform(({ value }: { value: unknown }): number | null | undefined => {
+    if (value === null || value === undefined) return value;
+    if (value === '') return null;
     return Number(value);
   })
   @IsInt()

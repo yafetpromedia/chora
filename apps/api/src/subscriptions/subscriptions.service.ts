@@ -8,7 +8,6 @@ import {
   BillingCurrency,
   Plan,
   PlatformInvoiceStatus,
-  PlatformPayMethod,
   PlatformPaymentProofStatus,
   Prisma,
   UserRole,
@@ -81,7 +80,7 @@ export class SubscriptionsService {
         plan: Plan.TRIAL,
         trialEndsAt,
         isActive: true,
-        enabledModules: allSchoolModules() as unknown as Prisma.InputJsonValue,
+        enabledModules: allSchoolModules(),
         billingBundle: 'full',
       },
     });
@@ -104,7 +103,7 @@ export class SubscriptionsService {
         plan,
         isActive: true,
         trialEndsAt: plan === Plan.TRIAL ? trialEndsAt : null,
-        enabledModules: allSchoolModules() as unknown as Prisma.InputJsonValue,
+        enabledModules: allSchoolModules(),
         billingBundle: 'full',
       },
     });
@@ -151,7 +150,8 @@ export class SubscriptionsService {
       daysRemaining = Math.max(
         0,
         Math.ceil(
-          (sub.currentPeriodEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
+          (sub.currentPeriodEnd.getTime() - now.getTime()) /
+            (1000 * 60 * 60 * 24),
         ),
       );
     }
@@ -218,7 +218,7 @@ export class SubscriptionsService {
     await this.prisma.subscription.update({
       where: { schoolId },
       data: {
-        enabledModules: normalized.modules as unknown as Prisma.InputJsonValue,
+        enabledModules: normalized.modules,
         billingBundle: normalized.billingBundle,
       },
     });
@@ -291,7 +291,9 @@ export class SubscriptionsService {
 
     if (role === 'admin' && limits.admins !== null) {
       if (status.usage.admins >= limits.admins) {
-        throw new ForbiddenException('Only one school administrator is allowed on the trial.');
+        throw new ForbiddenException(
+          'Only one school administrator is allowed on the trial.',
+        );
       }
     }
 
@@ -513,8 +515,14 @@ export class SubscriptionsService {
 
     const factor = interval === 'year' ? YEARLY_BILLING_MULTIPLIER : 1;
     const percentOff = await this.coupons.discountForSchool(schoolId);
-    const amountEtb = this.applyPercentOff(breakdown.totalEtb * factor, percentOff);
-    const amountUsd = this.applyPercentOff(breakdown.totalUsd * factor, percentOff);
+    const amountEtb = this.applyPercentOff(
+      breakdown.totalEtb * factor,
+      percentOff,
+    );
+    const amountUsd = this.applyPercentOff(
+      breakdown.totalUsd * factor,
+      percentOff,
+    );
 
     const [admin, school] = await Promise.all([
       this.prisma.user.findUnique({
@@ -569,15 +577,16 @@ export class SubscriptionsService {
         paymentReference: txRef,
         billingInterval: interval,
         initiatedBy: adminId,
-        enabledModules:
-          status.enabledModules as unknown as Prisma.InputJsonValue,
+        enabledModules: status.enabledModules,
         billingBundle: status.billingBundle,
         notes: `Chora ${planRow.label} modular plan (${interval}ly)`,
       },
     });
 
-    const webAppUrl = process.env.WEB_APP_URL?.trim() || 'http://localhost:3000';
-    const apiUrl = process.env.API_PUBLIC_URL?.trim() || 'http://localhost:3001';
+    const webAppUrl =
+      process.env.WEB_APP_URL?.trim() || 'http://localhost:3000';
+    const apiUrl =
+      process.env.API_PUBLIC_URL?.trim() || 'http://localhost:3001';
     const phone = this.normalizeEthiopianPhone(admin.phone);
     const intervalLabel = interval === 'year' ? 'annual' : 'monthly';
 
@@ -690,7 +699,7 @@ export class SubscriptionsService {
           currentPeriodEnd: invoice.periodEnd,
           ...(invoice.enabledModules != null
             ? {
-                enabledModules: invoice.enabledModules as Prisma.InputJsonValue,
+                enabledModules: invoice.enabledModules,
                 billingBundle: invoice.billingBundle,
               }
             : {}),
@@ -729,7 +738,9 @@ export class SubscriptionsService {
     return `${prefix}${String(seq).padStart(5, '0')}`;
   }
 
-  private normalizeEthiopianPhone(phone: string | null | undefined): string | null {
+  private normalizeEthiopianPhone(
+    phone: string | null | undefined,
+  ): string | null {
     if (!phone?.trim()) return null;
     const digits = phone.replace(/\D/g, '');
     if (digits.length === 10 && /^0[79]/.test(digits)) return digits;
@@ -755,7 +766,7 @@ export class SubscriptionsService {
         currentPeriodEnd: periodEnd,
         ...(modules?.enabledModules != null
           ? {
-              enabledModules: modules.enabledModules as Prisma.InputJsonValue,
+              enabledModules: modules.enabledModules,
               billingBundle: modules.billingBundle ?? null,
             }
           : {}),
@@ -772,7 +783,9 @@ export class SubscriptionsService {
     schoolId: string,
     data: { plan: Plan; isActive?: boolean; trialEndsAt?: string | null },
   ) {
-    let sub = await this.prisma.subscription.findUnique({ where: { schoolId } });
+    let sub = await this.prisma.subscription.findUnique({
+      where: { schoolId },
+    });
     if (!sub) {
       sub = await this.ensureSubscription(schoolId, data.plan);
     }
@@ -979,8 +992,7 @@ export class SubscriptionsService {
         status: PlatformInvoiceStatus.SENT,
         billingInterval: 'month',
         initiatedBy: adminId ?? null,
-        enabledModules:
-          status.enabledModules as unknown as Prisma.InputJsonValue,
+        enabledModules: status.enabledModules,
         billingBundle: status.billingBundle,
         notes: `${status.planLabel} modular renewal`,
       },
@@ -1013,7 +1025,7 @@ export class SubscriptionsService {
       periodEnd: inv.periodEnd.toISOString(),
       amountUsd: inv.amountUsd,
       amountEtb: inv.amountEtb,
-      currency: inv.currency as BillingCurrency,
+      currency: inv.currency,
       status: inv.status,
       issuedAt: inv.issuedAt.toISOString(),
       dueAt: inv.dueAt.toISOString(),
@@ -1068,7 +1080,7 @@ export class SubscriptionsService {
       data: {
         invoiceId,
         schoolId,
-        method: dto.method as PlatformPayMethod,
+        method: dto.method,
         transactionId: dto.transactionId.trim(),
         proofUrl: dto.proofUrl.trim(),
         submittedById: userId,
@@ -1104,13 +1116,17 @@ export class SubscriptionsService {
     }));
   }
 
-  async listPlatformPaymentProofsForReview(status?: PlatformPaymentProofStatus) {
+  async listPlatformPaymentProofsForReview(
+    status?: PlatformPaymentProofStatus,
+  ) {
     const rows = await this.prisma.platformPaymentProof.findMany({
       where: status ? { status } : undefined,
       orderBy: { createdAt: 'desc' },
       take: 100,
       include: {
-        invoice: { select: { invoiceNumber: true, amountEtb: true, amountUsd: true } },
+        invoice: {
+          select: { invoiceNumber: true, amountEtb: true, amountUsd: true },
+        },
         school: { select: { name: true, joinCode: true } },
       },
     });
@@ -1134,7 +1150,10 @@ export class SubscriptionsService {
     }));
   }
 
-  async reviewPlatformPaymentProof(proofId: string, dto: ReviewPlatformPaymentDto) {
+  async reviewPlatformPaymentProof(
+    proofId: string,
+    dto: ReviewPlatformPaymentDto,
+  ) {
     const proof = await this.prisma.platformPaymentProof.findUnique({
       where: { id: proofId },
       include: { invoice: true },
@@ -1194,7 +1213,7 @@ export class SubscriptionsService {
           currentPeriodEnd: invoice.periodEnd,
           ...(invoice.enabledModules != null
             ? {
-                enabledModules: invoice.enabledModules as Prisma.InputJsonValue,
+                enabledModules: invoice.enabledModules,
                 billingBundle: invoice.billingBundle,
               }
             : {}),

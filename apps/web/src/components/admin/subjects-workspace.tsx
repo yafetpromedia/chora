@@ -114,7 +114,24 @@ export function SubjectsWorkspace() {
   }
 
   useEffect(() => {
-    void load();
+    let cancelled = false;
+    void (async () => {
+      try {
+        const [rows, assignments] = await Promise.all([listSubjects(), listClassSubjects()]);
+        if (cancelled) return;
+        setSubjects(rows);
+        setSubjectInsights(buildSubjectInsights(assignments));
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Could not load subjects");
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const assignedCount = useMemo(

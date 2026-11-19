@@ -38,15 +38,12 @@ export function LandingNav() {
   const onHome = pathname === "/";
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-  const [overHero, setOverHero] = useState(onHome);
+  const [overHeroState, setOverHero] = useState(onHome);
+  const overHero = onHome && overHeroState;
   const [active, setActive] = useState("hero");
 
   useEffect(() => {
-    if (!onHome) {
-      setOverHero(false);
-      setActive("");
-      return;
-    }
+    if (!onHome) return;
 
     const update = () => {
       const y = window.scrollY;

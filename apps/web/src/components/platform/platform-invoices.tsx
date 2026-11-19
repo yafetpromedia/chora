@@ -69,15 +69,17 @@ export function PlatformInvoices({ schools }: Props) {
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState("");
 
-  const bounds = monthBounds(0);
-  const [form, setForm] = useState({
-    schoolId: "",
-    plan: "STARTER" as PlanType,
-    periodStart: bounds.start,
-    periodEnd: bounds.end,
-    dueAt: new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10),
-    currency: "USD" as BillingCurrency,
-    notes: "",
+  const [form, setForm] = useState(() => {
+    const bounds = monthBounds(0);
+    return {
+      schoolId: "",
+      plan: "STARTER" as PlanType,
+      periodStart: bounds.start,
+      periodEnd: bounds.end,
+      dueAt: new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10),
+      currency: "USD" as BillingCurrency,
+      notes: "",
+    };
   });
 
   function fail(err: unknown, fallback: string) {
@@ -96,10 +98,13 @@ export function PlatformInvoices({ schools }: Props) {
   }, [statusFilter]);
 
   useEffect(() => {
-    setLoading(true);
-    void load()
-      .catch((e) => fail(e, "Failed to load invoices"))
-      .finally(() => setLoading(false));
+    queueMicrotask(() => {
+      setLoading(true);
+      void load()
+        .catch((e) => fail(e, "Failed to load invoices"))
+        .finally(() => setLoading(false));
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [load, router]);
 
   const stats = useMemo(() => {

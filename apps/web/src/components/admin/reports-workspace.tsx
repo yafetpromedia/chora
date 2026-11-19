@@ -47,7 +47,6 @@ export function ReportsWorkspace() {
   const [success, setSuccess] = useState("");
 
   useEffect(() => {
-    setLoading(true);
     void Promise.all([listTerms(), listGrades()])
       .then(([termList, gradeList]) => {
         setTerms(termList);

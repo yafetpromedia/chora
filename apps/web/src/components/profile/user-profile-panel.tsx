@@ -87,45 +87,37 @@ export function UserProfilePanel() {
 
 
 
-  async function load() {
-
-    setLoading(true);
-
-    setError("");
-
-    try {
-
-      const data = await getMyProfile();
-
-      setProfile(data);
-
-      setUsername(data.user.username);
-
-      setEmail(data.user.email);
-
-      setFirstName(data.user.firstName);
-
-      setLastName(data.user.lastName);
-
-      setPhone(data.user.phone ?? "");
-
-    } catch (err) {
-
-      setError(err instanceof Error ? err.message : "Could not load profile");
-
-    } finally {
-
-      setLoading(false);
-
-    }
-
-  }
-
-
-
   useEffect(() => {
 
-    void load();
+    void (async () => {
+
+      try {
+
+        const data = await getMyProfile();
+
+        setProfile(data);
+
+        setUsername(data.user.username);
+
+        setEmail(data.user.email);
+
+        setFirstName(data.user.firstName);
+
+        setLastName(data.user.lastName);
+
+        setPhone(data.user.phone ?? "");
+
+      } catch (err) {
+
+        setError(err instanceof Error ? err.message : "Could not load profile");
+
+      } finally {
+
+        setLoading(false);
+
+      }
+
+    })();
 
   }, []);
 

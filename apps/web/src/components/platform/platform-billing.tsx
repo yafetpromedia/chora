@@ -56,10 +56,13 @@ export function PlatformBilling({ dashboard, schools, onNavigate }: Props) {
   }, []);
 
   useEffect(() => {
-    setLoading(true);
-    void loadSummary()
-      .catch((err) => fail(err, "Failed to load billing summary"))
-      .finally(() => setLoading(false));
+    queueMicrotask(() => {
+      setLoading(true);
+      void loadSummary()
+        .catch((err) => fail(err, "Failed to load billing summary"))
+        .finally(() => setLoading(false));
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadSummary, schools, router]);
 
   const planCounts = useMemo(() => {

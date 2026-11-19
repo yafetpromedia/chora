@@ -45,11 +45,21 @@ export default function TeacherConcernDetailPage() {
       router.replace(`/${role ?? "login"}`);
       return;
     }
-    setPortalRole(role === "teacher" ? "teacher" : "admin");
-    void getAttendanceConcern(params.id)
-      .then(setConcern)
-      .catch((e: Error) => setError(e.message))
-      .finally(() => setLoading(false));
+    let cancelled = false;
+    void (async () => {
+      setPortalRole(role === "teacher" ? "teacher" : "admin");
+      try {
+        const data = await getAttendanceConcern(params.id);
+        if (!cancelled) setConcern(data);
+      } catch (e) {
+        if (!cancelled) setError(e instanceof Error ? e.message : "Could not load concern");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [params.id, router]);
 
   async function onReview() {

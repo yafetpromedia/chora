@@ -35,7 +35,7 @@ export function PlatformProvisioning() {
   }, []);
 
   useEffect(() => {
-    void load();
+    queueMicrotask(() => void load());
   }, [load]);
 
   const stats = useMemo(() => {

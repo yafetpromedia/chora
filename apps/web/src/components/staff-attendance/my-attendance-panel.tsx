@@ -45,7 +45,7 @@ export function MyAttendancePanel() {
   const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
   const [types, setTypes] = useState<LeaveType[]>([]);
   const [qrPayload, setQrPayload] = useState<string | null>(null);
-  const [qrDataUrl, setQrDataUrl] = useState("");
+  const [qrDataUrlState, setQrDataUrl] = useState("");
   const [leaveTypeId, setLeaveTypeId] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -54,25 +54,36 @@ export function MyAttendancePanel() {
   const [toast, setToast] = useState("");
   const [loading, setLoading] = useState(true);
 
+  function fetchData() {
+    return Promise.all([
+      getMyStaffAttendanceSummary(from, to),
+      listLeaveRequests({ mine: true }).catch(() => []),
+      canLeave ? listLeaveTypes() : Promise.resolve([]),
+      getMyStaffQr().catch(() => null),
+    ]);
+  }
+
+  function applyData([summary, myLeaves, leaveTypes, qr]: Awaited<
+    ReturnType<typeof fetchData>
+  >) {
+    setRate(summary.rate);
+    setCounts(summary.counts);
+    setLateMinutes(summary.lateMinutes);
+    setWorkedMinutes(summary.workedMinutes);
+    setRecent(summary.recent);
+    setLeaves(myLeaves);
+    setTypes(leaveTypes);
+    if (leaveTypes[0]) {
+      setLeaveTypeId((current) => current || leaveTypes[0].id);
+    }
+    setQrPayload(qr?.active ? qr.payload : null);
+  }
+
   async function load() {
     setLoading(true);
     setError("");
     try {
-      const [summary, myLeaves, leaveTypes, qr] = await Promise.all([
-        getMyStaffAttendanceSummary(from, to),
-        listLeaveRequests({ mine: true }).catch(() => []),
-        canLeave ? listLeaveTypes() : Promise.resolve([]),
-        getMyStaffQr().catch(() => null),
-      ]);
-      setRate(summary.rate);
-      setCounts(summary.counts);
-      setLateMinutes(summary.lateMinutes);
-      setWorkedMinutes(summary.workedMinutes);
-      setRecent(summary.recent);
-      setLeaves(myLeaves);
-      setTypes(leaveTypes);
-      if (leaveTypes[0] && !leaveTypeId) setLeaveTypeId(leaveTypes[0].id);
-      setQrPayload(qr?.active ? qr.payload : null);
+      applyData(await fetchData());
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load");
     } finally {
@@ -80,17 +91,26 @@ export function MyAttendancePanel() {
     }
   }
 
+  const rangeKey = `${from}|${to}`;
+  const [prevRangeKey, setPrevRangeKey] = useState(rangeKey);
+  if (rangeKey !== prevRangeKey) {
+    setPrevRangeKey(rangeKey);
+    setLoading(true);
+    setError("");
+  }
+
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- async load()
-    void load();
+    void fetchData()
+      .then(applyData)
+      .catch((err) => setError(err instanceof Error ? err.message : "Failed to load"))
+      .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [from, to]);
 
+  const qrDataUrl = qrPayload ? qrDataUrlState : "";
+
   useEffect(() => {
-    if (!qrPayload) {
-      setQrDataUrl("");
-      return;
-    }
+    if (!qrPayload) return;
     let cancelled = false;
     void QRCode.toDataURL(qrPayload, {
       width: 220,

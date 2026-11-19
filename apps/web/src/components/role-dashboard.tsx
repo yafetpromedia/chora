@@ -76,7 +76,7 @@ function formatStatValue(key: string, value: string | number) {
 }
 
 export function RoleDashboard({ role }: Props) {
-  const [workspaceRole, setWorkspaceRole] = useState<UserRole>(() => {
+  const [workspaceRole] = useState<UserRole>(() => {
     if (typeof window === "undefined") return role;
     return (localStorage.getItem(AUTH_ROLE_KEY) as UserRole | null) ?? role;
   });
@@ -101,11 +101,6 @@ export function RoleDashboard({ role }: Props) {
   const [adminDay, setAdminDay] = useState<AdminDayOverview | null>(null);
   const [adminAnalytics, setAdminAnalytics] = useState<AdminAnalyticsOverview | null>(null);
   const router = useRouter();
-
-  useEffect(() => {
-    const stored = localStorage.getItem(AUTH_ROLE_KEY) as UserRole | null;
-    if (stored && stored !== workspaceRole) setWorkspaceRole(stored);
-  }, [workspaceRole]);
 
   const stats = useMemo(() => {
     if (!dashboard) return [];

@@ -3,7 +3,6 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
-  OnModuleInit,
 } from '@nestjs/common';
 import { ClassworkType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -16,9 +15,7 @@ function columnKey(name: string) {
   return name.trim().toLowerCase();
 }
 
-function assertWeightsSumTo100(
-  components: { weightPercent: number }[],
-) {
+function assertWeightsSumTo100(components: { weightPercent: number }[]) {
   const total = components.reduce((s, c) => s + c.weightPercent, 0);
   if (total !== 100) {
     throw new BadRequestException(
@@ -28,17 +25,12 @@ function assertWeightsSumTo100(
 }
 
 @Injectable()
-export class AssessmentTemplatesService implements OnModuleInit {
+export class AssessmentTemplatesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly teacherScope: TeacherScopeService,
     private readonly workflow: ResultWorkflowService,
   ) {}
-
-  async onModuleInit() {
-    // Do not auto-create assessment templates for every school on boot.
-    // Templates are created during school provisioning or by admins.
-  }
 
   async seedDemoTemplates(schoolId: string) {
     const existing = await this.prisma.assessmentTemplate.count({
@@ -52,7 +44,12 @@ export class AssessmentTemplatesService implements OnModuleInit {
       components: [
         { name: 'Activity', weightPercent: 10, maxScore: 10, sortOrder: 0 },
         { name: 'Worksheet', weightPercent: 10, maxScore: 10, sortOrder: 1 },
-        { name: 'Class Participation', weightPercent: 10, maxScore: 10, sortOrder: 2 },
+        {
+          name: 'Class Participation',
+          weightPercent: 10,
+          maxScore: 10,
+          sortOrder: 2,
+        },
         { name: 'Mid Exam', weightPercent: 20, maxScore: 20, sortOrder: 3 },
         { name: 'Final Exam', weightPercent: 50, maxScore: 50, sortOrder: 4 },
       ],
@@ -89,8 +86,7 @@ export class AssessmentTemplatesService implements OnModuleInit {
     for (const g of grades) {
       const n = this.parseGradeNumber(g.name);
       if (n == null) continue;
-      const templateId =
-        n <= 4 ? primary.id : n <= 8 ? middle.id : null;
+      const templateId = n <= 4 ? primary.id : n <= 8 ? middle.id : null;
       if (!templateId) continue;
       const existing = await this.prisma.assessmentTemplateGrade.findFirst({
         where: { templateId, gradeId: g.id, subjectId: null },
@@ -320,7 +316,9 @@ export class AssessmentTemplatesService implements OnModuleInit {
     const cs = await this.prisma.classSubject.findFirst({
       where: { id: classSubjectId, schoolId },
       include: {
-        assessmentTemplate: { include: { components: { orderBy: { sortOrder: 'asc' } } } },
+        assessmentTemplate: {
+          include: { components: { orderBy: { sortOrder: 'asc' } } },
+        },
         subject: true,
         grade: true,
       },
@@ -331,16 +329,20 @@ export class AssessmentTemplatesService implements OnModuleInit {
       return cs.assessmentTemplate;
     }
 
-    const subjectSpecific = await this.prisma.assessmentTemplateGrade.findFirst({
-      where: {
-        gradeId: cs.gradeId,
-        subjectId: cs.subjectId,
-        template: { schoolId },
+    const subjectSpecific = await this.prisma.assessmentTemplateGrade.findFirst(
+      {
+        where: {
+          gradeId: cs.gradeId,
+          subjectId: cs.subjectId,
+          template: { schoolId },
+        },
+        include: {
+          template: {
+            include: { components: { orderBy: { sortOrder: 'asc' } } },
+          },
+        },
       },
-      include: {
-        template: { include: { components: { orderBy: { sortOrder: 'asc' } } } },
-      },
-    });
+    );
     if (subjectSpecific) return subjectSpecific.template;
 
     const gradeWide = await this.prisma.assessmentTemplateGrade.findFirst({
@@ -350,7 +352,9 @@ export class AssessmentTemplatesService implements OnModuleInit {
         template: { schoolId },
       },
       include: {
-        template: { include: { components: { orderBy: { sortOrder: 'asc' } } } },
+        template: {
+          include: { components: { orderBy: { sortOrder: 'asc' } } },
+        },
       },
     });
     if (gradeWide) return gradeWide.template;
@@ -664,7 +668,13 @@ export class AssessmentTemplatesService implements OnModuleInit {
     // studentId -> termId -> classSubjectId -> score items
     const byStudentTermSubject = new Map<
       string,
-      Map<string, Map<string, { score: number; maxScore: number; weightPercent: number }[]>>
+      Map<
+        string,
+        Map<
+          string,
+          { score: number; maxScore: number; weightPercent: number }[]
+        >
+      >
     >();
 
     for (const a of assessments) {
@@ -713,7 +723,8 @@ export class AssessmentTemplatesService implements OnModuleInit {
           if (subjectAvgs.length === 0) continue;
           const termAvg =
             Math.round(
-              (subjectAvgs.reduce((s, n) => s + n, 0) / subjectAvgs.length) * 10,
+              (subjectAvgs.reduce((s, n) => s + n, 0) / subjectAvgs.length) *
+                10,
             ) / 10;
           termAvgs.push(termAvg);
           if (tId === termId) {
@@ -758,7 +769,11 @@ export class AssessmentTemplatesService implements OnModuleInit {
     schoolId: string,
     termId: string,
     classSubjectId: string,
-    entries: { studentProfileId: string; assessmentId: string; score: number }[],
+    entries: {
+      studentProfileId: string;
+      assessmentId: string;
+      score: number;
+    }[],
     userId?: string,
     role?: string,
   ) {
@@ -800,7 +815,9 @@ export class AssessmentTemplatesService implements OnModuleInit {
         );
       }
       if (entry.score > assessment.maxScore) {
-        throw new BadRequestException(`Score cannot exceed ${assessment.maxScore}`);
+        throw new BadRequestException(
+          `Score cannot exceed ${assessment.maxScore}`,
+        );
       }
     }
 
@@ -836,7 +853,9 @@ export class AssessmentTemplatesService implements OnModuleInit {
     const profile = await this.prisma.studentProfile.findFirst({
       where: { id: studentProfileId, schoolId },
       include: {
-        user: { select: { firstName: true, lastName: true, externalRef: true } },
+        user: {
+          select: { firstName: true, lastName: true, externalRef: true },
+        },
         grade: { select: { name: true } },
         section: { select: { name: true } },
       },
@@ -1023,7 +1042,8 @@ export class AssessmentTemplatesService implements OnModuleInit {
     );
 
     for (let i = 0; i < subjects.length; i++) {
-      const assessments = assessmentsByClass.get(subjects[i].classSubjectId) ?? [];
+      const assessments =
+        assessmentsByClass.get(subjects[i].classSubjectId) ?? [];
       const byKey = new Map(
         assessments.map((a) => [columnKey(a.name), a] as const),
       );
@@ -1061,13 +1081,15 @@ export class AssessmentTemplatesService implements OnModuleInit {
         studentId: profile.user.externalRef,
       },
       assessmentCount: columns.length,
-      columns: columns.map(({ key, name, maxScore, weightPercent, sortOrder }) => ({
-        key,
-        name,
-        maxScore,
-        weightPercent,
-        sortOrder,
-      })),
+      columns: columns.map(
+        ({ key, name, maxScore, weightPercent, sortOrder }) => ({
+          key,
+          name,
+          maxScore,
+          weightPercent,
+          sortOrder,
+        }),
+      ),
       subjects,
     };
   }

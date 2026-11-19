@@ -4,6 +4,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, useReducedMotion } from "framer-motion";
 import { BRAND_NAME } from "@/lib/brand";
+import { useHydrated } from "@/lib/use-client-snapshot";
 import {
   buildShareHandout,
   getLoginUrl,
@@ -45,23 +46,17 @@ export function SchoolWelcomeDialog({
   const titleId = useId();
   const descId = useId();
   const continueRef = useRef<HTMLButtonElement>(null);
-  const [mounted, setMounted] = useState(false);
+  const mounted = useHydrated();
   const [copied, setCopied] = useState<CopiedKind | null>(null);
   const [savedAck, setSavedAck] = useState(false);
   const reduce = useReducedMotion();
 
   const loginUrl = getLoginUrl();
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
-    if (!open) {
-      setSavedAck(false);
-      setCopied(null);
-    }
-  }, [open]);
+  if (!open && (savedAck || copied)) {
+    setSavedAck(false);
+    setCopied(null);
+  }
 
   useEffect(() => {
     if (!open) return;

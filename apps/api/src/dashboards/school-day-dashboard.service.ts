@@ -72,7 +72,10 @@ export class SchoolDayDashboardService {
         ? Math.round((presentToday / totalStudents) * 100)
         : null;
 
-    const classBuckets = new Map<string, { gradeId: string; sectionId: string | null }>();
+    const classBuckets = new Map<
+      string,
+      { gradeId: string; sectionId: string | null }
+    >();
     for (const cs of classSubjects) {
       const key = `${cs.gradeId}:${cs.sectionId ?? ''}`;
       if (!classBuckets.has(key)) {
@@ -111,7 +114,12 @@ export class SchoolDayDashboardService {
       financeSummary = null;
     }
 
-    const alerts: { type: string; label: string; count: number; href: string }[] = [];
+    const alerts: {
+      type: string;
+      label: string;
+      count: number;
+      href: string;
+    }[] = [];
     if (pendingPayments > 0) {
       alerts.push({
         type: 'finance',
@@ -250,8 +258,7 @@ export class SchoolDayDashboardService {
           if (scores.length > 0) {
             const pct =
               scores.reduce(
-                (s, sc) =>
-                  s + (sc.score / sc.assessment.maxScore) * 100,
+                (s, sc) => s + (sc.score / sc.assessment.maxScore) * 100,
                 0,
               ) / scores.length;
             overallAverage = Math.round(pct * 10) / 10;

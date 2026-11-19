@@ -75,16 +75,19 @@ export function StudentAcademicRecord({ profileId }: { profileId: string }) {
     requirements: { label: string; met: boolean }[];
   } | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const [s, enr, tr, t] = await Promise.all([
+  const fetchRecord = useCallback(
+    () =>
+      Promise.all([
         getStudentRecordsSummary(profileId),
         getEnrollmentHistory(profileId),
         getTranscript(profileId),
         listTerms(),
-      ]);
+      ]),
+    [profileId],
+  );
+
+  const applyRecord = useCallback(
+    ([s, enr, tr, t]: Awaited<ReturnType<typeof fetchRecord>>) => {
       setSummary(s);
       setEnrollments(enr);
       setTranscript(tr);
@@ -99,16 +102,35 @@ export function StudentAcademicRecord({ profileId }: { profileId: string }) {
           medicationNotes: s.health.medicationNotes ?? "",
         });
       }
+    },
+    [],
+  );
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      applyRecord(await fetchRecord());
     } catch (err) {
       setError(err instanceof Error ? err.message : "Load failed");
     } finally {
       setLoading(false);
     }
-  }, [profileId]);
+  }, [fetchRecord, applyRecord]);
+
+  const [prevProfileId, setPrevProfileId] = useState(profileId);
+  if (profileId !== prevProfileId) {
+    setPrevProfileId(profileId);
+    setLoading(true);
+    setError("");
+  }
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    void fetchRecord()
+      .then(applyRecord)
+      .catch((err) => setError(err instanceof Error ? err.message : "Load failed"))
+      .finally(() => setLoading(false));
+  }, [fetchRecord, applyRecord]);
 
   useEffect(() => {
     if (tab === "documents") {

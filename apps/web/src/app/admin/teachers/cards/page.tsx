@@ -46,7 +46,22 @@ export default function TeacherCardsPage() {
       router.replace("/login");
       return;
     }
-    void load();
+    let cancelled = false;
+    void listTeacherIdCards()
+      .then((list) => {
+        if (!cancelled) setCards(list);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Could not load cards");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [router]);
 
   async function onBackfill() {

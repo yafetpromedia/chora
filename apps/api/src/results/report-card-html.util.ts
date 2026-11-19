@@ -212,7 +212,9 @@ export function ethiopianCalendarYear(date = new Date()): number {
   return month >= 9 ? year - 7 : year - 8;
 }
 
-export function ageFromDateOfBirth(dob: Date | null | undefined): number | null {
+export function ageFromDateOfBirth(
+  dob: Date | null | undefined,
+): number | null {
   if (!dob) return null;
   const today = new Date();
   let age = today.getFullYear() - dob.getFullYear();
@@ -223,7 +225,9 @@ export function ageFromDateOfBirth(dob: Date | null | undefined): number | null 
   return age >= 0 ? age : null;
 }
 
-export function formatGenderLabel(gender: string | null | undefined): string | null {
+export function formatGenderLabel(
+  gender: string | null | undefined,
+): string | null {
   if (!gender) return null;
   if (gender === 'MALE') return 'Male';
   if (gender === 'FEMALE') return 'Female';
@@ -243,7 +247,10 @@ export function formatDateOfBirth(dob: Date | null | undefined): string | null {
   }
 }
 
-export function buildGradeSectionLabel(grade: string, section: string | null): string {
+export function buildGradeSectionLabel(
+  grade: string,
+  section: string | null,
+): string {
   if (!section) return grade;
   return `${grade} · ${section}`;
 }
@@ -267,11 +274,12 @@ export function buildSubjectRows(
   bands: GradingBand[],
 ): ReportCardSubjectRow[] {
   return subjects.map((subject, subjectIndex) => {
-    const termScores = termAverages.map((termCol) => termCol[subjectIndex] ?? null);
+    const termScores = termAverages.map(
+      (termCol) => termCol[subjectIndex] ?? null,
+    );
     const total = sumNullable(termScores);
     const average = avgNullable(termScores);
-    const letter =
-      average != null ? scoreToLetter(average, bands) : null;
+    const letter = average != null ? scoreToLetter(average, bands) : null;
     return { subject, termScores, total, average, letter };
   });
 }
@@ -344,8 +352,15 @@ export function buildSummaryFromGrid(
   };
 }
 
-function infoLine(label: string, value: string | number | null | undefined): string {
-  if (value == null || value === '' || (typeof value === 'number' && Number.isNaN(value))) {
+function infoLine(
+  label: string,
+  value: string | number | null | undefined,
+): string {
+  if (
+    value == null ||
+    value === '' ||
+    (typeof value === 'number' && Number.isNaN(value))
+  ) {
     return '';
   }
   return `<div class="rc-info-line"><span>${escapeHtml(label)}:</span> <strong>${escapeHtml(String(value))}</strong></div>`;
@@ -371,16 +386,8 @@ function schoolLogoHtml(data: ReportCardPrintPayload): string {
     </div>`;
 }
 
-function termHeading(term: { name: string; shortName: string }, index: number): string {
-  const n = term.name.trim();
-  if (/^term\s*\d+/i.test(n)) return n;
-  if (/^t\d+$/i.test(n) || /^t\d+$/i.test(term.shortName)) return `Term ${index + 1}`;
-  if (n.length <= 14) return n;
-  return `Term ${index + 1}`;
-}
-
 function sharedStyles(): string {
-      return `
+  return `
     :root {
       --chora: ${CHORA_TEAL};
       --chora-dark: ${CHORA_TEAL_DARK};
@@ -1153,30 +1160,6 @@ function sharedStyles(): string {
   `;
 }
 
-function gradingScaleHtml(bands: ReportCardGradingBand[]): string {
-  const source =
-    bands.length > 0
-      ? bands
-      : [
-          { letter: 'A', minScore: 90, maxScore: 100, description: 'Excellent' },
-          { letter: 'B', minScore: 80, maxScore: 89, description: 'Good' },
-          { letter: 'C', minScore: 70, maxScore: 79, description: 'Satisfactory' },
-          { letter: 'D', minScore: 60, maxScore: 69, description: 'Needs Improvement' },
-          { letter: 'F', minScore: 0, maxScore: 59, description: 'Fail' },
-        ];
-  const items = source
-    .map(
-      (b) =>
-        `<li><strong>${escapeHtml(b.letter)}</strong><span>${b.minScore} – ${b.maxScore}</span><span>${escapeHtml(b.description || '')}</span></li>`,
-    )
-    .join('');
-  return `
-    <section class="rc-scale">
-      <h2 class="rc-scale__h">Grading Scale</h2>
-      <ul class="rc-scale__list">${items}</ul>
-    </section>`;
-}
-
 function frontHeader(
   data: ReportCardPrintPayload,
   opts?: { subtitle?: string },
@@ -1206,94 +1189,6 @@ function frontHeader(
         <strong>${escapeHtml(data.school.name)}</strong>
         <span>${escapeHtml(tagline)}</span>
             </div>
-    </div>`;
-}
-
-function studentInfoHtml(data: ReportCardPrintPayload): string {
-  const [grade, sectionFromLabel] = data.student.gradeLabel.includes(' · ')
-    ? data.student.gradeLabel.split(' · ')
-    : [data.student.gradeLabel, data.student.section];
-  const left = [
-    infoLine('Student Name', data.student.name),
-    infoLine('Student ID', data.student.number),
-    infoLine('Grade', grade),
-    infoLine('Section', data.student.section ?? sectionFromLabel ?? null),
-  ]
-    .filter(Boolean)
-    .join('');
-  const right = [
-    infoLine('Academic Year', data.student.academicYear),
-    infoLine('Date of Birth', data.student.dateOfBirth),
-    infoLine('Gender', data.student.sex),
-  ]
-    .filter(Boolean)
-    .join('');
-
-  return `
-    <section class="rc-info-grid" aria-label="Student information">
-      <div class="rc-info-col">${left}</div>
-      <div class="rc-info-col">${right}</div>
-    </section>`;
-}
-
-function resultsTableHtml(data: ReportCardPrintPayload): string {
-  const terms =
-    data.terms.length > 0
-      ? data.terms
-      : [{ id: 'current', name: data.termName, shortName: 'Score' }];
-
-  const useGroupedTerms = terms.length >= 2;
-  const headTerms = useGroupedTerms
-    ? `<th class="rc-term-group" colspan="${terms.length}">Term</th>`
-    : terms
-        .map((t, i) => `<th>${escapeHtml(termHeading(t, i))}</th>`)
-        .join('');
-  const subHead = useGroupedTerms
-    ? `<tr class="rc-subhead">
-        <th></th><th></th>
-        ${terms.map((_, i) => `<th>${i + 1}</th>`).join('')}
-        <th></th><th></th><th></th>
-      </tr>`
-    : '';
-
-  const rows = data.subjectRows
-    .map((row, i) => {
-      const scores = terms
-        .map((_, ti) => `<td>${fmtScore(row.termScores[ti] ?? null)}</td>`)
-        .join('');
-      return `
-        <tr class="${i % 2 === 1 ? 'is-alt' : ''}">
-          <td class="rc-num">${i + 1}</td>
-          <th scope="row">${escapeHtml(row.subject)}</th>
-          ${scores}
-          <td>${fmtScore(row.total)}</td>
-          <td>${fmtScore(row.average)}</td>
-          <td><strong>${row.letter ? escapeHtml(row.letter) : '—'}</strong></td>
-        </tr>`;
-    })
-    .join('');
-
-  const colCount = 1 + 1 + terms.length + 3;
-  const empty = `<tr><td colspan="${colCount}">No subject scores recorded yet.</td></tr>`;
-
-  return `
-    <div class="rc-table-wrap">
-      <table class="rc-tbl">
-        <thead>
-          <tr>
-            <th class="rc-num" ${useGroupedTerms ? 'rowspan="2"' : ''}>No.</th>
-            <th ${useGroupedTerms ? 'rowspan="2"' : ''}>Subject</th>
-            ${headTerms}
-            <th ${useGroupedTerms ? 'rowspan="2"' : ''}>Total</th>
-            <th ${useGroupedTerms ? 'rowspan="2"' : ''}>Average</th>
-            <th ${useGroupedTerms ? 'rowspan="2"' : ''}>Grade</th>
-          </tr>
-          ${subHead}
-        </thead>
-        <tbody>
-          ${rows || empty}
-        </tbody>
-      </table>
     </div>`;
 }
 
@@ -1357,9 +1252,7 @@ function termFooterHtml(data: ReportCardPrintPayload): string {
   const letter = data.summary.overallLetter;
   const att = data.attendance.totals;
   const presentLabel =
-    att.totalDays > 0
-      ? `${att.present}/${att.totalDays}`
-      : String(att.present);
+    att.totalDays > 0 ? `${att.present}/${att.totalDays}` : String(att.present);
   const principalLabel =
     data.school.authorizedSignatureLabel?.trim() || 'Principal';
   const principalImg = data.school.authorizedSignatureUrl
@@ -1424,206 +1317,6 @@ function buildTermSheet(data: ReportCardPrintPayload): string {
   </section>`;
 }
 
-function attendanceTableHtml(data: ReportCardPrintPayload): string {
-  const terms = data.attendance.byTerm;
-  const head = terms.map((t) => `<th>${escapeHtml(t.termName)}</th>`).join('');
-  const row = (
-    label: string,
-    pick: (t: ReportCardAttendanceTerm) => number,
-    total: number,
-  ) => `
-    <tr>
-      <th scope="row">${escapeHtml(label)}</th>
-      ${terms.map((t) => `<td>${pick(t)}</td>`).join('')}
-      <td><strong>${total}</strong></td>
-    </tr>`;
-
-  return `
-    <section class="rc-panel rc-att">
-      <h2 class="rc-panel__h">Attendance Summary</h2>
-      <div class="rc-panel__b">
-        <table class="rc-tbl">
-          <thead>
-            <tr>
-              <th>Status</th>
-              ${head}
-              <th>Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${row('Days Present', (t) => t.present, data.attendance.totals.present)}
-            ${row('Days Absent', (t) => t.absent, data.attendance.totals.absent)}
-            ${row('Late', (t) => t.late, data.attendance.totals.late)}
-            ${row('Total School Days', (t) => t.totalDays, data.attendance.totals.totalDays)}
-          </tbody>
-        </table>
-      </div>
-    </section>`;
-}
-
-function conductHtml(data: ReportCardPrintPayload): string {
-  const rows: Array<[string, string | null]> = [
-    ['Discipline', data.conduct.discipline],
-    ['Participation', data.conduct.participation],
-    ['Attitude', data.conduct.attitude],
-    ['Cooperation', data.conduct.cooperation],
-    ['Overall', data.conduct.overall],
-  ];
-  const body = rows
-    .map(
-      ([label, value]) =>
-        `<tr><th scope="row">${escapeHtml(label)}</th><td>${value && String(value).trim() ? escapeHtml(String(value)) : '—'}</td></tr>`,
-    )
-    .join('');
-
-  return `
-    <section class="rc-panel">
-      <h2 class="rc-panel__h">Conduct / Behavior</h2>
-      <div class="rc-panel__b">
-        <table class="rc-conduct">
-          <tbody>${body}</tbody>
-        </table>
-      </div>
-    </section>`;
-}
-
-function summaryHtml(data: ReportCardPrintPayload): string {
-  const rank = data.summary.rank;
-  const classSize = data.summary.classSize;
-  const rankMain =
-    rank != null && classSize > 0 ? `${rank} / ${classSize}` : null;
-  const percentile =
-    rank != null && classSize > 0
-      ? `Top ${Math.max(1, Math.ceil((rank / classSize) * 100))}%`
-      : null;
-
-  const promo = data.summary.promotion;
-  const promoMain = promo
-    ? promo.outcome === 'PROMOTED'
-      ? 'Promoted'
-      : promo.outcome === 'GRADUATED'
-        ? 'Graduated'
-        : promo.outcome === 'RETAINED'
-          ? 'Retained'
-          : 'Passed'
-    : null;
-  const promoSub = promo?.nextGradeLabel
-    ? `To ${escapeHtml(promo.nextGradeLabel)} (Next Year)`
-    : promo?.label && promoMain && promo.label !== promoMain
-      ? escapeHtml(promo.label)
-      : null;
-
-  const avg = data.summary.overallAverage;
-  const letter = data.summary.overallLetter;
-
-  const cards: string[] = [];
-  if (rankMain) {
-    cards.push(`
-      <div class="rc-kpi">
-        <em>Class Rank</em>
-        <strong>${escapeHtml(rankMain)}</strong>
-        ${percentile ? `<span>(${escapeHtml(percentile)})</span>` : ''}
-      </div>`);
-  }
-  if (promoMain) {
-    cards.push(`
-      <div class="rc-kpi">
-        <em>Promotion Status</em>
-        <strong style="font-size:4.6mm">${escapeHtml(promoMain)}</strong>
-        ${promoSub ? `<span>${promoSub}</span>` : ''}
-      </div>`);
-  }
-  cards.push(`
-    <div class="rc-kpi">
-      <em>Overall Average</em>
-      <strong>${fmtScore(avg)}${avg != null ? '%' : ''}</strong>
-      ${letter ? `<span>(${escapeHtml(letter)})</span>` : ''}
-    </div>`);
-
-  return `<div class="rc-kpis">${cards.join('')}</div>`;
-}
-
-function remarksHtml(data: ReportCardPrintPayload): string {
-  const text =
-    data.remarks.general?.trim() ||
-    data.remarks.principal?.trim() ||
-    data.remarks.teacher?.trim() ||
-    '';
-  return `
-    <section class="rc-remarks">
-      <h2 class="rc-panel__h">General Remarks</h2>
-      <div class="rc-remarks__body ${text ? '' : 'is-empty'}">
-        ${text ? escapeHtml(text) : 'No remarks recorded.'}
-        </div>
-    </section>`;
-}
-
-function signaturesAndQrHtml(data: ReportCardPrintPayload): string {
-  const principalLabel =
-    data.school.authorizedSignatureLabel?.trim() || 'Principal / Director';
-  const principalImg = data.school.authorizedSignatureUrl
-    ? `<img class="rc-sign__img" src="${escapeHtml(data.school.authorizedSignatureUrl)}" alt=""/>`
-    : '';
-  // HTTPS verification URL — phone cameras open this (not CAMPUS1: codes).
-  const verifyUrl = data.verification.qrPayload;
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&margin=2&ecc=M&data=${encodeURIComponent(verifyUrl)}`;
-
-  return `
-    <div class="rc-signrow">
-      <div class="rc-sign">
-        <div class="rc-sign__line"></div>
-        <strong>Class Teacher Signature</strong>
-        <span>Class Teacher</span>
-        </div>
-      <div class="rc-sign">
-        <div class="rc-sign__line">${principalImg}</div>
-        <strong>${escapeHtml(principalLabel)} Signature</strong>
-        <span>${escapeHtml(principalLabel)}</span>
-      </div>
-      <div class="rc-qr">
-        <img src="${qrUrl}" alt="Verification QR code"/>
-        <strong>Scan to verify<br/>this report card</strong>
-    </div>
-    </div>`;
-}
-
-function buildFrontPage(data: ReportCardPrintPayload): string {
-  return `
-  <section class="rc-page" aria-label="Report card front — academic results">
-    <div class="rc-corner rc-corner--bl" aria-hidden="true"></div>
-    <div class="rc-face">Front</div>
-    <div class="rc-sheet">
-      ${frontHeader(data)}
-      ${studentInfoHtml(data)}
-      <div class="rc-main">
-        ${resultsTableHtml(data)}
-        <div class="rc-front-foot">
-          ${gradingScaleHtml(data.gradingScale)}
-          <div class="rc-motto">Better Students<br/><em>A Brighter Future</em></div>
-        </div>
-      </div>
-    </div>
-  </section>`;
-}
-
-function buildBackPage(data: ReportCardPrintPayload): string {
-  return `
-  <section class="rc-page" aria-label="Report card back — attendance and summary">
-    <div class="rc-corner rc-corner--br" aria-hidden="true"></div>
-    <div class="rc-face">Back</div>
-    <div class="rc-sheet">
-      <div class="rc-back-top">
-        ${attendanceTableHtml(data)}
-        ${conductHtml(data)}
-      </div>
-      ${summaryHtml(data)}
-      ${signaturesAndQrHtml(data)}
-      ${remarksHtml(data)}
-      <footer class="rc-foot">Learn | Grow | Succeed</footer>
-    </div>
-  </section>`;
-}
-
 function documentShell(title: string, body: string): string {
   return `<!DOCTYPE html>
 <html lang="en">
@@ -1651,6 +1344,8 @@ export function buildReportCardHtml(data: ReportCardPrintPayload): string {
 }
 
 /** @deprecated Use buildReportCardHtml */
-export function buildEthiopianReportCardHtml(data: ReportCardPrintPayload): string {
+export function buildEthiopianReportCardHtml(
+  data: ReportCardPrintPayload,
+): string {
   return buildReportCardHtml(data);
 }

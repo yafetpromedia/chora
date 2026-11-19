@@ -75,10 +75,7 @@ export class LeaveController {
   @Post('requests')
   @Roles('admin', 'staff', 'teacher')
   @RequirePermissions(SchoolPermission.LEAVE_REQUEST)
-  create(
-    @CurrentUser() user: AuthUser,
-    @Body() dto: CreateLeaveRequestDto,
-  ) {
+  create(@CurrentUser() user: AuthUser, @Body() dto: CreateLeaveRequestDto) {
     return this.leave.createRequest(
       user.schoolId,
       user.id,

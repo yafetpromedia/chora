@@ -80,7 +80,8 @@ export function PlatformLibraryRepo() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formTitle, setFormTitle] = useState("");
   const [formDescription, setFormDescription] = useState("");
-  const [formCategoryId, setFormCategoryId] = useState("");
+  const [pickedCategoryId, setFormCategoryId] = useState("");
+  const formCategoryId = pickedCategoryId || categories[0]?.id || "";
   const [formType, setFormType] = useState("BOOK_PDF");
   const [formSubject, setFormSubject] = useState("");
   const [formGrade, setFormGrade] = useState("");
@@ -115,14 +116,8 @@ export function PlatformLibraryRepo() {
   }, [router]);
 
   useEffect(() => {
-    void load();
+    queueMicrotask(() => void load());
   }, [load]);
-
-  useEffect(() => {
-    if (!formCategoryId && categories[0]) {
-      setFormCategoryId(categories[0].id);
-    }
-  }, [categories, formCategoryId]);
 
   const stats = useMemo(() => {
     return {

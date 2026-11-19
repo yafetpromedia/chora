@@ -4,53 +4,52 @@ import {
   AUTH_USER_ID_KEY,
   clearSessionStorage,
 } from "./auth";
+import {
+  resolveApiBaseUrl,
+  resolveUploadApiBaseUrl,
+} from "./api-base-url";
 
 const API_PORT = process.env.NEXT_PUBLIC_API_PORT?.trim() || "3001";
 
-function isLocalDevHost(hostname: string): boolean {
-  return (
-    hostname === "localhost" ||
-    hostname === "127.0.0.1" ||
-    hostname === "[::1]" ||
-    hostname === "::1" ||
-    hostname.startsWith("192.168.") ||
-    hostname.startsWith("10.") ||
-    /^172\.(1[6-9]|2\d|3[01])\./.test(hostname)
-  );
+function browserLocation():
+  | { hostname: string; origin: string; protocol: string }
+  | null {
+  if (typeof window === "undefined") return null;
+  return {
+    hostname: window.location.hostname,
+    origin: window.location.origin,
+    protocol: window.location.protocol,
+  };
 }
 
-/** API origin: same-origin proxy in local dev, configured URL in production. */
+/** API origin: same-origin `/backend` in prod/nginx; Next rewrite in local dev. */
 export function getApiBaseUrl(): string {
-  if (typeof window !== "undefined") {
-    const { hostname, origin } = window.location;
-    if (isLocalDevHost(hostname) && process.env.NODE_ENV !== "production") {
-      return `${origin}/backend`;
-    }
-  }
-  const configured = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
-  return configured && configured.length > 0
-    ? configured
-    : `http://localhost:${API_PORT}`;
+  return resolveApiBaseUrl({
+    configuredBaseUrl: process.env.NEXT_PUBLIC_API_BASE_URL,
+    nodeEnv: process.env.NODE_ENV,
+    windowLocation: browserLocation(),
+    apiPort: API_PORT,
+  });
 }
 
 /**
- * Direct API origin for large multipart uploads.
- * Next’s `/backend` rewrite buffers bodies (~10MB default) and aborts bigger files.
+ * Upload origin.
+ * Local dev talks to the API port directly (avoids Next rewrite body limits).
+ * Production uses the configured/same-origin `/backend` URL (nginx must allow large bodies).
  */
 export function getUploadApiBaseUrl(): string {
-  if (typeof window !== "undefined") {
-    const { hostname, protocol } = window.location;
-    if (isLocalDevHost(hostname) && process.env.NODE_ENV !== "production") {
-      return `${protocol}//${hostname}:${API_PORT}`;
-    }
-  }
-  return getApiBaseUrl();
+  return resolveUploadApiBaseUrl({
+    configuredBaseUrl: process.env.NEXT_PUBLIC_API_BASE_URL,
+    nodeEnv: process.env.NODE_ENV,
+    windowLocation: browserLocation(),
+    apiPort: API_PORT,
+  });
 }
 
 const NETWORK_RETRIES = 2;
 const NETWORK_RETRY_MS = 700;
 
-function networkErrorMessage(base: string): string {
+function networkErrorMessage(): string {
   return `Could not reach the server. Check that the API is running, then try again.`;
 }
 
@@ -448,7 +447,7 @@ async function authPost<T = LoginResponse>(path: string, body: unknown): Promise
     });
   } catch (err) {
     throw new Error(
-      err instanceof TypeError ? networkErrorMessage(getApiBaseUrl()) : "API is unavailable",
+      err instanceof TypeError ? networkErrorMessage() : "API is unavailable",
     );
   }
 
@@ -484,7 +483,7 @@ export async function validateSchoolCode(
     );
   } catch (err) {
     throw new Error(
-      err instanceof TypeError ? networkErrorMessage(getApiBaseUrl()) : "API is unavailable",
+      err instanceof TypeError ? networkErrorMessage() : "API is unavailable",
     );
   }
   if (!response.ok) {
@@ -714,7 +713,7 @@ async function authedFetch<T>(
   try {
     response = await fetchWithRetry(`${base}${path}`, { ...init, headers });
   } catch (err) {
-    throw new Error(err instanceof TypeError ? networkErrorMessage(base) : "API is unavailable");
+    throw new Error(err instanceof TypeError ? networkErrorMessage() : "API is unavailable");
   }
 
   if (response.status === 401) {
@@ -727,7 +726,7 @@ async function authedFetch<T>(
     try {
       retryResponse = await fetchWithRetry(`${base}${path}`, { ...init, headers });
     } catch (err) {
-      throw new Error(err instanceof TypeError ? networkErrorMessage(base) : "API is unavailable");
+      throw new Error(err instanceof TypeError ? networkErrorMessage() : "API is unavailable");
     }
     if (!retryResponse.ok) {
       throw new Error(`Request failed: ${retryResponse.status}`);
@@ -788,7 +787,7 @@ export async function apiUpload<T>(path: string, file: File): Promise<T> {
     });
   } catch (err) {
     throw new Error(
-      err instanceof TypeError ? networkErrorMessage(base) : "Upload failed — API unavailable",
+      err instanceof TypeError ? networkErrorMessage() : "Upload failed — API unavailable",
     );
   }
 
@@ -806,7 +805,7 @@ export async function apiUpload<T>(path: string, file: File): Promise<T> {
       });
     } catch (err) {
       throw new Error(
-        err instanceof TypeError ? networkErrorMessage(base) : "Upload failed — API unavailable",
+        err instanceof TypeError ? networkErrorMessage() : "Upload failed — API unavailable",
       );
     }
   }

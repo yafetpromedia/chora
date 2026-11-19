@@ -5,7 +5,7 @@ import Link from "next/link";
 import { StaffPermissionsDrawer } from "@/components/teachers/staff-permissions-drawer";
 import { listGrades } from "@/lib/school-setup";
 import type { GradeWithSections } from "@/lib/api";
-import { getCurrentUserId } from "@/lib/auth";
+import { useCurrentUserId } from "@/lib/use-client-snapshot";
 import { OFFICE_STAFF_ROLE_SLUGS, TEACHER_ROLE_SLUGS, type PeopleGroup } from "@/lib/people";
 import { ROLE_TEMPLATE_LABELS } from "@/lib/permissions";
 import {
@@ -43,7 +43,7 @@ export function PeopleDirectoryPanel({ group }: Props) {
   const [permCatalog, setPermCatalog] = useState<PermissionCatalogItem[]>([]);
   const [permDraft, setPermDraft] = useState<Record<string, boolean>>({});
   const [busy, setBusy] = useState(false);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const currentUserId = useCurrentUserId();
 
   const [email, setEmail] = useState("");
   const [firstName, setFirstName] = useState("");
@@ -75,8 +75,37 @@ export function PeopleDirectoryPanel({ group }: Props) {
   }
 
   useEffect(() => {
-    setCurrentUserId(getCurrentUserId());
-    void Promise.all([load(), listGrades().then(setGrades)]).catch(() => undefined);
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setLoading(true);
+      setError("");
+    });
+    void (async () => {
+      try {
+        const [rows, tpls] = await Promise.all([
+          listTeachers(group),
+          listRoleTemplates(),
+        ]);
+        if (cancelled) return;
+        setPeople(rows);
+        setTemplates(tpls);
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Could not load directory");
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    listGrades()
+      .then((g) => {
+        if (!cancelled) setGrades(g);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
   }, [group]);
 
   function resetForm() {

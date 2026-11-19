@@ -79,10 +79,9 @@ export default function PlatformDashboardPage() {
       router.replace("/platform/login");
       return;
     }
-    const raw = localStorage.getItem(PLATFORM_USER_KEY);
-    if (raw) setUser(JSON.parse(raw) as PlatformUser);
-
     void (async () => {
+      const raw = localStorage.getItem(PLATFORM_USER_KEY);
+      if (raw) setUser(JSON.parse(raw) as PlatformUser);
       try {
         const nextUser = await refreshSession();
         if (!nextUser) return;

@@ -62,13 +62,20 @@ export default function AssessmentTemplatesPage() {
   const [assignTab, setAssignTab] = useState<AssignTab>("grade");
   const [busy, setBusy] = useState(false);
 
-  async function load() {
-    const [tpls, g, sub, cs] = await Promise.all([
+  function fetchAll() {
+    return Promise.all([
       listAssessmentTemplates(),
       listGrades(),
       listSubjects(),
       listClassSubjects(),
     ]);
+  }
+
+  async function load() {
+    applyLoaded(await fetchAll());
+  }
+
+  function applyLoaded([tpls, g, sub, cs]: Awaited<ReturnType<typeof fetchAll>>) {
     setTemplates(tpls);
     setGrades(g);
     setSubjects(sub);
@@ -86,9 +93,21 @@ export default function AssessmentTemplatesPage() {
       router.replace("/login");
       return;
     }
-    void load()
-      .catch((err) => setError(err instanceof Error ? err.message : "Load failed"))
-      .finally(() => setLoading(false));
+    let cancelled = false;
+    void fetchAll()
+      .then((data) => {
+        if (!cancelled) applyLoaded(data);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : "Load failed");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
   const totalComponents = useMemo(

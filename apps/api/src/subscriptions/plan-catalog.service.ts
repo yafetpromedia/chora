@@ -1,7 +1,10 @@
-import { Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { Plan } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { DEFAULT_PLAN_CATALOG, type PlanCatalogRow } from './plan-catalog.defaults';
+import {
+  DEFAULT_PLAN_CATALOG,
+  type PlanCatalogRow,
+} from './plan-catalog.defaults';
 import type { PlanLimits } from './plan-limits';
 
 export type PlanCatalogDto = {
@@ -20,16 +23,15 @@ export type PlanCatalogDto = {
 };
 
 @Injectable()
-export class PlanCatalogService implements OnModuleInit {
+export class PlanCatalogService {
   private cache: PlanCatalogDto[] | null = null;
 
   constructor(private readonly prisma: PrismaService) {}
 
-  async onModuleInit() {
-    await this.ensureSeeded();
-    await this.syncListedPricesFromDefaults();
-  }
-
+  /**
+   * Explicit operator bootstrap only — never called from startup or read paths.
+   * Requires CHORA_ALLOW_RUNTIME_BOOTSTRAP=1 via scripts/runtime-bootstrap.mjs.
+   */
   async ensureSeeded() {
     const count = await this.prisma.planCatalog.count();
     if (count > 0) return;
@@ -68,7 +70,6 @@ export class PlanCatalogService implements OnModuleInit {
 
   async findAll(): Promise<PlanCatalogDto[]> {
     if (this.cache) return this.cache;
-    await this.ensureSeeded();
     const rows = await this.prisma.planCatalog.findMany({
       orderBy: { sortOrder: 'asc' },
     });
@@ -78,6 +79,12 @@ export class PlanCatalogService implements OnModuleInit {
 
   async findListed(): Promise<PlanCatalogDto[]> {
     const all = await this.findAll();
+    if (all.length === 0) {
+      // Read-only code defaults when catalog rows are absent — does not write.
+      return DEFAULT_PLAN_CATALOG.filter(
+        (p) => p.isListed && p.plan !== Plan.TRIAL,
+      ).map((row) => this.toDto(this.toCreate(row)));
+    }
     return all.filter((p) => p.isListed && p.plan !== Plan.TRIAL);
   }
 
@@ -93,18 +100,27 @@ export class PlanCatalogService implements OnModuleInit {
 
   async getTrialDays(): Promise<number> {
     const trial = (await this.findAll()).find((p) => p.plan === Plan.TRIAL);
-    return trial?.trialDays ?? 14;
+    if (trial?.trialDays != null) return trial.trialDays;
+    const fallback = DEFAULT_PLAN_CATALOG.find((p) => p.plan === Plan.TRIAL);
+    return fallback?.trialDays ?? 14;
   }
 
-  async update(plan: Plan, data: Partial<PlanCatalogRow>): Promise<PlanCatalogDto> {
-    const existing = await this.prisma.planCatalog.findUnique({ where: { plan } });
+  async update(
+    plan: Plan,
+    data: Partial<PlanCatalogRow>,
+  ): Promise<PlanCatalogDto> {
+    const existing = await this.prisma.planCatalog.findUnique({
+      where: { plan },
+    });
     if (!existing) throw new NotFoundException('Plan not found');
 
     const patch: Record<string, unknown> = {};
     if (data.label !== undefined) patch.label = data.label;
     if (data.description !== undefined) patch.description = data.description;
-    if (data.studentsLimit !== undefined) patch.studentsLimit = data.studentsLimit;
-    if (data.teachersLimit !== undefined) patch.teachersLimit = data.teachersLimit;
+    if (data.studentsLimit !== undefined)
+      patch.studentsLimit = data.studentsLimit;
+    if (data.teachersLimit !== undefined)
+      patch.teachersLimit = data.teachersLimit;
     if (data.adminsLimit !== undefined) patch.adminsLimit = data.adminsLimit;
     if (data.usdMonthly !== undefined) patch.usdMonthly = data.usdMonthly;
     if (data.etbMonthly !== undefined) patch.etbMonthly = data.etbMonthly;
@@ -161,9 +177,7 @@ export class PlanCatalogService implements OnModuleInit {
       admins: row.adminsLimit,
       usdMonthly: row.usdMonthly,
       etbMonthly: row.etbMonthly,
-      features: Array.isArray(row.features)
-        ? (row.features as string[])
-        : [],
+      features: Array.isArray(row.features) ? (row.features as string[]) : [],
       trialDays: row.trialDays,
       sortOrder: row.sortOrder,
       isListed: row.isListed,

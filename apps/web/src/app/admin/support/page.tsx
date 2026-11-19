@@ -56,12 +56,22 @@ export default function AdminSupportPage() {
   }
 
   useEffect(() => {
-    setLoading(true);
-    void refresh()
-      .catch((err) =>
-        setError(err instanceof Error ? err.message : "Failed to load tickets"),
-      )
-      .finally(() => setLoading(false));
+    let cancelled = false;
+    void listSchoolSupportTickets()
+      .then((data) => {
+        if (!cancelled) setTickets(data);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Failed to load tickets");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const stats = useMemo(() => {

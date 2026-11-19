@@ -500,26 +500,29 @@ export function PlatformCurriculum() {
       router.replace("/platform/login");
       return;
     }
-    void load();
+    queueMicrotask(() => void load());
   }, [load, router]);
 
   useEffect(() => {
-    if (!selectedKey) {
-      setDetail(null);
-      return;
-    }
-    setDetailLoading(true);
-    setTab("overview");
-    setSubjectQ("");
-    setLibraryQ("");
-    setTemplateQ("");
-    setStructureQ("");
-    setEditingTemplateId(null);
-    setEditingDepartmentId(null);
-    void platformFetch<PackageDetail>(`/platform/curriculum-packages/${selectedKey}`)
-      .then(setDetail)
-      .catch((err) => fail(err, "Could not load package"))
-      .finally(() => setDetailLoading(false));
+    queueMicrotask(() => {
+      if (!selectedKey) {
+        setDetail(null);
+        return;
+      }
+      setDetailLoading(true);
+      setTab("overview");
+      setSubjectQ("");
+      setLibraryQ("");
+      setTemplateQ("");
+      setStructureQ("");
+      setEditingTemplateId(null);
+      setEditingDepartmentId(null);
+      void platformFetch<PackageDetail>(`/platform/curriculum-packages/${selectedKey}`)
+        .then(setDetail)
+        .catch((err) => fail(err, "Could not load package"))
+        .finally(() => setDetailLoading(false));
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedKey]);
 
   const loadPlatformSubjects = useCallback(async () => {
@@ -550,14 +553,14 @@ export function PlatformCurriculum() {
     if (tab !== "subjects" || detail?.isBlank) {
       return;
     }
-    void loadPlatformSubjects();
+    queueMicrotask(() => void loadPlatformSubjects());
   }, [tab, detail?.isBlank, detail?.key, loadPlatformSubjects]);
 
   useEffect(() => {
     if (tab !== "library" || detail?.isBlank) {
       return;
     }
-    void loadPlatformLibrary();
+    queueMicrotask(() => void loadPlatformLibrary());
   }, [tab, detail?.isBlank, detail?.key, loadPlatformLibrary]);
 
   const loadPlatformTemplates = useCallback(async () => {
@@ -575,7 +578,7 @@ export function PlatformCurriculum() {
     if (tab !== "templates" || detail?.isBlank) {
       return;
     }
-    void loadPlatformTemplates();
+    queueMicrotask(() => void loadPlatformTemplates());
   }, [tab, detail?.isBlank, detail?.key, loadPlatformTemplates]);
 
   const availableSubjects = useMemo(() => {
@@ -1040,8 +1043,10 @@ export function PlatformCurriculum() {
 
   useEffect(() => {
     if (!detail) return;
-    setEditLabel(detail.label);
-    setEditDescription(detail.description ?? "");
+    queueMicrotask(() => {
+      setEditLabel(detail.label);
+      setEditDescription(detail.description ?? "");
+    });
   }, [detail]);
 
   async function savePackageMeta() {

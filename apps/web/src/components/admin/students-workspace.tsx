@@ -198,9 +198,22 @@ export function StudentsWorkspace() {
       router.replace("/login");
       return;
     }
-    void refresh()
-      .catch((err) => setError(err instanceof Error ? err.message : "Load failed"))
-      .finally(() => setLoading(false));
+    let cancelled = false;
+    void Promise.all([listGrades(), listStudents()])
+      .then(([g, s]) => {
+        if (cancelled) return;
+        setGrades(g);
+        setStudents(s);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : "Load failed");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [router]);
 
   async function onRegisterSuccess(result: CreateStudentResult) {

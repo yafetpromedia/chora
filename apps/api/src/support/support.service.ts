@@ -1,8 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import {
-  SupportTicketCategory,
-  SupportTicketStatus,
-} from '@prisma/client';
+import { SupportTicketCategory, SupportTicketStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateSupportTicketDto } from './dto/create-support-ticket.dto';
 import { UpdateSupportTicketDto } from './dto/update-support-ticket.dto';
@@ -124,9 +121,7 @@ export class SupportService {
       where: { id },
       data: {
         ...(dto.status ? { status: dto.status } : {}),
-        ...(dto.platformNote !== undefined
-          ? { platformNote: nextNote }
-          : {}),
+        ...(dto.platformNote !== undefined ? { platformNote: nextNote } : {}),
         resolvedAt: resolved ? new Date() : null,
       },
       include: this.ticketInclude,
@@ -155,37 +150,35 @@ export class SupportService {
     return this.serialize(ticket);
   }
 
-  private serialize(
-    ticket: {
+  private serialize(ticket: {
+    id: string;
+    schoolId: string;
+    createdById: string;
+    subject: string;
+    body: string;
+    category: SupportTicketCategory;
+    status: SupportTicketStatus;
+    platformNote: string | null;
+    resolvedAt: Date | null;
+    createdAt: Date;
+    updatedAt: Date;
+    school: {
       id: string;
-      schoolId: string;
-      createdById: string;
-      subject: string;
-      body: string;
-      category: SupportTicketCategory;
-      status: SupportTicketStatus;
-      platformNote: string | null;
-      resolvedAt: Date | null;
-      createdAt: Date;
-      updatedAt: Date;
-      school: {
-        id: string;
-        name: string;
-        slug: string;
-        joinCode: string;
-        email: string | null;
-        phone: string | null;
-        status: string;
-      };
-      createdBy: {
-        id: string;
-        firstName: string;
-        lastName: string;
-        email: string;
-        role: string;
-      };
-    },
-  ) {
+      name: string;
+      slug: string;
+      joinCode: string;
+      email: string | null;
+      phone: string | null;
+      status: string;
+    };
+    createdBy: {
+      id: string;
+      firstName: string;
+      lastName: string;
+      email: string;
+      role: string;
+    };
+  }) {
     return {
       id: ticket.id,
       schoolId: ticket.schoolId,

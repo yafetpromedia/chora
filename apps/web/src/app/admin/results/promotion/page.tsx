@@ -51,9 +51,12 @@ export default function YearPromotionPage() {
 
   useEffect(() => {
     if (!fromYearId) return;
-    setError("");
-    void getPromotionPreview(fromYearId)
-      .then((p) => {
+    let cancelled = false;
+    void (async () => {
+      setError("");
+      try {
+        const p = await getPromotionPreview(fromYearId);
+        if (cancelled) return;
         setPreview(p);
         if (p.suggestedToYear) setToYearId(p.suggestedToYear.id);
         else if (p.availableTargetYears[0]) {
@@ -64,8 +67,13 @@ export default function YearPromotionPage() {
           map[m.fromGradeId] = m.suggestedToGradeId;
         }
         setMappings(map);
-      })
-      .catch((err) => setError(err instanceof Error ? err.message : "Preview failed"));
+      } catch (err) {
+        if (!cancelled) setError(err instanceof Error ? err.message : "Preview failed");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [fromYearId]);
 
   async function onSync() {

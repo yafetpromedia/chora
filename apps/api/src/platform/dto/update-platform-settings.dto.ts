@@ -24,7 +24,9 @@ export class UpdatePlatformSettingsDto {
   @MaxLength(120)
   platformName?: string;
 
-  @ValidateIf((_, v) => v !== null && v !== undefined && String(v).trim() !== '')
+  @ValidateIf(
+    (_, v) => v !== null && v !== undefined && String(v).trim() !== '',
+  )
   @IsEmail()
   @MaxLength(200)
   @IsOptional()
@@ -89,7 +91,9 @@ export class UpdatePlatformSettingsDto {
   @MaxLength(120)
   emailFromName?: string;
 
-  @ValidateIf((_, v) => v !== null && v !== undefined && String(v).trim() !== '')
+  @ValidateIf(
+    (_, v) => v !== null && v !== undefined && String(v).trim() !== '',
+  )
   @IsEmail()
   @MaxLength(200)
   @IsOptional()

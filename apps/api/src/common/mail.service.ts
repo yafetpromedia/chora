@@ -15,7 +15,8 @@ export class MailService {
   private transporter: Transporter | null = null;
 
   constructor(private readonly config: ConfigService) {
-    const enabled = this.config.get<string>('EMAIL_ENABLED', 'false') === 'true';
+    const enabled =
+      this.config.get<string>('EMAIL_ENABLED', 'false') === 'true';
     const host = this.config.get<string>('SMTP_HOST')?.trim();
     if (!enabled || !host) {
       return;
@@ -36,7 +37,9 @@ export class MailService {
     return Boolean(this.transporter);
   }
 
-  async send(input: SendMailInput): Promise<{ sent: boolean; reason?: string }> {
+  async send(
+    input: SendMailInput,
+  ): Promise<{ sent: boolean; reason?: string }> {
     if (!this.transporter) {
       return { sent: false, reason: 'Email is not configured' };
     }

@@ -780,7 +780,10 @@ export class AttendanceConcernsService {
       if (approvedLeave.length > 0) {
         hints.push(`Approved leave: ${approvedLeave.join(', ')}`);
       }
-      if (officialStatus === AttendanceStatus.absent && approvedLeave.length === 0) {
+      if (
+        officialStatus === AttendanceStatus.absent &&
+        approvedLeave.length === 0
+      ) {
         hints.push('Marked absent on official roll');
       }
       if (

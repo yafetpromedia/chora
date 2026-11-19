@@ -24,10 +24,7 @@ import { RequireSchoolModule } from '../common/decorators/require-school-module.
 import { SchoolModuleGuard } from '../common/guards/school-module.guard';
 import { AttendanceModeDto } from '../schools/dto/attendance-mode.dto';
 import { SchoolsService } from '../schools/schools.service';
-import {
-  AttendanceConcernStatus,
-  AttendanceConcernType,
-} from '@prisma/client';
+import { AttendanceConcernStatus, AttendanceConcernType } from '@prisma/client';
 import { BulkAttendanceDto } from './dto/bulk-attendance.dto';
 import { CreateAttendanceConcernDto } from './dto/create-attendance-concern.dto';
 import { CreateAttendancePermissionDto } from './dto/create-attendance-permission.dto';
@@ -238,14 +235,24 @@ export class AttendanceController {
   @Roles('teacher', 'admin')
   @RequirePermissions(SchoolPermission.ATTENDANCE_MANAGE)
   bulkMark(@CurrentUser() user: AuthUser, @Body() dto: BulkAttendanceDto) {
-    return this.attendanceService.bulkMark(dto, user.schoolId, user.id, user.role);
+    return this.attendanceService.bulkMark(
+      dto,
+      user.schoolId,
+      user.id,
+      user.role,
+    );
   }
 
   @Post('scan')
   @Roles('teacher', 'admin')
   @RequirePermissions(SchoolPermission.ATTENDANCE_MANAGE)
   scanMark(@CurrentUser() user: AuthUser, @Body() dto: ScanAttendanceDto) {
-    return this.attendanceService.scanMark(dto, user.schoolId, user.id, user.role);
+    return this.attendanceService.scanMark(
+      dto,
+      user.schoolId,
+      user.id,
+      user.role,
+    );
   }
 
   @Get('student/summary')
@@ -293,7 +300,10 @@ export class AttendanceController {
       user.role,
       requested,
     );
-    return this.attendanceService.listByStudentProfile(profileId, user.schoolId);
+    return this.attendanceService.listByStudentProfile(
+      profileId,
+      user.schoolId,
+    );
   }
 
   @Get('analytics')

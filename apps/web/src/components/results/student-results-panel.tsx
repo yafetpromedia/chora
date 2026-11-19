@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   listMyScoreUpdates,
   listTerms,
@@ -47,22 +47,28 @@ export function StudentResultsPanel() {
       .finally(() => setLoading(false));
   }, []);
 
-  const loadScores = useCallback(async () => {
-    setScoresError("");
-    setScoresLoading(true);
-    try {
-      setScores(await listMyScoreUpdates(termId || undefined));
-    } catch (err) {
-      setScoresError(err instanceof Error ? err.message : "Failed to load scores");
-    } finally {
-      setScoresLoading(false);
+  const scoresKey = !loading && termId ? termId : "";
+  const [prevScoresKey, setPrevScoresKey] = useState("");
+  if (scoresKey !== prevScoresKey) {
+    setPrevScoresKey(scoresKey);
+    if (scoresKey) {
+      setScoresError("");
+      setScoresLoading(true);
     }
-  }, [termId]);
+  }
 
   useEffect(() => {
     if (loading || !termId) return;
-    void loadScores();
-  }, [loading, termId, loadScores]);
+    void (async () => {
+      try {
+        setScores(await listMyScoreUpdates(termId));
+      } catch (err) {
+        setScoresError(err instanceof Error ? err.message : "Failed to load scores");
+      } finally {
+        setScoresLoading(false);
+      }
+    })();
+  }, [loading, termId]);
 
   const groupedScores = useMemo(() => {
     const map = new Map<string, StudentScoreUpdate[]>();

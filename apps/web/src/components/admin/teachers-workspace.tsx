@@ -135,7 +135,7 @@ export function TeachersWorkspace() {
   const [gradeFilter, setGradeFilter] = useState("");
   const [sectionFilter, setSectionFilter] = useState("");
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [editTarget, setEditTarget] = useState<TeacherRecord | null>(null);
+  const [editTargetState, setEditTarget] = useState<TeacherRecord | null>(null);
   const [busy, setBusy] = useState(false);
 
   const [email, setEmail] = useState("");
@@ -227,14 +227,41 @@ export function TeachersWorkspace() {
   }
 
   useEffect(() => {
-    void Promise.all([load(), listGrades().then(setGrades)]).catch(() => undefined);
+    let cancelled = false;
+    void (async () => {
+      try {
+        const [rows, tpls] = await Promise.all([
+          listTeachers("teachers"),
+          listRoleTemplates(),
+        ]);
+        if (cancelled) return;
+        setPeople(rows);
+        setTemplates(tpls);
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Could not load teachers");
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    listGrades()
+      .then((g) => {
+        if (!cancelled) setGrades(g);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  useEffect(() => {
-    if (!editTarget) return;
-    const fresh = people.find((p) => p.userId === editTarget.userId);
-    if (fresh) setEditTarget(fresh);
-  }, [people, editTarget?.userId]);
+  const editTarget = useMemo(
+    () =>
+      editTargetState
+        ? (people.find((p) => p.userId === editTargetState.userId) ?? editTargetState)
+        : null,
+    [people, editTargetState],
+  );
 
   function resetForm() {
     setEmail("");

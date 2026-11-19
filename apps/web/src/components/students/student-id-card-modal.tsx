@@ -28,20 +28,26 @@ export function StudentIdCardModal({
   showBack = true,
   downloadHint = false,
 }: Props) {
-  const [card, setCard] = useState<StudentIdCard | null>(initialCard ?? null);
+  const [fetchedCard, setCard] = useState<StudentIdCard | null>(null);
+  const card = initialCard ?? fetchedCard;
   const [loading, setLoading] = useState(!initialCard && !!studentProfileId);
   const [error, setError] = useState("");
   const [duplex, setDuplex] = useState(showBack);
 
-  useEffect(() => {
-    if (initialCard) {
-      setCard(initialCard);
+  const fetchKey = initialCard ? "" : (studentProfileId ?? "");
+  const [prevFetchKey, setPrevFetchKey] = useState(fetchKey);
+  if (fetchKey !== prevFetchKey) {
+    setPrevFetchKey(fetchKey);
+    if (fetchKey) {
+      setLoading(true);
+      setError("");
+    } else {
       setLoading(false);
-      return;
     }
-    if (!studentProfileId) return;
-    setLoading(true);
-    setError("");
+  }
+
+  useEffect(() => {
+    if (initialCard || !studentProfileId) return;
     void getStudentIdCard(studentProfileId)
       .then(setCard)
       .catch((err) => setError(err instanceof Error ? err.message : "Could not load ID card"))

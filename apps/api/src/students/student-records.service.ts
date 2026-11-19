@@ -75,26 +75,31 @@ export class StudentRecordsService {
   async getSummary(schoolId: string, studentProfileId: string) {
     const profile = await this.assertStudent(schoolId, studentProfileId);
 
-    const [enrollmentCount, documentCount, behaviorCount, certificateCount, attStats] =
-      await Promise.all([
-        this.prisma.studentEnrollment.count({
-          where: { studentProfileId, schoolId },
-        }),
-        this.prisma.studentDocument.count({
-          where: { studentProfileId, schoolId },
-        }),
-        this.prisma.behaviorRecord.count({
-          where: { studentProfileId, schoolId },
-        }),
-        this.prisma.studentCertificate.count({
-          where: { studentProfileId, schoolId },
-        }),
-        this.prisma.attendanceRecord.groupBy({
-          by: ['status'],
-          where: { schoolId, studentProfileId, periodNumber: 0 },
-          _count: { _all: true },
-        }),
-      ]);
+    const [
+      enrollmentCount,
+      documentCount,
+      behaviorCount,
+      certificateCount,
+      attStats,
+    ] = await Promise.all([
+      this.prisma.studentEnrollment.count({
+        where: { studentProfileId, schoolId },
+      }),
+      this.prisma.studentDocument.count({
+        where: { studentProfileId, schoolId },
+      }),
+      this.prisma.behaviorRecord.count({
+        where: { studentProfileId, schoolId },
+      }),
+      this.prisma.studentCertificate.count({
+        where: { studentProfileId, schoolId },
+      }),
+      this.prisma.attendanceRecord.groupBy({
+        by: ['status'],
+        where: { schoolId, studentProfileId, periodNumber: 0 },
+        _count: { _all: true },
+      }),
+    ]);
 
     const attTotal = attStats.reduce((s, r) => s + r._count._all, 0);
     const attPresent = attStats
@@ -215,7 +220,8 @@ export class StudentRecordsService {
         if (subjects.length === 0) continue;
         const avg =
           Math.round(
-            (subjects.reduce((s, r) => s + r.average, 0) / subjects.length) * 10,
+            (subjects.reduce((s, r) => s + r.average, 0) / subjects.length) *
+              10,
           ) / 10;
         termRows.push({
           termId: term.id,
@@ -263,7 +269,10 @@ export class StudentRecordsService {
       overallAverage != null ? percentToGpa(overallAverage) : null;
 
     return {
-      school: { name: school?.name ?? 'School', logoUrl: school?.logoUrl ?? null },
+      school: {
+        name: school?.name ?? 'School',
+        logoUrl: school?.logoUrl ?? null,
+      },
       student: {
         profileId: profile.id,
         name: `${profile.user.firstName} ${profile.user.lastName}`,
@@ -670,9 +679,7 @@ export class StudentRecordsService {
       data: {
         status: dto.status,
         graduatedAt:
-          dto.status === StudentRecordStatus.GRADUATED
-            ? new Date()
-            : undefined,
+          dto.status === StudentRecordStatus.GRADUATED ? new Date() : undefined,
       },
       select: { id: true, status: true, graduatedAt: true },
     });

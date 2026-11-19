@@ -25,14 +25,11 @@ function brandColor(data: ReportCardPrintPayload): string {
 function schoolInitials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return 'S';
-  if (parts.length === 1) return parts[0]!.slice(0, 2).toUpperCase();
-  return `${parts[0]![0] ?? ''}${parts[1]![0] ?? ''}`.toUpperCase();
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0] ?? ''}${parts[1][0] ?? ''}`.toUpperCase();
 }
 
-function logoBlock(
-  data: ReportCardPrintPayload,
-  className: string,
-): string {
+function logoBlock(data: ReportCardPrintPayload, className: string): string {
   if (data.school.logoUrl) {
     return `<img class="${className}" src="${escapeHtml(data.school.logoUrl)}" alt="" />`;
   }
@@ -64,7 +61,10 @@ function choraPoweredBy(data: ReportCardPrintPayload): string {
   `;
 }
 
-function scoreRange(band: { minScore: number; maxScore?: number | null }): string {
+function scoreRange(band: {
+  minScore: number;
+  maxScore?: number | null;
+}): string {
   if (band.maxScore != null && Number.isFinite(band.maxScore)) {
     return `${band.minScore}–${band.maxScore}`;
   }
@@ -1127,7 +1127,10 @@ function buildFrontLeft(data: ReportCardPrintPayload): string {
   `;
 }
 
-function buildFrontRight(data: ReportCardPrintPayload, primary: string): string {
+function buildFrontRight(
+  data: ReportCardPrintPayload,
+  primary: string,
+): string {
   const nameAm = data.school.nameAm?.trim();
   const motto = data.school.headerTagline?.trim();
   const cover = data.school.coverImageUrl?.trim();
@@ -1277,7 +1280,7 @@ function schoolSealHtml(data: ReportCardPrintPayload): string {
   `;
 }
 
-function buildBackLeft(data: ReportCardPrintPayload, _primary: string): string {
+function buildBackLeft(data: ReportCardPrintPayload): string {
   const verifyUrl = data.verification.qrPayload;
   const promo = data.summary.promotion;
   const isPromoted =
@@ -1302,8 +1305,7 @@ function buildBackLeft(data: ReportCardPrintPayload, _primary: string): string {
       ? promo?.label ||
         'The student will continue in the current grade for the next academic year.'
       : 'Promotion decision has not been recorded yet.';
-  const promoClass =
-    isPromoted ? 'yr-promo' : 'yr-promo yr-promo--pending';
+  const promoClass = isPromoted ? 'yr-promo' : 'yr-promo yr-promo--pending';
 
   const infoRows: Array<[string, string | null | undefined]> = [
     ['Full Name', data.student.name],
@@ -1321,8 +1323,7 @@ function buildBackLeft(data: ReportCardPrintPayload, _primary: string): string {
     )
     .join('');
 
-  const sigLabel =
-    data.school.authorizedSignatureLabel?.trim() || 'Director';
+  const sigLabel = data.school.authorizedSignatureLabel?.trim() || 'Director';
   const sigImg = data.school.authorizedSignatureUrl?.trim();
 
   return `
@@ -1381,7 +1382,9 @@ function buildBackRight(data: ReportCardPrintPayload): string {
     .map((t, i) => {
       const label = t.shortName || `T${i + 1}`;
       // Prefer Term 1… labels when shortName is T1-style
-      const nice = /^T\d+$/i.test(label) ? label.replace(/^T/i, 'Term ') : label;
+      const nice = /^T\d+$/i.test(label)
+        ? label.replace(/^T/i, 'Term ')
+        : label;
       return `<th class="num">${escapeHtml(nice)}</th>`;
     })
     .join('');
@@ -1500,7 +1503,9 @@ const A4_FIT_SCRIPT = `
 })();
 `;
 
-export function buildYearlyReportCardHtml(data: ReportCardPrintPayload): string {
+export function buildYearlyReportCardHtml(
+  data: ReportCardPrintPayload,
+): string {
   const primary = brandColor(data);
   const title = `${data.student.name} — Yearly Report Card`;
   const body = `
@@ -1514,7 +1519,7 @@ export function buildYearlyReportCardHtml(data: ReportCardPrintPayload): string 
       <article class="yr-page yr-page--back" aria-label="Yearly report card back">
         ${buildBackHero(data, primary)}
         <div class="yr-back-body">
-          ${buildBackLeft(data, primary)}
+          ${buildBackLeft(data)}
           ${buildBackRight(data)}
         </div>
         ${buildBackFoot(data, primary)}

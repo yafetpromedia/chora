@@ -152,7 +152,11 @@ export function parseEnabledModules(raw: unknown): SchoolModuleKey[] {
   if (!Array.isArray(raw)) return [];
   const out: SchoolModuleKey[] = [];
   for (const item of raw) {
-    if (typeof item === 'string' && isSchoolModuleKey(item) && !out.includes(item)) {
+    if (
+      typeof item === 'string' &&
+      isSchoolModuleKey(item) &&
+      !out.includes(item)
+    ) {
       out.push(item);
     }
   }
@@ -199,7 +203,7 @@ export function computeModularMonthlyTotal(input: {
   const custom = input.plan === Plan.ENTERPRISE;
   const bundle =
     input.bundleId && isBillingBundleId(input.bundleId)
-      ? BILLING_BUNDLES.find((b) => b.id === input.bundleId) ?? null
+      ? (BILLING_BUNDLES.find((b) => b.id === input.bundleId) ?? null)
       : null;
   const modules = bundle ? [...bundle.modules] : [...input.modules];
   const percentOffModules = bundle?.percentOffModules ?? 0;

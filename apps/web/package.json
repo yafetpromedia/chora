@@ -6,7 +6,8 @@
     "dev": "next dev -H 0.0.0.0",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:api-url": "node --test src/lib/api-base-url.test.mjs"
   },
   "dependencies": {
     "@react-oauth/google": "^0.13.5",

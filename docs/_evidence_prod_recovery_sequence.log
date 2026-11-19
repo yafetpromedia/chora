@@ -1,0 +1,320 @@
+
+========================================================================
+META
+========================================================================
+timestamp_utc=2026-11-19T19:27:33.520Z
+disposable_db=chora_migrate_evidence
+redacted_url=postgresql://***:***@127.0.0.1:8000/chora_migrate_evidence?schema=public
+NOTE: This is NOT chora_db. Production was not contacted.
+Prisma schema loaded from prisma\schema.prisma
+prisma                  : 6.19.3
+@prisma/client          : 6.19.3
+Computed binaryTarget   : windows
+Operating System        : win32
+Architecture            : x64
+Node.js                 : v22.17.0
+TypeScript              : 5.9.3
+Query Engine (Node-API) : libquery-engine c2990dca591cba766e3b7ef5d9e8a84796e47ab7 (at node_modules\@prisma\engines\query_engine-windows.dll.node)
+PSL                     : @prisma/prisma-schema-wasm 7.1.1-3.c2990dca591cba766e3b7ef5d9e8a84796e47ab7
+Schema Engine           : schema-engine-cli c2990dca591cba766e3b7ef5d9e8a84796e47ab7 (at node_modules\@prisma\engines\schema-engine-windows.exe)
+Default Engines Hash    : c2990dca591cba766e3b7ef5d9e8a84796e47ab7
+Studio                  : 0.511.0
+
+========================================================================
+PRE-WRITE GATE (seven tables + database identity) — READ-ONLY on replica
+========================================================================
+-- Analogous production gate must use current_database() = 'chora_db'
+db_name         
+------------------------
+ chora_migrate_evidence
+(1 row)
+
+ User | AttendanceRecord | ResultRecord | Announcement | AnnouncementRead | School | SchoolInvite 
+------+------------------+--------------+--------------+------------------+--------+--------------
+    0 |                0 |            0 |            0 |                0 |      0 |            0
+(1 row)
+
+   gate    
+-----------
+ GATE_PASS
+(1 row)
+
+========================================================================
+COMMAND: prisma migrate resolve --rolled-back 20260530160000_subscriptions
+========================================================================
+exit_code=0
+Prisma schema loaded from prisma\schema.prisma
+Datasource "db": PostgreSQL database "chora_migrate_evidence", schema "public" at "127.0.0.1:8000"
+
+Migration 20260530160000_subscriptions marked as rolled back.
+Environment variables loaded from .env
+
+========================================================================
+COMMAND: prisma migrate deploy  (complete pending sequence)
+========================================================================
+exit_code=0
+Prisma schema loaded from prisma\schema.prisma
+Datasource "db": PostgreSQL database "chora_migrate_evidence", schema "public" at "127.0.0.1:8000"
+
+50 migrations found in prisma/migrations
+
+Applying migration `20260530160000_subscriptions`
+Applying migration `20260530170000_schema_catchup`
+Applying migration `20260531180000_plan_catalog`
+Applying migration `20260601120000_student_portal_temp_password`
+Applying migration `20260602120000_timetable`
+Applying migration `20260602121500_library_audience`
+Applying migration `20260602180000_platform_content_layer`
+Applying migration `20260602200000_platform_content_full`
+Applying migration `20260602210000_student_academic_records`
+Applying migration `20260603120000_library`
+Applying migration `20260603160000_teacher_ids_and_classwork`
+Applying migration `20260604120000_user_username`
+Applying migration `20260605140000_subscription_checkout`
+Applying migration `20260605180000_assessment_entry_lock`
+Applying migration `20260605200000_classwork_grading`
+Applying migration `20260605210000_attendance_permission_requests`
+Applying migration `20260708103000_class_subject_weekly_sessions`
+Applying migration `20260709100000_platform_settings`
+Applying migration `20260713120000_admissions`
+Applying migration `20260717120000_support_tickets`
+Applying migration `20260809220000_report_card_header`
+Applying migration `20260811220000_student_parents_can_view_results`
+Applying migration `20260815210000_platform_landing_hero`
+Applying migration `20260815220000_school_theme_colors`
+Applying migration `20260816093000_exam_schedules`
+Applying migration `20260816110000_exam_seating`
+Applying migration `20260816120000_platform_role_permissions`
+Applying migration `20260816210000_announcement_recipient`
+Applying migration `20260817140000_assessment_entry_open_default`
+Applying migration `20260817150000_score_correction_requests`
+Applying migration `20260817200000_school_authorized_signature`
+Applying migration `20260829220000_school_telebirr_payment`
+Applying migration `20260829230000_subscription_coupons`
+Applying migration `20260829240000_platform_payout_account`
+Applying migration `20260829250000_platform_payment_proof`
+Applying migration `20260902180000_platform_social_links`
+Applying migration `20261006140000_platform_ai_settings`
+Applying migration `20261007174500_platform_demo_video`
+Applying migration `20261007180000_staff_attendance`
+Applying migration `20261007200000_leave_ot_staff_qr`
+Applying migration `20261007220000_hr_payroll`
+Applying migration `20261008190000_attendance_concerns`
+Applying migration `20261008193000_platform_product_docs`
+Applying migration `20261009120000_yearly_report_branding`
+Applying migration `20261109100000_platform_product_docs_thumbnail`
+Applying migration `20261116220000_school_postal_box`
+Applying migration `20261116233000_school_id_card_show_stamp`
+
+The following migration(s) have been applied:
+
+migrations/
+  └─ 20260530160000_subscriptions/
+    └─ migration.sql
+  └─ 20260530170000_schema_catchup/
+    └─ migration.sql
+  └─ 20260531180000_plan_catalog/
+    └─ migration.sql
+  └─ 20260601120000_student_portal_temp_password/
+    └─ migration.sql
+  └─ 20260602120000_timetable/
+    └─ migration.sql
+  └─ 20260602121500_library_audience/
+    └─ migration.sql
+  └─ 20260602180000_platform_content_layer/
+    └─ migration.sql
+  └─ 20260602200000_platform_content_full/
+    └─ migration.sql
+  └─ 20260602210000_student_academic_records/
+    └─ migration.sql
+  └─ 20260603120000_library/
+    └─ migration.sql
+  └─ 20260603160000_teacher_ids_and_classwork/
+    └─ migration.sql
+  └─ 20260604120000_user_username/
+    └─ migration.sql
+  └─ 20260605140000_subscription_checkout/
+    └─ migration.sql
+  └─ 20260605180000_assessment_entry_lock/
+    └─ migration.sql
+  └─ 20260605200000_classwork_grading/
+    └─ migration.sql
+  └─ 20260605210000_attendance_permission_requests/
+    └─ migration.sql
+  └─ 20260708103000_class_subject_weekly_sessions/
+    └─ migration.sql
+  └─ 20260709100000_platform_settings/
+    └─ migration.sql
+  └─ 20260713120000_admissions/
+    └─ migration.sql
+  └─ 20260717120000_support_tickets/
+    └─ migration.sql
+  └─ 20260809220000_report_card_header/
+    └─ migration.sql
+  └─ 20260811220000_student_parents_can_view_results/
+    └─ migration.sql
+  └─ 20260815210000_platform_landing_hero/
+    └─ migration.sql
+  └─ 20260815220000_school_theme_colors/
+    └─ migration.sql
+  └─ 20260816093000_exam_schedules/
+    └─ migration.sql
+  └─ 20260816110000_exam_seating/
+    └─ migration.sql
+  └─ 20260816120000_platform_role_permissions/
+    └─ migration.sql
+  └─ 20260816210000_announcement_recipient/
+    └─ migration.sql
+  └─ 20260817140000_assessment_entry_open_default/
+    └─ migration.sql
+  └─ 20260817150000_score_correction_requests/
+    └─ migration.sql
+  └─ 20260817200000_school_authorized_signature/
+    └─ migration.sql
+  └─ 20260829220000_school_telebirr_payment/
+    └─ migration.sql
+  └─ 20260829230000_subscription_coupons/
+    └─ migration.sql
+  └─ 20260829240000_platform_payout_account/
+    └─ migration.sql
+  └─ 20260829250000_platform_payment_proof/
+    └─ migration.sql
+  └─ 20260902180000_platform_social_links/
+    └─ migration.sql
+  └─ 20261006140000_platform_ai_settings/
+    └─ migration.sql
+  └─ 20261007174500_platform_demo_video/
+    └─ migration.sql
+  └─ 20261007180000_staff_attendance/
+    └─ migration.sql
+  └─ 20261007200000_leave_ot_staff_qr/
+    └─ migration.sql
+  └─ 20261007220000_hr_payroll/
+    └─ migration.sql
+  └─ 20261008190000_attendance_concerns/
+    └─ migration.sql
+  └─ 20261008193000_platform_product_docs/
+    └─ migration.sql
+  └─ 20261009120000_yearly_report_branding/
+    └─ migration.sql
+  └─ 20261109100000_platform_product_docs_thumbnail/
+    └─ migration.sql
+  └─ 20261116220000_school_postal_box/
+    └─ migration.sql
+  └─ 20261116233000_school_id_card_show_stamp/
+    └─ migration.sql
+      
+All migrations have been successfully applied.
+Environment variables loaded from .env
+
+========================================================================
+APPLIED_MIGRATION_SEQUENCE (complete)
+========================================================================
+count=47
+01. 20260530160000_subscriptions
+02. 20260530170000_schema_catchup
+03. 20260531180000_plan_catalog
+04. 20260601120000_student_portal_temp_password
+05. 20260602120000_timetable
+06. 20260602121500_library_audience
+07. 20260602180000_platform_content_layer
+08. 20260602200000_platform_content_full
+09. 20260602210000_student_academic_records
+10. 20260603120000_library
+11. 20260603160000_teacher_ids_and_classwork
+12. 20260604120000_user_username
+13. 20260605140000_subscription_checkout
+14. 20260605180000_assessment_entry_lock
+15. 20260605200000_classwork_grading
+16. 20260605210000_attendance_permission_requests
+17. 20260708103000_class_subject_weekly_sessions
+18. 20260709100000_platform_settings
+19. 20260713120000_admissions
+20. 20260717120000_support_tickets
+21. 20260809220000_report_card_header
+22. 20260811220000_student_parents_can_view_results
+23. 20260815210000_platform_landing_hero
+24. 20260815220000_school_theme_colors
+25. 20260816093000_exam_schedules
+26. 20260816110000_exam_seating
+27. 20260816120000_platform_role_permissions
+28. 20260816210000_announcement_recipient
+29. 20260817140000_assessment_entry_open_default
+30. 20260817150000_score_correction_requests
+31. 20260817200000_school_authorized_signature
+32. 20260829220000_school_telebirr_payment
+33. 20260829230000_subscription_coupons
+34. 20260829240000_platform_payout_account
+35. 20260829250000_platform_payment_proof
+36. 20260902180000_platform_social_links
+37. 20261006140000_platform_ai_settings
+38. 20261007174500_platform_demo_video
+39. 20261007180000_staff_attendance
+40. 20261007200000_leave_ot_staff_qr
+41. 20261007220000_hr_payroll
+42. 20261008190000_attendance_concerns
+43. 20261008193000_platform_product_docs
+44. 20261009120000_yearly_report_branding
+45. 20261109100000_platform_product_docs_thumbnail
+46. 20261116220000_school_postal_box
+47. 20261116233000_school_id_card_show_stamp
+expected_pending_after_failed_subscriptions=47 (subscriptions + catch-up + 45 no-ops)
+actual_applied_count=47
+
+========================================================================
+COMMAND: prisma migrate diff --from-url <DB> --to-schema-datamodel prisma/schema.prisma --script --exit-code
+========================================================================
+DIRECTION: from = live disposable database; to = release prisma/schema.prisma
+PASS criterion: exit_code=0 and empty/no-op migration SQL
+exit_code=0
+-- This is an empty migration.
+
+
+========================================================================
+COMMAND: prisma migrate status
+========================================================================
+exit_code=0
+Prisma schema loaded from prisma\schema.prisma
+Datasource "db": PostgreSQL database "chora_migrate_evidence", schema "public" at "127.0.0.1:8000"
+
+50 migrations found in prisma/migrations
+
+Database schema is up to date!
+Environment variables loaded from .env
+
+========================================================================
+COMMAND: prisma migrate deploy  (second run — expect no pending)
+========================================================================
+exit_code=0
+Prisma schema loaded from prisma\schema.prisma
+Datasource "db": PostgreSQL database "chora_migrate_evidence", schema "public" at "127.0.0.1:8000"
+
+50 migrations found in prisma/migrations
+
+
+No pending migrations to apply.
+Environment variables loaded from .env
+
+========================================================================
+POSTCHECKS
+========================================================================
+public_base_tables 
+--------------------
+                119
+(1 row)
+
+ public_enums 
+--------------
+           60
+(1 row)
+
+ demo_school 
+-------------
+           0
+(1 row)
+
+        migration_name        | finished | rolled_back |      ck      
+------------------------------+----------+-------------+--------------
+ 20260530160000_subscriptions | f        | t           | 04abfe7b9f39
+ 20260530160000_subscriptions | t        | f           | ca23942bd789
+(2 rows)

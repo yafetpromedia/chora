@@ -132,11 +132,7 @@ export class LibraryService {
     return { in: [LibraryAudience.STUDENTS, LibraryAudience.BOTH] };
   }
 
-  async getHub(
-    schoolId: string,
-    userId: string,
-    role: UserRole,
-  ) {
+  async getHub(schoolId: string, userId: string, role: UserRole) {
     await this.ensureCategories(schoolId);
     const statusFilter = this.publishedFilter(role);
 
@@ -413,8 +409,10 @@ export class LibraryService {
       role !== 'staff' &&
       ![resource.audience, LibraryAudience.BOTH].some((audience) =>
         role === 'teacher'
-          ? audience === LibraryAudience.TEACHERS || audience === LibraryAudience.BOTH
-          : audience === LibraryAudience.STUDENTS || audience === LibraryAudience.BOTH,
+          ? audience === LibraryAudience.TEACHERS ||
+            audience === LibraryAudience.BOTH
+          : audience === LibraryAudience.STUDENTS ||
+            audience === LibraryAudience.BOTH,
       )
     ) {
       throw new NotFoundException('Resource not found');
@@ -518,9 +516,7 @@ export class LibraryService {
         ...(dto.description !== undefined
           ? { description: dto.description?.trim() || null }
           : {}),
-        ...(dto.categoryId !== undefined
-          ? { categoryId: dto.categoryId }
-          : {}),
+        ...(dto.categoryId !== undefined ? { categoryId: dto.categoryId } : {}),
         ...(dto.resourceType !== undefined
           ? { resourceType: dto.resourceType }
           : {}),
@@ -587,11 +583,15 @@ export class LibraryService {
     };
   }
 
-  async getFilePath(schoolId: string, filename: string) {
-    if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
-      throw new BadRequestException('Invalid file');
+  getFilePath(schoolId: string, filename: string): Promise<string> {
+    if (
+      filename.includes('..') ||
+      filename.includes('/') ||
+      filename.includes('\\')
+    ) {
+      return Promise.reject(new BadRequestException('Invalid file'));
     }
-    return join(this.uploadRoot, schoolId, filename);
+    return Promise.resolve(join(this.uploadRoot, schoolId, filename));
   }
 
   async recordDownload(schoolId: string, resourceId: string) {
@@ -602,11 +602,7 @@ export class LibraryService {
     return { ok: true };
   }
 
-  async toggleFavorite(
-    schoolId: string,
-    userId: string,
-    resourceId: string,
-  ) {
+  async toggleFavorite(schoolId: string, userId: string, resourceId: string) {
     const student = await this.requireStudent(schoolId, userId);
     const resource = await this.prisma.libraryResource.findFirst({
       where: {

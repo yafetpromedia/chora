@@ -61,10 +61,7 @@ function ResourceCard({
   useEffect(() => {
     let revokedUrl: string | null = null;
     let alive = true;
-    if (!resource.coverUrl) {
-      setCoverSrc(null);
-      return;
-    }
+    if (!resource.coverUrl) return;
     void fetchLibraryAssetObjectUrl(resource.coverUrl)
       .then((url) => {
         if (!alive) {
@@ -87,7 +84,7 @@ function ResourceCard({
         {isNew ? (
           <span className="lib-resource__badge lib-badge lib-badge--new">New</span>
         ) : null}
-        {coverSrc ? (
+        {resource.coverUrl && coverSrc ? (
           <img src={coverSrc} alt="" />
         ) : (
           <LibCategoryIcon slug={resource.category.slug} className="lib-resource__placeholder-icon" />
@@ -215,11 +212,22 @@ export function LibraryHubView({
   }, []);
 
   useEffect(() => {
-    void loadHub();
+    void (async () => {
+      try {
+        setHub(await getLibraryHub());
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Could not load library");
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [canManage, canUpload]);
+
+  useEffect(() => {
     if (canManage || canUpload) {
       void listGrades().then(setGrades).catch(() => undefined);
     }
-  }, [loadHub, canManage, canUpload]);
+  }, [canManage, canUpload]);
 
   async function runSearch(e?: FormEvent) {
     e?.preventDefault();

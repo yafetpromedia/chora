@@ -1,8 +1,5 @@
 import { sumCents, percentOfCents, minutesToHourCents } from './money.util';
-import {
-  deductionCalendarDays,
-  leaveDaysInPeriod,
-} from './payroll-leave.util';
+import { deductionCalendarDays, leaveDaysInPeriod } from './payroll-leave.util';
 
 describe('payroll math & leave policy', () => {
   function d(iso: string) {

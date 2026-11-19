@@ -216,7 +216,13 @@ export function AiChatWidget(props: Props) {
   }, [variant]);
 
   useEffect(() => {
-    setThreads(loadThreads(variant));
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) setThreads(loadThreads(variant));
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [variant]);
 
   useEffect(() => {
@@ -247,11 +253,13 @@ export function AiChatWidget(props: Props) {
       updatedAt: new Date().toISOString(),
       messages: persistableMessages(messages),
     };
-    setThreads((prev) => {
-      const others = prev.filter((t) => t.id !== threadId);
-      const merged = [next, ...others].slice(0, MAX_STORED_THREADS);
-      saveThreads(variant, merged);
-      return merged;
+    queueMicrotask(() => {
+      setThreads((prev) => {
+        const others = prev.filter((t) => t.id !== threadId);
+        const merged = [next, ...others].slice(0, MAX_STORED_THREADS);
+        saveThreads(variant, merged);
+        return merged;
+      });
     });
   }, [messages, threadId, variant]);
 

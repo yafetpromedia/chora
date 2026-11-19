@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { PlatformPayoutInstructions, SubscriptionStatus } from "@/lib/api";
 import {
   requestRenewalInvoice,
@@ -69,8 +69,11 @@ export function PlatformPaymentPanel({
     return list;
   }, [payout]);
 
-  const [invoiceId, setInvoiceId] = useState("");
-  const [payMethod, setPayMethod] = useState<PlatformPayMethod>("TELEBIRR");
+  const [invoiceIdState, setInvoiceId] = useState("");
+  const [payMethodState, setPayMethod] = useState<PlatformPayMethod>("TELEBIRR");
+  const invoiceId = selectedInvoiceId || invoiceIdState || openInvoices[0]?.id || "";
+  const payMethod =
+    methods.length && !methods.includes(payMethodState) ? methods[0] : payMethodState;
   const [transactionId, setTransactionId] = useState("");
   const [proofPreview, setProofPreview] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -85,22 +88,6 @@ export function PlatformPaymentPanel({
     subscription.plan !== "TRIAL" &&
     subscription.plan !== "ENTERPRISE" &&
     !hasOpenInvoice;
-
-  useEffect(() => {
-    if (selectedInvoiceId) {
-      setInvoiceId(selectedInvoiceId);
-      return;
-    }
-    if (!invoiceId && openInvoices[0]) {
-      setInvoiceId(openInvoices[0].id);
-    }
-  }, [openInvoices, invoiceId, selectedInvoiceId]);
-
-  useEffect(() => {
-    if (methods.length && !methods.includes(payMethod)) {
-      setPayMethod(methods[0]);
-    }
-  }, [methods, payMethod]);
 
   const selectedInvoice = openInvoices.find((inv) => inv.id === invoiceId);
   const pendingForInvoice = paymentProofs.find(
