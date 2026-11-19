@@ -5,7 +5,8 @@
 **Production `chora_db` was not connected, modified, migrated, dumped, reset, or backed up by this work.**
 
 **Do not execute recovery commands on production without explicit human approval.**  
-**Do not merge, deploy, or restart services as part of this document.**
+**Do not merge, deploy, or restart services as part of this document.**  
+**Do not create any new backups until the entire Chora task is finished** (project-wide restriction; this plan must not instruct `pg_dump` or other backup creation).
 
 ---
 
@@ -16,7 +17,7 @@
 | Answer | Detail |
 |--------|--------|
 | **YES — conditional** | Use `prisma migrate resolve --rolled-back 20260530160000_subscriptions` then `prisma migrate deploy` on the **current** migration files. |
-| **Hard precondition** | All seven application tables still have **zero rows** (re-confirm with read-only `COUNT(*)` immediately before execution). |
+| **Hard preconditions** | (1) Application writers isolated before the gate and through verification. (2) All seven application tables still have **zero rows** at the immediate pre-write gate (`GATE_PASS` + `current_database() = 'chora_db'`). |
 | **Why safe when empty** | Catch-up’s `DROP COLUMN "studentId"` / `ADD … studentProfileId TEXT NOT NULL` / `User.username TEXT NOT NULL` succeed only because there is no row data to rewrite. Repaired subscriptions SQL creates `Plan` + `Subscription` and does **not** insert `school-addis`. |
 | **Why not a wipe** | Init / schools / invites objects and their `_prisma_migrations` rows are kept. The failed subscriptions attempt remains visible as a rolled-back history row. |
 | **If any application row appears** | **STOP — procedure is unsafe.** Disposable probe with seeded rows: catch-up failed `23502` (`studentProfileId` nulls); release schema was **not** reached. A different, hand-designed data migration would be required. |
@@ -107,15 +108,21 @@ Therefore “data-preserving” for current production means: **no application d
 ### Preconditions (all required)
 
 1. Explicit written approval for database recovery on `chora_db`.
-2. **Immediate pre-write gate** (§5.1) — all seven tables zero rows **and** `current_database() = 'chora_db'`. Do not rely on an earlier inspection.
-3. Read-only confirm: failed migration is `20260530160000_subscriptions`; `Plan` / `Subscription` absent; schema diff non-empty.
-4. Approved worktree SHA of `sync/production-hardening` (repaired subscriptions file, no `school-addis` INSERT).
-5. Writers paused / maintenance window.
-6. Backups: **not** created in this investigation; take any backup your policy requires **before** you approve writes (separate human step).
+2. **Writer isolation** (§5.0) — application writers stopped or otherwise prevented from writing **before** the zero-row gate, and kept isolated until migration **and** verification finish.
+3. **Immediate pre-write gate** (§5.1) — all seven tables zero rows **and** `current_database() = 'chora_db'`. Do not rely on an earlier inspection. Run only after writers are isolated.
+4. Read-only confirm: failed migration is `20260530160000_subscriptions`; `Plan` / `Subscription` absent; schema diff non-empty.
+5. Approved worktree SHA of `sync/production-hardening` (repaired subscriptions file, no `school-addis` INSERT) — on VPS this is `6524a1d3a5adc33491469c44accac7c2ed0ba267` unless a later docs-only SHA is explicitly approved.
+6. **No new backups** as part of this recovery or until the entire Chora task is finished. Do not run `pg_dump` / `pg_basebackup` / equivalent “create a backup before writes” steps.
 
-### 5.1 Immediate pre-write gate (READ-ONLY — run immediately before any write)
+### 5.0 Writer isolation (mandatory before the gate)
 
-Must return `GATE_PASS`. If `GATE_FAIL_STOP` or any count ≠ 0 → **STOP**. Does not authorize writes by itself.
+A zero-row `COUNT(*)` is a point-in-time observation. It does **not** prevent concurrent inserts from the API, workers, or other clients while recovery runs. If a writer inserts into `User`, `AttendanceRecord`, or another early table after the gate and before catch-up finishes, catch-up can fail (`23502` / NOT NULL) or leave an unsafe partial state (validated on disposable populated replica).
+
+**Required:** stop or block all application writers (for example stop/disable Chora API and any job that can write to `chora_db`, or equivalent maintenance isolation) **before** §5.1, and keep that isolation in place through `resolve`, both `migrate deploy` runs, `migrate diff`, and `migrate status`. Only then may writers be restored under a separate approval.
+
+### 5.1 Immediate pre-write gate (READ-ONLY — run immediately before any migrate write)
+
+Must return `GATE_PASS`. If `GATE_FAIL_STOP` or any count ≠ 0 → **STOP**. Does not authorize writes by itself. Run only while writers are already isolated (§5.0).
 
 ```sql
 -- READ-ONLY. Target must be chora_db.
@@ -149,7 +156,8 @@ Also confirm `DATABASE_URL` path/dbname is `chora_db` (not `edu_os`, not a dispo
 ### Commands
 
 ```bash
-# FUTURE CONDITIONAL — only after approval + GATE_PASS. Example paths/URL.
+# FUTURE CONDITIONAL — only after approval + writer isolation (§5.0) + GATE_PASS (§5.1).
+# Do NOT create backups as part of this sequence.
 cd /path/to/approved/chora/apps/api
 export DATABASE_URL='postgresql://…/chora_db?schema=public'
 # assert: URL database name is exactly chora_db
@@ -157,7 +165,8 @@ export DATABASE_URL='postgresql://…/chora_db?schema=public'
 # 1) FUTURE CONDITIONAL — bookkeeping only; does not create schema objects
 npx prisma migrate resolve --rolled-back 20260530160000_subscriptions
 
-# 2) FUTURE CONDITIONAL — applies ALL pending migrations (47 on replica: subscriptions + catch-up + 45 no-ops)
+# 2) FUTURE CONDITIONAL / WRITE-CAPABLE — applies ALL pending migrations
+#    (47 on replica: subscriptions + catch-up + 45 no-ops; exact sequence in evidence log)
 npx prisma migrate deploy
 # expect every "Applying migration …" line to succeed; final: All migrations have been successfully applied.
 
@@ -173,7 +182,9 @@ npx prisma migrate diff \
 npx prisma migrate status
 # expect: Database schema is up to date!
 
-# 4) READ-ONLY — second deploy must be a no-op
+# 4) WRITE-CAPABLE (expected no-op after successful recovery) — not read-only.
+#    Prisma migrate deploy can write migration history if anything were still pending;
+#    after a complete recovery it must report no pending work and change nothing material.
 npx prisma migrate deploy
 # expect: No pending migrations to apply.
 
@@ -192,23 +203,28 @@ Full sanitized transcript: `docs/_evidence_prod_recovery_sequence.log` (Prisma C
 | `migrate deploy` pending sequence | **47/47** applied successfully (complete list in evidence log) |
 | `migrate diff` direction | `--from-url` = replica DB; `--to-schema-datamodel prisma/schema.prisma`; **exit 0**; `-- This is an empty migration.` |
 | `migrate status` | exit 0 — “Database schema is up to date!” |
-| Second `migrate deploy` | exit 0 — “No pending migrations to apply.” |
+| Second `migrate deploy` (WRITE-CAPABLE, expected no-op) | exit 0 — “No pending migrations to apply.” |
 
-### Why each step is safe (under zero-row precondition)
+### Why each step is safe (under writer isolation + zero-row precondition)
 
 | Step | Effect | Safety rationale |
 |------|--------|------------------|
+| Writer isolation (§5.0) | Blocks concurrent inserts during gate → verification | Zero-row count alone does not stop writers |
 | `resolve --rolled-back` | Sets `rolled_back_at` on failed subscriptions row; clears P3009 | Does not claim success; does not run SQL; preserves failure visibility |
-| `migrate deploy` | Re-applies **current** subscriptions (no demo INSERT), then catch-up, then no-ops | Current file checksum stored on new successful row; empty tables allow NOT NULL / DROP COLUMN |
+| First `migrate deploy` | Re-applies **current** subscriptions (no demo INSERT), then catch-up, then no-ops (47 pending on replica) | Current file checksum stored on new successful row; empty tables allow NOT NULL / DROP COLUMN |
 | `migrate diff --exit-code` | Compares live DB to `schema.prisma` | Read-only verification |
+| Second `migrate deploy` | WRITE-CAPABLE; expected no-op (“No pending migrations”) | Confirms history is complete; do not label this step read-only |
 | History after | Two subscriptions rows: rolled-back (old checksum) + finished (current checksum); init rolled-back + finished retained | Failure not concealed |
 
 ### Stop conditions
 
-- Any application `COUNT(*) > 0`
+- Writers not isolated before the gate, or isolation lost before verification finishes
+- Any application `COUNT(*) > 0` at the immediate gate (`GATE_FAIL_STOP`)
 - Deploy error / “already exists” / unexpected P3018
-- Diff exit ≠ 0 after deploy
+- Diff exit ≠ 0 after first deploy
+- Second deploy reports pending migrations unexpectedly
 - Do **not** then run `resolve --applied` to paper over failure
+- Do **not** create backups to “make the write safer” — forbidden until the entire Chora task is finished
 
 ---
 
@@ -233,7 +249,7 @@ Full sanitized transcript: `docs/_evidence_prod_recovery_sequence.log` (Prisma C
 | `migrate resolve --applied` on incomplete schema | **Forbidden** |
 | `DROP SCHEMA` / `DROP DATABASE` / recreate | **Not required**; not recommended for this path |
 | `migrate reset`, `db push`, `db-sync`, bootstrap, runtime-bootstrap | **Forbidden** for this recovery |
-| `pg_dump` / backup creation | **Deferred** to your approval (not done here) |
+| `pg_dump` / backup creation / any new backup | **Forbidden** until the entire Chora task is finished |
 | Merge PR / deploy app / restart services | **Out of scope** |
 
 ### Production — read-only diagnostics (when you choose to inspect)
