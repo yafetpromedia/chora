@@ -107,38 +107,92 @@ Therefore “data-preserving” for current production means: **no application d
 ### Preconditions (all required)
 
 1. Explicit written approval for database recovery on `chora_db`.
-2. Read-only confirm: **0** rows in all seven application tables.
+2. **Immediate pre-write gate** (§5.1) — all seven tables zero rows **and** `current_database() = 'chora_db'`. Do not rely on an earlier inspection.
 3. Read-only confirm: failed migration is `20260530160000_subscriptions`; `Plan` / `Subscription` absent; schema diff non-empty.
 4. Approved worktree SHA of `sync/production-hardening` (repaired subscriptions file, no `school-addis` INSERT).
 5. Writers paused / maintenance window.
 6. Backups: **not** created in this investigation; take any backup your policy requires **before** you approve writes (separate human step).
 
+### 5.1 Immediate pre-write gate (READ-ONLY — run immediately before any write)
+
+Must return `GATE_PASS`. If `GATE_FAIL_STOP` or any count ≠ 0 → **STOP**. Does not authorize writes by itself.
+
+```sql
+-- READ-ONLY. Target must be chora_db.
+SELECT current_database() AS db_name;  -- must equal 'chora_db'
+
+SELECT
+  (SELECT count(*) FROM "User")              AS "User",
+  (SELECT count(*) FROM "AttendanceRecord")  AS "AttendanceRecord",
+  (SELECT count(*) FROM "ResultRecord")      AS "ResultRecord",
+  (SELECT count(*) FROM "Announcement")      AS "Announcement",
+  (SELECT count(*) FROM "AnnouncementRead")  AS "AnnouncementRead",
+  (SELECT count(*) FROM "School")            AS "School",
+  (SELECT count(*) FROM "SchoolInvite")      AS "SchoolInvite";
+
+SELECT CASE
+  WHEN current_database() = 'chora_db'
+   AND (SELECT count(*) FROM "User") = 0
+   AND (SELECT count(*) FROM "AttendanceRecord") = 0
+   AND (SELECT count(*) FROM "ResultRecord") = 0
+   AND (SELECT count(*) FROM "Announcement") = 0
+   AND (SELECT count(*) FROM "AnnouncementRead") = 0
+   AND (SELECT count(*) FROM "School") = 0
+   AND (SELECT count(*) FROM "SchoolInvite") = 0
+  THEN 'GATE_PASS'
+  ELSE 'GATE_FAIL_STOP'
+END AS gate;
+```
+
+Also confirm `DATABASE_URL` path/dbname is `chora_db` (not `edu_os`, not a disposable name) before exporting it into the shell that will run Prisma.
+
 ### Commands
 
 ```bash
-# FUTURE CONDITIONAL — only after approval. Example paths/URL.
+# FUTURE CONDITIONAL — only after approval + GATE_PASS. Example paths/URL.
 cd /path/to/approved/chora/apps/api
 export DATABASE_URL='postgresql://…/chora_db?schema=public'
+# assert: URL database name is exactly chora_db
 
 # 1) FUTURE CONDITIONAL — bookkeeping only; does not create schema objects
 npx prisma migrate resolve --rolled-back 20260530160000_subscriptions
 
-# 2) FUTURE CONDITIONAL — applies current subscriptions + catch-up + no-ops
+# 2) FUTURE CONDITIONAL — applies ALL pending migrations (47 on replica: subscriptions + catch-up + 45 no-ops)
 npx prisma migrate deploy
+# expect every "Applying migration …" line to succeed; final: All migrations have been successfully applied.
 
-# 3) READ-ONLY proof
+# 3) READ-ONLY proof — direction matters:
+#    --from-url     = the SAME database just migrated (chora_db)
+#    --to-schema-datamodel = release prisma/schema.prisma
+#    Pass = exit code 0 AND empty/no-op SQL ("This is an empty migration.")
 npx prisma migrate diff \
   --from-url "$DATABASE_URL" \
   --to-schema-datamodel prisma/schema.prisma \
   --script --exit-code
-# must exit 0
 
 npx prisma migrate status
 # expect: Database schema is up to date!
 
-# 4) READ-ONLY — no demo seed
+# 4) READ-ONLY — second deploy must be a no-op
+npx prisma migrate deploy
+# expect: No pending migrations to apply.
+
+# 5) READ-ONLY — no demo seed
 # SELECT count(*) FROM "School" WHERE id = 'school-addis';  -- expect 0
 ```
+
+### 5.2 Verified on disposable replica (see evidence log)
+
+Full sanitized transcript: `docs/_evidence_prod_recovery_sequence.log` (Prisma CLI **6.19.3**, DB `chora_migrate_evidence`, **not** `chora_db`).
+
+| Check | Result |
+|-------|--------|
+| Seven-table zero-row gate (replica analog) | `GATE_PASS` — all seven counts 0 |
+| `resolve --rolled-back` | exit 0 — “Migration … marked as rolled back.” |
+| `migrate deploy` pending sequence | **47/47** applied successfully (complete list in evidence log) |
+| `migrate diff` direction | `--from-url` = replica DB; `--to-schema-datamodel prisma/schema.prisma`; **exit 0**; `-- This is an empty migration.` |
+| `migrate status` | exit 0 — “Database schema is up to date!” |
+| Second `migrate deploy` | exit 0 — “No pending migrations to apply.” |
 
 ### Why each step is safe (under zero-row precondition)
 
