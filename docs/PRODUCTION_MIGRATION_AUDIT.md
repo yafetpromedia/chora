@@ -1,8 +1,9 @@
 # Chora — Production Database Migration Audit
 
-**Audit date:** 2026-11-19
-**Scope:** `apps/api/prisma/migrations`, `apps/api/scripts/migrate-existing-db.mjs`, `apps/api/scripts/db-sync.*`, `docs/DATABASE_MIGRATION_RECOVERY.md`
-**Mode:** READ-ONLY file audit. No database was connected to, queried, backed up, or modified.
+**Audit date:** 2026-11-19  
+**Updated:** See also `docs/PRODUCTION_DATABASE_RECOVERY_PLAN.md` (empty-`chora_db` recovery strategies A/B; disposable clean-install + continue-sim results).  
+**Scope:** `apps/api/prisma/migrations`, `apps/api/scripts/migrate-existing-db.mjs`, `apps/api/scripts/db-sync.*`, `docs/DATABASE_MIGRATION_RECOVERY.md`  
+**Mode:** READ-ONLY file audit. No production database was connected to, queried, backed up, or modified.
 
 > ## NO PRODUCTION MIGRATION WAS EXECUTED
 > No `migrate deploy/dev/reset/resolve`, `db push`, seed, `db-bootstrap`, `db-sync`, backup, dump, or any SQL (read or write) was run by this audit against any database. Production `chora_db` was not contacted. Only repository files were read (plus read-only `git` history lookups).
