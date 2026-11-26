@@ -255,6 +255,7 @@ export class EmailService {
   }
 
   async processDue(now = new Date()): Promise<{ processed: number }> {
+    if (!this.settings().enabled) return { processed: 0 };
     await this.recoverStaleClaims(now);
     const due = await this.prisma.emailDelivery.findMany({
       where: {
@@ -622,6 +623,14 @@ export class EmailService {
     attempts: number,
   ): Promise<EmailDispatchResult> {
     const settings = this.settings();
+    if (!settings.enabled) {
+      return {
+        sent: false,
+        queued: true,
+        id: row.id,
+        reason: 'Email is not configured',
+      };
+    }
     const mailbox = Object.values(settings.mailboxes).find(
       (item) => item.address === row.sender,
     );

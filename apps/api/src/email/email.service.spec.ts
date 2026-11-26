@@ -59,7 +59,7 @@ function config(overrides: Record<string, string> = {}) {
   return { get: (key: string) => values[key] };
 }
 
-function memory() {
+function memory(overrides: Record<string, string> = {}) {
   const rows: Row[] = [];
   const apply = (row: Row, data: Record<string, unknown>) => {
     const attempts = data.attempts as { increment?: number } | number | undefined;
@@ -190,7 +190,7 @@ function memory() {
     },
   };
   const service = new EmailService(
-    config() as never,
+    config(overrides) as never,
     prisma as never,
     new EmailPreferencesService(prisma as never),
   );
@@ -554,6 +554,73 @@ describe('email delivery', () => {
     const missing = await bare.providerStatus();
     expect(missing.connection).toBe('missing_credentials');
     expect(JSON.stringify(missing)).not.toMatch(/password/i);
+  });
+
+  function parkedRow(status: string, id: string): Row {
+    const now = new Date('2026-01-01T00:00:00Z');
+    return {
+      id,
+      status,
+      attempts: 1,
+      maxAttempts: 5,
+      nextAttemptAt: now,
+      createdAt: now,
+      updatedAt: new Date(Date.now() - 5 * 60 * 1000),
+      idempotencyKey: id,
+      recipient: 'parent@example.com',
+      sender: 'info@awuddigitals.com',
+      replyTo: null,
+      subject: 'Attendance',
+      category: 'student_absence',
+      templateId: 'student_absence',
+      variables: { childName: 'Liya' },
+      lastError: null,
+    };
+  }
+
+  it('does not claim, retry, fail, or send while email is disabled', async () => {
+    const { prisma, service } = memory({
+      CHORA_EMAIL_ENABLED: 'false',
+      CHORA_CONTACT_EMAIL_PASSWORD: '',
+      CHORA_SUPPORT_EMAIL_PASSWORD: '',
+      CHORA_ADMIN_EMAIL_PASSWORD: '',
+      CHORA_INFO_EMAIL_PASSWORD: '',
+      CHORA_SALES_EMAIL_PASSWORD: '',
+    });
+    prisma.rows.push(
+      parkedRow('QUEUED', 'queued-1'),
+      parkedRow('SENDING', 'stale-1'),
+    );
+    const before = JSON.stringify(prisma.rows);
+
+    const result = await service.processDue();
+
+    expect(result).toEqual({ processed: 0 });
+    expect(JSON.stringify(prisma.rows)).toBe(before);
+    expect(mockSendMail).not.toHaveBeenCalled();
+    expect(prisma.emailDelivery.updateMany).not.toHaveBeenCalled();
+    expect(prisma.emailDelivery.update).not.toHaveBeenCalled();
+    expect(prisma.emailDelivery.findMany).not.toHaveBeenCalled();
+  });
+
+  it('does not send or fail a claimed row when delivery is turned off', async () => {
+    const { prisma, service } = memory({ CHORA_EMAIL_ENABLED: 'false' });
+    const row = parkedRow('SENDING', 'claimed-1');
+    prisma.rows.push(row);
+
+    const result = await (
+      service as unknown as {
+        deliverClaimed: (
+          claimed: Row,
+          attempts: number,
+        ) => Promise<{ sent: boolean }>;
+      }
+    ).deliverClaimed(row, 1);
+
+    expect(result.sent).toBe(false);
+    expect(row.status).toBe('SENDING');
+    expect(mockSendMail).not.toHaveBeenCalled();
+    expect(prisma.emailDelivery.update).not.toHaveBeenCalled();
   });
 
   it('deletes terminal rows older than 180 days and retries if the delete fails', async () => {

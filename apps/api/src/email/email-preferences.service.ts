@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   DEFAULT_PARENT_EMAIL_PREFERENCES,
@@ -15,7 +16,9 @@ import {
 
 export type PreferencePatch = Partial<ParentEmailPreferenceView>;
 
-function schoolView(row: Partial<SchoolEmailPreferenceView> | null): SchoolEmailPreferenceView {
+function schoolView(
+  row: Partial<SchoolEmailPreferenceView> | null,
+): SchoolEmailPreferenceView {
   return { ...DEFAULT_SCHOOL_EMAIL_PREFERENCES, ...(row ?? {}) };
 }
 
@@ -100,14 +103,51 @@ export class EmailPreferencesService {
     patch: PreferencePatch,
   ) {
     const data = pickPatch(patch, true);
-    const row = await this.prisma.parentEmailPreference.upsert({
-      where: { userId },
-      create: { userId, schoolId, ...data },
-      update: { schoolId, ...data },
+    const row = await this.prisma.$transaction(async (tx) => {
+      const parent = await tx.user.findFirst({
+        where: { id: userId, schoolId, role: 'parent' },
+        select: { id: true },
+      });
+      if (!parent) {
+        throw new NotFoundException('Parent not found in this school');
+      }
+
+      const existing = await tx.parentEmailPreference.findUnique({
+        where: { userId },
+      });
+      if (existing) {
+        if (existing.schoolId !== schoolId) {
+          throw new NotFoundException('Parent not found in this school');
+        }
+        return tx.parentEmailPreference.update({
+          where: { userId },
+          data,
+        });
+      }
+
+      try {
+        return await tx.parentEmailPreference.create({
+          data: { userId, schoolId, ...data },
+        });
+      } catch (error) {
+        if (
+          !(error instanceof Prisma.PrismaClientKnownRequestError) ||
+          error.code !== 'P2002'
+        ) {
+          throw error;
+        }
+        const raced = await tx.parentEmailPreference.findUnique({
+          where: { userId },
+        });
+        if (!raced || raced.schoolId !== schoolId) {
+          throw new NotFoundException('Parent not found in this school');
+        }
+        return tx.parentEmailPreference.update({
+          where: { userId },
+          data,
+        });
+      }
     });
-    if (row.schoolId !== schoolId) {
-      throw new NotFoundException('Parent not found in this school');
-    }
     return parentView(row);
   }
 

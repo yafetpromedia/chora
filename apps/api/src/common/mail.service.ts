@@ -66,8 +66,24 @@ export class MailService {
       return { sent: true };
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Send failed';
-      this.logger.warn(`Failed to send email to ${input.to}: ${message}`);
+      const detail = redactMailLog(
+        message,
+        this.config.get<string>('SMTP_PASS'),
+      );
+      this.logger.warn(`Failed to send email to [redacted-email]: ${detail}`);
       return { sent: false, reason: message };
     }
   }
+}
+
+function redactMailLog(message: string, password?: string): string {
+  let text = message.replace(
+    /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi,
+    '[redacted-email]',
+  );
+  const secret = password?.trim();
+  if (secret && secret.length >= 4) {
+    text = text.split(secret).join('[redacted]');
+  }
+  return text.slice(0, 300);
 }
