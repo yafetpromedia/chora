@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DashboardPage } from "@/components/dashboard/dashboard-page";
 import { useLocale } from "@/components/i18n/locale-provider";
@@ -49,22 +49,22 @@ export default function ParentTimetablePage() {
   const selectedChild = children.find((c) => c.profileId === selectedId);
   const filterName = selectedChild?.name;
 
-  const filteredToday = useMemo(() => {
-    if (!filterName || children.length <= 1) return todaySlots;
-    return todaySlots.filter(
-      (s) => !s.studentName || s.studentName === filterName,
-    );
-  }, [todaySlots, filterName, children.length]);
+  const filteredToday =
+    !filterName || children.length <= 1
+      ? todaySlots
+      : todaySlots.filter(
+          (s) => !s.studentName || s.studentName === filterName,
+        );
 
-  const filteredWeek = useMemo(() => {
-    if (!filterName || children.length <= 1) return weekDays;
-    return weekDays.map((day) => ({
-      ...day,
-      slots: day.slots.filter(
-        (s) => !s.studentName || s.studentName === filterName,
-      ),
-    }));
-  }, [weekDays, filterName, children.length]);
+  const filteredWeek =
+    !filterName || children.length <= 1
+      ? weekDays
+      : weekDays.map((day) => ({
+          ...day,
+          slots: day.slots.filter(
+            (s) => !s.studentName || s.studentName === filterName,
+          ),
+        }));
 
   return (
     <DashboardPage

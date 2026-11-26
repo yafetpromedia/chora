@@ -65,6 +65,7 @@ export default function AssessmentTemplatesPage() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Initialize the translated default when the locale changes.
     setName((prev) => prev || t("adminTemplatesUi.defaultName"));
   }, [t]);
 

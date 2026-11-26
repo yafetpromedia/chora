@@ -56,6 +56,7 @@ export function StudentImportModal({ open, onClose, onImported }: Props) {
 
   useEffect(() => {
     if (status === "" && open) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Initialize the translated status when the modal opens.
       setStatus(t("studentImportUi.chooseCsv"));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

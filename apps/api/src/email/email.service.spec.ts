@@ -7,7 +7,7 @@ jest.mock('nodemailer', () => ({
 }));
 
 jest.mock('./email.dns', () => ({
-  lookupMailAuthentication: jest.fn(async () => ({
+  lookupMailAuthentication: jest.fn(() => ({
     domain: 'awuddigitals.com',
     spf: 'v=spf1 mx -all',
     dmarc: 'v=DMARC1; p=reject',
@@ -62,7 +62,10 @@ function config(overrides: Record<string, string> = {}) {
 function memory() {
   const rows: Row[] = [];
   const apply = (row: Row, data: Record<string, unknown>) => {
-    const attempts = data.attempts as { increment?: number } | number | undefined;
+    const attempts = data.attempts as
+      | { increment?: number }
+      | number
+      | undefined;
     if (attempts && typeof attempts === 'object' && attempts.increment) {
       row.attempts += attempts.increment;
     } else if (typeof attempts === 'number') {
@@ -77,10 +80,11 @@ function memory() {
     rows,
     emailDelivery: {
       findUnique: jest.fn(
-        async ({ where }: { where: { idempotencyKey?: string } }) =>
-          rows.find((row) => row.idempotencyKey === where.idempotencyKey) ?? null,
+        ({ where }: { where: { idempotencyKey?: string } }) =>
+          rows.find((row) => row.idempotencyKey === where.idempotencyKey) ??
+          null,
       ),
-      create: jest.fn(async ({ data }: { data: Row }) => {
+      create: jest.fn(({ data }: { data: Row }) => {
         const now = new Date();
         const row: Row = {
           id: `mail-${rows.length + 1}`,
@@ -104,14 +108,20 @@ function memory() {
         return row;
       }),
       update: jest.fn(
-        async ({ where, data }: { where: { id: string }; data: Record<string, unknown> }) => {
+        ({
+          where,
+          data,
+        }: {
+          where: { id: string };
+          data: Record<string, unknown>;
+        }) => {
           const row = rows.find((item) => item.id === where.id);
           if (!row) throw new Error('missing row');
           return apply(row, data);
         },
       ),
       updateMany: jest.fn(
-        async ({
+        ({
           where,
           data,
         }: {
@@ -126,39 +136,56 @@ function memory() {
           return { count: 1 };
         },
       ),
-      findMany: jest.fn(async (args: {
-        where?: {
-          status?: string | { in?: string[] };
-          nextAttemptAt?: { lte: Date };
-          updatedAt?: { lt: Date };
-          createdAt?: { lt: Date };
-          schoolId?: string;
-        };
-        take?: number;
-        skip?: number;
-        cursor?: { id: string };
-      }) => {
-        const where = args.where ?? {};
-        let matched = rows.filter((row) => {
-          if (typeof where.status === 'string' && row.status !== where.status) return false;
-          if (where.status && typeof where.status === 'object' && where.status.in) {
-            if (!where.status.in.includes(row.status)) return false;
+      findMany: jest.fn(
+        (args: {
+          where?: {
+            status?: string | { in?: string[] };
+            nextAttemptAt?: { lte: Date };
+            updatedAt?: { lt: Date };
+            createdAt?: { lt: Date };
+            schoolId?: string;
+          };
+          take?: number;
+          skip?: number;
+          cursor?: { id: string };
+        }) => {
+          const where = args.where ?? {};
+          let matched = rows.filter((row) => {
+            if (typeof where.status === 'string' && row.status !== where.status)
+              return false;
+            if (
+              where.status &&
+              typeof where.status === 'object' &&
+              where.status.in
+            ) {
+              if (!where.status.in.includes(row.status)) return false;
+            }
+            if (
+              where.nextAttemptAt?.lte &&
+              row.nextAttemptAt > where.nextAttemptAt.lte
+            )
+              return false;
+            if (where.updatedAt?.lt && row.updatedAt >= where.updatedAt.lt)
+              return false;
+            if (where.createdAt?.lt && row.createdAt >= where.createdAt.lt)
+              return false;
+            if (where.schoolId && row.schoolId !== where.schoolId) return false;
+            return true;
+          });
+          matched = [...matched].sort(
+            (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
+          );
+          if (args.cursor?.id) {
+            const index = matched.findIndex(
+              (row) => row.id === args.cursor?.id,
+            );
+            matched = index >= 0 ? matched.slice(index + (args.skip ?? 0)) : [];
           }
-          if (where.nextAttemptAt?.lte && row.nextAttemptAt > where.nextAttemptAt.lte) return false;
-          if (where.updatedAt?.lt && row.updatedAt >= where.updatedAt.lt) return false;
-          if (where.createdAt?.lt && row.createdAt >= where.createdAt.lt) return false;
-          if (where.schoolId && row.schoolId !== where.schoolId) return false;
-          return true;
-        });
-        matched = [...matched].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-        if (args.cursor?.id) {
-          const index = matched.findIndex((row) => row.id === args.cursor?.id);
-          matched = index >= 0 ? matched.slice(index + (args.skip ?? 0)) : [];
-        }
-        if (args.take) matched = matched.slice(0, args.take);
-        return matched;
-      }),
-      deleteMany: jest.fn(async ({ where }: { where: { id: { in: string[] } } }) => {
+          if (args.take) matched = matched.slice(0, args.take);
+          return matched;
+        },
+      ),
+      deleteMany: jest.fn(({ where }: { where: { id: { in: string[] } } }) => {
         const ids = new Set(where.id.in);
         const before = rows.length;
         for (let index = rows.length - 1; index >= 0; index -= 1) {
@@ -166,8 +193,8 @@ function memory() {
         }
         return { count: before - rows.length };
       }),
-      count: jest.fn(async () => 0),
-      findFirst: jest.fn(async () => null),
+      count: jest.fn(() => 0),
+      findFirst: jest.fn(() => null),
     },
     schoolEmailPreference: { findUnique: jest.fn().mockResolvedValue(null) },
     parentEmailPreference: {
@@ -179,14 +206,14 @@ function memory() {
       findFirst: jest.fn().mockResolvedValue(null),
     },
     school: {
-      findUnique: jest.fn(async () => ({
+      findUnique: jest.fn(() => ({
         name: 'Everest Youth Academy',
         email: 'office@school.test',
       })),
     },
     emailSystemState: {
-      findUnique: jest.fn(async () => null),
-      upsert: jest.fn(async ({ create }: { create: unknown }) => create),
+      findUnique: jest.fn(() => null),
+      upsert: jest.fn(({ create }: { create: unknown }) => create),
     },
   };
   const service = new EmailService(
@@ -248,7 +275,9 @@ describe('email delivery', () => {
   });
 
   it('marks authentication failures as failed without retrying', async () => {
-    mockSendMail.mockRejectedValue(new Error('Invalid login: 535 5.7.8 Authentication failed'));
+    mockSendMail.mockRejectedValue(
+      new Error('Invalid login: 535 5.7.8 Authentication failed'),
+    );
     const { prisma, service } = memory();
     const result = await service.sendNow({
       to: 'parent@example.com',
@@ -358,7 +387,10 @@ describe('email delivery', () => {
     expect(prisma.emailDelivery.create).toHaveBeenCalledTimes(1);
     expect(prisma.user.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({ schoolId: 'school-b', role: 'parent' }),
+        where: expect.objectContaining({
+          schoolId: 'school-b',
+          role: 'parent',
+        }),
       }),
     );
   });
@@ -377,14 +409,20 @@ describe('email delivery', () => {
       category: 'student_absence',
       templateId: 'student_absence',
       messages: [
-        { parentId: 'parent-1', idempotencyKey: 'attendance:off', vars: { childName: 'Liya' } },
+        {
+          parentId: 'parent-1',
+          idempotencyKey: 'attendance:off',
+          vars: { childName: 'Liya' },
+        },
       ],
     });
     expect(prisma.emailDelivery.create).not.toHaveBeenCalled();
   });
 
   it('redacts a mailbox password that appears in an SMTP error', async () => {
-    mockSendMail.mockRejectedValue(new Error('535 authentication failed contact-secret'));
+    mockSendMail.mockRejectedValue(
+      new Error('535 authentication failed contact-secret'),
+    );
     const { service } = memory();
     const result = await service.sendNow({
       to: 'parent@example.com',
@@ -435,7 +473,9 @@ describe('email delivery', () => {
   it('keeps a successful SMTP accept when the status write fails, then can deliver again', async () => {
     const { prisma, service } = memory();
     const update = prisma.emailDelivery.update.getMockImplementation();
-    prisma.emailDelivery.update.mockRejectedValue(new Error('database unavailable'));
+    prisma.emailDelivery.update.mockRejectedValue(
+      new Error('database unavailable'),
+    );
     const result = await service.sendNow({
       to: 'parent@example.com',
       category: 'welcome',
@@ -448,7 +488,7 @@ describe('email delivery', () => {
     expect(prisma.rows[0].status).toBe('SENDING');
     expect(mockSendMail).toHaveBeenCalledTimes(1);
 
-    prisma.emailDelivery.update.mockImplementation(update!);
+    prisma.emailDelivery.update.mockImplementation(update);
     prisma.rows[0].updatedAt = new Date(Date.now() - 3 * 60 * 1000);
     await service.processDue();
     expect(mockSendMail).toHaveBeenCalledTimes(2);
@@ -481,7 +521,9 @@ describe('email delivery', () => {
         to: 'other@example.com',
         actorEmail: 'owner@awuddigitals.com',
       }),
-    ).rejects.toThrow('Test messages can only be sent to the signed-in operator');
+    ).rejects.toThrow(
+      'Test messages can only be sent to the signed-in operator',
+    );
     expect(mockSendMail).not.toHaveBeenCalled();
 
     const result = await service.sendTest({
@@ -506,7 +548,11 @@ describe('email delivery', () => {
         category: 'welcome',
         templateId: 'welcome',
         idempotencyKey: key,
-        vars: { firstName: 'Sara', schoolName: 'Everest', actionUrl: 'https://chora.test/invite/secret' },
+        vars: {
+          firstName: 'Sara',
+          schoolName: 'Everest',
+          actionUrl: 'https://chora.test/invite/secret',
+        },
       });
     }
     prisma.rows[0].createdAt = new Date('2026-01-01T00:00:00Z');
@@ -517,10 +563,15 @@ describe('email delivery', () => {
     expect(page.items.map((item) => item.id)).toEqual(['mail-3', 'mail-2']);
     expect(page.nextCursor).toBe('mail-2');
     expect(JSON.stringify(page)).not.toContain('secret');
-    const query = prisma.emailDelivery.findMany.mock.calls.at(-1)?.[0] as { select: object };
+    const query = prisma.emailDelivery.findMany.mock.calls.at(-1)?.[0] as {
+      select: object;
+    };
     expect(query.select).not.toHaveProperty('variables');
 
-    const rest = await service.listLogs({ limit: 2, cursor: page.nextCursor ?? undefined });
+    const rest = await service.listLogs({
+      limit: 2,
+      cursor: page.nextCursor ?? undefined,
+    });
     expect(rest.items.map((item) => item.id)).toEqual(['mail-1']);
     expect(rest.nextCursor).toBeNull();
   });
@@ -541,7 +592,7 @@ describe('email delivery', () => {
       }) as never,
       {
         emailSystemState: {
-          findUnique: jest.fn(async () => ({
+          findUnique: jest.fn(() => ({
             lastTestAt: new Date(),
             lastTestOk: true,
             lastTestError: null,
@@ -567,7 +618,9 @@ describe('email delivery', () => {
     });
     prisma.rows[0].status = 'SENT';
     prisma.rows[0].createdAt = new Date(Date.now() - 181 * 24 * 60 * 60 * 1000);
-    prisma.emailDelivery.deleteMany.mockRejectedValueOnce(new Error('database unavailable'));
+    prisma.emailDelivery.deleteMany.mockRejectedValueOnce(
+      new Error('database unavailable'),
+    );
     await expect(service.pruneOld()).rejects.toThrow('database unavailable');
     expect(prisma.rows).toHaveLength(1);
 

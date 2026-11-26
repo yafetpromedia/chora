@@ -236,7 +236,10 @@ export class TeachersService {
         emergencyContactName?: string | null;
         emergencyContactPhone?: string | null;
       } = {};
-      if (dto.homeroomGradeId !== undefined || dto.homeroomSectionId !== undefined) {
+      if (
+        dto.homeroomGradeId !== undefined ||
+        dto.homeroomSectionId !== undefined
+      ) {
         profileData.homeroomGradeId = dto.homeroomGradeId ?? null;
         profileData.homeroomSectionId = dto.homeroomSectionId ?? null;
       }
@@ -1037,82 +1040,87 @@ export class TeachersService {
     const ids = students.map((s) => s.id);
 
     const empty = ids.length === 0;
-    const [attendanceRows, scoreRows, classworkRows, libraryRows, behaviorRows] =
-      await Promise.all([
-        empty
-          ? Promise.resolve([])
-          : this.prisma.attendanceRecord.findMany({
-              where: {
+    const [
+      attendanceRows,
+      scoreRows,
+      classworkRows,
+      libraryRows,
+      behaviorRows,
+    ] = await Promise.all([
+      empty
+        ? Promise.resolve([])
+        : this.prisma.attendanceRecord.findMany({
+            where: {
+              schoolId,
+              periodNumber: 0,
+              date: { gte: since },
+              studentProfileId: { in: ids },
+            },
+            select: {
+              studentProfileId: true,
+              status: true,
+            },
+          }),
+      empty
+        ? Promise.resolve([])
+        : this.prisma.studentAssessmentScore.findMany({
+            where: {
+              studentProfileId: { in: ids },
+              assessment: {
                 schoolId,
-                periodNumber: 0,
-                date: { gte: since },
-                studentProfileId: { in: ids },
-              },
-              select: {
-                studentProfileId: true,
-                status: true,
-              },
-            }),
-        empty
-          ? Promise.resolve([])
-          : this.prisma.studentAssessmentScore.findMany({
-              where: {
-                studentProfileId: { in: ids },
-                assessment: {
-                  schoolId,
-                  classSubject: {
-                    termSheets: {
-                      some: { status: ResultWorkflowStatus.PUBLISHED },
-                    },
+                classSubject: {
+                  termSheets: {
+                    some: { status: ResultWorkflowStatus.PUBLISHED },
                   },
                 },
               },
-              select: {
-                studentProfileId: true,
-                score: true,
-                assessment: {
-                  select: {
-                    maxScore: true,
-                    termId: true,
-                    classSubjectId: true,
-                  },
+            },
+            select: {
+              studentProfileId: true,
+              score: true,
+              assessment: {
+                select: {
+                  maxScore: true,
+                  termId: true,
+                  classSubjectId: true,
                 },
               },
-              take: 5000,
-            }),
-        empty
-          ? Promise.resolve([])
-          : this.prisma.classworkSubmission.findMany({
-              where: { studentProfileId: { in: ids } },
-              select: {
-                studentProfileId: true,
-                status: true,
-                score: true,
-              },
-            }),
-        empty
-          ? Promise.resolve([])
-          : this.prisma.libraryReadingProgress.findMany({
-              where: { studentProfileId: { in: ids } },
-              select: {
-                studentProfileId: true,
-                progressPercent: true,
-              },
-            }),
-        empty
-          ? Promise.resolve([])
-          : this.prisma.behaviorRecord.findMany({
-              where: {
-                schoolId,
-                studentProfileId: { in: ids },
-                date: { gte: since },
-              },
-              select: {
-                studentProfileId: true,
-                type: true,
-              },
-            }),
-      ]);
+            },
+            take: 5000,
+          }),
+      empty
+        ? Promise.resolve([])
+        : this.prisma.classworkSubmission.findMany({
+            where: { studentProfileId: { in: ids } },
+            select: {
+              studentProfileId: true,
+              status: true,
+              score: true,
+            },
+          }),
+      empty
+        ? Promise.resolve([])
+        : this.prisma.libraryReadingProgress.findMany({
+            where: { studentProfileId: { in: ids } },
+            select: {
+              studentProfileId: true,
+              progressPercent: true,
+            },
+          }),
+      empty
+        ? Promise.resolve([])
+        : this.prisma.behaviorRecord.findMany({
+            where: {
+              schoolId,
+              studentProfileId: { in: ids },
+              date: { gte: since },
+            },
+            select: {
+              studentProfileId: true,
+              type: true,
+            },
+          }),
+    ]);
 
     const attMap = new Map<string, { present: number; total: number }>();
     for (const row of attendanceRows) {
@@ -1293,7 +1301,10 @@ export class TeachersService {
     };
   }
 
-  private async requireHomeroomProfile(schoolId: string, teacherUserId: string) {
+  private async requireHomeroomProfile(
+    schoolId: string,
+    teacherUserId: string,
+  ) {
     const profile = await this.prisma.teacherProfile.findFirst({
       where: { schoolId, userId: teacherUserId },
       select: {

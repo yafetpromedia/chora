@@ -44,6 +44,7 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const stored = readStoredLocale();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Hydrate the locale from browser storage after mount.
     setLocaleState(stored);
     applyDocumentLocale(stored);
     setReady(true);

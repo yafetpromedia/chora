@@ -423,8 +423,7 @@ export class PlatformService {
       schoolId: school.id,
       schoolJoinCode: school.joinCode,
     });
-    const actionUrl =
-      process.env.WEB_APP_URL?.replace(/\/$/, '') ?? '';
+    const actionUrl = process.env.WEB_APP_URL?.replace(/\/$/, '') ?? '';
     await this.email?.enqueueSafe({
       to: admin.email,
       category: 'welcome',

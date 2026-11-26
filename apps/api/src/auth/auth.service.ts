@@ -394,7 +394,9 @@ export class AuthService {
   }
 
   private appUrl() {
-    return this.configService.get<string>('WEB_APP_URL')?.replace(/\/$/, '') ?? '';
+    return (
+      this.configService.get<string>('WEB_APP_URL')?.replace(/\/$/, '') ?? ''
+    );
   }
 
   private async sendAccountOpened(

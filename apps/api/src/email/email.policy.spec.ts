@@ -18,28 +18,59 @@ function settings(overrides: Partial<SmtpSettings> = {}): SmtpSettings {
     secure: true,
     encryption: 'SSL/TLS',
     mailboxes: {
-      contact: { id: 'contact', address: 'contact@awuddigitals.com', password: 'x', configured: true },
-      support: { id: 'support', address: 'support@awuddigitals.com', password: 'x', configured: true },
-      admin: { id: 'admin', address: 'admin@awuddigitals.com', password: 'x', configured: true },
-      info: { id: 'info', address: 'info@awuddigitals.com', password: 'x', configured: true },
-      sales: { id: 'sales', address: 'sales@awuddigitals.com', password: 'x', configured: true },
+      contact: {
+        id: 'contact',
+        address: 'contact@awuddigitals.com',
+        password: 'x',
+        configured: true,
+      },
+      support: {
+        id: 'support',
+        address: 'support@awuddigitals.com',
+        password: 'x',
+        configured: true,
+      },
+      admin: {
+        id: 'admin',
+        address: 'admin@awuddigitals.com',
+        password: 'x',
+        configured: true,
+      },
+      info: {
+        id: 'info',
+        address: 'info@awuddigitals.com',
+        password: 'x',
+        configured: true,
+      },
+      sales: {
+        id: 'sales',
+        address: 'sales@awuddigitals.com',
+        password: 'x',
+        configured: true,
+      },
     },
   };
-  return { ...base, ...overrides, mailboxes: overrides.mailboxes ?? base.mailboxes };
+  return {
+    ...base,
+    ...overrides,
+    mailboxes: overrides.mailboxes ?? base.mailboxes,
+  };
 }
 
 describe('SMTP configuration', () => {
   it('accepts implicit TLS on port 465 and STARTTLS on port 587', () => {
     expect(validateSmtpSettings(settings())).toEqual([]);
     expect(
-      validateSmtpSettings(settings({ port: 587, secure: false, encryption: 'STARTTLS' })),
+      validateSmtpSettings(
+        settings({ port: 587, secure: false, encryption: 'STARTTLS' }),
+      ),
     ).toEqual([]);
-    expect(validateSmtpSettings(settings({ port: 465, secure: false }))).toContain(
-      'Port 465 requires SSL/TLS',
-    );
-    expect(validateSmtpSettings(settings({ port: 587, secure: true }))).toContain(
-      'Port 587 uses STARTTLS and must not force implicit TLS',
-    );
+    expect(
+      validateSmtpSettings(settings({ port: 465, secure: false })),
+    ).toContain('Port 465 requires SSL/TLS');
+    expect(
+      validateSmtpSettings(settings({ port: 587, secure: true })),
+    ).toContain('Port 587 uses STARTTLS and must not force implicit TLS');
   });
 
   it('reads Alet defaults and keeps each mailbox password separate', () => {
@@ -92,9 +123,11 @@ describe('email safety helpers', () => {
   });
 
   it('removes a bare mailbox password from a stored SMTP error', () => {
-    expect(redactStoredError(new Error('535 failed contact-secret'), ['contact-secret'])).toBe(
-      '535 failed [redacted]',
-    );
+    expect(
+      redactStoredError(new Error('535 failed contact-secret'), [
+        'contact-secret',
+      ]),
+    ).toBe('535 failed [redacted]');
   });
 
   it('allows only platform owners to manage email', () => {

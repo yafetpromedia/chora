@@ -1,6 +1,12 @@
 import { ForbiddenException } from '@nestjs/common';
 import { createHash } from 'crypto';
-import type { EmailCategory, MailboxId, PreferenceKey, SchoolEmailPreferenceView, SmtpSettings } from './email.types';
+import type {
+  EmailCategory,
+  MailboxId,
+  PreferenceKey,
+  SchoolEmailPreferenceView,
+  SmtpSettings,
+} from './email.types';
 import { PARENT_FACING_CATEGORIES, SENDER_BY_CATEGORY } from './email.types';
 
 const MAX_ATTEMPTS_DEFAULT = 5;
@@ -13,7 +19,10 @@ export function isValidEmail(value: string): boolean {
 }
 
 export function sanitizeHeader(value: string): string {
-  return value.replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim();
+  return value
+    .replace(/[\r\n]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 export function isSafeHttpUrl(value: string): boolean {
@@ -124,7 +133,10 @@ export function publicSmtpError(error: unknown): string {
     .slice(0, 300);
 }
 
-export function redactStoredError(error: unknown, secrets: string[] = []): string {
+export function redactStoredError(
+  error: unknown,
+  secrets: string[] = [],
+): string {
   let message = publicSmtpError(error);
   for (const secret of secrets) {
     if (!secret || secret.length < 4) continue;
@@ -163,7 +175,7 @@ export function cleanTemplateVars(
     if (!/^[a-zA-Z0-9_]+$/.test(key)) continue;
     if (/password|secret|credential/i.test(key)) continue;
     if (typeof value !== 'string') continue;
-    cleaned[key] = value.replace(/[\u0000]/g, '').slice(0, 1000);
+    cleaned[key] = value.replaceAll('\u0000', '').slice(0, 1000);
   }
   return cleaned;
 }

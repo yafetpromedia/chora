@@ -6,10 +6,18 @@ describe('email preferences', () => {
     const prisma = {
       schoolEmailPreference: {
         findUnique: jest.fn(),
-        upsert: jest.fn(async ({ where, create }: { where: { schoolId: string }; create: object }) => ({
-          schoolId: where.schoolId,
-          ...create,
-        })),
+        upsert: jest.fn(
+          ({
+            where,
+            create,
+          }: {
+            where: { schoolId: string };
+            create: object;
+          }) => ({
+            schoolId: where.schoolId,
+            ...create,
+          }),
+        ),
       },
       parentEmailPreference: {
         findFirst: jest.fn(),
@@ -76,7 +84,10 @@ describe('email preferences', () => {
     expect(prisma.parentEmailPreference.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { userId: 'parent-1' },
-        create: expect.objectContaining({ schoolId: 'school-a', enabled: false }),
+        create: expect.objectContaining({
+          schoolId: 'school-a',
+          enabled: false,
+        }),
       }),
     );
   });

@@ -55,10 +55,6 @@ export class AnnouncementsController {
   @Delete(':id')
   @Roles('admin', 'teacher', 'student', 'parent', 'staff')
   dismiss(@Param('id') id: string, @CurrentUser() user: AuthUser) {
-    return this.announcementsService.dismissForUser(
-      id,
-      user.schoolId,
-      user.id,
-    );
+    return this.announcementsService.dismissForUser(id, user.schoolId, user.id);
   }
 }

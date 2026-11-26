@@ -805,24 +805,24 @@ export class ResultWorkflowService {
 
     await this.prisma.parentNotification.createMany({
       data: emailLinks.map((link) => {
-          const info = byStudent.get(link.studentId);
-          const child = nameById.get(link.studentId) ?? 'your child';
-          const subjects = info ? [...info.subjects].sort() : [];
-          const termLabel = info
-            ? [...info.termNames].join(', ') || 'this term'
-            : 'this term';
-          const subjectLabel =
-            subjects.length <= 3
-              ? subjects.join(', ')
-              : `${subjects.slice(0, 3).join(', ')} +${subjects.length - 3} more`;
-          return {
-            schoolId,
-            parentId: link.parentId,
-            studentProfileId: link.studentId,
-            title: `Results published for ${child}`,
-            body: `${subjectLabel || 'Subject'} results are now published (${termLabel}). Open Results in the parent portal to review.`,
-          };
-        }),
+        const info = byStudent.get(link.studentId);
+        const child = nameById.get(link.studentId) ?? 'your child';
+        const subjects = info ? [...info.subjects].sort() : [];
+        const termLabel = info
+          ? [...info.termNames].join(', ') || 'this term'
+          : 'this term';
+        const subjectLabel =
+          subjects.length <= 3
+            ? subjects.join(', ')
+            : `${subjects.slice(0, 3).join(', ')} +${subjects.length - 3} more`;
+        return {
+          schoolId,
+          parentId: link.parentId,
+          studentProfileId: link.studentId,
+          title: `Results published for ${child}`,
+          body: `${subjectLabel || 'Subject'} results are now published (${termLabel}). Open Results in the parent portal to review.`,
+        };
+      }),
     });
 
     try {
@@ -902,7 +902,9 @@ export class ResultWorkflowService {
           ? 'reportCardEnabled'
           : 'examinationEnabled',
         category: options.reportCardReady ? 'report_card' : 'results_published',
-        templateId: options.reportCardReady ? 'report_card' : 'results_published',
+        templateId: options.reportCardReady
+          ? 'report_card'
+          : 'results_published',
         messages: links.map((link) => ({
           parentId: link.parentId,
           idempotencyKey: `results-student:${schoolId}:${studentProfileId}:${termName}:${options.reportCardReady ? 'card' : 'scores'}:${link.parentId}`,

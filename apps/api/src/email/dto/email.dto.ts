@@ -1,4 +1,11 @@
-import { IsBoolean, IsEmail, IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
+import {
+  IsBoolean,
+  IsEmail,
+  IsIn,
+  IsOptional,
+  IsString,
+  MaxLength,
+} from 'class-validator';
 import { MAILBOX_IDS, type MailboxId } from '../email.types';
 
 export class UpdateEmailPreferencesDto {

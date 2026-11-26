@@ -24,9 +24,7 @@ export function buildTeacherCardScanPayload(cardCode: string): string {
 export function parseTeacherCardScanPayload(raw: string): string | null {
   const trimmed = raw.trim().toUpperCase();
   if (trimmed.startsWith('CAMPUS1-T:')) {
-    return (
-      trimmed.slice('CAMPUS1-T:'.length).replace(/[^A-Z0-9]/g, '') || null
-    );
+    return trimmed.slice('CAMPUS1-T:'.length).replace(/[^A-Z0-9]/g, '') || null;
   }
   // Bare CODE128 barcode / manual entry (same cardCode as QR payload).
   if (!trimmed.includes(':')) {

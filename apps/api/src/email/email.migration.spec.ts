@@ -2,12 +2,17 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 
 const sql = readFileSync(
-  join(__dirname, '../../prisma/migrations/20261124120000_email_delivery/migration.sql'),
+  join(
+    __dirname,
+    '../../prisma/migrations/20261124120000_email_delivery/migration.sql',
+  ),
   'utf8',
 );
 
 function columns(table: string): string[] {
-  const match = sql.match(new RegExp(`CREATE TABLE "${table}" \\(([\\s\\S]*?)\\n\\);`));
+  const match = sql.match(
+    new RegExp(`CREATE TABLE "${table}" \\(([\\s\\S]*?)\\n\\);`),
+  );
   if (!match) return [];
   return match[1]
     .split('\n')
@@ -77,7 +82,9 @@ describe('email delivery migration SQL', () => {
       'lastTestMailbox',
       'updatedAt',
     ]);
-    expect(sql).toContain('CREATE UNIQUE INDEX "EmailDelivery_idempotencyKey_key"');
+    expect(sql).toContain(
+      'CREATE UNIQUE INDEX "EmailDelivery_idempotencyKey_key"',
+    );
     expect(sql).toContain('ON DELETE SET NULL');
     expect(sql).toContain('ON DELETE CASCADE');
   });

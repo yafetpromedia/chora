@@ -53,6 +53,7 @@ export function MyStudentsPanel() {
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Fetch the teacher student list on mount.
     void reload();
   }, []);
 

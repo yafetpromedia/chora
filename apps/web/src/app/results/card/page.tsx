@@ -65,6 +65,7 @@ function CardResultsInner() {
 
   useEffect(() => {
     if (!initialSchool || !initialCard) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Complete the initial state when the URL has no lookup parameters.
       setMetaLoading(false);
       return;
     }

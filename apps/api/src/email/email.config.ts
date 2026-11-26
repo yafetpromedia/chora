@@ -33,7 +33,7 @@ const MAILBOX_ENV: Record<
 };
 
 function flag(value: unknown): boolean {
-  return String(value ?? '').trim().toLowerCase() === 'true';
+  return typeof value === 'string' && value.trim().toLowerCase() === 'true';
 }
 
 function text(config: ConfigService, key: string): string {
@@ -41,9 +41,16 @@ function text(config: ConfigService, key: string): string {
 }
 
 export function readSmtpSettings(config: ConfigService): SmtpSettings {
-  const enabled = flag(text(config, 'CHORA_EMAIL_ENABLED')) || flag(text(config, 'EMAIL_ENABLED'));
-  const host = text(config, 'CHORA_SMTP_HOST') || text(config, 'SMTP_HOST') || 'mx1.aletcloud.com';
-  const portValue = Number(text(config, 'CHORA_SMTP_PORT') || text(config, 'SMTP_PORT') || '465');
+  const enabled =
+    flag(text(config, 'CHORA_EMAIL_ENABLED')) ||
+    flag(text(config, 'EMAIL_ENABLED'));
+  const host =
+    text(config, 'CHORA_SMTP_HOST') ||
+    text(config, 'SMTP_HOST') ||
+    'mx1.aletcloud.com';
+  const portValue = Number(
+    text(config, 'CHORA_SMTP_PORT') || text(config, 'SMTP_PORT') || '465',
+  );
   const port = Number.isFinite(portValue) ? portValue : 465;
   const secureRaw = text(config, 'CHORA_SMTP_SECURE');
   const secure = secureRaw ? flag(secureRaw) : port === 465;

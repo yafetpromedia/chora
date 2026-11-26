@@ -15,7 +15,9 @@ import {
 
 export type PreferencePatch = Partial<ParentEmailPreferenceView>;
 
-function schoolView(row: Partial<SchoolEmailPreferenceView> | null): SchoolEmailPreferenceView {
+function schoolView(
+  row: Partial<SchoolEmailPreferenceView> | null,
+): SchoolEmailPreferenceView {
   return { ...DEFAULT_SCHOOL_EMAIL_PREFERENCES, ...(row ?? {}) };
 }
 

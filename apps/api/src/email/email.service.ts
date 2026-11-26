@@ -19,7 +19,11 @@ import {
   shouldFailPermanently,
   validateSmtpSettings,
 } from './email.policy';
-import { renderTemplate, findTemplate, listTemplateCatalog } from './email.templates';
+import {
+  renderTemplate,
+  findTemplate,
+  listTemplateCatalog,
+} from './email.templates';
 import { createMailboxTransport } from './email.transport';
 import {
   PARENT_FACING_CATEGORIES,
@@ -50,7 +54,10 @@ type DeliveryRow = {
 @Injectable()
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
-  private dnsCache: { at: number; value: Awaited<ReturnType<typeof lookupMailAuthentication>> } | null = null;
+  private dnsCache: {
+    at: number;
+    value: Awaited<ReturnType<typeof lookupMailAuthentication>>;
+  } | null = null;
   private lastPruneAt = 0;
 
   constructor(
@@ -76,7 +83,12 @@ export class EmailService {
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === 'P2002'
       ) {
-        return { sent: false, queued: false, duplicate: true, reason: 'Duplicate suppressed' };
+        return {
+          sent: false,
+          queued: false,
+          duplicate: true,
+          reason: 'Duplicate suppressed',
+        };
       }
       throw error;
     }
@@ -134,10 +146,16 @@ export class EmailService {
     const schoolPrefs = await this.preferences.getSchool(input.schoolId);
     if (!preferenceAllows(schoolPrefs, input.preference)) return;
 
-    const parentIds = [...new Set(input.messages.map((message) => message.parentId))];
+    const parentIds = [
+      ...new Set(input.messages.map((message) => message.parentId)),
+    ];
     const [parents, parentPrefs, school] = await Promise.all([
       this.prisma.user.findMany({
-        where: { id: { in: parentIds }, schoolId: input.schoolId, role: 'parent' },
+        where: {
+          id: { in: parentIds },
+          schoolId: input.schoolId,
+          role: 'parent',
+        },
         select: { id: true, email: true, firstName: true },
       }),
       this.prisma.parentEmailPreference.findMany({
@@ -195,7 +213,13 @@ export class EmailService {
       ? {
           id: input.recipientUserId,
           schoolId: input.schoolId,
-          role: { in: ['parent', 'admin', 'teacher'] as ('parent' | 'admin' | 'teacher')[] },
+          role: {
+            in: ['parent', 'admin', 'teacher'] as (
+              | 'parent'
+              | 'admin'
+              | 'teacher'
+            )[],
+          },
         }
       : { schoolId: input.schoolId, role: 'parent' as const };
     const users = await this.prisma.user.findMany({
@@ -285,7 +309,13 @@ export class EmailService {
     const cutoff = new Date(now.getTime() - RETENTION_MS);
     const old = await this.prisma.emailDelivery.findMany({
       where: {
-        status: { in: [EmailDeliveryStatus.SENT, EmailDeliveryStatus.FAILED, EmailDeliveryStatus.SKIPPED] },
+        status: {
+          in: [
+            EmailDeliveryStatus.SENT,
+            EmailDeliveryStatus.FAILED,
+            EmailDeliveryStatus.SKIPPED,
+          ],
+        },
         createdAt: { lt: cutoff },
       },
       select: { id: true },
@@ -305,12 +335,22 @@ export class EmailService {
   async overview() {
     const [total, sent, failed, pending, skipped, oldest] = await Promise.all([
       this.prisma.emailDelivery.count(),
-      this.prisma.emailDelivery.count({ where: { status: EmailDeliveryStatus.SENT } }),
-      this.prisma.emailDelivery.count({ where: { status: EmailDeliveryStatus.FAILED } }),
       this.prisma.emailDelivery.count({
-        where: { status: { in: [EmailDeliveryStatus.QUEUED, EmailDeliveryStatus.SENDING] } },
+        where: { status: EmailDeliveryStatus.SENT },
       }),
-      this.prisma.emailDelivery.count({ where: { status: EmailDeliveryStatus.SKIPPED } }),
+      this.prisma.emailDelivery.count({
+        where: { status: EmailDeliveryStatus.FAILED },
+      }),
+      this.prisma.emailDelivery.count({
+        where: {
+          status: {
+            in: [EmailDeliveryStatus.QUEUED, EmailDeliveryStatus.SENDING],
+          },
+        },
+      }),
+      this.prisma.emailDelivery.count({
+        where: { status: EmailDeliveryStatus.SKIPPED },
+      }),
       this.prisma.emailDelivery.findFirst({
         where: { status: EmailDeliveryStatus.QUEUED },
         orderBy: { createdAt: 'asc' },
@@ -354,31 +394,29 @@ export class EmailService {
     let rows;
     try {
       rows = await this.prisma.emailDelivery.findMany({
-      where: {
-        ...(status ? { status } : {}),
-        ...(filters.schoolId ? { schoolId: filters.schoolId } : {}),
-      },
-      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-      take: limit + 1,
-      ...(filters.cursor
-        ? { cursor: { id: filters.cursor }, skip: 1 }
-        : {}),
-      select: {
-        id: true,
-        recipient: true,
-        sender: true,
-        subject: true,
-        category: true,
-        templateId: true,
-        schoolId: true,
-        status: true,
-        attempts: true,
-        lastError: true,
-        createdAt: true,
-        sentAt: true,
-        school: { select: { name: true } },
-      },
-    });
+        where: {
+          ...(status ? { status } : {}),
+          ...(filters.schoolId ? { schoolId: filters.schoolId } : {}),
+        },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        take: limit + 1,
+        ...(filters.cursor ? { cursor: { id: filters.cursor }, skip: 1 } : {}),
+        select: {
+          id: true,
+          recipient: true,
+          sender: true,
+          subject: true,
+          category: true,
+          templateId: true,
+          schoolId: true,
+          status: true,
+          attempts: true,
+          lastError: true,
+          createdAt: true,
+          sentAt: true,
+          school: { select: { name: true } },
+        },
+      });
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -406,7 +444,7 @@ export class EmailService {
         createdAt: row.createdAt,
         sentAt: row.sentAt,
       })),
-      nextCursor: hasMore ? page[page.length - 1]?.id ?? null : null,
+      nextCursor: hasMore ? (page[page.length - 1]?.id ?? null) : null,
     };
   }
 
@@ -456,7 +494,11 @@ export class EmailService {
     };
   }
 
-  async sendTest(input: { to: string; actorEmail: string; mailboxId?: MailboxId }) {
+  async sendTest(input: {
+    to: string;
+    actorEmail: string;
+    mailboxId?: MailboxId;
+  }) {
     const actor = sanitizeHeader(input.actorEmail).toLowerCase();
     const recipient = sanitizeHeader(input.to).toLowerCase();
     if (!isValidEmail(actor) || recipient !== actor) {
@@ -493,7 +535,9 @@ export class EmailService {
     return result;
   }
 
-  private async prepare(input: OutboundEmail): Promise<
+  private async prepare(
+    input: OutboundEmail,
+  ): Promise<
     | { ok: true; data: Prisma.EmailDeliveryCreateInput }
     | { ok: false; result: EmailDispatchResult }
   > {
@@ -501,7 +545,11 @@ export class EmailService {
     if (!settings.enabled) {
       return {
         ok: false,
-        result: { sent: false, queued: false, reason: 'Email is not configured' },
+        result: {
+          sent: false,
+          queued: false,
+          reason: 'Email is not configured',
+        },
       };
     }
     const validationErrors = validateSmtpSettings(settings);
@@ -521,7 +569,11 @@ export class EmailService {
     if (!findTemplate(input.templateId)) {
       return {
         ok: false,
-        result: { sent: false, queued: false, reason: 'Unknown email template' },
+        result: {
+          sent: false,
+          queued: false,
+          reason: 'Unknown email template',
+        },
       };
     }
 
@@ -533,7 +585,11 @@ export class EmailService {
           input.schoolId,
           input.parentUserId,
         );
-        parentEnabled = preferenceAllows(parentPrefs, input.preference, parentPrefs.enabled);
+        parentEnabled = preferenceAllows(
+          parentPrefs,
+          input.preference,
+          parentPrefs.enabled,
+        );
       }
       if (!preferenceAllows(schoolPrefs, input.preference, parentEnabled)) {
         return {
@@ -570,7 +626,11 @@ export class EmailService {
     if (room <= 0) {
       return {
         ok: false,
-        result: { sent: false, queued: false, reason: 'Email rate limit reached' },
+        result: {
+          sent: false,
+          queued: false,
+          reason: 'Email rate limit reached',
+        },
       };
     }
 
@@ -612,7 +672,9 @@ export class EmailService {
         nextAttemptAt: new Date(),
         idempotencyKey,
         variables: vars,
-        ...(input.schoolId ? { school: { connect: { id: input.schoolId } } } : {}),
+        ...(input.schoolId
+          ? { school: { connect: { id: input.schoolId } } }
+          : {}),
       },
     };
   }
@@ -637,10 +699,7 @@ export class EmailService {
     }
     try {
       const rendered = renderTemplate(row.templateId, vars);
-      const transport = createMailboxTransport(
-        settings,
-        mailbox.id,
-      );
+      const transport = createMailboxTransport(settings, mailbox.id);
       if (!transport) {
         return this.finishFailure(
           row.id,
@@ -661,7 +720,9 @@ export class EmailService {
       });
       const recorded = await this.recordAccepted(row.id, info?.messageId);
       if (!recorded) {
-        this.logger.warn(`Email status update failed after SMTP accept (${row.templateId})`);
+        this.logger.warn(
+          `Email status update failed after SMTP accept (${row.templateId})`,
+        );
         return {
           sent: true,
           queued: false,
@@ -714,7 +775,10 @@ export class EmailService {
     return { sent: false, queued: true, id, reason };
   }
 
-  private async recordAccepted(id: string, messageId: unknown): Promise<boolean> {
+  private async recordAccepted(
+    id: string,
+    messageId: unknown,
+  ): Promise<boolean> {
     const data = {
       status: EmailDeliveryStatus.SENT,
       sentAt: new Date(),
@@ -796,7 +860,9 @@ function smtpConnectionState(
   | 'not_tested'
   | 'last_test_failed'
   | 'last_test_accepted' {
-  const missing = Object.values(settings.mailboxes).some((mailbox) => !mailbox.configured);
+  const missing = Object.values(settings.mailboxes).some(
+    (mailbox) => !mailbox.configured,
+  );
   if (missing) return 'missing_credentials';
   if (!settings.enabled) return 'disabled';
   if (!state || state.lastTestOk == null) return 'not_tested';

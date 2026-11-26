@@ -6,14 +6,14 @@ import { SchoolEmailPreferenceController } from './email-preferences.controller'
 
 describe('email permissions', () => {
   it('keeps platform email routes owner-only', () => {
-    expect(Reflect.getMetadata(PLATFORM_OWNER_ONLY_KEY, EmailAdminController)).toBe(
-      true,
-    );
+    expect(
+      Reflect.getMetadata(PLATFORM_OWNER_ONLY_KEY, EmailAdminController),
+    ).toBe(true);
   });
 
   it('keeps school email settings on the school admin role', () => {
-    expect(Reflect.getMetadata(ROLES_KEY, SchoolEmailPreferenceController)).toEqual([
-      'admin',
-    ]);
+    expect(
+      Reflect.getMetadata(ROLES_KEY, SchoolEmailPreferenceController),
+    ).toEqual(['admin']);
   });
 });

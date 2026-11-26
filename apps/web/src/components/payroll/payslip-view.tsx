@@ -39,10 +39,12 @@ export function PayslipView({ payslipId }: { payslipId: string }) {
 
   useEffect(() => {
     const role = localStorage.getItem(AUTH_ROLE_KEY);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Resolve the return path from browser authentication storage.
     setBackHref(role === "admin" ? "/admin/payroll/me" : "/teacher/payroll/me");
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Reset loading before fetching a different payslip.
     setLoading(true);
     void getPayslip(payslipId)
       .then(setData)

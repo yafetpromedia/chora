@@ -118,6 +118,7 @@ export default function TeacherConcernDetailPage() {
       router.replace(`/${role ?? "login"}`);
       return;
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Initialize the role from browser authentication storage.
     setPortalRole(role === "teacher" ? "teacher" : "admin");
     void loadConcern();
     // eslint-disable-next-line react-hooks/exhaustive-deps

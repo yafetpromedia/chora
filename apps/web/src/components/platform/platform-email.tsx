@@ -85,6 +85,7 @@ export function PlatformEmail() {
   }, [router, t]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Load the platform email dashboard on mount and when its loader changes.
     void load();
   }, [load]);
 

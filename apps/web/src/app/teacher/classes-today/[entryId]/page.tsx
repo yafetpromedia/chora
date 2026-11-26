@@ -93,6 +93,7 @@ export default function TeacherClassContextPage() {
       router.replace(`/${role ?? "login"}`);
       return;
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Start the authenticated context request after validating the browser session.
     void loadContext();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entryId, router]);

@@ -67,7 +67,8 @@ export const EMAIL_TEMPLATES: TemplateDef[] = [
     id: 'email_verification',
     category: 'email_verification',
     label: 'Email verification',
-    description: 'Ready for a verification flow. Chora does not issue verification links today.',
+    description:
+      'Ready for a verification flow. Chora does not issue verification links today.',
     wired: false,
     subject: 'Confirm your Chora email',
     heading: 'Confirm your email',
@@ -86,7 +87,8 @@ export const EMAIL_TEMPLATES: TemplateDef[] = [
     id: 'password_reset',
     category: 'password_reset',
     label: 'Password reset',
-    description: 'Ready for a reset flow. Chora does not issue reset links today.',
+    description:
+      'Ready for a reset flow. Chora does not issue reset links today.',
     wired: false,
     subject: 'Reset your Chora password',
     heading: 'Reset your password',
@@ -272,7 +274,8 @@ export const EMAIL_TEMPLATES: TemplateDef[] = [
     id: 'payment_confirmation',
     category: 'payment_confirmation',
     label: 'Payment confirmation',
-    description: 'Confirmation copy. Live payments send the receipt template so parents receive one email.',
+    description:
+      'Confirmation copy. Live payments send the receipt template so parents receive one email.',
     wired: false,
     subject: 'Payment confirmed for {{childName}}',
     heading: 'Payment confirmed',
@@ -316,7 +319,8 @@ export const EMAIL_TEMPLATES: TemplateDef[] = [
     id: 'payment_reminder',
     category: 'payment_reminder',
     label: 'Payment reminder',
-    description: 'Template only. Chora has no outstanding-balance reminder job yet.',
+    description:
+      'Template only. Chora has no outstanding-balance reminder job yet.',
     wired: false,
     subject: 'Payment reminder from {{schoolName}}',
     heading: 'Outstanding balance',
@@ -334,7 +338,8 @@ export const EMAIL_TEMPLATES: TemplateDef[] = [
     id: 'payment_failed',
     category: 'payment_failed',
     label: 'Payment failed',
-    description: 'Template only. Rejected payments are recorded in finance without a parent email today.',
+    description:
+      'Template only. Rejected payments are recorded in finance without a parent email today.',
     wired: false,
     subject: 'Payment not completed',
     heading: 'Payment not completed',
@@ -371,7 +376,8 @@ export const EMAIL_TEMPLATES: TemplateDef[] = [
     id: 'subscription_expiration',
     category: 'subscription_expiration',
     label: 'Subscription expiration',
-    description: 'Template only. Chora has no expiration reminder scheduler yet.',
+    description:
+      'Template only. Chora has no expiration reminder scheduler yet.',
     wired: false,
     subject: '{{schoolName}} subscription is ending',
     heading: 'Subscription ending',
@@ -410,7 +416,8 @@ export const EMAIL_TEMPLATES: TemplateDef[] = [
     id: 'school_decision',
     category: 'school_decision',
     label: 'School status',
-    description: 'Sent when a platform operator activates or suspends a school.',
+    description:
+      'Sent when a platform operator activates or suspends a school.',
     wired: true,
     subject: '{{schoolName}} status: {{statusLabel}}',
     heading: 'School status updated',
@@ -426,7 +433,8 @@ export const EMAIL_TEMPLATES: TemplateDef[] = [
     id: 'security_alert',
     category: 'security_alert',
     label: 'Security alert',
-    description: 'Template only. Chora does not yet detect suspicious sign-ins.',
+    description:
+      'Template only. Chora does not yet detect suspicious sign-ins.',
     wired: false,
     subject: 'Chora security notice',
     heading: 'Security notice',
@@ -461,7 +469,8 @@ export const EMAIL_TEMPLATES: TemplateDef[] = [
     id: 'test',
     category: 'test',
     label: 'SMTP test',
-    description: 'Used by the platform console to authenticate and deliver a real test message.',
+    description:
+      'Used by the platform console to authenticate and deliver a real test message.',
     wired: true,
     subject: 'Chora SMTP test',
     heading: 'SMTP test',
@@ -477,10 +486,13 @@ function fill(
   vars: Record<string, string>,
   html: boolean,
 ): string {
-  return template.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_, key: string) => {
-    const value = vars[key] ?? '';
-    return html ? escapeHtml(value) : value;
-  });
+  return template.replace(
+    /\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g,
+    (_, key: string) => {
+      const value = vars[key] ?? '';
+      return html ? escapeHtml(value) : value;
+    },
+  );
 }
 
 export function findTemplate(id: string): TemplateDef | undefined {
@@ -506,7 +518,10 @@ export function renderTemplate(
     throw new Error('Unknown email template');
   }
 
-  const subject = sanitizeHeader(fill(template.subject, vars, false)).slice(0, 180);
+  const subject = sanitizeHeader(fill(template.subject, vars, false)).slice(
+    0,
+    180,
+  );
   const heading = fill(template.heading, vars, true);
   const paragraphs = template.paragraphs.map((paragraph) =>
     fill(paragraph, vars, true),
@@ -521,7 +536,8 @@ export function renderTemplate(
     }))
     .filter((detail) => detail.value);
   const actionUrl = isSafeHttpUrl(vars.actionUrl ?? '') ? vars.actionUrl : '';
-  const actionLabel = template.actionLabel && actionUrl ? template.actionLabel : '';
+  const actionLabel =
+    template.actionLabel && actionUrl ? template.actionLabel : '';
 
   const detailHtml = details
     .map(
