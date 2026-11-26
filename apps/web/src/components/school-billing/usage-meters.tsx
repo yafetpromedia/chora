@@ -1,5 +1,6 @@
 "use client";
 
+import { useLocale } from "@/components/i18n/locale-provider";
 import type { SubscriptionStatus } from "@/lib/api";
 
 function pct(used: number, limit: number | null) {
@@ -12,10 +13,26 @@ type Props = {
 };
 
 export function UsageMeters({ subscription }: Props) {
+  const { t } = useLocale();
   const items = [
-    { key: "students", label: "Students", used: subscription.usage.students, limit: subscription.limits.students },
-    { key: "teachers", label: "Teachers", used: subscription.usage.teachers, limit: subscription.limits.teachers },
-    { key: "admins", label: "Admins", used: subscription.usage.admins, limit: subscription.limits.admins },
+    {
+      key: "students",
+      label: t("usageMetersUi.students"),
+      used: subscription.usage.students,
+      limit: subscription.limits.students,
+    },
+    {
+      key: "teachers",
+      label: t("usageMetersUi.teachers"),
+      used: subscription.usage.teachers,
+      limit: subscription.limits.teachers,
+    },
+    {
+      key: "admins",
+      label: t("usageMetersUi.admins"),
+      used: subscription.usage.admins,
+      limit: subscription.limits.admins,
+    },
   ] as const;
 
   return (
@@ -43,7 +60,7 @@ export function UsageMeters({ subscription }: Props) {
                 />
               </div>
             ) : (
-              <p className="sb-v2__muted">Unlimited on your plan</p>
+              <p className="sb-v2__muted">{t("usageMetersUi.unlimited")}</p>
             )}
           </article>
         );

@@ -3,6 +3,7 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import {
   BillingCurrency,
@@ -14,6 +15,7 @@ import {
 } from '@prisma/client';
 import type { ReviewPlatformPaymentDto } from './dto/platform-payment.dto';
 import type { SubmitPlatformPaymentDto } from './dto/platform-payment.dto';
+import { EmailService } from '../email/email.service';
 import { ChapaService } from '../payments/chapa.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CouponsService } from './coupons.service';
@@ -67,6 +69,7 @@ export class SubscriptionsService {
     private readonly chapaService: ChapaService,
     private readonly coupons: CouponsService,
     private readonly moduleEntitlements: ModuleEntitlementService,
+    @Optional() private readonly email?: EmailService,
   ) {}
 
   async createTrial(schoolId: string) {
@@ -772,6 +775,20 @@ export class SubscriptionsService {
           : {}),
       },
     });
+    try {
+      await this.email?.notifySchoolAdmins({
+        schoolId,
+        category: 'subscription_activation',
+        templateId: 'subscription_activation',
+        idempotencyPrefix: `subscription:${schoolId}:${plan}:${periodEnd.toISOString()}`,
+        vars: {
+          plan: String(plan),
+          periodEnd: periodEnd.toISOString().slice(0, 10),
+        },
+      });
+    } catch {
+      // Subscription activation already succeeded.
+    }
   }
 
   private applyPercentOff(amount: number, percentOff: number) {

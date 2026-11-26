@@ -13,6 +13,7 @@ import {
 import { BRAND_NAME } from "@/lib/brand";
 import { EtbAmount } from "@/components/billing/etb-amount";
 import { formatEtbWhole } from "@/lib/currency";
+import { useLocale } from "@/components/i18n/locale-provider";
 
 const MAX_PROOF_BYTES = 4_000_000;
 
@@ -20,7 +21,7 @@ function readProofAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () => reject(new Error("Could not read screenshot"));
+    reader.onerror = () => reject(new Error("read_failed"));
     reader.readAsDataURL(file);
   });
 }
@@ -37,10 +38,13 @@ function formatDate(iso: string) {
   }
 }
 
-function proofStatusLabel(status: PlatformPaymentProof["status"]) {
-  if (status === "PENDING") return "Under review";
-  if (status === "CONFIRMED") return "Confirmed";
-  return "Rejected";
+function proofStatusLabel(
+  status: PlatformPaymentProof["status"],
+  t: (key: string) => string,
+) {
+  if (status === "PENDING") return t("billingUi.proofUnderReviewLabel");
+  if (status === "CONFIRMED") return t("billingUi.proofConfirmed");
+  return t("billingUi.proofRejected");
 }
 
 type Props = {
@@ -62,6 +66,7 @@ export function PlatformPaymentPanel({
   selectedInvoiceId,
   onSubmitted,
 }: Props) {
+  const { t, tn } = useLocale();
   const methods = useMemo(() => {
     const list: PlatformPayMethod[] = [];
     if (payout?.telebirr) list.push("TELEBIRR");
@@ -100,14 +105,18 @@ export function PlatformPaymentPanel({
       return;
     }
     if (file.size > MAX_PROOF_BYTES) {
-      setError("Screenshot must be under 4 MB");
+      setError(t("billingUi.screenshotTooBig"));
       return;
     }
     try {
       setProofPreview(await readProofAsDataUrl(file));
       setError("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not read screenshot");
+      setError(
+        err instanceof Error && err.message !== "read_failed"
+          ? err.message
+          : t("billingUi.readScreenshotFailed"),
+      );
     }
   }
 
@@ -120,7 +129,7 @@ export function PlatformPaymentPanel({
       setMessage(res.message);
       onSubmitted?.();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not create invoice");
+      setError(err instanceof Error ? err.message : t("billingUi.createInvoiceFailed"));
     } finally {
       setRequestingInvoice(false);
     }
@@ -128,19 +137,19 @@ export function PlatformPaymentPanel({
 
   async function onSubmit() {
     if (!invoiceId) {
-      setError("Create or select an invoice first");
+      setError(t("billingUi.selectInvoiceFirst"));
       return;
     }
     if (!transactionId.trim()) {
       setError(
         payMethod === "TELEBIRR"
-          ? "Enter the Telebirr transaction number"
-          : "Enter the bank transaction ID",
+          ? t("billingUi.telebirrTxnRequired")
+          : t("billingUi.bankTxnRequired"),
       );
       return;
     }
     if (!proofPreview) {
-      setError("Upload your payment receipt screenshot");
+      setError(t("billingUi.uploadReceipt"));
       return;
     }
 
@@ -158,7 +167,7 @@ export function PlatformPaymentPanel({
       setProofPreview(null);
       onSubmitted?.();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not submit payment");
+      setError(err instanceof Error ? err.message : t("billingUi.submitPaymentFailed"));
     } finally {
       setSubmitting(false);
     }
@@ -170,13 +179,14 @@ export function PlatformPaymentPanel({
         <div className="sb-v2__pay-panel__head">
           <span className="sb-v2__pay-badge">
             <span className="sb-v2__pay-badge__dot" aria-hidden />
-            Payment
+            {t("billingUi.paymentBadge")}
           </span>
-          <h3 className="sb-v2__card-title">Pay {BRAND_NAME}</h3>
+          <h3 className="sb-v2__card-title">{t("billingUi.payBrand", { brand: BRAND_NAME })}</h3>
           <p className="sb-v2__card-sub">
-            Payment details are not published yet. Contact support
-            {payout?.supportEmail ? ` at ${payout.supportEmail}` : ""}
-            {payout?.supportPhone ? ` or ${payout.supportPhone}` : ""}.
+            {t("billingUi.paySubUnavailable", {
+              email: payout?.supportEmail ? t("billingUi.supportAt", { email: payout.supportEmail }) : "",
+              phone: payout?.supportPhone ? t("billingUi.supportOr", { phone: payout.supportPhone }) : "",
+            })}
           </p>
         </div>
       </article>
@@ -188,39 +198,40 @@ export function PlatformPaymentPanel({
       <div className="sb-v2__pay-panel__head">
         <span className="sb-v2__pay-badge">
           <span className="sb-v2__pay-badge__dot" aria-hidden />
-          Offline payment
+          {t("billingUi.offlinePayment")}
         </span>
-        <h3 className="sb-v2__card-title">Pay {BRAND_NAME}</h3>
-        <p className="sb-v2__card-sub">
-          Choose Telebirr or bank transfer, pay the invoice amount, then submit your transaction ID
-          and receipt. We verify within 1–2 business days.
-        </p>
+        <h3 className="sb-v2__card-title">{t("billingUi.payBrand", { brand: BRAND_NAME })}</h3>
+        <p className="sb-v2__card-sub">{t("billingUi.paySubOffline")}</p>
       </div>
 
       <div className="sb-v2__pay-panel__body">
         {!hasOpenInvoice ? (
           <div className="sb-v2__pay-empty">
-            <p className="sb-v2__pay-empty__title">No open invoice</p>
+            <p className="sb-v2__pay-empty__title">{t("billingUi.noOpenInvoice")}</p>
             <p className="sb-v2__pay-empty__sub">
               {subscription?.plan === "TRIAL" ? (
                 <>
-                  You are on a trial.{" "}
-                  <Link href="/admin/billing/plans">Upgrade to a paid plan</Link> to get an invoice.
+                  {t("billingUi.trialUpgrade")}{" "}
+                  <Link href="/admin/billing/plans">{t("billingUi.upgradeLink")}</Link>
+                  {t("billingUi.upgradeToInvoice")}
                 </>
               ) : subscription?.isActive && subscription.currentPeriodEnd ? (
                 <>
-                  Your {subscription.planLabel} plan is active until{" "}
-                  {formatDate(subscription.currentPeriodEnd)}.
+                  {t("billingUi.planActiveUntil", {
+                    plan: subscription.planLabel,
+                    date: formatDate(subscription.currentPeriodEnd),
+                  })}
                   {planPrice ? (
                     <>
                       {" "}
-                      Renewal is <EtbAmount amount={planPrice.etbMonthly} maximumFractionDigits={0} />
-                      /mo.
+                      {t("billingUi.renewalMoLabel")}{" "}
+                      <EtbAmount amount={planPrice.etbMonthly} maximumFractionDigits={0} />
+                      {t("billingUi.usdMo")}
                     </>
                   ) : null}
                 </>
               ) : (
-                <>When {BRAND_NAME} issues a bill, you can pay it here.</>
+                <>{t("billingUi.whenBillIssued", { brand: BRAND_NAME })}</>
               )}
             </p>
             {canRequestInvoice ? (
@@ -230,7 +241,7 @@ export function PlatformPaymentPanel({
                 disabled={requestingInvoice}
                 onClick={() => void onRequestInvoice()}
               >
-                {requestingInvoice ? "Creating invoice…" : "Get renewal invoice"}
+                {requestingInvoice ? t("billingUi.creatingInvoice") : t("billingUi.getRenewalInvoice")}
               </button>
             ) : null}
           </div>
@@ -238,23 +249,24 @@ export function PlatformPaymentPanel({
 
         <div className="sb-v2__pay-panel__grid">
           <section className="sb-v2__pay-panel__section">
-            <h4 className="sb-v2__pay-panel__label">1 · Invoice</h4>
+            <h4 className="sb-v2__pay-panel__label">{t("billingUi.stepInvoice")}</h4>
             {!hasOpenInvoice ? (
               <p className="sb-v2__pay-panel__note">
-                Generate an invoice above, or check{" "}
-                <Link href="/admin/billing/invoices">Invoices</Link> for past bills.
+                {t("billingUi.invoiceNoteNoOpenPrefix")}
+                <Link href="/admin/billing/invoices">{tn("Invoices")}</Link>
+                {t("billingUi.invoiceNoteNoOpenSuffix")}
               </p>
             ) : openInvoices.length === 1 ? (
               <div className="sb-v2__pay-invoice">
                 <strong>{openInvoices[0].invoiceNumber}</strong>
                 <span>
-                  <EtbAmount amount={openInvoices[0].amountEtb} maximumFractionDigits={0} /> · due{" "}
-                  {formatDate(openInvoices[0].dueAt)}
+                  <EtbAmount amount={openInvoices[0].amountEtb} maximumFractionDigits={0} /> ·{" "}
+                  {t("billingUi.dueOn", { date: formatDate(openInvoices[0].dueAt) })}
                 </span>
               </div>
             ) : (
               <label className="sb-v2__pay-field">
-                <span className="sb-v2__pay-field__hint">Select invoice</span>
+                <span className="sb-v2__pay-field__hint">{t("billingUi.selectInvoice")}</span>
                 <select
                   className="sb-v2__pay-select"
                   value={invoiceId}
@@ -262,8 +274,9 @@ export function PlatformPaymentPanel({
                 >
                   {openInvoices.map((inv) => (
                     <option key={inv.id} value={inv.id}>
-                      {inv.invoiceNumber} — {formatEtbWhole(inv.amountEtb)} (due{" "}
-                      {formatDate(inv.dueAt)})
+                      {inv.invoiceNumber} — {formatEtbWhole(inv.amountEtb)} ({t("billingUi.dueOn", {
+                        date: formatDate(inv.dueAt),
+                      })})
                     </option>
                   ))}
                 </select>
@@ -272,16 +285,16 @@ export function PlatformPaymentPanel({
           </section>
 
           <section className="sb-v2__pay-panel__section">
-            <h4 className="sb-v2__pay-panel__label">2 · Payment method</h4>
+            <h4 className="sb-v2__pay-panel__label">{t("billingUi.stepPaymentMethod")}</h4>
             {methods.length > 0 ? (
-              <div className="sb-v2__pay-methods" role="group" aria-label="Payment method">
+              <div className="sb-v2__pay-methods" role="group" aria-label={t("billingUi.paymentMethodAria")}>
                 {methods.includes("TELEBIRR") ? (
                   <button
                     type="button"
                     className={`sb-v2__pay-method${payMethod === "TELEBIRR" ? " sb-v2__pay-method--active" : ""}`}
                     onClick={() => setPayMethod("TELEBIRR")}
                   >
-                    Telebirr
+                    {t("billingUi.telebirr")}
                   </button>
                 ) : null}
                 {methods.includes("BANK_TRANSFER") ? (
@@ -290,7 +303,7 @@ export function PlatformPaymentPanel({
                     className={`sb-v2__pay-method${payMethod === "BANK_TRANSFER" ? " sb-v2__pay-method--active" : ""}`}
                     onClick={() => setPayMethod("BANK_TRANSFER")}
                   >
-                    CBE / bank
+                    {t("billingUi.bankCbe")}
                   </button>
                 ) : null}
               </div>
@@ -298,7 +311,7 @@ export function PlatformPaymentPanel({
 
             {payMethod === "TELEBIRR" && payout?.telebirr ? (
               <div className="sb-v2__pay-account sb-v2__pay-account--telebirr">
-                <p className="sb-v2__pay-account__label">Send Telebirr to</p>
+                <p className="sb-v2__pay-account__label">{t("billingUi.sendTelebirrTo")}</p>
                 <p className="sb-v2__pay-account__name">{payout.telebirr.accountName}</p>
                 <p className="sb-v2__pay-account__number">{payout.telebirr.number}</p>
               </div>
@@ -314,49 +327,59 @@ export function PlatformPaymentPanel({
 
             {selectedInvoice ? (
               <p className="sb-v2__pay-panel__amount">
-                Amount due: <strong><EtbAmount amount={selectedInvoice.amountEtb} maximumFractionDigits={0} /></strong>
+                {t("billingUi.amountDue")}{" "}
+                <strong>
+                  <EtbAmount amount={selectedInvoice.amountEtb} maximumFractionDigits={0} />
+                </strong>
                 <span> (${selectedInvoice.amountUsd.toLocaleString()} USD)</span>
               </p>
             ) : planPrice && canRequestInvoice ? (
               <p className="sb-v2__pay-panel__amount">
-                Renewal amount: <strong><EtbAmount amount={planPrice.etbMonthly} maximumFractionDigits={0} /></strong>
-                <span> (${planPrice.usdMonthly.toLocaleString()} USD/mo)</span>
+                {t("billingUi.renewalAmount")}{" "}
+                <strong>
+                  <EtbAmount amount={planPrice.etbMonthly} maximumFractionDigits={0} />
+                </strong>
+                <span>
+                  {" "}
+                  (${planPrice.usdMonthly.toLocaleString()} USD{t("billingUi.usdMo")})
+                </span>
               </p>
             ) : null}
           </section>
 
           <section className="sb-v2__pay-panel__section sb-v2__pay-panel__section--form">
-            <h4 className="sb-v2__pay-panel__label">3 · Submit proof</h4>
+            <h4 className="sb-v2__pay-panel__label">{t("billingUi.stepSubmitProof")}</h4>
 
             {!hasOpenInvoice ? (
-              <p className="sb-v2__pay-panel__note">
-                After you pay, create an invoice first — then enter your transaction ID and upload
-                the receipt screenshot here.
-              </p>
+              <p className="sb-v2__pay-panel__note">{t("billingUi.proofNoteNoInvoice")}</p>
             ) : pendingForInvoice ? (
               <div className="sb-v2__pay-alert sb-v2__pay-alert--pending">
-                Payment for {pendingForInvoice.invoiceNumber} is under review. Submitted{" "}
-                {formatDate(pendingForInvoice.createdAt)}.
+                {t("billingUi.proofUnderReview", {
+                  invoice: pendingForInvoice.invoiceNumber,
+                  date: formatDate(pendingForInvoice.createdAt),
+                })}
               </div>
             ) : (
               <>
                 <label className="sb-v2__pay-field">
                   <span>
-                    {payMethod === "TELEBIRR" ? "Transaction number" : "Transaction ID"}
+                    {payMethod === "TELEBIRR"
+                      ? t("billingUi.transactionNumber")
+                      : t("billingUi.transactionId")}
                   </span>
                   <input
                     className="sb-v2__pay-input"
                     value={transactionId}
                     onChange={(e) => setTransactionId(e.target.value)}
                     placeholder={
-                      payMethod === "TELEBIRR" ? "e.g. DHR97D11WZ" : "e.g. FT26239YHGVN"
+                      payMethod === "TELEBIRR" ? t("billingUi.telebirrPh") : t("billingUi.bankPh")
                     }
                     disabled={!hasOpenInvoice}
                   />
                 </label>
 
                 <label className="sb-v2__pay-field">
-                  <span>Receipt screenshot</span>
+                  <span>{t("billingUi.receiptScreenshot")}</span>
                   <input
                     type="file"
                     accept="image/*"
@@ -371,7 +394,7 @@ export function PlatformPaymentPanel({
                   <img
                     className="sb-v2__pay-proof"
                     src={proofPreview}
-                    alt="Payment receipt preview"
+                    alt={t("billingUi.receiptPreviewAlt")}
                   />
                 ) : null}
 
@@ -383,7 +406,7 @@ export function PlatformPaymentPanel({
                   }
                   onClick={() => void onSubmit()}
                 >
-                  {submitting ? "Submitting…" : "Submit for verification"}
+                  {submitting ? t("billingUi.submitting") : t("billingUi.submitVerification")}
                 </button>
               </>
             )}
@@ -400,20 +423,21 @@ export function PlatformPaymentPanel({
 
       {paymentProofs.length > 0 ? (
         <div className="sb-v2__pay-history">
-          <h4 className="sb-v2__pay-panel__label">Recent submissions</h4>
+          <h4 className="sb-v2__pay-panel__label">{t("billingUi.recentSubmissions")}</h4>
           <ul className="sb-v2__pay-history__list">
             {paymentProofs.slice(0, 4).map((p) => (
               <li key={p.id}>
                 <div>
                   <strong>{p.invoiceNumber}</strong>
                   <span className="sb-v2__muted">
-                    {p.method === "TELEBIRR" ? "Telebirr" : "Bank"} · {p.transactionId}
+                    {p.method === "TELEBIRR" ? t("billingUi.methodTelebirr") : t("billingUi.methodBank")} ·{" "}
+                    {p.transactionId}
                   </span>
                 </div>
                 <span
                   className={`sb-v2__pay-history__status sb-v2__pay-history__status--${p.status.toLowerCase()}`}
                 >
-                  {proofStatusLabel(p.status)}
+                  {proofStatusLabel(p.status, t)}
                 </span>
               </li>
             ))}

@@ -1,4 +1,5 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException, Optional } from '@nestjs/common';
+import { EmailService } from '../email/email.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { CreateAnnouncementDto } from './dto/create-announcement.dto';
@@ -8,6 +9,7 @@ export class AnnouncementsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly subscriptionsService: SubscriptionsService,
+    @Optional() private readonly email?: EmailService,
   ) {}
 
   async create(
@@ -17,7 +19,7 @@ export class AnnouncementsService {
   ) {
     await this.subscriptionsService.assertActive(schoolId);
 
-    return this.prisma.announcement.create({
+    const created = await this.prisma.announcement.create({
       data: {
         schoolId,
         title: dto.title,
@@ -25,6 +27,23 @@ export class AnnouncementsService {
         createdBy,
       },
     });
+    try {
+      await this.email?.notifySchoolParents({
+        schoolId,
+        preference: 'announcementEnabled',
+        category: 'announcement',
+        templateId: 'announcement',
+        idempotencyPrefix: `announcement:${created.id}`,
+        recipientUserId: created.recipientUserId,
+        vars: {
+          title: created.title,
+          message: created.body.replace(/\s+/g, ' ').slice(0, 500),
+        },
+      });
+    } catch {
+      // The announcement is already saved.
+    }
+    return created;
   }
 
   async list(schoolId: string, userId?: string) {
@@ -123,5 +142,31 @@ export class AnnouncementsService {
       skipDuplicates: true,
     });
     return { updated: unread.length };
+  }
+
+  async dismissForUser(
+    announcementId: string,
+    schoolId: string,
+    userId: string,
+  ) {
+    const announcement = await this.prisma.announcement.findFirst({
+      where: {
+        id: announcementId,
+        schoolId,
+        OR: [{ recipientUserId: null }, { recipientUserId: userId }],
+      },
+    });
+    if (!announcement) {
+      throw new NotFoundException('Notification not found');
+    }
+
+    // Personal inbox items can be removed entirely for that recipient.
+    if (announcement.recipientUserId === userId) {
+      await this.prisma.announcement.delete({ where: { id: announcementId } });
+      return { announcementId, deleted: true };
+    }
+
+    await this.markRead(announcementId, userId);
+    return { announcementId, deleted: false, read: true };
   }
 }

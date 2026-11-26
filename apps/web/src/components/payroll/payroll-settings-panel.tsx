@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
+import { useLocale } from "@/components/i18n/locale-provider";
 import { AppToast } from "@/components/ui/app-toast";
 import {
   createCompensationComponent,
@@ -15,6 +16,7 @@ import {
 import { hasPermission, Permission } from "@/lib/permissions";
 
 export function PayrollSettingsPanel() {
+  const { t } = useLocale();
   const canSettings = hasPermission(Permission.PAYROLL_SETTINGS);
   const canApprove = hasPermission(Permission.PAYROLL_APPROVE);
   const [settings, setSettings] = useState<Awaited<
@@ -57,7 +59,7 @@ export function PayrollSettingsPanel() {
     try {
       applyLoaded(await fetchAll());
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load settings");
+      setError(err instanceof Error ? err.message : t("payrollSettingsUi.loadFailed"));
     }
   }
 
@@ -66,7 +68,7 @@ export function PayrollSettingsPanel() {
     void fetchAll()
       .then(applyLoaded)
       .catch((err) => {
-        setError(err instanceof Error ? err.message : "Failed to load settings");
+        setError(err instanceof Error ? err.message : t("payrollSettingsUi.loadFailed"));
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -83,10 +85,10 @@ export function PayrollSettingsPanel() {
         absenceDeductionMethod: settings.absenceDeductionMethod,
         absenceFixedDays: settings.absenceFixedDays,
       });
-      setToast("Settings saved (statutory remains inactive)");
+      setToast(t("payrollSettingsUi.settingsSaved"));
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Save failed");
+      setError(err instanceof Error ? err.message : t("payrollSettingsUi.saveFailed"));
     }
   }
 
@@ -94,11 +96,8 @@ export function PayrollSettingsPanel() {
     return (
       <div className="hr-page">
         <div className="hr-empty">
-          <p className="hr-empty__title">No settings access</p>
-          <p className="hr-empty__sub">
-            You need the payroll settings permission to manage policies and
-            components.
-          </p>
+          <p className="hr-empty__title">{t("payrollSettingsUi.noAccessTitle")}</p>
+          <p className="hr-empty__sub">{t("payrollSettingsUi.noAccessSub")}</p>
         </div>
       </div>
     );
@@ -113,13 +112,12 @@ export function PayrollSettingsPanel() {
         <div className="tch-v2__hero-glow" aria-hidden />
         <div className="tch-v2__hero-inner">
           <div className="tch-v2__hero-main">
-            <span className="tch-v2__chip">Payroll</span>
-            <h2 className="tch-v2__hero-title">Settings</h2>
+            <span className="tch-v2__chip">{t("payrollSettingsUi.chipPayroll")}</span>
+            <h2 className="tch-v2__hero-title">{t("payrollSettingsUi.title")}</h2>
             <p className="tch-v2__hero-sub">
-              Attendance feed policies, compensation catalog, and inactive
-              statutory packs. Return to{" "}
+              {t("payrollSettingsUi.heroSubPrefix")}{" "}
               <Link href="/admin/payroll" className="tch-v2__hero-link">
-                Payroll runs
+                {t("payrollSettingsUi.payrollRuns")}
               </Link>
               .
             </p>
@@ -127,21 +125,23 @@ export function PayrollSettingsPanel() {
           <div className="tch-v2__hero-stats">
             <div className="tch-v2__stat">
               <strong>{components.length}</strong>
-              <span>Components</span>
+              <span>{t("payrollSettingsUi.statComponents")}</span>
             </div>
             <div className="tch-v2__stat">
               <strong>{ruleSets.length}</strong>
-              <span>Rule packs</span>
+              <span>{t("payrollSettingsUi.statRulePacks")}</span>
             </div>
             <div className="tch-v2__stat">
               <strong>{ot.length}</strong>
-              <span>OT pending</span>
+              <span>{t("payrollSettingsUi.statOtPending")}</span>
             </div>
             <div className="tch-v2__stat tch-v2__stat--accent">
               <strong>
-                {settings?.overtimeEnabled ? "On" : "Off"}
+                {settings?.overtimeEnabled
+                  ? t("payrollSettingsUi.on")
+                  : t("payrollSettingsUi.off")}
               </strong>
-              <span>Overtime</span>
+              <span>{t("payrollSettingsUi.statOvertime")}</span>
             </div>
           </div>
         </div>
@@ -149,8 +149,8 @@ export function PayrollSettingsPanel() {
 
       <div className="hr-banner hr-banner--warn">
         <p>
-          <strong>Statutory tax/pension inactive</strong> until MoF-verified.
-          The engine always applies zero statutory amounts.
+          <strong>{t("payrollSettingsUi.statutoryBannerTitle")}</strong>{" "}
+          {t("payrollSettingsUi.statutoryBannerBody")}
         </p>
       </div>
 
@@ -159,15 +159,17 @@ export function PayrollSettingsPanel() {
           <section className="hr-panel">
             <div className="hr-panel__head">
               <div>
-                <h3 className="hr-panel__title">Attendance feed policies</h3>
+                <h3 className="hr-panel__title">
+                  {t("payrollSettingsUi.attendancePoliciesTitle")}
+                </h3>
                 <p className="hr-panel__hint">
-                  How overtime and absence from staff attendance affect payroll.
+                  {t("payrollSettingsUi.attendancePoliciesHint")}
                 </p>
               </div>
             </div>
             <form className="hr-form" onSubmit={(e) => void onSaveSettings(e)}>
               <label className="sa-field">
-                <span>Working days / month</span>
+                <span>{t("payrollSettingsUi.workingDaysMonth")}</span>
                 <input
                   type="number"
                   min={1}
@@ -181,7 +183,7 @@ export function PayrollSettingsPanel() {
                 />
               </label>
               <label className="sa-field">
-                <span>OT multiplier (bp, 15000 = 1.5×)</span>
+                <span>{t("payrollSettingsUi.otMultiplier")}</span>
                 <input
                   type="number"
                   value={settings.overtimeMultiplierBp}
@@ -194,7 +196,7 @@ export function PayrollSettingsPanel() {
                 />
               </label>
               <label className="sa-field sa-field--full">
-                <span>Absence deduction</span>
+                <span>{t("payrollSettingsUi.absenceDeduction")}</span>
                 <select
                   value={settings.absenceDeductionMethod}
                   onChange={(e) =>
@@ -204,12 +206,14 @@ export function PayrollSettingsPanel() {
                     })
                   }
                 >
-                  <option value="NO_DEDUCTION">No deduction (default)</option>
+                  <option value="NO_DEDUCTION">
+                    {t("payrollSettingsUi.absenceNoDeduction")}
+                  </option>
                   <option value="MONTHLY_DIVIDED_BY_WORKING_DAYS">
-                    Monthly ÷ working days
+                    {t("payrollSettingsUi.absenceMonthlyWorking")}
                   </option>
                   <option value="MONTHLY_DIVIDED_BY_FIXED_DAYS">
-                    Monthly ÷ fixed days
+                    {t("payrollSettingsUi.absenceMonthlyFixed")}
                   </option>
                 </select>
               </label>
@@ -224,7 +228,7 @@ export function PayrollSettingsPanel() {
                     })
                   }
                 />
-                <span>Overtime enabled</span>
+                <span>{t("payrollSettingsUi.overtimeEnabled")}</span>
               </label>
               <label className="sa-check">
                 <input
@@ -237,28 +241,28 @@ export function PayrollSettingsPanel() {
                     })
                   }
                 />
-                <span>Require OT approval before pay</span>
+                <span>{t("payrollSettingsUi.requireOtApproval")}</span>
               </label>
               <div className="hr-form__actions">
                 <button type="submit" className="sa-btn sa-btn--primary">
-                  Save policies
+                  {t("payrollSettingsUi.savePolicies")}
                 </button>
               </div>
             </form>
           </section>
         ) : (
           <section className="hr-panel">
-            <p className="sa-empty">Loading policies…</p>
+            <p className="sa-empty">{t("payrollSettingsUi.loadingPolicies")}</p>
           </section>
         )}
 
         <section className="hr-panel">
           <div className="hr-panel__head">
             <div>
-              <h3 className="hr-panel__title">Statutory rule packs</h3>
-              <p className="hr-panel__hint">
-                Versioned placeholders only — calculation stays off.
-              </p>
+              <h3 className="hr-panel__title">
+                {t("payrollSettingsUi.statutoryRuleTitle")}
+              </h3>
+              <p className="hr-panel__hint">{t("payrollSettingsUi.statutoryRuleHint")}</p>
             </div>
           </div>
           {ruleSets.length ? (
@@ -266,15 +270,20 @@ export function PayrollSettingsPanel() {
               <div key={r.id} className="hr-rule-card">
                 <strong>{r.name}</strong>
                 <p>
-                  {r.code} · pack {r.active ? "flagged" : "inactive"} ·{" "}
-                  {r.taxBrackets.length} brackets · {r.contributions.length}{" "}
-                  contributions
+                  {t("payrollSettingsUi.rulePackMeta", {
+                    code: r.code,
+                    active: r.active
+                      ? t("payrollSettingsUi.rulePackActive")
+                      : t("payrollSettingsUi.rulePackInactive"),
+                    brackets: r.taxBrackets.length,
+                    contributions: r.contributions.length,
+                  })}
                 </p>
-                <p>Rates are placeholders (0%). Do not treat as live MoF rules.</p>
+                <p>{t("payrollSettingsUi.rulePackRates")}</p>
               </div>
             ))
           ) : (
-            <p className="hr-panel__hint">No rule packs loaded yet.</p>
+            <p className="hr-panel__hint">{t("payrollSettingsUi.noRulePacks")}</p>
           )}
         </section>
       </div>
@@ -282,10 +291,10 @@ export function PayrollSettingsPanel() {
       <section className="hr-panel">
         <div className="hr-panel__head">
           <div>
-            <h3 className="hr-panel__title">Compensation components</h3>
-            <p className="hr-panel__hint">
-              School catalog for earnings and deductions used in packages.
-            </p>
+            <h3 className="hr-panel__title">
+              {t("payrollSettingsUi.compComponentsTitle")}
+            </h3>
+            <p className="hr-panel__hint">{t("payrollSettingsUi.compComponentsHint")}</p>
           </div>
         </div>
         <form
@@ -301,45 +310,45 @@ export function PayrollSettingsPanel() {
               .then(async () => {
                 setCompCode("");
                 setCompName("");
-                setToast("Component added");
+                setToast(t("payrollSettingsUi.componentAdded"));
                 await load();
               })
               .catch((err) =>
-                setError(err instanceof Error ? err.message : "Failed"),
+                setError(err instanceof Error ? err.message : t("payrollSettingsUi.addFailed")),
               );
           }}
         >
           <label className="sa-field">
-            <span>Code</span>
+            <span>{t("payrollSettingsUi.code")}</span>
             <input
               value={compCode}
               onChange={(e) => setCompCode(e.target.value)}
               required
-              placeholder="TRANSPORT"
+              placeholder={t("payrollSettingsUi.codePh")}
             />
           </label>
           <label className="sa-field">
-            <span>Name</span>
+            <span>{t("payrollSettingsUi.name")}</span>
             <input
               value={compName}
               onChange={(e) => setCompName(e.target.value)}
               required
-              placeholder="Transport allowance"
+              placeholder={t("payrollSettingsUi.namePh")}
             />
           </label>
           <label className="sa-field">
-            <span>Type</span>
+            <span>{t("payrollSettingsUi.type")}</span>
             <select
               value={compType}
               onChange={(e) => setCompType(e.target.value)}
             >
-              <option value="EARNING">Earning</option>
-              <option value="DEDUCTION">Deduction</option>
+              <option value="EARNING">{t("payrollSettingsUi.typeEarning")}</option>
+              <option value="DEDUCTION">{t("payrollSettingsUi.typeDeduction")}</option>
             </select>
           </label>
           <div className="hr-form__actions">
             <button type="submit" className="sa-btn sa-btn--primary">
-              Add component
+              {t("payrollSettingsUi.addComponent")}
             </button>
           </div>
         </form>
@@ -351,7 +360,9 @@ export function PayrollSettingsPanel() {
               <span
                 className={`hr-badge hr-badge--${c.type === "DEDUCTION" ? "deduction" : "earning"}`}
               >
-                {c.type}
+                {c.type === "DEDUCTION"
+                  ? t("payrollSettingsUi.typeDeduction")
+                  : t("payrollSettingsUi.typeEarning")}
               </span>
             </div>
           ))}
@@ -362,19 +373,19 @@ export function PayrollSettingsPanel() {
         <section className="hr-panel">
           <div className="hr-panel__head">
             <div>
-              <h3 className="hr-panel__title">Pending overtime approvals</h3>
-              <p className="hr-panel__hint">
-                Approve before OT minutes are paid on the next calculate.
-              </p>
+              <h3 className="hr-panel__title">{t("payrollSettingsUi.pendingOtTitle")}</h3>
+              <p className="hr-panel__hint">{t("payrollSettingsUi.pendingOtHint")}</p>
             </div>
           </div>
           <ul className="hr-ot-list">
             {ot.map((row) => (
               <li key={row.id}>
                 <span>
-                  {row.overtimeMinutes} min ·{" "}
-                  {String(row.periodStart).slice(0, 10)} →{" "}
-                  {String(row.periodEnd).slice(0, 10)}
+                  {t("payrollSettingsUi.otMinutesRange", {
+                    minutes: row.overtimeMinutes,
+                    start: String(row.periodStart).slice(0, 10),
+                    end: String(row.periodEnd).slice(0, 10),
+                  })}
                 </span>
                 <span className="sa-actions">
                   <button
@@ -383,13 +394,13 @@ export function PayrollSettingsPanel() {
                     onClick={() =>
                       void reviewOvertimeApproval(row.id, "APPROVED").then(
                         () => {
-                          setToast("OT approved");
+                          setToast(t("payrollSettingsUi.otApproved"));
                           return load();
                         },
                       )
                     }
                   >
-                    Approve
+                    {t("payrollSettingsUi.approve")}
                   </button>
                   <button
                     type="button"
@@ -397,13 +408,13 @@ export function PayrollSettingsPanel() {
                     onClick={() =>
                       void reviewOvertimeApproval(row.id, "REJECTED").then(
                         () => {
-                          setToast("OT rejected");
+                          setToast(t("payrollSettingsUi.otRejected"));
                           return load();
                         },
                       )
                     }
                   >
-                    Reject
+                    {t("payrollSettingsUi.reject")}
                   </button>
                 </span>
               </li>

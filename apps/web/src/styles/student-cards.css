@@ -359,12 +359,8 @@
 }
 
 .sid__badge--staff {
-  background: linear-gradient(
-    135deg,
-    rgba(13, 92, 99, 0.55) 0%,
-    rgba(10, 61, 66, 0.75) 100%
-  );
-  border-color: rgba(255, 255, 255, 0.35);
+  background: rgba(8, 32, 31, 0.72);
+  border-color: rgba(255, 255, 255, 0.42);
   box-shadow: 0 calc(var(--sid-u) * 0.4) calc(var(--sid-u) * 1.2) rgba(0, 0, 0, 0.15);
 }
 
@@ -382,12 +378,35 @@
 }
 
 .sid--staff .sid__head {
+  background: #113d3b;
+}
+
+.sid--staff .sid__head::after {
   background: linear-gradient(
-    125deg,
-    var(--sid-mid) 0%,
-    var(--sid-bright) 42%,
-    var(--sid-light) 100%
+    90deg,
+    transparent,
+    rgba(94, 234, 212, 0.45) 35%,
+    rgba(167, 243, 208, 0.75) 50%,
+    rgba(94, 234, 212, 0.45) 65%,
+    transparent
   );
+}
+
+.sid--staff .sid__foot {
+  background: #113d3b;
+}
+
+.sid--staff .sid__stripe--back {
+  background: linear-gradient(90deg, #0a2e2c, #113d3b 50%, #1a5c58);
+}
+
+.sid--staff.sid--back .sid__back-foot {
+  background: #113d3b;
+  color: rgba(248, 250, 252, 0.92);
+  border-top-color: rgba(167, 243, 208, 0.22);
+  text-transform: none;
+  letter-spacing: 0.01em;
+  font-weight: 650;
 }
 
 .sid__year {
@@ -2940,25 +2959,20 @@
 }
 
 .tid-hero {
-  display: grid;
-  gap: 1rem;
-  padding: 1.2rem 1.25rem;
+  padding: 1.25rem 1.35rem;
   border-radius: 1.15rem;
-  background: linear-gradient(145deg, var(--brand-ink) 0%, var(--brand-teal-dark) 52%, var(--brand-teal) 100%);
   color: #fff;
-  box-shadow: 0 14px 40px rgba(30, 74, 74, 0.2);
   min-width: 0;
 }
 
 @media (min-width: 900px) {
   .tid-hero {
-    grid-template-columns: 1fr auto;
-    align-items: end;
     padding: 1.35rem 1.5rem;
   }
 }
 
 .tid-hero__main {
+  flex: 1 1 240px;
   min-width: 0;
 }
 
@@ -3056,6 +3070,43 @@
   min-width: 0;
 }
 
+.tid-photo-upload {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.tid-photo-upload__preview {
+  width: 6rem;
+  height: 7.5rem;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: var(--brand-surface, #f0fdfa);
+  border: 1.5px solid var(--brand-border, #d1e7e4);
+  color: var(--brand-muted, #5f7a78);
+  font-size: 0.75rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.tid-photo-upload__preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.tid-photo-upload__actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.55rem;
+  min-width: 0;
+  flex: 1 1 12rem;
+}
+
 .tid-card--preview {
   border-left: 3px solid var(--brand-teal);
 }
@@ -3066,6 +3117,8 @@
   justify-content: space-between;
   gap: 0.75rem;
   margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid rgba(22, 117, 109, 0.08);
 }
 
 .tid-card__title {

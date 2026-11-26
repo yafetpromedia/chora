@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
+import { useLocale } from "@/components/i18n/locale-provider";
 import { AppToast } from "@/components/ui/app-toast";
 import {
   createHrDepartment,
@@ -13,6 +14,7 @@ import {
 import { hasPermission, Permission } from "@/lib/permissions";
 
 export function HrOrgWorkspace({ kind }: { kind: "departments" | "positions" }) {
+  const { t, tn } = useLocale();
   const canManage = hasPermission(Permission.HR_ORG_MANAGE);
   const [rows, setRows] = useState<HrOrgUnit[]>([]);
   const [error, setError] = useState("");
@@ -20,16 +22,25 @@ export function HrOrgWorkspace({ kind }: { kind: "departments" | "positions" }) 
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
 
+  const isDepartments = kind === "departments";
+  const title = isDepartments
+    ? t("hrOrgUi.departmentsTitle")
+    : t("hrOrgUi.positionsTitle");
+  const otherHref = isDepartments
+    ? "/admin/hr/positions"
+    : "/admin/hr/departments";
+  const otherLabel = isDepartments
+    ? tn("Positions")
+    : tn("Departments");
+
   async function load() {
     setError("");
     try {
       setRows(
-        kind === "departments"
-          ? await listHrDepartments()
-          : await listHrPositions(),
+        isDepartments ? await listHrDepartments() : await listHrPositions(),
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load");
+      setError(err instanceof Error ? err.message : t("hrOrgUi.loadFailed"));
     }
   }
 
@@ -37,48 +48,46 @@ export function HrOrgWorkspace({ kind }: { kind: "departments" | "positions" }) 
     let cancelled = false;
     void (async () => {
       try {
-        const data =
-          kind === "departments"
-            ? await listHrDepartments()
-            : await listHrPositions();
+        const data = isDepartments
+          ? await listHrDepartments()
+          : await listHrPositions();
         if (!cancelled) {
           setError("");
           setRows(data);
         }
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Failed to load");
+          setError(
+            err instanceof Error ? err.message : t("hrOrgUi.loadFailed"),
+          );
         }
       }
     })();
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kind]);
 
   async function onCreate(e: FormEvent) {
     e.preventDefault();
     if (!canManage) return;
     try {
-      if (kind === "departments") {
+      if (isDepartments) {
         await createHrDepartment({ name, code });
       } else {
         await createHrPosition({ name, code });
       }
       setName("");
       setCode("");
-      setToast("Saved");
+      setToast(t("hrOrgUi.saved"));
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Create failed");
+      setError(err instanceof Error ? err.message : t("hrOrgUi.createFailed"));
     }
   }
 
-  const title = kind === "departments" ? "Departments" : "Positions";
   const activeCount = rows.filter((r) => r.active).length;
-  const otherHref =
-    kind === "departments" ? "/admin/hr/positions" : "/admin/hr/departments";
-  const otherLabel = kind === "departments" ? "Positions" : "Departments";
 
   return (
     <div className="hr-page">
@@ -88,13 +97,12 @@ export function HrOrgWorkspace({ kind }: { kind: "departments" | "positions" }) 
         <div className="tch-v2__hero-glow" aria-hidden />
         <div className="tch-v2__hero-inner">
           <div className="tch-v2__hero-main">
-            <span className="tch-v2__chip">People</span>
+            <span className="tch-v2__chip">{t("hrOrgUi.chip")}</span>
             <h2 className="tch-v2__hero-title">{title}</h2>
             <p className="tch-v2__hero-sub">
-              HR org chart units for this school (separate from curriculum
-              departments). Open{" "}
+              {t("hrOrgUi.heroSubPrefix")}{" "}
               <Link href="/admin/hr/employees" className="tch-v2__hero-link">
-                Employees
+                {tn("Employees")}
               </Link>
               {" · "}
               <Link href={otherHref} className="tch-v2__hero-link">
@@ -106,19 +114,21 @@ export function HrOrgWorkspace({ kind }: { kind: "departments" | "positions" }) 
           <div className="tch-v2__hero-stats">
             <div className="tch-v2__stat">
               <strong>{rows.length}</strong>
-              <span>Total</span>
+              <span>{t("hrOrgUi.statTotal")}</span>
             </div>
             <div className="tch-v2__stat">
               <strong>{activeCount}</strong>
-              <span>Active</span>
+              <span>{t("hrOrgUi.statActive")}</span>
             </div>
             <div className="tch-v2__stat">
               <strong>{rows.length - activeCount}</strong>
-              <span>Inactive</span>
+              <span>{t("hrOrgUi.statInactive")}</span>
             </div>
             <div className="tch-v2__stat tch-v2__stat--accent">
-              <strong>{canManage ? "Edit" : "View"}</strong>
-              <span>Access</span>
+              <strong>
+                {canManage ? t("hrOrgUi.accessEdit") : t("hrOrgUi.accessView")}
+              </strong>
+              <span>{t("hrOrgUi.statAccess")}</span>
             </div>
           </div>
         </div>
@@ -127,7 +137,7 @@ export function HrOrgWorkspace({ kind }: { kind: "departments" | "positions" }) 
       {canManage ? (
         <form className="hr-form" onSubmit={(e) => void onCreate(e)}>
           <label className="sa-field">
-            <span>Name</span>
+            <span>{t("hrOrgUi.name")}</span>
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -135,7 +145,7 @@ export function HrOrgWorkspace({ kind }: { kind: "departments" | "positions" }) 
             />
           </label>
           <label className="sa-field">
-            <span>Code</span>
+            <span>{t("hrOrgUi.code")}</span>
             <input
               value={code}
               onChange={(e) => setCode(e.target.value)}
@@ -143,7 +153,9 @@ export function HrOrgWorkspace({ kind }: { kind: "departments" | "positions" }) 
             />
           </label>
           <button type="submit" className="sa-btn sa-btn--primary">
-            Add {kind === "departments" ? "department" : "position"}
+            {isDepartments
+              ? t("hrOrgUi.addDepartment")
+              : t("hrOrgUi.addPosition")}
           </button>
         </form>
       ) : null}
@@ -152,9 +164,9 @@ export function HrOrgWorkspace({ kind }: { kind: "departments" | "positions" }) 
         <table className="sa-table">
           <thead>
             <tr>
-              <th>Name</th>
-              <th>Code</th>
-              <th>Active</th>
+              <th>{t("hrOrgUi.name")}</th>
+              <th>{t("hrOrgUi.code")}</th>
+              <th>{t("hrOrgUi.active")}</th>
             </tr>
           </thead>
           <tbody>
@@ -164,7 +176,7 @@ export function HrOrgWorkspace({ kind }: { kind: "departments" | "positions" }) 
                   <strong>{r.name}</strong>
                 </td>
                 <td>{r.code}</td>
-                <td>{r.active ? "Yes" : "No"}</td>
+                <td>{r.active ? t("hrOrgUi.yes") : t("hrOrgUi.no")}</td>
               </tr>
             ))}
           </tbody>

@@ -1,7 +1,8 @@
 "use client";
 
 import { DashIcon } from "@/components/dashboard/dash-icons";
-import type { PlatformDashboard, PlatformSchoolRow, PlatformSection } from "./platform-types";
+import { useLocale } from "@/components/i18n/locale-provider";
+import type { PlatformDashboard, PlatformSchoolRow } from "./platform-types";
 
 type Props = {
   dashboard: PlatformDashboard;
@@ -14,18 +15,24 @@ function monthKey(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
-function monthLabel(key: string) {
+function monthLabel(key: string, locale: string) {
   const [y, m] = key.split("-").map(Number);
-  return new Date(y, m - 1, 1).toLocaleDateString(undefined, { month: "short" });
+  return new Date(y, m - 1, 1).toLocaleDateString(locale === "am" ? "am-ET" : undefined, {
+    month: "short",
+  });
 }
 
-function buildSignupTrend(schools: PlatformSchoolRow[]) {
+function buildSignupTrend(schools: PlatformSchoolRow[], locale: string) {
   const now = new Date();
   const buckets: { key: string; label: string; count: number }[] = [];
 
   for (let i = MONTHS - 1; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    buckets.push({ key: monthKey(d), label: monthLabel(monthKey(d)), count: 0 });
+    buckets.push({
+      key: monthKey(d),
+      label: monthLabel(monthKey(d), locale),
+      count: 0,
+    });
   }
 
   for (const school of schools) {
@@ -37,7 +44,10 @@ function buildSignupTrend(schools: PlatformSchoolRow[]) {
   return buckets;
 }
 
-function buildPlanBreakdown(schools: PlatformSchoolRow[]) {
+function buildPlanBreakdown(
+  schools: PlatformSchoolRow[],
+  noPlanLabel: string,
+) {
   const counts = new Map<string, number>();
   for (const school of schools) {
     const plan = school.subscription?.plan ?? "NONE";
@@ -45,7 +55,10 @@ function buildPlanBreakdown(schools: PlatformSchoolRow[]) {
   }
   return [...counts.entries()]
     .map(([plan, count]) => ({
-      plan: plan === "NONE" ? "No plan" : plan.charAt(0) + plan.slice(1).toLowerCase(),
+      plan:
+        plan === "NONE"
+          ? noPlanLabel
+          : plan.charAt(0) + plan.slice(1).toLowerCase(),
       count,
     }))
     .sort((a, b) => b.count - a.count);
@@ -64,13 +77,18 @@ function buildCommunityTotals(schools: PlatformSchoolRow[]) {
 }
 
 function TenantSignupChart({ schools }: { schools: PlatformSchoolRow[] }) {
-  const trend = buildSignupTrend(schools);
+  const { t, locale } = useLocale();
+  const trend = buildSignupTrend(schools, locale);
   const max = Math.max(1, ...trend.map((d) => d.count));
   const total = trend.reduce((sum, d) => sum + d.count, 0);
 
   return (
     <div className="plat-analytics__chart">
-      <div className="da-chart__bars" role="img" aria-label="New tenant signups last 6 months">
+      <div
+        className="da-chart__bars"
+        role="img"
+        aria-label={t("platformUi.analyticsSignupsAria")}
+      >
         {trend.map((month) => {
           const h = month.count > 0 ? Math.max(12, (month.count / max) * 100) : 6;
           return (
@@ -79,7 +97,11 @@ function TenantSignupChart({ schools }: { schools: PlatformSchoolRow[] }) {
                 <div
                   className={`da-chart__bar plat-analytics__bar${month.count === 0 ? " da-chart__bar--empty" : ""}`}
                   style={{ height: `${h}%` }}
-                  title={`${month.label}: ${month.count} new tenant${month.count === 1 ? "" : "s"}`}
+                  title={t("platformUi.analyticsBarTitle", {
+                    label: month.label,
+                    count: month.count,
+                    s: month.count === 1 ? "" : "s",
+                  })}
                 />
               </div>
               <span className="da-chart__bar-label">{month.label}</span>
@@ -89,10 +111,14 @@ function TenantSignupChart({ schools }: { schools: PlatformSchoolRow[] }) {
         })}
       </div>
       {total === 0 ? (
-        <p className="da-chart__empty">New tenants will appear here as signups come in.</p>
+        <p className="da-chart__empty">{t("platformUi.analyticsSignupsEmpty")}</p>
       ) : (
         <p className="plat-analytics__footnote">
-          <strong>{total}</strong> new tenant{total === 1 ? "" : "s"} in the last {MONTHS} months
+          {t("platformUi.analyticsSignupsFoot", {
+            total,
+            s: total === 1 ? "" : "s",
+            months: MONTHS,
+          })}
         </p>
       )}
     </div>
@@ -100,12 +126,13 @@ function TenantSignupChart({ schools }: { schools: PlatformSchoolRow[] }) {
 }
 
 function PlanDistributionChart({ schools }: { schools: PlatformSchoolRow[] }) {
-  const plans = buildPlanBreakdown(schools);
+  const { t } = useLocale();
+  const plans = buildPlanBreakdown(schools, t("platformUi.analyticsNoPlan"));
   const max = Math.max(1, ...plans.map((p) => p.count));
   const colors = ["#0d9488", "#38bdf8", "#8b5cf6", "#f59e0b", "#64748b"];
 
   if (plans.length === 0) {
-    return <p className="da-chart__empty">No subscription data yet.</p>;
+    return <p className="da-chart__empty">{t("platformUi.analyticsPlansEmpty")}</p>;
   }
 
   return (
@@ -132,12 +159,13 @@ function PlanDistributionChart({ schools }: { schools: PlatformSchoolRow[] }) {
 }
 
 function CommunityChart({ schools }: { schools: PlatformSchoolRow[] }) {
+  const { t } = useLocale();
   const totals = buildCommunityTotals(schools);
   const items = [
-    { label: "Students", value: totals.students, color: "var(--brand-teal-dark)" },
-    { label: "Parents", value: totals.parents, color: "var(--brand-teal)" },
-    { label: "Teachers", value: totals.teachers, color: "var(--brand-cyan)" },
-    { label: "Admins", value: totals.admins, color: "#5eead4" },
+    { label: t("platformUi.statStudents"), value: totals.students, color: "var(--brand-teal-dark)" },
+    { label: t("platformUi.statParents"), value: totals.parents, color: "var(--brand-teal)" },
+    { label: t("platformUi.statTeachers"), value: totals.teachers, color: "var(--brand-cyan)" },
+    { label: t("platformUi.statAdmins"), value: totals.admins, color: "#5eead4" },
   ];
   const max = Math.max(1, ...items.map((i) => i.value));
   const portalTotal = totals.students + totals.parents + totals.teachers + totals.admins;
@@ -164,13 +192,14 @@ function CommunityChart({ schools }: { schools: PlatformSchoolRow[] }) {
         ))}
       </ul>
       <p className="plat-analytics__footnote">
-        <strong>{portalTotal}</strong> accounts across all tenants
+        {t("platformUi.analyticsCommunityFoot", { total: portalTotal })}
       </p>
     </>
   );
 }
 
 function SubscriptionMixRing({ dashboard }: { dashboard: PlatformDashboard }) {
+  const { t } = useLocale();
   const { trial, paid, suspended } = dashboard.schools;
   const total = Math.max(1, trial + paid + suspended);
   const trialPct = Math.round((trial / total) * 100);
@@ -197,21 +226,21 @@ function SubscriptionMixRing({ dashboard }: { dashboard: PlatformDashboard }) {
       >
         <div className="da-finance__ring-inner">
           <span className="da-finance__pct">{activeRate}%</span>
-          <span className="da-finance__pct-label">active</span>
+          <span className="da-finance__pct-label">{t("platformUi.analyticsActive")}</span>
         </div>
       </div>
       <ul className="da-finance__legend">
         <li>
           <span className="da-finance__dot plat-analytics__dot--trial" />
-          Trial <strong>{trial}</strong>
+          {t("platformUi.statTrial")} <strong>{trial}</strong>
         </li>
         <li>
           <span className="da-finance__dot plat-analytics__dot--paid" />
-          Paid <strong>{paid}</strong>
+          {t("platformUi.statPaid")} <strong>{paid}</strong>
         </li>
         <li>
           <span className="da-finance__dot plat-analytics__dot--suspended" />
-          Suspended <strong>{suspended}</strong>
+          {t("platformUi.statSuspended")} <strong>{suspended}</strong>
         </li>
       </ul>
     </div>
@@ -219,13 +248,14 @@ function SubscriptionMixRing({ dashboard }: { dashboard: PlatformDashboard }) {
 }
 
 function TopTenantsChart({ schools }: { schools: PlatformSchoolRow[] }) {
+  const { t } = useLocale();
   const top = [...schools]
     .sort((a, b) => b.usage.students - a.usage.students)
     .slice(0, 5);
   const max = Math.max(1, ...top.map((s) => s.usage.students));
 
   if (top.length === 0) {
-    return <p className="da-chart__empty">Enrollment by tenant will show here.</p>;
+    return <p className="da-chart__empty">{t("platformUi.analyticsLeadersEmpty")}</p>;
   }
 
   return (
@@ -249,12 +279,13 @@ function TopTenantsChart({ schools }: { schools: PlatformSchoolRow[] }) {
 }
 
 export function PlatformAnalytics({ dashboard, schools }: Props) {
+  const { t } = useLocale();
   return (
-    <section className="plat-analytics" aria-label="Platform analytics">
+    <section className="plat-analytics" aria-label={t("platformUi.analyticsAria")}>
       <header className="plat-analytics__head">
         <div>
-          <h2 className="plat-analytics__title">Analytics</h2>
-          <p className="plat-analytics__sub">Growth, subscriptions, and community footprint</p>
+          <h2 className="plat-analytics__title">{t("platformUi.analyticsTitle")}</h2>
+          <p className="plat-analytics__sub">{t("platformUi.analyticsSub")}</p>
         </div>
       </header>
 
@@ -262,8 +293,10 @@ export function PlatformAnalytics({ dashboard, schools }: Props) {
         <article className="da-card da-card--span2">
           <header className="da-card__head">
             <div>
-              <h3 className="da-card__title">Tenant signups</h3>
-              <p className="da-card__sub">New tenants — last {MONTHS} months</p>
+              <h3 className="da-card__title">{t("platformUi.analyticsSignupsTitle")}</h3>
+              <p className="da-card__sub">
+                {t("platformUi.analyticsSignupsSub", { months: MONTHS })}
+              </p>
             </div>
           </header>
           <TenantSignupChart schools={schools} />
@@ -272,8 +305,8 @@ export function PlatformAnalytics({ dashboard, schools }: Props) {
         <article className="da-card">
           <header className="da-card__head">
             <div>
-              <h3 className="da-card__title">Subscription mix</h3>
-              <p className="da-card__sub">Trial, paid, and suspended</p>
+              <h3 className="da-card__title">{t("platformUi.analyticsMixTitle")}</h3>
+              <p className="da-card__sub">{t("platformUi.analyticsMixSub")}</p>
             </div>
           </header>
           <SubscriptionMixRing dashboard={dashboard} />
@@ -282,8 +315,8 @@ export function PlatformAnalytics({ dashboard, schools }: Props) {
         <article className="da-card">
           <header className="da-card__head">
             <div>
-              <h3 className="da-card__title">Plan distribution</h3>
-              <p className="da-card__sub">Active subscriptions by plan</p>
+              <h3 className="da-card__title">{t("platformUi.analyticsPlansTitle")}</h3>
+              <p className="da-card__sub">{t("platformUi.analyticsPlansSub")}</p>
             </div>
           </header>
           <PlanDistributionChart schools={schools} />
@@ -292,8 +325,8 @@ export function PlatformAnalytics({ dashboard, schools }: Props) {
         <article className="da-card">
           <header className="da-card__head">
             <div>
-              <h3 className="da-card__title">Community footprint</h3>
-              <p className="da-card__sub">Users across all tenants</p>
+              <h3 className="da-card__title">{t("platformUi.analyticsCommunityTitle")}</h3>
+              <p className="da-card__sub">{t("platformUi.analyticsCommunitySub")}</p>
             </div>
           </header>
           <CommunityChart schools={schools} />
@@ -302,12 +335,12 @@ export function PlatformAnalytics({ dashboard, schools }: Props) {
         <article className="da-card">
           <header className="da-card__head">
             <div>
-              <h3 className="da-card__title">Enrollment leaders</h3>
-              <p className="da-card__sub">Top tenants by student count</p>
+              <h3 className="da-card__title">{t("platformUi.analyticsLeadersTitle")}</h3>
+              <p className="da-card__sub">{t("platformUi.analyticsLeadersSub")}</p>
             </div>
             <span className="plat-analytics__badge">
               <DashIcon name="students" className="dash-icon--xs" />
-              Live
+              {t("platformUi.analyticsLive")}
             </span>
           </header>
           <TopTenantsChart schools={schools} />

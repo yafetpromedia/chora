@@ -6,8 +6,10 @@ import { TeacherIdCardView } from "@/components/teacher/teacher-id-card";
 import { AUTH_TOKEN_KEY } from "@/lib/auth";
 import { getMyTeacherIdCard, listTeacherIdCards, type TeacherIdCard } from "@/lib/teacher-cards";
 import { BRAND_NAME } from "@/lib/brand";
+import { useLocale } from "@/components/i18n/locale-provider";
 
 function PrintTeacherIdCardInner() {
+  const { t } = useLocale();
   const router = useRouter();
   const searchParams = useSearchParams();
   const userId = searchParams.get("userId") ?? "";
@@ -28,10 +30,10 @@ function PrintTeacherIdCardInner() {
       : userId
         ? listTeacherIdCards().then((rows) => {
             const found = rows.find((r) => r.userId === userId);
-            if (!found) throw new Error("Teacher not found");
+            if (!found) throw new Error(t("idCardPrintChromeUi.teacherNotFound"));
             return found;
           })
-        : Promise.reject(new Error("Missing teacher."));
+        : Promise.reject(new Error(t("idCardPrintChromeUi.missingStaff")));
 
     void load
       .then((data) => {
@@ -39,14 +41,14 @@ function PrintTeacherIdCardInner() {
         setReady(true);
       })
       .catch((err) => {
-        setError(err instanceof Error ? err.message : "Could not load card");
+        setError(err instanceof Error ? err.message : t("idCardPrintChromeUi.loadFailed"));
       });
-  }, [userId, me, router]);
+  }, [userId, me, router, t]);
 
   useEffect(() => {
     if (!ready || !card) return;
-    const t = window.setTimeout(() => window.print(), 450);
-    return () => window.clearTimeout(t);
+    const timeout = window.setTimeout(() => window.print(), 450);
+    return () => window.clearTimeout(timeout);
   }, [ready, card]);
 
   if (error) {
@@ -60,7 +62,7 @@ function PrintTeacherIdCardInner() {
   if (!card) {
     return (
       <div className="sid-print-page">
-        <p className="sid-print-page__loading">Preparing faculty ID card for print…</p>
+        <p className="sid-print-page__loading">{t("idCardPrintChromeUi.preparingStaff")}</p>
       </div>
     );
   }
@@ -79,7 +81,9 @@ function PrintTeacherIdCardInner() {
             <img src={card.schoolLogoUrl} alt="" className="sid-print-meta__logo" />
           ) : null}
           <div className="sid-print-meta__copy">
-            <p className="sid-print-meta__brand">{BRAND_NAME} · Faculty ID</p>
+            <p className="sid-print-meta__brand">
+              {t("idCardPrintChromeUi.facultyId", { brand: BRAND_NAME })}
+            </p>
             <h1 className="sid-print-meta__title">{card.name}</h1>
             <p className="sid-print-meta__sub">
               {card.schoolName}
@@ -89,27 +93,29 @@ function PrintTeacherIdCardInner() {
           </div>
         </div>
         <ul className="sid-print-checklist">
-          <li>Turn on <strong>Background graphics</strong> in the print dialog</li>
+          <li>{t("idCardPrintChromeUi.checklistGraphics")}</li>
           <li>
             {duplex
-              ? "Use double-sided · Flip on long edge · Page 1 front, page 2 back"
-              : "Front only — enable duplex in the app for both sides"}
+              ? t("idCardPrintChromeUi.duplexLong")
+              : t("idCardPrintChromeUi.frontOnlyHint")}
           </li>
-          <li>Trim along the dashed line · Standard card 85.6 × 54 mm (CR80)</li>
+          <li>{t("idCardPrintChromeUi.trimSize")}</li>
         </ul>
-        <p className="sid-print-meta__date">Generated {printedAt}</p>
+        <p className="sid-print-meta__date">
+          {t("idCardPrintChromeUi.generated", { date: printedAt })}
+        </p>
       </header>
 
       <div className={`sid-print-cards${duplex ? " sid-print-cards--duplex" : ""}`}>
         <div className="sid-print-mount">
-          <span className="sid-print-side-label">Front</span>
+          <span className="sid-print-side-label">{t("idCardPrintChromeUi.front")}</span>
           <div className="sid-print-mount__frame">
             <TeacherIdCardView card={card} showBack={false} />
           </div>
         </div>
         {duplex ? (
           <div className="sid-print-mount sid-print-mount--back">
-            <span className="sid-print-side-label">Back — flip on long edge</span>
+            <span className="sid-print-side-label">{t("idCardPrintChromeUi.backLong")}</span>
             <div className="sid-print-mount__frame">
               <TeacherIdCardView card={card} backOnly />
             </div>
@@ -118,21 +124,27 @@ function PrintTeacherIdCardInner() {
       </div>
 
       <footer className="sid-print-foot">
-        {card.schoolName} · Card {card.cardCode} · Faculty property of the school
+        {t("idCardPrintChromeUi.facultyProperty", {
+          school: card.schoolName,
+          code: card.cardCode,
+        })}
       </footer>
+    </div>
+  );
+}
+
+function PrintTeacherIdCardFallback() {
+  const { t } = useLocale();
+  return (
+    <div className="sid-print-page">
+      <p className="sid-print-page__loading">{t("idCardPrintChromeUi.loading")}</p>
     </div>
   );
 }
 
 export default function PrintTeacherIdCardPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="sid-print-page">
-          <p className="sid-print-page__loading">Loading…</p>
-        </div>
-      }
-    >
+    <Suspense fallback={<PrintTeacherIdCardFallback />}>
       <PrintTeacherIdCardInner />
     </Suspense>
   );

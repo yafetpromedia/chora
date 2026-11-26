@@ -1,8 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Html5Qrcode } from "html5-qrcode";
+import type { Html5Qrcode } from "html5-qrcode";
+import { useLocale } from "@/components/i18n/locale-provider";
 import { AppToast } from "@/components/ui/app-toast";
+import {
+  createIdCardScanner,
+  ID_CARD_CAMERA_CONFIG,
+} from "@/lib/id-card-scanner";
 import {
   scanStaffAttendance,
   type StaffScanResult,
@@ -23,6 +28,7 @@ export function StaffAttendanceScanner({
   onDateChange,
   onScanned,
 }: Props) {
+  const { t } = useLocale();
   const [mode, setMode] = useState<ScanMode>("auto");
   const [manualCode, setManualCode] = useState("");
   const [cameraOn, setCameraOn] = useState(false);
@@ -60,7 +66,8 @@ export function StaffAttendanceScanner({
         }
         onScanned?.();
       } catch (err) {
-        const msg = err instanceof Error ? err.message : "Scan failed";
+        const msg =
+          err instanceof Error ? err.message : t("staffAttendanceUi.scanFailed");
         setFlash({ type: "err", text: msg });
         if (typeof navigator !== "undefined" && navigator.vibrate) {
           navigator.vibrate([60, 40, 60]);
@@ -72,18 +79,18 @@ export function StaffAttendanceScanner({
         }, 700);
       }
     },
-    [date, mode, onScanned],
+    [date, mode, onScanned, t],
   );
 
   async function startCamera() {
     if (scannerRef.current) return;
-    const scanner = new Html5Qrcode(SCANNER_ID);
+    const scanner = createIdCardScanner(SCANNER_ID);
     scannerRef.current = scanner;
     setCameraOn(true);
     try {
       await scanner.start(
         { facingMode: "environment" },
-        { fps: 10, qrbox: { width: 220, height: 220 } },
+        ID_CARD_CAMERA_CONFIG,
         (decoded) => {
           void processCode(decoded);
         },
@@ -94,7 +101,7 @@ export function StaffAttendanceScanner({
       scannerRef.current = null;
       setFlash({
         type: "err",
-        text: "Camera not available. Type the staff card code below.",
+        text: t("staffAttendanceUi.scanCameraUnavailable"),
       });
     }
   }
@@ -137,7 +144,7 @@ export function StaffAttendanceScanner({
 
       <div className="sa-scan__toolbar">
         <label className="sa-field">
-          <span>Date</span>
+          <span>{t("staffAttendanceUi.date")}</span>
           <input
             type="date"
             value={date}
@@ -145,21 +152,21 @@ export function StaffAttendanceScanner({
           />
         </label>
         <label className="sa-field">
-          <span>Scan mode</span>
+          <span>{t("staffAttendanceUi.scanMode")}</span>
           <select
             value={mode}
             onChange={(e) => setMode(e.target.value as ScanMode)}
           >
-            <option value="auto">Auto (in → out)</option>
-            <option value="check_in">Check-in only</option>
-            <option value="check_out">Check-out only</option>
+            <option value="auto">{t("staffAttendanceUi.scanMode_auto")}</option>
+            <option value="check_in">
+              {t("staffAttendanceUi.scanMode_check_in")}
+            </option>
+            <option value="check_out">
+              {t("staffAttendanceUi.scanMode_check_out")}
+            </option>
           </select>
         </label>
-        <p className="sa-scan__hint">
-          Accepts staff QR (`CAMPUS1-S:…`) and teacher cards (`CAMPUS1-T:…` /
-          TCH- ID). Student cards (`CAMPUS1:…`) are rejected. Auto mode checks in
-          on the first scan and checks out on the second.
-        </p>
+        <p className="sa-scan__hint">{t("staffAttendanceUi.scanHint")}</p>
       </div>
 
       <div className="sa-scan__layout">
@@ -168,9 +175,11 @@ export function StaffAttendanceScanner({
             <div id={SCANNER_ID} className="sa-scan__reader" />
             {!cameraOn ? (
               <div className="sa-scan__idle">
-                <p className="sa-scan__idle-title">Ready to scan</p>
+                <p className="sa-scan__idle-title">
+                  {t("staffAttendanceUi.scanReadyTitle")}
+                </p>
                 <p className="sa-scan__idle-sub">
-                  Start the camera and point it at a staff ID card
+                  {t("staffAttendanceUi.scanReadySub")}
                 </p>
               </div>
             ) : null}
@@ -182,7 +191,7 @@ export function StaffAttendanceScanner({
                 className="sa-btn sa-btn--primary"
                 onClick={() => void startCamera()}
               >
-                Start camera
+                {t("attendanceScan.startCamera")}
               </button>
             ) : (
               <button
@@ -190,7 +199,7 @@ export function StaffAttendanceScanner({
                 className="sa-btn sa-btn--ghost"
                 onClick={() => void stopCamera()}
               >
-                Stop camera
+                {t("attendanceScan.stopCamera")}
               </button>
             )}
             <form
@@ -206,7 +215,7 @@ export function StaffAttendanceScanner({
                 type="text"
                 value={manualCode}
                 onChange={(e) => setManualCode(e.target.value)}
-                placeholder="Or type card code / TCH-…"
+                placeholder={t("staffAttendanceUi.scanManualPlaceholder")}
                 autoComplete="off"
               />
               <button
@@ -214,7 +223,7 @@ export function StaffAttendanceScanner({
                 className="sa-btn sa-btn--ghost"
                 disabled={busy || !manualCode.trim()}
               >
-                Submit
+                {t("common.submit")}
               </button>
             </form>
           </div>
@@ -222,11 +231,11 @@ export function StaffAttendanceScanner({
 
         <aside className="sa-scan__feed">
           <header className="sa-scan__feed-head">
-            <h3>Recent scans</h3>
+            <h3>{t("staffAttendanceUi.recentScans")}</h3>
             <span>{scanned.length}</span>
           </header>
           {!scanned.length ? (
-            <p className="sa-empty">Scans will appear here.</p>
+            <p className="sa-empty">{t("staffAttendanceUi.scansEmpty")}</p>
           ) : (
             <ul className="sa-scan__list">
               {scanned.map((s) => (
@@ -247,10 +256,10 @@ export function StaffAttendanceScanner({
                     }
                   >
                     {s.action === "check_in"
-                      ? "In"
+                      ? t("staffAttendanceUi.historyIn")
                       : s.action === "check_out"
-                        ? "Out"
-                        : "Done"}
+                        ? t("staffAttendanceUi.historyOut")
+                        : t("staffAttendanceUi.scanDone")}
                   </em>
                 </li>
               ))}

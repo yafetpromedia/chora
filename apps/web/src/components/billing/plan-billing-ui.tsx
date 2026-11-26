@@ -1,6 +1,7 @@
 "use client";
 
 import { BirrSymbol } from "@/components/billing/birr-symbol";
+import { useLocale } from "@/components/i18n/locale-provider";
 import type { BillingInterval, DisplayCurrency, ResolvedPlanPricing } from "@/lib/plan-catalog";
 import { formatEtbAmount, formatUsdAmount } from "@/lib/plan-catalog";
 
@@ -10,15 +11,16 @@ type IntervalToggleProps = {
 };
 
 export function BillingIntervalToggle({ interval, onChange }: IntervalToggleProps) {
+  const { t } = useLocale();
   return (
-    <div className="bill-toggle" role="group" aria-label="Billing period">
+    <div className="bill-toggle" role="group" aria-label={t("planBillingControlsUi.billingPeriodAria")}>
       <button
         type="button"
         className={`bill-toggle__btn${interval === "month" ? " bill-toggle__btn--active" : ""}`}
         onClick={() => onChange("month")}
         aria-pressed={interval === "month"}
       >
-        Monthly
+        {t("planBillingControlsUi.monthly")}
       </button>
       <button
         type="button"
@@ -26,8 +28,8 @@ export function BillingIntervalToggle({ interval, onChange }: IntervalToggleProp
         onClick={() => onChange("year")}
         aria-pressed={interval === "year"}
       >
-        Yearly
-        <span className="bill-toggle__save">−17%</span>
+        {t("planBillingControlsUi.yearly")}
+        <span className="bill-toggle__save">{t("planBillingControlsUi.yearlySave")}</span>
       </button>
     </div>
   );
@@ -39,8 +41,9 @@ type CurrencyToggleProps = {
 };
 
 export function CurrencyToggle({ currency, onChange }: CurrencyToggleProps) {
+  const { t } = useLocale();
   return (
-    <div className="bill-currency-toggle" role="group" aria-label="Currency">
+    <div className="bill-currency-toggle" role="group" aria-label={t("planBillingControlsUi.currencyAria")}>
       <button
         type="button"
         className={`bill-currency-toggle__btn${currency === "usd" ? " bill-currency-toggle__btn--active" : ""}`}
@@ -50,7 +53,7 @@ export function CurrencyToggle({ currency, onChange }: CurrencyToggleProps) {
         <span className="bill-currency-toggle__sym" aria-hidden>
           $
         </span>
-        USD
+        {t("planBillingControlsUi.usd")}
       </button>
       <button
         type="button"
@@ -59,7 +62,7 @@ export function CurrencyToggle({ currency, onChange }: CurrencyToggleProps) {
         aria-pressed={currency === "etb"}
       >
         <BirrSymbol size={16} className="bill-currency-toggle__birr" />
-        ETB
+        {t("planBillingControlsUi.etb")}
       </button>
     </div>
   );
@@ -93,13 +96,14 @@ type PriceProps = {
 };
 
 export function PlanPriceDisplay({ pricing, currency, compact }: PriceProps) {
-  const per = pricing.interval === "year" ? "/yr" : "/mo";
+  const { t } = useLocale();
+  const per = pricing.interval === "year" ? t("planBillingControlsUi.perYear") : t("planBillingControlsUi.perMonth");
 
   if (pricing.custom) {
     return (
       <div className={`bill-price bill-price--custom${compact ? " bill-price--compact" : ""}`}>
-        <p className="bill-price__custom-label">Custom</p>
-        <p className="bill-price__period-note">Contact sales</p>
+        <p className="bill-price__custom-label">{t("planBillingControlsUi.custom")}</p>
+        <p className="bill-price__period-note">{t("planBillingControlsUi.contactSales")}</p>
       </div>
     );
   }

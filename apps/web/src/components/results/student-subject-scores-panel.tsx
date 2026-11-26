@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { StudentSectionBanner } from "@/components/student/student-section-banner";
+import { DashIcon } from "@/components/dashboard/dash-icons";
 import {
   createScoreCorrection,
   getScoreMatrix,
@@ -19,6 +20,8 @@ import {
   ResultsStudentPicker,
   type ResultsStudentOption,
 } from "@/components/results/results-student-picker";
+import { useLocale } from "@/components/i18n/locale-provider";
+import { subjectCompactLabel } from "@/lib/subject-label";
 
 function useHydrated() {
   return useSyncExternalStore(
@@ -90,6 +93,7 @@ export function StudentSubjectScoresPanel({
   loadStudentsFromClasses = false,
   initialClassSubjectId,
 }: Props) {
+  const { t, tn } = useLocale();
   const hydrated = useHydrated();
   const isPortalView = role === "student" || role === "parent";
   const canEdit = !readOnly && !isPortalView;
@@ -125,14 +129,17 @@ export function StudentSubjectScoresPanel({
 
   useEffect(() => {
     void listTerms()
-      .then((t) => {
-        setTerms(t);
+      .then((termsList) => {
+        setTerms(termsList);
         if (!termId) {
-          const current = defaultTermId ?? t.find((x) => x.isCurrent)?.id ?? t[0]?.id ?? "";
+          const current =
+            defaultTermId ?? termsList.find((x) => x.isCurrent)?.id ?? termsList[0]?.id ?? "";
           if (current) setTermId(current);
         }
       })
-      .catch((err) => setError(err instanceof Error ? err.message : "Could not load terms"));
+      .catch((err) =>
+        setError(err instanceof Error ? err.message : t("studentSubjectScoresUi.loadTermsFailed")),
+      );
   }, [defaultTermId, termId]);
 
   useEffect(() => {
@@ -146,7 +153,7 @@ export function StudentSubjectScoresPanel({
             : "";
         setClassSubjectId(match);
       })
-      .catch(() => setError("Could not load classes"));
+      .catch(() => setError(t("studentSubjectScoresUi.loadClassesFailed")));
   }, [loadStudentsFromClasses, studentsProp.length, initialClassSubjectId]);
 
   const [prevDefaultStudentId, setPrevDefaultStudentId] = useState(defaultStudentId);
@@ -211,7 +218,9 @@ export function StudentSubjectScoresPanel({
           return next[0]?.id ?? "";
         });
       })
-      .catch((err) => setError(err instanceof Error ? err.message : "Could not load students"))
+      .catch((err) =>
+        setError(err instanceof Error ? err.message : t("studentSubjectScoresUi.loadStudentsFailed")),
+      )
       .finally(() => setLoadingStudents(false));
   }, [rosterSources, termId]);
 
@@ -234,7 +243,7 @@ export function StudentSubjectScoresPanel({
       setSaved(false);
       if (isPortalView) setStudentId(data.student.id);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load scores");
+      setError(err instanceof Error ? err.message : t("studentSubjectScoresUi.loadScoresFailed"));
       setMatrix(null);
     } finally {
       setLoading(false);
@@ -270,7 +279,7 @@ export function StudentSubjectScoresPanel({
         setSaved(false);
         if (isPortalView) setStudentId(data.student.id);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Could not load scores");
+        setError(err instanceof Error ? err.message : t("studentSubjectScoresUi.loadScoresFailed"));
         setMatrix(null);
       } finally {
         setLoading(false);
@@ -353,7 +362,7 @@ export function StudentSubjectScoresPanel({
     }
 
     if (entries.length === 0) {
-      setError("Enter at least one score before saving.");
+      setError(t("studentSubjectScoresUi.enterBeforeSave"));
       return;
     }
 
@@ -364,7 +373,7 @@ export function StudentSubjectScoresPanel({
       setSaved(true);
       await loadMatrix();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Save failed");
+      setError(err instanceof Error ? err.message : t("studentSubjectScoresUi.saveFailed"));
     } finally {
       setSaving(false);
     }
@@ -373,7 +382,7 @@ export function StudentSubjectScoresPanel({
   async function submitScoreReport() {
     if (!reportTarget || !matrix) return;
     if (reportMessage.trim().length < 3) {
-      setError("Please describe what looks wrong (at least a few words).");
+      setError(t("studentSubjectScoresUi.reportTooShort"));
       return;
     }
     setReportBusy(true);
@@ -384,18 +393,18 @@ export function StudentSubjectScoresPanel({
         studentProfileId: matrix.student.id,
         message: reportMessage.trim(),
       });
-      setReportFlash("Report sent to your subject teacher. You’ll be notified when it’s reviewed.");
+      setReportFlash(t("studentSubjectScoresUi.reportSent"));
       setReportTarget(null);
       setReportMessage("");
       setReportsRefreshKey((key) => key + 1);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not send report");
+      setError(err instanceof Error ? err.message : t("studentSubjectScoresUi.sendReportFailed"));
     } finally {
       setReportBusy(false);
     }
   }
 
-  const selectedTerm = terms.find((t) => t.id === termId);
+  const selectedTerm = terms.find((term) => term.id === termId);
   const selectedStudent = students.find((s) => s.id === studentId);
   const hasDraft = canEdit && Object.keys(draft).length > 0;
 
@@ -456,33 +465,42 @@ export function StudentSubjectScoresPanel({
       {isPortalView ? (
         <StudentSectionBanner
           tone="results"
-          eyebrow={selectedTerm?.name ?? matrix?.term.name ?? "Term scores"}
-          title={role === "parent" ? "Child results" : "My results"}
+          eyebrow={selectedTerm?.name ?? matrix?.term.name ?? t("studentSubjectScoresUi.termScores")}
+          title={
+            role === "parent"
+              ? t("studentSubjectScoresUi.childResults")
+              : t("studentSubjectScoresUi.myResults")
+          }
           subtitle={
             role === "parent"
               ? portalStats && portalStats.publishedSubjects > 0
-                ? `${portalStats.publishedSubjects} subject${portalStats.publishedSubjects === 1 ? "" : "s"} officially published. In-progress subjects are marked until the school publishes them.`
-                : "Scores appear as teachers enter them. Published subjects are marked when the school releases them officially."
-              : "Scores released by your teachers, organized by subject."
+                ? t(
+                    portalStats.publishedSubjects === 1
+                      ? "studentSubjectScoresUi.parentPubSubOne"
+                      : "studentSubjectScoresUi.parentPubSub",
+                    { count: portalStats.publishedSubjects },
+                  )
+                : t("studentSubjectScoresUi.parentDefaultSub")
+              : t("studentSubjectScoresUi.myResultsSub")
           }
-          icon="📊"
+          icon={<DashIcon name="results" className="dash-icon--sm" />}
           stats={
             portalStats
               ? [
                   {
                     value: portalStats.average ?? "—",
-                    label: "Average",
+                    label: t("studentSubjectScoresUi.average"),
                   },
-                  { value: portalStats.subjects, label: "Subjects" },
+                  { value: portalStats.subjects, label: t("studentSubjectScoresUi.subjects") },
                   {
                     value: portalStats.publishedSubjects,
-                    label: "Published",
+                    label: t("studentSubjectScoresUi.published"),
                   },
                 ]
               : [
-                  { value: "—", label: "Average" },
-                  { value: 0, label: "Subjects" },
-                  { value: 0, label: "Published" },
+                  { value: "—", label: t("studentSubjectScoresUi.average") },
+                  { value: 0, label: t("studentSubjectScoresUi.subjects") },
+                  { value: 0, label: t("studentSubjectScoresUi.published") },
                 ]
           }
         />
@@ -490,21 +508,23 @@ export function StudentSubjectScoresPanel({
 
       <AppToast message={error} tone="error" onDismiss={() => setError("")} />
       <AppToast
-        message={saved ? "Scores saved." : ""}
+        message={saved ? t("studentSubjectScoresUi.scoresSaved") : ""}
         tone="success"
         onDismiss={() => setSaved(false)}
       />
 
       {!isPortalView ? (
         <div className="res-scores-head res-scores-head--modern">
-          <div className="res-scores-context">
+          <div className="res-scores-context res-scores-context--hero">
             <div className="res-scores-context__main">
-              <p className="res-scores-context__eyebrow">Individual view</p>
+              <div className="res-scores-context__brand">
+                <span className="res-scores-context__chip">{t("studentSubjectScoresUi.byStudentChip")}</span>
+              </div>
               <h2 className="res-scores-context__title">
-                {selectedStudent?.name ?? matrix?.student.name ?? "Subject scores by student"}
+                {selectedStudent?.name ?? matrix?.student.name ?? t("studentSubjectScoresUi.titleFallback")}
               </h2>
               <p className="res-scores-context__meta">
-                {selectedTerm?.name ?? "Select term"}
+                {selectedTerm?.name ?? t("scoreMatrixUi.selectTerm")}
                 {matrix?.student.grade
                   ? ` · ${matrix.student.grade}`
                   : selectedStudent?.grade
@@ -516,50 +536,50 @@ export function StudentSubjectScoresPanel({
                     ? ` · ${selectedStudent.section}`
                     : ""}
                 {matrix?.student.studentId
-                  ? ` · ID ${matrix.student.studentId}`
+                  ? `${t("studentSubjectScoresUi.idPrefix")}${matrix.student.studentId}`
                   : selectedStudent?.studentId
-                    ? ` · ID ${selectedStudent.studentId}`
+                    ? `${t("studentSubjectScoresUi.idPrefix")}${selectedStudent.studentId}`
                     : ""}
-                {" · One row per subject"}
+                {t("studentSubjectScoresUi.oneRowPerSubject")}
               </p>
             </div>
             <div className="res-scores-context__metrics">
               <div className="res-metric-pill">
                 <strong>{matrix?.subjects.length ?? 0}</strong>
-                <span>Subjects</span>
+                <span>{t("studentSubjectScoresUi.subjects")}</span>
               </div>
               <div className="res-metric-pill">
                 <strong>{matrix?.columns.length ?? 0}</strong>
-                <span>Components</span>
+                <span>{t("studentSubjectScoresUi.components")}</span>
               </div>
               <div className="res-metric-pill res-metric-pill--accent">
                 <strong>{completionPct}%</strong>
-                <span>Complete</span>
+                <span>{t("studentSubjectScoresUi.complete")}</span>
               </div>
             </div>
           </div>
 
           <div className="res-scores-filters res-scores-toolbar res-scores-toolbar--triple">
             <label className="res-scores-field">
-              <span>Term</span>
+              <span>{t("scoreMatrixUi.term")}</span>
               <select value={termId} onChange={(e) => setTermId(e.target.value)}>
-                {terms.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                    {t.isCurrent ? " (current)" : ""}
+                {terms.map((term) => (
+                  <option key={term.id} value={term.id}>
+                    {term.name}
+                    {term.isCurrent ? t("scoreMatrixUi.currentTerm") : ""}
                   </option>
                 ))}
               </select>
             </label>
             {showClassPicker ? (
               <label className="res-scores-field res-scores-field--wide">
-                <span>Roster from</span>
+                <span>{t("studentSubjectScoresUi.rosterFrom")}</span>
                 <select
                   value={classSubjectId}
                   onChange={(e) => setClassSubjectId(e.target.value)}
                   disabled={controlsDisabled}
                 >
-                  <option value="">All my classes</option>
+                  <option value="">{t("studentSubjectScoresUi.allMyClasses")}</option>
                   {classSubjects.map((c) => (
                     <option key={c.id} value={c.id}>
                       {classLabel(c)}
@@ -583,35 +603,39 @@ export function StudentSubjectScoresPanel({
       {loading || loadingStudents ? (
         <div className="res-scores-loading">
           <span className="res-scores-loading__spinner" aria-hidden />
-          <p>{isPortalView ? "Loading your scores…" : "Loading subject scores…"}</p>
+          <p>
+            {isPortalView
+              ? t("studentSubjectScoresUi.loadingPortal")
+              : t("studentSubjectScoresUi.loadingTeacher")}
+          </p>
         </div>
       ) : !isPortalView && !studentId ? (
         <div className="res-scores-empty res-scores-empty--action">
-          <h3>Select a student</h3>
-          <p>Choose a student from the toolbar to view their subject score sheet.</p>
+          <h3>{t("studentSubjectScoresUi.pickStudentTitle")}</h3>
+          <p>{t("studentSubjectScoresUi.pickStudentBody")}</p>
         </div>
       ) : !matrix ? null : matrix.subjects.length === 0 ? (
         <div className="res-scores-empty res-scores-empty--action">
-          <h3>No subjects assigned</h3>
-          <p>Assign subjects to this grade before entering scores.</p>
+          <h3>{t("studentSubjectScoresUi.noSubjectsTitle")}</h3>
+          <p>{t("studentSubjectScoresUi.noSubjectsBody")}</p>
         </div>
       ) : matrix.columns.length === 0 ? (
         <div className="res-scores-empty res-scores-empty--action">
-          <h3>No assessment components</h3>
-          <p>Assign assessment templates to classes first.</p>
+          <h3>{t("studentSubjectScoresUi.noComponentsTitle")}</h3>
+          <p>{t("studentSubjectScoresUi.noComponentsBody")}</p>
         </div>
       ) : isPortalView && portalStats?.released === 0 ? (
         <div className="res-portal-empty">
           <p className="res-portal-empty__eyebrow">{selectedTerm?.name ?? matrix.term.name}</p>
-          <h3>No scores released yet</h3>
-          <p>When your teacher posts marks, they&apos;ll show up here by subject.</p>
+          <h3>{t("studentSubjectScoresUi.noScoresTitle")}</h3>
+          <p>{t("studentSubjectScoresUi.noScoresBody")}</p>
           <label className="res-portal-term">
-            <span>Term</span>
+            <span>{t("scoreMatrixUi.term")}</span>
             <select value={termId} onChange={(e) => setTermId(e.target.value)}>
-              {terms.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                  {t.isCurrent ? " (current)" : ""}
+              {terms.map((term) => (
+                <option key={term.id} value={term.id}>
+                  {term.name}
+                  {term.isCurrent ? t("scoreMatrixUi.currentTerm") : ""}
                 </option>
               ))}
             </select>
@@ -628,12 +652,12 @@ export function StudentSubjectScoresPanel({
               <>
                 <div className="res-portal-head">
                   <label className="res-portal-term">
-                    <span>Term</span>
+                    <span>{t("scoreMatrixUi.term")}</span>
                     <select value={termId} onChange={(e) => setTermId(e.target.value)}>
-                      {terms.map((t) => (
-                        <option key={t.id} value={t.id}>
-                          {t.name}
-                          {t.isCurrent ? " (current)" : ""}
+                      {terms.map((term) => (
+                        <option key={term.id} value={term.id}>
+                          {term.name}
+                          {term.isCurrent ? t("scoreMatrixUi.currentTerm") : ""}
                         </option>
                       ))}
                     </select>
@@ -650,16 +674,16 @@ export function StudentSubjectScoresPanel({
                     {portalStats.average != null ? (
                       <div className="res-portal-stat res-portal-stat--accent">
                         <strong>{portalStats.average}%</strong>
-                        <span>Average</span>
+                        <span>{t("studentSubjectScoresUi.average")}</span>
                       </div>
                     ) : null}
                     <div className="res-portal-stat">
                       <strong>{portalStats.subjects}</strong>
-                      <span>Subjects</span>
+                      <span>{t("studentSubjectScoresUi.subjects")}</span>
                     </div>
                     <div className="res-portal-stat">
                       <strong>{portalStats.publishedSubjects}</strong>
-                      <span>Published</span>
+                      <span>{t("studentSubjectScoresUi.published")}</span>
                     </div>
                   </div>
                 ) : null}
@@ -668,23 +692,31 @@ export function StudentSubjectScoresPanel({
               <>
                 <div>
                   <h3 className="res-subject-sheet__title">
-                    Score grid — {selectedTerm?.name ?? matrix.term.name}
+                    {t("studentSubjectScoresUi.scoreGrid", {
+                      term: selectedTerm?.name ?? matrix.term.name,
+                    })}
                   </h3>
                   <p className="res-subject-sheet__meta">
-                    {stats.filled} of {stats.total} scores entered
+                    {t("studentSubjectScoresUi.enteredOf", {
+                      filled: stats.filled,
+                      total: stats.total,
+                    })}
                   </p>
                 </div>
-                <div className="res-subject-legend" aria-label="Score status legend">
+                <div
+                  className="res-subject-legend"
+                  aria-label={t("studentSubjectScoresUi.legendAria")}
+                >
                   <span className="res-subject-legend__item res-subject-legend__item--committed">
-                    committed
+                    {t("studentSubjectScoresUi.committed")}
                   </span>
                   {canEdit ? (
                     <span className="res-subject-legend__item res-subject-legend__item--temp">
-                      temp
+                      {t("studentSubjectScoresUi.temp")}
                     </span>
                   ) : null}
                   <span className="res-subject-legend__item res-subject-legend__item--missing">
-                    missing
+                    {t("studentSubjectScoresUi.missing")}
                   </span>
                 </div>
               </>
@@ -697,7 +729,9 @@ export function StudentSubjectScoresPanel({
                 <div className="res-scores-progress__bar">
                   <span style={{ width: `${completionPct}%` }} />
                 </div>
-                <p className="res-scores-progress__label">{completionPct}% complete</p>
+                <p className="res-scores-progress__label">
+                  {t("studentSubjectScoresUi.percentComplete", { pct: completionPct })}
+                </p>
               </div>
               <div className="res-subject-sheet__actions">
                 {hasDraft ? (
@@ -707,10 +741,10 @@ export function StudentSubjectScoresPanel({
                     disabled={saving}
                     onClick={() => void onSave()}
                   >
-                    {saving ? "Saving…" : "Save changes"}
+                    {saving ? t("common.saving") : t("studentSubjectScoresUi.saveChanges")}
                   </button>
                 ) : (
-                  <p className="res-subject-sheet__progress">All changes saved</p>
+                  <p className="res-subject-sheet__progress">{t("studentSubjectScoresUi.allSaved")}</p>
                 )}
               </div>
             </>
@@ -720,13 +754,13 @@ export function StudentSubjectScoresPanel({
             <table className="res-subject-table">
               <thead>
                 <tr>
-                  <th className="res-subject-table__subject-col">Subject</th>
+                  <th className="res-subject-table__subject-col">{t("studentSubjectScoresUi.colSubject")}</th>
                   {matrix.columns.map((col) => (
                     <th key={col.key}>
                       <span className="res-subject-table__col-name">{col.name}</span>
                     </th>
                   ))}
-                  <th className="res-subject-table__total-col">Total</th>
+                  <th className="res-subject-table__total-col">{t("studentSubjectScoresUi.colTotal")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -736,8 +770,11 @@ export function StudentSubjectScoresPanel({
                   return (
                     <tr key={subject.classSubjectId}>
                       <th scope="row" className="res-subject-table__subject">
-                        <span className="res-subject-table__subject-name">
-                          {subject.subject}
+                        <span
+                          className="res-subject-table__subject-name"
+                          title={subject.subject}
+                        >
+                          {subjectCompactLabel({ name: subject.subject })}
                         </span>
                         {isPortalView ? (
                           <span
@@ -746,11 +783,13 @@ export function StudentSubjectScoresPanel({
                             }`}
                             title={
                               isPublished
-                                ? "Officially published for families"
-                                : "Saved scores — not officially published yet"
+                                ? t("studentSubjectScoresUi.publishedTitle")
+                                : t("studentSubjectScoresUi.draftTitle")
                             }
                           >
-                            {isPublished ? "Published" : "In progress"}
+                            {isPublished
+                              ? t("studentSubjectScoresUi.publishedPill")
+                              : t("studentSubjectScoresUi.inProgress")}
                           </span>
                         ) : null}
                       </th>
@@ -829,7 +868,7 @@ export function StudentSubjectScoresPanel({
                                 <button
                                   type="button"
                                   className="res-subject-report-btn"
-                                  title="Report a wrong published mark"
+                                  title={t("studentSubjectScoresUi.reportTitle")}
                                   onClick={() => {
                                     const col = matrix.columns.find(
                                       (c) => c.key === cell.columnKey,
@@ -838,14 +877,14 @@ export function StudentSubjectScoresPanel({
                                     setReportMessage("");
                                     setReportTarget({
                                       assessmentId: cell.assessmentId!,
-                                      assessmentName: col?.name ?? "Component",
+                                      assessmentName: col?.name ?? t("studentSubjectScoresUi.componentFallback"),
                                       subjectName: subject.subject,
                                       score: value,
                                       maxScore: cell.maxScore,
                                     });
                                   }}
                                 >
-                                  Report
+                                  {t("studentSubjectScoresUi.reportBtn")}
                                 </button>
                               ) : null}
                             </div>
@@ -871,17 +910,9 @@ export function StudentSubjectScoresPanel({
           </div>
 
           {!isPortalView ? (
-            <p className="res-subject-sheet__hint">
-              Assessment columns come from each subject&apos;s template — configure them under{" "}
-              <strong>Assessment templates</strong>. Different schools can use different component
-              names and weights.
-            </p>
+            <p className="res-subject-sheet__hint">{t("studentSubjectScoresUi.teacherHint")}</p>
           ) : (
-            <p className="res-subject-sheet__hint">
-              See a wrong published mark? Use <strong>Report</strong> under that score. Your
-              teacher will propose a fix and the school office must approve before it updates for
-              everyone.
-            </p>
+            <p className="res-subject-sheet__hint">{t("studentSubjectScoresUi.portalHint")}</p>
           )}
         </section>
       )}
@@ -910,15 +941,18 @@ export function StudentSubjectScoresPanel({
           <div className="res-correction-drawer__panel">
             <header className="res-correction-drawer__head">
               <div>
-                <h3>Report score issue</h3>
+                <h3>{t("studentSubjectScoresUi.reportDrawerTitle")}</h3>
                 <p>
                   {reportTarget.subjectName} · {reportTarget.assessmentName}
                   {reportTarget.score != null
-                    ? ` · showing ${reportTarget.score}${
-                        reportTarget.maxScore != null
-                          ? `/${reportTarget.maxScore}`
-                          : ""
-                      }`
+                    ? reportTarget.maxScore != null
+                      ? t("studentSubjectScoresUi.reportShowingMax", {
+                          score: reportTarget.score,
+                          max: reportTarget.maxScore,
+                        })
+                      : t("studentSubjectScoresUi.reportShowing", {
+                          score: reportTarget.score,
+                        })
                     : ""}
                 </p>
               </div>
@@ -927,16 +961,16 @@ export function StudentSubjectScoresPanel({
                 className="res-approvals__btn res-approvals__btn--sm"
                 onClick={() => setReportTarget(null)}
               >
-                Cancel
+                {t("common.cancel")}
               </button>
             </header>
             <label className="res-correction-drawer__field">
-              <span>What looks wrong?</span>
+              <span>{t("studentSubjectScoresUi.whatWrong")}</span>
               <textarea
                 rows={4}
                 value={reportMessage}
                 onChange={(e) => setReportMessage(e.target.value)}
-                placeholder="Example: Mid exam should be 28, not 18."
+                placeholder={t("studentSubjectScoresUi.reportPlaceholder")}
               />
             </label>
             <div className="res-correction-drawer__actions">
@@ -946,7 +980,7 @@ export function StudentSubjectScoresPanel({
                 disabled={reportBusy}
                 onClick={() => void submitScoreReport()}
               >
-                {reportBusy ? "Sending…" : "Send report"}
+                {reportBusy ? t("studentSubjectScoresUi.sending") : t("studentSubjectScoresUi.sendReport")}
               </button>
             </div>
           </div>

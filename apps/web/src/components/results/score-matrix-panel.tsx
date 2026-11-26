@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { useHydrated } from "@/lib/use-client-snapshot";
 import { DashIcon } from "@/components/dashboard/dash-icons";
+import { useLocale } from "@/components/i18n/locale-provider";
 import { AppToast } from "@/components/ui/app-toast";
 import type { GradeWithSections } from "@/lib/api";
 import { listGrades } from "@/lib/school-setup";
@@ -21,6 +22,7 @@ import {
   type ResultWorkflowStatus,
   type ScoreMatrix,
 } from "@/lib/results";
+import { subjectCompactLabel } from "@/lib/subject-label";
 
 type Props = {
   role: "admin" | "teacher" | "staff";
@@ -29,14 +31,19 @@ type Props = {
 
 const ALL = "__all__";
 
-function workflowDisplay(status: ResultWorkflowStatus): {
+type MatrixT = (key: string, vars?: Record<string, string | number>) => string;
+
+function workflowDisplay(
+  status: ResultWorkflowStatus,
+  t: MatrixT,
+): {
   label: string;
   pill: "working" | "published";
 } {
   if (status === "PUBLISHED") {
-    return { label: "Published", pill: "published" };
+    return { label: t("scoreMatrixUi.workflowPublished"), pill: "published" };
   }
-  return { label: "Working", pill: "working" };
+  return { label: t("scoreMatrixUi.workflowWorking"), pill: "working" };
 }
 
 function heroTitle(
@@ -46,20 +53,24 @@ function heroTitle(
   subjectName: string | null,
   sectionId: string,
   sectionName: string | null,
+  t: MatrixT,
 ) {
   if (subjectId === ALL && sectionId === ALL) {
-    return `${gradeName} — All subjects · All sections`;
+    return t("scoreMatrixUi.heroAllSubjectsAllSections", { grade: gradeName });
   }
   if (subjectId === ALL) {
     const section = sectionName ? ` · ${sectionName}` : "";
-    return `${gradeName}${section} — All subjects`;
+    return t("scoreMatrixUi.heroAllSubjects", { grade: gradeName, section });
   }
   if (sectionId === ALL) {
-    return `${gradeName} — ${subjectName ?? "Subject"} · All sections`;
+    return t("scoreMatrixUi.heroSubjectAllSections", {
+      grade: gradeName,
+      subject: subjectName ?? t("scoreMatrixUi.heroSubjectFallback"),
+    });
   }
-  if (!cs) return "Enter scores";
+  if (!cs) return t("scoreMatrixUi.heroEnterScores");
   const section = cs.section ? ` · ${cs.section.name}` : "";
-  return `${cs.grade.name}${section} — ${cs.subject.name}`;
+  return `${cs.grade.name}${section} — ${subjectCompactLabel(cs.subject)}`;
 }
 
 function sectionKey(cs: ClassSubject) {
@@ -101,31 +112,34 @@ function statusMessage(
   status: ResultWorkflowStatus,
   role: Props["role"],
   hasOpenComponents: boolean,
+  t: MatrixT,
 ) {
   if (status === "PUBLISHED") {
     return {
-      title: "Published to parents",
+      title: t("scoreMatrixUi.statusPubTitle"),
       body:
         role === "teacher"
-          ? "This score sheet is final. Scores below are read-only and visible on report cards."
-          : "This score sheet is final and visible on report cards. Reopen to allow edits again.",
+          ? t("scoreMatrixUi.statusPubBodyTeacher")
+          : t("scoreMatrixUi.statusPubBodyAdmin"),
       tone: "success" as const,
     };
   }
 
   if (role === "teacher") {
     return {
-      title: hasOpenComponents ? "Open for scoring" : "Components locked",
+      title: hasOpenComponents
+        ? t("scoreMatrixUi.statusOpenTitle")
+        : t("scoreMatrixUi.statusLockedTitle"),
       body: hasOpenComponents
-        ? "Enter and save scores anytime. Academic office publishes when ready — no submit or approval needed."
-        : "Ask academic office to open components before entering scores.",
+        ? t("scoreMatrixUi.statusOpenBody")
+        : t("scoreMatrixUi.statusLockedBody"),
       tone: "info" as const,
     };
   }
 
   return {
-    title: "Working sheet",
-    body: "Teachers can enter scores on open components. Publish when the sheet is ready for families and report cards.",
+    title: t("scoreMatrixUi.statusWorkingTitle"),
+    body: t("scoreMatrixUi.statusWorkingBody"),
     tone: "info" as const,
   };
 }
@@ -220,6 +234,7 @@ function rankByValue(values: { id: string; value: number | null }[], id: string)
 }
 
 export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
+  const { t } = useLocale();
   const [terms, setTerms] = useState<AcademicTerm[]>([]);
   const [classSubjects, setClassSubjects] = useState<ClassSubject[]>([]);
   const [schoolGrades, setSchoolGrades] = useState<GradeWithSections[]>([]);
@@ -263,11 +278,11 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
       listClassSubjects(),
       isSchoolAdmin ? listGrades() : Promise.resolve([] as GradeWithSections[]),
     ])
-      .then(([t, cs, allGrades]) => {
-        setTerms(t);
+      .then(([termRows, cs, allGrades]) => {
+        setTerms(termRows);
         setClassSubjects(cs);
         setSchoolGrades(allGrades);
-        const curTerm = t.find((x) => x.isCurrent) ?? t[0];
+        const curTerm = termRows.find((x) => x.isCurrent) ?? termRows[0];
         if (curTerm) setTermId(curTerm.id);
 
         const initial =
@@ -287,9 +302,9 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
           setClassSubjectId("");
         }
       })
-      .catch(() => setError("Could not load classes or terms"))
+      .catch(() => setError(t("scoreMatrixUi.loadClassesTermsFailed")))
       .finally(() => setFiltersLoaded(true));
-  }, [initialClassSubjectId, isSchoolAdmin]);
+  }, [initialClassSubjectId, isSchoolAdmin, t]);
 
   // Only set after mount so SSR HTML and the first client render both omit `disabled`.
   const filterSelectDisabled = filtersInteractive ? !filtersLoaded : undefined;
@@ -306,11 +321,20 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
   }, [classSubjects, isSchoolAdmin, schoolGrades]);
 
   const subjectsForGrade = useMemo(() => {
-    const map = new Map<string, string>();
+    const map = new Map<string, { name: string; code?: string | null }>();
     for (const cs of classSubjects.filter((c) => c.grade.id === gradeId)) {
-      if (!map.has(cs.subject.id)) map.set(cs.subject.id, cs.subject.name);
+      if (!map.has(cs.subject.id)) {
+        map.set(cs.subject.id, {
+          name: cs.subject.name,
+          code: cs.subject.code ?? null,
+        });
+      }
     }
-    return [...map.entries()].map(([id, name]) => ({ id, name }));
+    return [...map.entries()].map(([id, value]) => ({
+      id,
+      name: value.name,
+      code: value.code,
+    }));
   }, [classSubjects, gradeId]);
 
   const sectionsForFilter = useMemo(() => {
@@ -409,7 +433,7 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
       }
       setDraft(initial);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load scores");
+      setError(err instanceof Error ? err.message : t("scoreMatrixUi.loadScoresFailed"));
       setMatrix(null);
     } finally {
       setLoading(false);
@@ -462,7 +486,7 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
           );
           setAggregatedSheets(results);
         } catch (err) {
-          setError(err instanceof Error ? err.message : "Could not load scores");
+          setError(err instanceof Error ? err.message : t("scoreMatrixUi.loadScoresFailed"));
           setAggregatedSheets([]);
         } finally {
           setLoading(false);
@@ -482,7 +506,7 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
           }
           setDraft(initial);
         } catch (err) {
-          setError(err instanceof Error ? err.message : "Could not load scores");
+          setError(err instanceof Error ? err.message : t("scoreMatrixUi.loadScoresFailed"));
           setMatrix(null);
         } finally {
           setLoading(false);
@@ -517,7 +541,8 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
 
   async function toggleAssessmentLock(assessmentId: string, open: boolean) {
     const name =
-      matrix?.assessments.find((a) => a.id === assessmentId)?.name ?? "Component";
+      matrix?.assessments.find((a) => a.id === assessmentId)?.name ??
+        t("scoreMatrixUi.componentFallback");
     setLockToggleBusy(assessmentId);
     setError("");
     setSuccess("");
@@ -536,18 +561,24 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
       if (lockScope === "all") {
         setSuccess(
           open
-            ? `${name} open for teacher entry on all grades & subjects this term (${result.updatedCount}).`
-            : `${name} locked for teacher entry on all grades & subjects this term (${result.updatedCount}). Students still see saved scores.`,
+            ? t("scoreMatrixUi.lockOpenAll", {
+                name,
+                count: result.updatedCount,
+              })
+            : t("scoreMatrixUi.lockClosedAll", {
+                name,
+                count: result.updatedCount,
+              }),
         );
       } else {
         setSuccess(
           open
-            ? `${name} open for this class — teachers can enter scores.`
-            : `${name} locked for this class — teacher entry closed. Students still see saved scores.`,
+            ? t("scoreMatrixUi.lockOpenClass", { name })
+            : t("scoreMatrixUi.lockClosedClass", { name }),
         );
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not update component lock");
+      setError(err instanceof Error ? err.message : t("scoreMatrixUi.lockUpdateFailed"));
     } finally {
       setLockToggleBusy(null);
     }
@@ -584,10 +615,12 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
       else await reopenResultWorkflow(termId, classSubjectId);
       await loadMatrix();
       setSuccess(
-        action === "publish" ? "Results published." : "Score sheet reopened.",
+        action === "publish"
+          ? t("scoreMatrixUi.resultsPublished")
+          : t("scoreMatrixUi.scoreSheetReopened"),
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Workflow action failed");
+      setError(err instanceof Error ? err.message : t("scoreMatrixUi.workflowActionFailed"));
     } finally {
       setWorkflowBusy(false);
     }
@@ -607,7 +640,7 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
       }
     }
     if (entries.length === 0) {
-      setError("Enter at least one score before saving.");
+      setError(t("scoreMatrixUi.saveAtLeastOne"));
       return;
     }
     setSaving(true);
@@ -617,10 +650,12 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
       await saveScoreMatrix({ termId, classSubjectId, entries });
       await loadMatrix();
       setSuccess(
-        `Saved ${entries.length} score${entries.length === 1 ? "" : "s"} successfully.`,
+        entries.length === 1
+          ? t("scoreMatrixUi.saveSuccessOne")
+          : t("scoreMatrixUi.saveSuccessMany", { count: entries.length }),
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Save failed");
+      setError(err instanceof Error ? err.message : t("scoreMatrixUi.saveFailed"));
     } finally {
       setSaving(false);
     }
@@ -770,7 +805,9 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
           <table className="res-scores-table">
             <thead>
               <tr>
-                <th className="res-scores-table__student-col">Student</th>
+                <th className="res-scores-table__student-col">
+                  {t("scoreMatrixUi.studentCol")}
+                </th>
                 {sheet.assessments.map((a) => (
                   <th key={a.id}>
                     <span className="res-scores-table__col-name">{a.name}</span>
@@ -780,8 +817,12 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
                   </th>
                 ))}
                 <th className="res-scores-table__avg-col">
-                  <span className="res-scores-table__col-name">Total</span>
-                  <span className="res-scores-table__col-meta">Sum /{maxPoints}</span>
+                  <span className="res-scores-table__col-name">
+                    {t("scoreMatrixUi.totalCol")}
+                  </span>
+                  <span className="res-scores-table__col-meta">
+                    {t("scoreMatrixUi.sumMeta", { max: maxPoints })}
+                  </span>
                 </th>
               </tr>
             </thead>
@@ -804,11 +845,13 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
                             type="button"
                             className="res-scores-table__view-btn"
                             onClick={() => openStats(st.studentProfileId)}
-                            aria-label={`View summary for ${st.name}`}
-                            title="View summary"
+                            aria-label={t("scoreMatrixUi.viewSummaryFor", {
+                              name: st.name,
+                            })}
+                            title={t("scoreMatrixUi.viewSummary")}
                           >
                             <DashIcon name="eye" className="dash-icon--sm" />
-                            <span>View</span>
+                            <span>{t("scoreMatrixUi.view")}</span>
                           </button>
                         ) : null}
                       </div>
@@ -857,7 +900,12 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
                     <div className="res-scores-row-card__identity">
                       <h4>{st.name}</h4>
                       <p>
-                        {points != null ? `Total ${points}/${maxPoints}` : "No scores yet"}
+                        {points != null
+                          ? t("scoreMatrixUi.totalPoints", {
+                              points,
+                              max: maxPoints,
+                            })
+                          : t("scoreMatrixUi.noScoresYet")}
                       </p>
                     </div>
                     {showStudentView ? (
@@ -865,8 +913,10 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
                         type="button"
                         className="res-scores-table__view-btn"
                         onClick={() => openStats(st.studentProfileId)}
-                        aria-label={`View summary for ${st.name}`}
-                        title="View summary"
+                        aria-label={t("scoreMatrixUi.viewSummaryFor", {
+                          name: st.name,
+                        })}
+                        title={t("scoreMatrixUi.viewSummary")}
                       >
                         <DashIcon name="eye" className="dash-icon--sm" />
                         <span>View</span>
@@ -932,7 +982,7 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
     matrix?.assessments.filter((a) => !a.entryLocked).map((a) => a.name) ?? [];
 
   const statusInfo = workflowStatus
-    ? statusMessage(workflowStatus, role, openComponents.length > 0)
+    ? statusMessage(workflowStatus, role, openComponents.length > 0, t)
     : null;
 
   const canPublish =
@@ -944,7 +994,7 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
   const canReopen =
     (role === "admin" || role === "staff") && workflowStatus === "PUBLISHED";
 
-  const workflowUi = workflowStatus ? workflowDisplay(workflowStatus) : null;
+  const workflowUi = workflowStatus ? workflowDisplay(workflowStatus, t) : null;
 
   const statsSheet = statsTarget
     ? isAggregated
@@ -991,7 +1041,7 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
         <button
           type="button"
           className="res-scores-stats__backdrop"
-          aria-label="Close"
+          aria-label={t("scoreMatrixUi.close")}
           onClick={() => setStatsTarget(null)}
         />
         <div className="res-scores-stats__panel">
@@ -1003,7 +1053,9 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
                 className="res-scores-stats__avatar"
               />
               <div className="res-scores-stats__who">
-                <p className="res-scores-stats__eyebrow">Student summary</p>
+                <p className="res-scores-stats__eyebrow">
+                  {t("scoreMatrixUi.studentSummary")}
+                </p>
                 <h3 id="res-scores-stats-title" className="res-scores-stats__name">
                   {statsMetrics.name}
                 </h3>
@@ -1017,14 +1069,17 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
                       }`
                     : ""}
                   {selectedTerm ? ` · ${selectedTerm.name}` : ""}
-                  {` · ${statsFilled}/${statsComponents.length} components`}
+                  {t("scoreMatrixUi.componentsCount", {
+                    filled: statsFilled,
+                    total: statsComponents.length,
+                  })}
                 </p>
               </div>
             </div>
 
             <div className="res-scores-stats__kpis">
               <div className="res-scores-stats__kpi">
-                <p className="res-scores-stats__kpi-label">Total</p>
+                <p className="res-scores-stats__kpi-label">{t("scoreMatrixUi.kpiTotal")}</p>
                 <p className="res-scores-stats__kpi-value">
                   {statsMetrics.pointsTotal != null
                     ? statsMetrics.pointsTotal
@@ -1035,18 +1090,22 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
                 </p>
               </div>
               <div className="res-scores-stats__kpi">
-                <p className="res-scores-stats__kpi-label">Subject avg</p>
+                <p className="res-scores-stats__kpi-label">
+                  {t("scoreMatrixUi.kpiSubjectAvg")}
+                </p>
                 <p className="res-scores-stats__kpi-value">
                   {formatPct(statsMetrics.subjectAverage)}
                 </p>
               </div>
               <div className="res-scores-stats__kpi res-scores-stats__kpi--rank">
-                <p className="res-scores-stats__kpi-label">Class rank</p>
+                <p className="res-scores-stats__kpi-label">
+                  {t("scoreMatrixUi.kpiClassRank")}
+                </p>
                 <p className="res-scores-stats__kpi-value">
                   {statsMetrics.rank != null ? `#${statsMetrics.rank}` : "—"}
                 </p>
                 <p className="res-scores-stats__kpi-note">
-                  of {statsMetrics.classSize}
+                  {t("scoreMatrixUi.kpiOfClass", { size: statsMetrics.classSize })}
                 </p>
               </div>
             </div>
@@ -1054,7 +1113,7 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
             <button
               type="button"
               className="res-scores-stats__close"
-              aria-label="Close"
+              aria-label={t("scoreMatrixUi.close")}
               onClick={() => setStatsTarget(null)}
             >
               ×
@@ -1064,11 +1123,13 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
           <div className="res-scores-stats__body">
             <section className="res-scores-stats__block">
               <div className="res-scores-stats__block-head">
-                <h4 className="res-scores-stats__block-title">Component scores</h4>
+                <h4 className="res-scores-stats__block-title">
+                  {t("scoreMatrixUi.blockComponentScores")}
+                </h4>
                 <p className="res-scores-stats__block-sub">
                   {statsTotalPct != null
-                    ? `${statsTotalPct}% of available points`
-                    : "No scores entered yet"}
+                    ? t("scoreMatrixUi.pctOfPoints", { pct: statsTotalPct })
+                    : t("scoreMatrixUi.noScoresEntered")}
                 </p>
               </div>
               <div className="res-scores-stats__track" aria-hidden>
@@ -1085,7 +1146,7 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
                       <div>
                         <p className="res-scores-stats__comp-name">{c.name}</p>
                         <p className="res-scores-stats__comp-weight">
-                          {c.weightPercent}% weight
+                          {t("scoreMatrixUi.weightPercent", { pct: c.weightPercent })}
                         </p>
                       </div>
                       <p className="res-scores-stats__comp-score">
@@ -1106,14 +1167,22 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
 
             <section className="res-scores-stats__block">
               <div className="res-scores-stats__block-head">
-                <h4 className="res-scores-stats__block-title">Averages</h4>
-                <p className="res-scores-stats__block-sub">Class and year comparison</p>
+                <h4 className="res-scores-stats__block-title">
+                  {t("scoreMatrixUi.blockAverages")}
+                </h4>
+                <p className="res-scores-stats__block-sub">
+                  {t("scoreMatrixUi.blockAveragesSub")}
+                </p>
               </div>
               <ul className="res-scores-stats__avgs">
                 <li className="res-scores-stats__avg">
                   <div>
-                    <p className="res-scores-stats__avg-name">Subjects average</p>
-                    <p className="res-scores-stats__avg-desc">All subjects this term</p>
+                    <p className="res-scores-stats__avg-name">
+                      {t("scoreMatrixUi.subjectsAverage")}
+                    </p>
+                    <p className="res-scores-stats__avg-desc">
+                      {t("scoreMatrixUi.subjectsAverageSub")}
+                    </p>
                   </div>
                   <div className="res-scores-stats__avg-right">
                     <p className="res-scores-stats__avg-pct">
@@ -1133,8 +1202,12 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
                 </li>
                 <li className="res-scores-stats__avg">
                   <div>
-                    <p className="res-scores-stats__avg-name">Terms average</p>
-                    <p className="res-scores-stats__avg-desc">Across terms this year</p>
+                    <p className="res-scores-stats__avg-name">
+                      {t("scoreMatrixUi.termsAverage")}
+                    </p>
+                    <p className="res-scores-stats__avg-desc">
+                      {t("scoreMatrixUi.termsAverageSub")}
+                    </p>
                   </div>
                   <div className="res-scores-stats__avg-right">
                     <p className="res-scores-stats__avg-pct">
@@ -1154,8 +1227,12 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
                 </li>
                 <li className="res-scores-stats__avg">
                   <div>
-                    <p className="res-scores-stats__avg-name">Subject average</p>
-                    <p className="res-scores-stats__avg-desc">Weighted for this subject</p>
+                    <p className="res-scores-stats__avg-name">
+                      {t("scoreMatrixUi.subjectAverage")}
+                    </p>
+                    <p className="res-scores-stats__avg-desc">
+                      {t("scoreMatrixUi.subjectAverageSub")}
+                    </p>
                   </div>
                   <div className="res-scores-stats__avg-right">
                     <p className="res-scores-stats__avg-pct">
@@ -1200,24 +1277,24 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
       <div className="res-scores-head res-scores-head--modern">
         <div className="res-scores-filters res-scores-toolbar res-scores-toolbar--quad">
           <label className="res-scores-field">
-            <span>Term</span>
+            <span>{t("scoreMatrixUi.term")}</span>
             <select
               value={termId}
               onChange={(e) => setTermId(e.target.value)}
             >
               {terms.length === 0 ? (
-                <option value="">Loading…</option>
+                <option value="">{t("scoreMatrixUi.loading")}</option>
               ) : null}
-              {terms.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                  {t.isCurrent ? " (current)" : ""}
+              {terms.map((term) => (
+                <option key={term.id} value={term.id}>
+                  {term.name}
+                  {term.isCurrent ? t("scoreMatrixUi.currentTerm") : ""}
                 </option>
               ))}
             </select>
           </label>
           <label className="res-scores-field">
-            <span>Grade</span>
+            <span>{t("scoreMatrixUi.grade")}</span>
             <select
               value={gradeId}
               onChange={(e) => selectGrade(e.target.value)}
@@ -1225,7 +1302,7 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
               suppressHydrationWarning
             >
               {!filtersLoaded || grades.length === 0 ? (
-                <option value="">Loading…</option>
+                <option value="">{t("scoreMatrixUi.loading")}</option>
               ) : null}
               {grades.map((g) => (
                 <option key={g.id} value={g.id}>
@@ -1235,29 +1312,29 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
             </select>
           </label>
           <label className="res-scores-field res-scores-field--wide">
-            <span>Subject</span>
+            <span>{t("scoreMatrixUi.subject")}</span>
             <select
               value={subjectId}
               onChange={(e) => selectSubject(e.target.value)}
               disabled={filterSelectDisabled}
               suppressHydrationWarning
             >
-              <option value={ALL}>All subjects</option>
+              <option value={ALL}>{t("scoreMatrixUi.allSubjects")}</option>
               {subjectsForGrade.map((s) => (
                 <option key={s.id} value={s.id}>
-                  {s.name}
+                  {s.code ? `${s.code} — ${s.name}` : s.name}
                 </option>
               ))}
             </select>
           </label>
           {hasSections ? (
             <label className="res-scores-field res-scores-field--section">
-              <span>Section</span>
+              <span>{t("scoreMatrixUi.section")}</span>
               <select
                 value={sectionId}
                 onChange={(e) => selectSection(e.target.value)}
               >
-                <option value={ALL}>All sections</option>
+                <option value={ALL}>{t("scoreMatrixUi.allSections")}</option>
                 {sectionsForFilter
                   .filter((s) => s.id !== "")
                   .map((s) => (
@@ -1270,20 +1347,12 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
           ) : null}
         </div>
 
-        <div className="res-scores-context">
+        <div className="res-scores-context res-scores-context--hero">
           <div className="res-scores-context__main">
-            <div className="res-scores-context__title-row">
-              <h2 className="res-scores-context__title">
-                {heroTitle(
-                  selectedCs,
-                  selectedGrade?.name ?? "Grade",
-                  subjectId,
-                  selectedSubjectName,
-                  sectionId,
-                  selectedSectionName,
-                )}
-                {!canEditScores && selectedCs ? " (view)" : ""}
-              </h2>
+            <div className="res-scores-context__brand">
+              <span className="res-scores-context__chip">
+                {t("scoreMatrixUi.chipScoreSheet")}
+              </span>
               {workflowUi && !isAggregated ? (
                 <span
                   className={`res-scores-workflow-pill res-scores-workflow-pill--${workflowUi.pill}`}
@@ -1292,10 +1361,25 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
                 </span>
               ) : null}
             </div>
+            <h2 className="res-scores-context__title">
+              {heroTitle(
+                selectedCs,
+                selectedGrade?.name ?? t("scoreMatrixUi.heroGradeFallback"),
+                subjectId,
+                selectedSubjectName,
+                sectionId,
+                selectedSectionName,
+                t,
+              )}
+              {!canEditScores && selectedCs ? t("scoreMatrixUi.heroViewSuffix") : ""}
+            </h2>
             <p className="res-scores-context__meta">
-              {selectedTerm?.name ?? "Select term"}
+              {selectedTerm?.name ?? t("scoreMatrixUi.selectTerm")}
               {matrix?.template ? ` · ${matrix.template.name}` : ""}
-              {viewOnlyHomeroom ? " · View only (homeroom)" : ""}
+              {selectedCs?.subject?.name && selectedCs.subject.code
+                ? ` · ${selectedCs.subject.name}`
+                : ""}
+              {viewOnlyHomeroom ? t("scoreMatrixUi.viewOnlyHomeroom") : ""}
             </p>
           </div>
           <div className="res-scores-context__metrics">
@@ -1305,7 +1389,7 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
                   ? aggregatedSheets.reduce((n, s) => n + s.matrix.students.length, 0)
                   : (displayMatrix?.students.length ?? 0)}
               </strong>
-              <span>Students</span>
+              <span>{t("scoreMatrixUi.metricStudents")}</span>
             </div>
             <div className="res-metric-pill">
               <strong>
@@ -1313,11 +1397,15 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
                   ? activeClassSubjects.length
                   : (displayMatrix?.assessments.length ?? 0)}
               </strong>
-              <span>{isAggregated ? "Classes" : "Components"}</span>
+              <span>
+                {isAggregated
+                  ? t("scoreMatrixUi.metricClasses")
+                  : t("scoreMatrixUi.metricComponents")}
+              </span>
             </div>
             <div className="res-metric-pill res-metric-pill--accent">
               <strong>{completionPct}%</strong>
-              <span>Complete</span>
+              <span>{t("scoreMatrixUi.metricComplete")}</span>
             </div>
           </div>
         </div>
@@ -1330,18 +1418,25 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
                   ℹ
                 </span>
                 <div>
-                  <strong>Overview mode</strong>
+                  <strong>{t("scoreMatrixUi.overviewModeTitle")}</strong>
                   <p>
-                    Showing scores across{" "}
-                    {subjectId === ALL
-                      ? "all subjects"
-                      : subjectsForGrade.find((s) => s.id === subjectId)?.name}
-                    {sectionId === ALL
-                      ? " and all sections"
-                      : sectionsForFilter.find((s) => s.id === sectionId)?.name
-                        ? ` in ${sectionsForFilter.find((s) => s.id === sectionId)?.name}`
-                        : ""}
-                    . Pick a specific subject and section to enter or edit scores.
+                    {t("scoreMatrixUi.overviewModeBody", {
+                      subjects:
+                        subjectId === ALL
+                          ? t("scoreMatrixUi.overviewAllSubjects")
+                          : (subjectsForGrade.find((s) => s.id === subjectId)?.name ??
+                            ""),
+                      sections:
+                        sectionId === ALL
+                          ? t("scoreMatrixUi.overviewAllSections")
+                          : sectionsForFilter.find((s) => s.id === sectionId)?.name
+                            ? t("scoreMatrixUi.overviewInSection", {
+                                name:
+                                  sectionsForFilter.find((s) => s.id === sectionId)
+                                    ?.name ?? "",
+                              })
+                            : "",
+                    })}
                   </p>
                 </div>
               </div>
@@ -1352,14 +1447,15 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
                   👁
                 </span>
                 <div>
-                  <strong>View only</strong>
+                  <strong>{t("scoreMatrixUi.viewOnlyTitle")}</strong>
                   <p>
-                    As homeroom teacher you can review scores for your class. Only the assigned
-                    subject teacher
-                    {selectedCs?.teacher
-                      ? ` (${selectedCs.teacher.firstName} ${selectedCs.teacher.lastName})`
-                      : ""}{" "}
-                    can enter or change marks.
+                    {t("scoreMatrixUi.viewOnlyBody", {
+                      teacher: selectedCs?.teacher
+                        ? t("scoreMatrixUi.viewOnlyTeacher", {
+                            name: `${selectedCs.teacher.firstName} ${selectedCs.teacher.lastName}`,
+                          })
+                        : "",
+                    })}
                   </p>
                 </div>
               </div>
@@ -1382,18 +1478,18 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
       {!filtersLoaded || loading ? (
         <div className="res-scores-loading">
           <span className="res-scores-loading__spinner" aria-hidden />
-          <p>Loading score sheet…</p>
+          <p>{t("scoreMatrixUi.loadingScoreSheet")}</p>
         </div>
       ) : classSubjects.length === 0 ? (
         <div className="res-scores-empty res-scores-empty--action">
           <div className="res-scores-empty__icon" aria-hidden>
             <DashIcon name="results" className="dash-icon--lg" />
           </div>
-          <h3>No classes assigned</h3>
-          <p>Link grade, section, subject, and teacher before score entry.</p>
+          <h3>{t("scoreMatrixUi.noClassesTitle")}</h3>
+          <p>{t("scoreMatrixUi.noClassesBody")}</p>
           {role === "admin" || role === "staff" ? (
             <Link href="/admin/subjects/assign" className="res-scores-btn res-scores-btn--primary">
-              Assign subjects
+              {t("scoreMatrixUi.assignSubjects")}
             </Link>
           ) : null}
         </div>
@@ -1402,11 +1498,11 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
           <div className="res-scores-empty__icon" aria-hidden>
             <DashIcon name="results" className="dash-icon--lg" />
           </div>
-          <h3>No grading components</h3>
-          <p>Assign an assessment template to this class to unlock the score grid.</p>
+          <h3>{t("scoreMatrixUi.noComponentsTitle")}</h3>
+          <p>{t("scoreMatrixUi.noComponentsBody")}</p>
           {role === "admin" || role === "staff" ? (
             <Link href="/admin/results/templates" className="res-scores-btn res-scores-btn--primary">
-              Assessment templates
+              {t("scoreMatrixUi.assessmentTemplates")}
             </Link>
           ) : null}
         </div>
@@ -1415,13 +1511,16 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
           <div className="res-scores-empty__icon" aria-hidden>
             <DashIcon name="students" className="dash-icon--lg" />
           </div>
-          <h3>No students in this class</h3>
+          <h3>{t("scoreMatrixUi.noStudentsTitle")}</h3>
           <p>
-            Enroll learners in {selectedCs?.grade.name ?? "this grade"}
-            {selectedCs?.section ? ` · ${selectedCs.section.name}` : ""} before entering scores.
+            {t("scoreMatrixUi.noStudentsBody", {
+              grade:
+                selectedCs?.grade.name ?? t("scoreMatrixUi.noStudentsGradeFallback"),
+              section: selectedCs?.section ? ` · ${selectedCs.section.name}` : "",
+            })}
           </p>
           <Link href="/admin/students" className="res-scores-btn res-scores-btn--primary">
-            Go to students
+            {t("scoreMatrixUi.goToStudents")}
           </Link>
         </div>
       ) : hasSheet ? (
@@ -1429,10 +1528,20 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
           <div className="res-scores-aggregate">
             <div className="res-scores-sheet__head res-scores-sheet__head--aggregate">
               <div>
-                <h3 className="res-scores-sheet__title">Score overview</h3>
+                <h3 className="res-scores-sheet__title">
+                  {t("scoreMatrixUi.scoreOverview")}
+                </h3>
                 <p className="res-scores-sheet__meta">
-                  {filledScores} of {totalCells} entered across {aggregatedSheets.length} class
-                  {aggregatedSheets.length === 1 ? "" : "es"}
+                  {aggregatedSheets.length === 1
+                    ? t("scoreMatrixUi.enteredAcrossOne", {
+                        filled: filledScores,
+                        total: totalCells,
+                      })
+                    : t("scoreMatrixUi.enteredAcrossMany", {
+                        filled: filledScores,
+                        total: totalCells,
+                        count: aggregatedSheets.length,
+                      })}
                 </p>
               </div>
             </div>
@@ -1458,9 +1567,20 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
                         {sectionLabel}
                       </h3>
                       <p className="res-scores-sheet__meta">
-                        {sheetFilled} of {sheetTotal} entered
+                        {t("scoreMatrixUi.enteredOf", {
+                          filled: sheetFilled,
+                          total: sheetTotal,
+                        })}
                         {sheet.workflow?.status ? (
-                          <> · {workflowDisplay(sheet.workflow.status as ResultWorkflowStatus).label}</>
+                          <>
+                            {" · "}
+                            {
+                              workflowDisplay(
+                                sheet.workflow.status as ResultWorkflowStatus,
+                                t,
+                              ).label
+                            }
+                          </>
                         ) : null}
                       </p>
                     </div>
@@ -1481,18 +1601,21 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
               <div className="res-scores-components__head">
                 <div className="res-scores-components__head-row">
                   <div>
-                    <h3 className="res-scores-components__title">Score components</h3>
+                    <h3 className="res-scores-components__title">
+                      {t("scoreMatrixUi.scoreComponentsTitle")}
+                    </h3>
                     <p className="res-scores-components__hint">
-                      Open lets teachers enter scores; Locked closes teacher editing.
-                      Publish when the sheet is ready for families — no submit step.
+                      {t("scoreMatrixUi.scoreComponentsHint")}
                     </p>
                   </div>
                   <div
                     className="res-scores-components__scope"
                     role="group"
-                    aria-label="Apply lock to"
+                    aria-label={t("scoreMatrixUi.applyLockAria")}
                   >
-                    <span className="res-scores-components__scope-label">Apply to</span>
+                    <span className="res-scores-components__scope-label">
+                      {t("scoreMatrixUi.applyTo")}
+                    </span>
                     <button
                       type="button"
                       className={`res-scores-components__scope-btn${
@@ -1501,7 +1624,7 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
                       aria-pressed={lockScope === "this"}
                       onClick={() => setLockScope("this")}
                     >
-                      This class
+                      {t("scoreMatrixUi.scopeThisClass")}
                     </button>
                     <button
                       type="button"
@@ -1511,7 +1634,7 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
                       aria-pressed={lockScope === "all"}
                       onClick={() => setLockScope("all")}
                     >
-                      All grades & subjects
+                      {t("scoreMatrixUi.scopeAll")}
                     </button>
                   </div>
                 </div>
@@ -1542,7 +1665,11 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
                         <span className="res-scores-component-toggle__track" aria-hidden />
                       </span>
                       <span className="res-scores-component-toggle__state">
-                        {busy ? "…" : isOpen ? "Open for entry" : "Locked for entry"}
+                        {busy
+                          ? "…"
+                          : isOpen
+                            ? t("scoreMatrixUi.openForEntry")
+                            : t("scoreMatrixUi.lockedForEntry")}
                       </span>
                     </label>
                   );
@@ -1554,23 +1681,18 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
           {role === "teacher" && canEditScores && !workflowFullyLocked && lockedComponents.length > 0 ? (
             <p className="res-scores-components__teacher-note">
               {openComponents.length > 0 ? (
-                <>
-                  You can edit: <strong>{openComponents.join(", ")}</strong>. Locked components
-                  ({lockedComponents.join(", ")}) still show saved scores.
-                </>
+                t("scoreMatrixUi.teacherNoteEdit", {
+                  open: openComponents.join(", "),
+                  locked: lockedComponents.join(", "),
+                })
               ) : filledScores > 0 ? (
-                <>
-                  All components are locked. Your{" "}
-                  <strong>
-                    {filledScores} saved score{filledScores === 1 ? "" : "s"}
-                  </strong>{" "}
-                  still show below. Ask academic office to open components to change them.
-                </>
+                filledScores === 1
+                  ? t("scoreMatrixUi.teacherNoteAllLockedScoresOne")
+                  : t("scoreMatrixUi.teacherNoteAllLockedScoresMany", {
+                      count: filledScores,
+                    })
               ) : (
-                <>
-                  All components are locked. Ask academic office to open them before entering
-                  scores.
-                </>
+                t("scoreMatrixUi.teacherNoteAllLocked")
               )}
             </p>
           ) : null}
@@ -1578,13 +1700,18 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
           <div className="res-scores-sheet__head">
             <div>
               <h3 className="res-scores-sheet__title">
-                Score sheet
+                {t("scoreMatrixUi.scoreSheetTitle")}
                 {workflowFullyLocked ? (
-                  <span className="res-scores-sheet__readonly">Read only</span>
+                  <span className="res-scores-sheet__readonly">
+                    {t("scoreMatrixUi.readOnly")}
+                  </span>
                 ) : null}
               </h3>
               <p className="res-scores-sheet__meta">
-                {filledScores} of {totalCells} entered
+                {t("scoreMatrixUi.enteredOf", {
+                  filled: filledScores,
+                  total: totalCells,
+                })}
               </p>
             </div>
             <div className="res-scores-sheet__actions">
@@ -1595,7 +1722,7 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
                   disabled={saving}
                   onClick={() => void onSave()}
                 >
-                  {saving ? "Saving…" : "Save"}
+                  {saving ? t("scoreMatrixUi.saving") : t("scoreMatrixUi.save")}
                 </button>
               ) : null}
               {canPublish ? (
@@ -1605,7 +1732,7 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
                   disabled={workflowBusy}
                   onClick={() => void onWorkflowAction("publish")}
                 >
-                  {workflowBusy ? "…" : "Publish"}
+                  {workflowBusy ? "…" : t("scoreMatrixUi.publish")}
                 </button>
               ) : null}
               {canReopen ? (
@@ -1615,7 +1742,7 @@ export function ScoreMatrixPanel({ role, initialClassSubjectId }: Props) {
                   disabled={workflowBusy}
                   onClick={() => void onWorkflowAction("reopen")}
                 >
-                  Reopen
+                  {t("scoreMatrixUi.reopen")}
                 </button>
               ) : null}
             </div>

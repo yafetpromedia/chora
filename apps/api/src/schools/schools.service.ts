@@ -9,8 +9,13 @@ import {
   GradePreset,
   SchoolStatus,
   SchoolType,
+  Weekday,
 } from '@prisma/client';
 import { randomBytes } from 'crypto';
+import {
+  DEFAULT_WEEKEND_DAYS,
+  normalizeWeekendDays,
+} from '../common/school-calendar.util';
 import { PermissionsService } from '../permissions/permissions.service';
 import { SchoolProvisioningService } from '../provisioning/school-provisioning.service';
 import { DEFAULT_CURRICULUM_PACKAGE_KEY } from '../provisioning/curriculum-packages.data';
@@ -38,6 +43,7 @@ export type SchoolRecord = {
   gradePreset: string | null;
   curriculumPackageKey: string | null;
   attendanceMode: string;
+  weekendDays: Weekday[];
   status: string;
   bankName: string | null;
   bankAccountHolder: string | null;
@@ -172,6 +178,7 @@ export class SchoolsService {
       accentColor?: string | null;
       accentDeep?: string | null;
       attendanceMode?: AttendanceMode;
+      weekendDays?: Weekday[];
       bankName?: string | null;
       bankAccountHolder?: string | null;
       bankAccountNumber?: string | null;
@@ -242,6 +249,10 @@ export class SchoolsService {
     }
     if (input.attendanceMode !== undefined) {
       data.attendanceMode = input.attendanceMode;
+    }
+    if (input.weekendDays !== undefined) {
+      const next = normalizeWeekendDays(input.weekendDays);
+      data.weekendDays = next.length > 0 ? next : [...DEFAULT_WEEKEND_DAYS];
     }
     if (input.bankName !== undefined) {
       data.bankName = input.bankName?.trim() || null;
@@ -386,6 +397,7 @@ export class SchoolsService {
       gradePreset: string | null;
       curriculumPackageKey?: string | null;
       attendanceMode: string;
+      weekendDays?: Weekday[] | null;
       status: string;
       bankName: string | null;
       bankAccountHolder: string | null;
@@ -429,6 +441,9 @@ export class SchoolsService {
       gradePreset: school.gradePreset,
       curriculumPackageKey: school.curriculumPackageKey ?? null,
       attendanceMode: school.attendanceMode,
+      weekendDays: normalizeWeekendDays(
+        (school as { weekendDays?: Weekday[] | null }).weekendDays,
+      ),
       status: school.status,
       bankName: school.bankName,
       bankAccountHolder: school.bankAccountHolder,

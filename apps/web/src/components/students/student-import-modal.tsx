@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { DashIcon } from "@/components/dashboard/dash-icons";
+import { useLocale } from "@/components/i18n/locale-provider";
 import type { ImportStudentsResult } from "@/lib/api";
 import {
   downloadStudentsImportTemplate,
@@ -27,12 +28,13 @@ function estimateRows(file: File): Promise<number> {
 }
 
 export function StudentImportModal({ open, onClose, onImported }: Props) {
+  const { t } = useLocale();
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [rowEstimate, setRowEstimate] = useState<number | null>(null);
   const [phase, setPhase] = useState<Phase>("idle");
   const [progress, setProgress] = useState(0);
-  const [status, setStatus] = useState("Choose a CSV file to begin.");
+  const [status, setStatus] = useState("");
   const [error, setError] = useState("");
   const [result, setResult] = useState<ImportStudentsResult | null>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -45,12 +47,19 @@ export function StudentImportModal({ open, onClose, onImported }: Props) {
       setRowEstimate(null);
       setPhase("idle");
       setProgress(0);
-      setStatus("Choose a CSV file to begin.");
+      setStatus(t("studentImportUi.chooseCsv"));
       setError("");
       setResult(null);
       setDragOver(false);
     }
   }
+
+  useEffect(() => {
+    if (status === "" && open) {
+      setStatus(t("studentImportUi.chooseCsv"));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, status]);
 
   useEffect(() => {
     if (phase !== "uploading") return;
@@ -66,7 +75,7 @@ export function StudentImportModal({ open, onClose, onImported }: Props) {
   async function pickFile(next: File | null) {
     if (!next) return;
     if (!next.name.toLowerCase().endsWith(".csv")) {
-      setError("Please choose a .csv file.");
+      setError(t("studentImportUi.csvOnly"));
       return;
     }
     setError("");
@@ -74,14 +83,17 @@ export function StudentImportModal({ open, onClose, onImported }: Props) {
     setPhase("idle");
     setProgress(0);
     setFile(next);
-    setStatus(`Ready to import “${next.name}”.`);
+    setStatus(t("studentImportUi.readyFile", { name: next.name }));
     try {
       const rows = await estimateRows(next);
       setRowEstimate(rows);
       setStatus(
         rows > 0
-          ? `Ready to import ${rows} student row${rows === 1 ? "" : "s"} from “${next.name}”.`
-          : `Ready to import “${next.name}”.`,
+          ? t(rows === 1 ? "studentImportUi.readyRows" : "studentImportUi.readyRowsPlural", {
+              count: rows,
+              name: next.name,
+            })
+          : t("studentImportUi.readyFile", { name: next.name }),
       );
     } catch {
       setRowEstimate(null);
@@ -96,8 +108,10 @@ export function StudentImportModal({ open, onClose, onImported }: Props) {
     setResult(null);
     setStatus(
       rowEstimate
-        ? `Importing ${rowEstimate} student${rowEstimate === 1 ? "" : "s"}…`
-        : "Uploading and importing students…",
+        ? t(rowEstimate === 1 ? "studentImportUi.importing" : "studentImportUi.importingPlural", {
+            count: rowEstimate,
+          })
+        : t("studentImportUi.uploading"),
     );
 
     try {
@@ -110,20 +124,22 @@ export function StudentImportModal({ open, onClose, onImported }: Props) {
       const skipped = imported.skipped ?? 0;
       setStatus(
         [
-          created > 0 ? `${created} created` : null,
-          updated > 0 ? `${updated} updated` : null,
-          skipped > 0 ? `${skipped} skipped` : null,
-          imported.failed > 0 ? `${imported.failed} failed` : null,
+          created > 0 ? t("studentImportUi.statCreated", { count: created }) : null,
+          updated > 0 ? t("studentImportUi.statUpdated", { count: updated }) : null,
+          skipped > 0 ? t("studentImportUi.statSkipped", { count: skipped }) : null,
+          imported.failed > 0
+            ? t("studentImportUi.statFailed", { count: imported.failed })
+            : null,
         ]
           .filter(Boolean)
-          .join(" · ") || "Import finished.",
+          .join(" · ") || t("studentImportUi.importFinished"),
       );
       onImported(imported);
     } catch (err) {
       setPhase("error");
       setProgress(0);
-      setError(err instanceof Error ? err.message : "Import failed");
-      setStatus("Import stopped. Fix the file and try again.");
+      setError(err instanceof Error ? err.message : t("studentImportUi.importFailed"));
+      setStatus(t("studentImportUi.importStopped"));
     }
   }
 
@@ -136,7 +152,7 @@ export function StudentImportModal({ open, onClose, onImported }: Props) {
     if (!failedRows.length) return null;
     const counts = new Map<string, number>();
     for (const row of failedRows) {
-      const key = row.error?.trim() || "Failed";
+      const key = row.error?.trim() || t("studentImportUi.failedDefault");
       counts.set(key, (counts.get(key) ?? 0) + 1);
     }
     return Array.from(counts.entries())
@@ -149,7 +165,7 @@ export function StudentImportModal({ open, onClose, onImported }: Props) {
       <button
         type="button"
         className="stu-drawer-backdrop"
-        aria-label="Close import"
+        aria-label={t("studentImportUi.closeImport")}
         onClick={() => {
           if (phase === "uploading") return;
           onClose();
@@ -163,21 +179,18 @@ export function StudentImportModal({ open, onClose, onImported }: Props) {
       >
         <header className="stu-import-modal__head">
           <div>
-            <p className="stu-import-modal__eyebrow">Bulk enroll</p>
+            <p className="stu-import-modal__eyebrow">{t("studentImportUi.eyebrow")}</p>
             <h2 id="stu-import-title" className="stu-import-modal__title">
-              Import students
+              {t("studentImportUi.title")}
             </h2>
-            <p className="stu-import-modal__sub">
-              Upload a CSV to add or update learners. Existing students are
-              matched by FAN, student ID, ID number, or name + DOB/phone +
-              grade — then updated instead of failing.
-            </p>
+            <p className="stu-import-modal__sub">{t("studentImportUi.sub")}</p>
           </div>
           <button
             type="button"
             className="stu-drawer__close"
             disabled={phase === "uploading"}
             onClick={onClose}
+            aria-label={t("common.close")}
           >
             ×
           </button>
@@ -191,7 +204,7 @@ export function StudentImportModal({ open, onClose, onImported }: Props) {
               onClick={() => downloadStudentsImportTemplate()}
             >
               <DashIcon name="library" className="dash-icon--sm" />
-              Download CSV template
+              {t("studentImportUi.downloadTemplate")}
             </button>
           </div>
 
@@ -224,18 +237,18 @@ export function StudentImportModal({ open, onClose, onImported }: Props) {
             <span className="stu-import-modal__drop-icon" aria-hidden>
               <DashIcon name="students" className="dash-icon--md" />
             </span>
-            <strong>
-              {file ? file.name : "Drop CSV here or browse"}
-            </strong>
+            <strong>{file ? file.name : t("studentImportUi.dropOrBrowse")}</strong>
             <span>
               {file
                 ? `${(file.size / 1024).toFixed(1)} KB${
-                    rowEstimate != null ? ` · ~${rowEstimate} rows` : ""
+                    rowEstimate != null
+                      ? ` · ${t("studentImportUi.rowsEstimate", { count: rowEstimate })}`
+                      : ""
                   }`
-                : "Accepted format: .csv"}
+                : t("studentImportUi.acceptedCsv")}
             </span>
             {!file ? (
-              <span className="stu-import-modal__browse">Browse files</span>
+              <span className="stu-import-modal__browse">{t("studentImportUi.browseFiles")}</span>
             ) : null}
           </label>
 
@@ -252,7 +265,7 @@ export function StudentImportModal({ open, onClose, onImported }: Props) {
               aria-valuemin={0}
               aria-valuemax={100}
               aria-valuenow={progress}
-              aria-label="Import progress"
+              aria-label={t("studentImportUi.progressAria")}
             >
               <div
                 className={`stu-import-modal__fill${
@@ -276,41 +289,46 @@ export function StudentImportModal({ open, onClose, onImported }: Props) {
               <div className="stu-import-modal__result-stats stu-import-modal__result-stats--wide">
                 <div>
                   <strong>{result.created ?? 0}</strong>
-                  <span>Created</span>
+                  <span>{t("studentImportUi.created")}</span>
                 </div>
                 <div>
                   <strong>{result.updated ?? 0}</strong>
-                  <span>Updated</span>
+                  <span>{t("studentImportUi.updated")}</span>
                 </div>
                 <div>
                   <strong>{result.skipped ?? 0}</strong>
-                  <span>Skipped</span>
+                  <span>{t("studentImportUi.skipped")}</span>
                 </div>
                 <div>
                   <strong>{result.failed}</strong>
-                  <span>Failed</span>
+                  <span>{t("studentImportUi.failed")}</span>
                 </div>
               </div>
               {errorSummary && errorSummary.length > 0 ? (
                 <ul className="stu-import-modal__errors">
                   {errorSummary.map(([msg, count]) => (
                     <li key={msg}>
-                      {count} row{count === 1 ? "" : "s"}: {msg}
+                      {t(count === 1 ? "studentImportUi.rowErrors" : "studentImportUi.rowErrorsPlural", {
+                        count,
+                        msg,
+                      })}
                     </li>
                   ))}
                   {failedPreview.length > 0 ? (
                     <li className="stu-import-modal__errors-sample">
-                      Examples:{" "}
+                      {t("studentImportUi.examples")}{" "}
                       {failedPreview
                         .map(
                           (r) =>
-                            `row ${r.row}${
+                            `${t("studentImportUi.rowLabel", { row: r.row })}${
                               r.studentName ? ` (${r.studentName})` : ""
                             }`,
                         )
                         .join(", ")}
                       {failedRows.length > failedPreview.length
-                        ? ` +${failedRows.length - failedPreview.length} more`
+                        ? ` ${t("studentImportUi.moreFailed", {
+                            count: failedRows.length - failedPreview.length,
+                          })}`
                         : ""}
                     </li>
                   ) : null}
@@ -327,7 +345,7 @@ export function StudentImportModal({ open, onClose, onImported }: Props) {
             disabled={phase === "uploading"}
             onClick={onClose}
           >
-            {phase === "done" ? "Close" : "Cancel"}
+            {phase === "done" ? t("common.close") : t("common.cancel")}
           </button>
           {phase === "done" ? (
             <button
@@ -339,11 +357,11 @@ export function StudentImportModal({ open, onClose, onImported }: Props) {
                 setPhase("idle");
                 setProgress(0);
                 setResult(null);
-                setStatus("Choose a CSV file to begin.");
+                setStatus(t("studentImportUi.chooseCsv"));
                 inputRef.current?.click();
               }}
             >
-              Import another
+              {t("studentImportUi.importAnother")}
             </button>
           ) : (
             <button
@@ -352,7 +370,7 @@ export function StudentImportModal({ open, onClose, onImported }: Props) {
               disabled={!canImport}
               onClick={() => void startImport()}
             >
-              {phase === "uploading" ? "Importing…" : "Start import"}
+              {phase === "uploading" ? t("studentImportUi.importingBtn") : t("studentImportUi.startImport")}
             </button>
           )}
         </footer>

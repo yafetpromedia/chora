@@ -1,6 +1,7 @@
 "use client";
 
 import { DashIcon } from "@/components/dashboard/dash-icons";
+import { useLocale } from "@/components/i18n/locale-provider";
 import { PlatformAnalytics } from "@/components/platform/platform-analytics";
 import { BRAND_NAME } from "@/lib/brand";
 import type { PlatformDashboard, PlatformSchoolRow, PlatformSection } from "./platform-types";
@@ -11,14 +12,6 @@ type Props = {
   onNavigate: (section: PlatformSection) => void;
 };
 
-function todayLabel() {
-  return new Date().toLocaleDateString(undefined, {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-  });
-}
-
 function schoolInitials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return "?";
@@ -26,16 +19,37 @@ function schoolInitials(name: string) {
   return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
 }
 
-function planLabel(school: PlatformSchoolRow) {
+function planLabel(
+  school: PlatformSchoolRow,
+  t: (key: string) => string,
+) {
   const plan = school.subscription?.plan;
-  if (!plan) return "No plan";
-  return plan.charAt(0) + plan.slice(1).toLowerCase();
+  if (!plan) return t("platformUi.planNone");
+  if (plan === "PROFESSIONAL") return t("platformUi.planProfessional");
+  if (plan === "STARTER") return t("platformUi.planStarter");
+  if (plan === "ENTERPRISE") return t("platformUi.planEnterprise");
+  if (plan === "TRIAL") return t("platformUi.planTrial");
+  return plan;
+}
+
+function tenantStatusLabel(status: string, t: (key: string) => string) {
+  if (status === "ACTIVE") return t("platformUi.statusActive");
+  if (status === "TRIAL") return t("platformUi.statusTrial");
+  if (status === "SUSPENDED") return t("platformUi.statusSuspended");
+  return status;
 }
 
 export function PlatformOverview({ dashboard, schools, onNavigate }: Props) {
+  const { t, locale } = useLocale();
   const recent = schools.slice(0, 5);
   const totalTenants = dashboard.schools.total;
   const enrolledTotal = schools.reduce((sum, s) => sum + s.usage.students, 0);
+
+  const todayLabel = new Date().toLocaleDateString(locale === "am" ? "am-ET" : undefined, {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  });
 
   return (
     <div className="plat-v2 dash-admin dash-admin--modern">
@@ -45,40 +59,42 @@ export function PlatformOverview({ dashboard, schools, onNavigate }: Props) {
             <DashIcon name="students" className="dash-icon--md" />
           </span>
           <div>
-            <p className="plat-subjects-v2__eyebrow">{todayLabel()}</p>
-            <h2 className="plat-subjects-v2__title">Tenant control center</h2>
+            <p className="plat-subjects-v2__eyebrow">{todayLabel}</p>
+            <h2 className="plat-subjects-v2__title">{t("platformUi.overviewTitle")}</h2>
             <p className="plat-subjects-v2__sub">
-              Monitor every tenant on {BRAND_NAME} — enrollment, trials, billing,
-              and access from one console.
+              {t("platformUi.overviewSub", { brand: BRAND_NAME })}
             </p>
           </div>
         </div>
         <div className="plat-subjects-v2__hero-stats">
           <div className="plat-subjects-v2__stat">
             <strong>{totalTenants}</strong>
-            <span>Tenants</span>
+            <span>{t("platformUi.statTenants")}</span>
           </div>
           <div className="plat-subjects-v2__stat">
             <strong>{dashboard.schools.trial}</strong>
-            <span>Trial</span>
+            <span>{t("platformUi.statTrial")}</span>
           </div>
           <div className="plat-subjects-v2__stat">
             <strong>{dashboard.schools.paid}</strong>
-            <span>Paid</span>
+            <span>{t("platformUi.statPaid")}</span>
           </div>
         </div>
       </header>
 
-      <section className="dash-admin-kpis dash-admin-kpis--modern" aria-label="Platform metrics">
+      <section className="dash-admin-kpis dash-admin-kpis--modern" aria-label={t("platformUi.overviewMetricsAria")}>
         <article className="dash-admin-kpi dash-admin-kpi--modern">
           <span className="dash-admin-kpi__icon dash-admin-kpi__icon--teal">
             <DashIcon name="students" />
           </span>
           <div>
-            <p className="dash-admin-kpi__label">Tenants</p>
+            <p className="dash-admin-kpi__label">{t("platformUi.statTenants")}</p>
             <p className="dash-admin-kpi__value">{dashboard.schools.total}</p>
             <p className="dash-admin-kpi__hint">
-              {dashboard.schools.active} active · {dashboard.schools.suspended} suspended
+              {t("platformUi.overviewTenantsHint", {
+                active: dashboard.schools.active,
+                suspended: dashboard.schools.suspended,
+              })}
             </p>
           </div>
         </article>
@@ -87,10 +103,12 @@ export function PlatformOverview({ dashboard, schools, onNavigate }: Props) {
             <DashIcon name="users" />
           </span>
           <div>
-            <p className="dash-admin-kpi__label">Students</p>
+            <p className="dash-admin-kpi__label">{t("platformUi.statStudents")}</p>
             <p className="dash-admin-kpi__value">{dashboard.users.students}</p>
             <p className="dash-admin-kpi__hint">
-              {enrolledTotal > 0 ? `${enrolledTotal} across tenant profiles` : "Across all tenants"}
+              {enrolledTotal > 0
+                ? t("platformUi.overviewStudentsHintProfiles", { count: enrolledTotal })
+                : t("platformUi.overviewStudentsHintAll")}
             </p>
           </div>
         </article>
@@ -99,9 +117,9 @@ export function PlatformOverview({ dashboard, schools, onNavigate }: Props) {
             <DashIcon name="calendar" />
           </span>
           <div>
-            <p className="dash-admin-kpi__label">On trial</p>
+            <p className="dash-admin-kpi__label">{t("platformUi.overviewOnTrial")}</p>
             <p className="dash-admin-kpi__value">{dashboard.schools.trial}</p>
-            <p className="dash-admin-kpi__hint">Trial plan subscriptions</p>
+            <p className="dash-admin-kpi__hint">{t("platformUi.overviewTrialHint")}</p>
           </div>
         </article>
         <article className="dash-admin-kpi dash-admin-kpi--modern">
@@ -109,10 +127,10 @@ export function PlatformOverview({ dashboard, schools, onNavigate }: Props) {
             <DashIcon name="finance" />
           </span>
           <div>
-            <p className="dash-admin-kpi__label">Paid</p>
+            <p className="dash-admin-kpi__label">{t("platformUi.statPaid")}</p>
             <p className="dash-admin-kpi__value">{dashboard.schools.paid}</p>
             <p className="dash-admin-kpi__hint">
-              {dashboard.users.teachers} teachers platform-wide
+              {t("platformUi.overviewTeachersPlatform", { count: dashboard.users.teachers })}
             </p>
           </div>
         </article>
@@ -123,7 +141,7 @@ export function PlatformOverview({ dashboard, schools, onNavigate }: Props) {
       {dashboard.alerts ? (
         <section
           className="plat-subjects-v2__kpis"
-          aria-label="Operations alerts"
+          aria-label={t("platformUi.overviewAlertsAria")}
           style={{ marginTop: "1rem" }}
         >
           <button
@@ -135,7 +153,7 @@ export function PlatformOverview({ dashboard, schools, onNavigate }: Props) {
             <DashIcon name="fees" className="dash-icon--sm" />
             <div>
               <strong>{dashboard.alerts.pendingPaymentProofs}</strong>
-              <span>Pending receipts</span>
+              <span>{t("platformUi.overviewPendingReceipts")}</span>
             </div>
           </button>
           <button
@@ -147,7 +165,7 @@ export function PlatformOverview({ dashboard, schools, onNavigate }: Props) {
             <DashIcon name="support" className="dash-icon--sm" />
             <div>
               <strong>{dashboard.alerts.openSupportTickets}</strong>
-              <span>Open support</span>
+              <span>{t("platformUi.overviewOpenSupport")}</span>
             </div>
           </button>
           <button
@@ -159,7 +177,7 @@ export function PlatformOverview({ dashboard, schools, onNavigate }: Props) {
             <DashIcon name="alert" className="dash-icon--sm" />
             <div>
               <strong>{dashboard.alerts.openAttendanceConcerns}</strong>
-              <span>Attendance concerns</span>
+              <span>{t("platformUi.overviewAttendanceConcerns")}</span>
             </div>
           </button>
         </section>
@@ -168,27 +186,27 @@ export function PlatformOverview({ dashboard, schools, onNavigate }: Props) {
       <article className="plat-v2__card plat-v2__card--wide">
         <header className="plat-v2__card-head">
           <div>
-            <h3 className="plat-v2__card-title">Recent tenants</h3>
-            <p className="plat-v2__card-sub">Latest tenants on the platform</p>
+            <h3 className="plat-v2__card-title">{t("platformUi.overviewRecentTenants")}</h3>
+            <p className="plat-v2__card-sub">{t("platformUi.overviewRecentSub")}</p>
           </div>
           <button
             type="button"
             className="plat-v2__link"
             onClick={() => onNavigate("schools")}
           >
-            View all
+            {t("common.viewAll")}
             <DashIcon name="chevron" className="dash-icon--xs" />
           </button>
         </header>
         {recent.length === 0 ? (
           <div className="plat-v2__empty">
-            <p>No tenants yet.</p>
+            <p>{t("platformUi.overviewNoTenants")}</p>
             <button
               type="button"
               className="plat-btn plat-btn--primary plat-btn--sm"
               onClick={() => onNavigate("schools")}
             >
-              Create first tenant
+              {t("platformUi.overviewCreateFirst")}
             </button>
           </div>
         ) : (
@@ -201,16 +219,19 @@ export function PlatformOverview({ dashboard, schools, onNavigate }: Props) {
                 <div className="plat-v2__school-body">
                   <strong>{school.name}</strong>
                   <span>
-                    {school.joinCode} · {school.usage.students} students ·{" "}
-                    {school.usage.teachers} teachers
+                    {t("platformUi.overviewSchoolMeta", {
+                      code: school.joinCode,
+                      students: school.usage.students,
+                      teachers: school.usage.teachers,
+                    })}
                   </span>
                 </div>
                 <div className="plat-v2__school-badges">
-                  <span className="plat-v2__plan">{planLabel(school)}</span>
+                  <span className="plat-v2__plan">{planLabel(school, t)}</span>
                   <span
                     className={`plat-v2__status plat-v2__status--${school.status.toLowerCase()}`}
                   >
-                    {school.status}
+                    {tenantStatusLabel(school.status, t)}
                   </span>
                 </div>
               </li>

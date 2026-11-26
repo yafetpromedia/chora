@@ -3,26 +3,37 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DashIcon } from "@/components/dashboard/dash-icons";
+import { useLocale } from "@/components/i18n/locale-provider";
 import { handlePlatformAuthFailure } from "@/lib/platform-auth";
 import {
   SUPPORT_STATUSES,
   listPlatformSupportTickets,
   supportCategoryLabel,
-  supportStatusLabel,
   updatePlatformSupportTicket,
   type SupportTicket,
   type SupportTicketStatus,
 } from "@/lib/support-tickets";
 import { AppToast } from "@/components/ui/app-toast";
 
-const STATUS_FILTERS: { id: SupportTicketStatus | "ALL"; label: string }[] = [
-  { id: "ALL", label: "All" },
-  ...SUPPORT_STATUSES,
+const STATUS_FILTER_IDS: (SupportTicketStatus | "ALL")[] = [
+  "ALL",
+  ...SUPPORT_STATUSES.map((row) => row.id),
 ];
 
-function formatDate(iso: string) {
+function supportStatusText(status: SupportTicketStatus, translate: (key: string) => string) {
+  const map: Record<SupportTicketStatus, string> = {
+    OPEN: translate("platformUi.supportStatusOpen"),
+    IN_PROGRESS: translate("platformUi.supportStatusInProgress"),
+    WAITING_ON_SCHOOL: translate("platformUi.supportStatusWaitingOnSchool"),
+    RESOLVED: translate("platformUi.supportStatusResolved"),
+    CLOSED: translate("platformUi.supportStatusClosed"),
+  };
+  return map[status] ?? status;
+}
+
+function formatDate(iso: string, locale: string) {
   try {
-    return new Date(iso).toLocaleString(undefined, {
+    return new Date(iso).toLocaleString(locale === "am" ? "am-ET" : undefined, {
       month: "short",
       day: "numeric",
       year: "numeric",
@@ -35,6 +46,7 @@ function formatDate(iso: string) {
 }
 
 export function PlatformSupportInbox() {
+  const { t, locale } = useLocale();
   const router = useRouter();
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [loading, setLoading] = useState(true);
@@ -68,7 +80,7 @@ export function PlatformSupportInbox() {
     queueMicrotask(() => {
       setLoading(true);
       void load()
-        .catch((e) => fail(e, "Failed to load support tickets"))
+        .catch((e) => fail(e, t("platformUi.errLoadTickets")))
         .finally(() => setLoading(false));
     });
   }, [load, router]);
@@ -76,12 +88,13 @@ export function PlatformSupportInbox() {
   const stats = useMemo(() => {
     return {
       total: tickets.length,
-      open: tickets.filter((t) => t.status === "OPEN").length,
+      open: tickets.filter((ticket) => ticket.status === "OPEN").length,
       active: tickets.filter(
-        (t) => t.status === "IN_PROGRESS" || t.status === "WAITING_ON_SCHOOL",
+        (ticket) =>
+          ticket.status === "IN_PROGRESS" || ticket.status === "WAITING_ON_SCHOOL",
       ).length,
       resolved: tickets.filter(
-        (t) => t.status === "RESOLVED" || t.status === "CLOSED",
+        (ticket) => ticket.status === "RESOLVED" || ticket.status === "CLOSED",
       ).length,
     };
   }, [tickets]);
@@ -89,15 +102,15 @@ export function PlatformSupportInbox() {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return tickets;
-    return tickets.filter((t) => {
+    return tickets.filter((ticket) => {
       const hay = [
-        t.subject,
-        t.body,
-        t.school.name,
-        t.school.joinCode,
-        t.reporter.name,
-        t.reporter.email,
-        t.category,
+        ticket.subject,
+        ticket.body,
+        ticket.school.name,
+        ticket.school.joinCode,
+        ticket.reporter.name,
+        ticket.reporter.email,
+        ticket.category,
       ]
         .join(" ")
         .toLowerCase();
@@ -105,7 +118,7 @@ export function PlatformSupportInbox() {
     });
   }, [tickets, query]);
 
-  const selected = tickets.find((t) => t.id === selectedId) ?? null;
+  const selected = tickets.find((ticket) => ticket.id === selectedId) ?? null;
 
   const [syncedSelected, setSyncedSelected] = useState<typeof selected>(null);
   if (selected !== syncedSelected) {
@@ -126,10 +139,10 @@ export function PlatformSupportInbox() {
         status: statusDraft,
         platformNote: noteDraft,
       });
-      setTickets((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
-      setMessage("Ticket updated.");
+      setTickets((prev) => prev.map((ticket) => (ticket.id === updated.id ? updated : ticket)));
+      setMessage(t("platformUi.supportTicketUpdated"));
     } catch (err) {
-      fail(err, "Failed to update ticket");
+      fail(err, t("platformUi.supportErrUpdate"));
     } finally {
       setSaving(false);
     }
@@ -143,27 +156,23 @@ export function PlatformSupportInbox() {
             <DashIcon name="support" className="dash-icon--md" />
           </span>
           <div>
-            <p className="plat-subjects-v2__eyebrow">Tenant support</p>
-            <h2 className="plat-subjects-v2__title">School issue inbox</h2>
-            <p className="plat-subjects-v2__sub">
-              Reports from school admins across all tenants. Update status and
-              leave a control-center note — the reporter gets an in-app
-              notification when you resolve or reply.
-            </p>
+            <p className="plat-subjects-v2__eyebrow">{t("platformUi.supportEyebrow")}</p>
+            <h2 className="plat-subjects-v2__title">{t("platformUi.supportTitle")}</h2>
+            <p className="plat-subjects-v2__sub">{t("platformUi.supportSub")}</p>
           </div>
         </div>
         <div className="plat-subjects-v2__hero-stats">
           <div className="plat-subjects-v2__stat">
             <strong>{loading ? "—" : stats.total}</strong>
-            <span>Loaded</span>
+            <span>{t("platformUi.supportStatLoaded")}</span>
           </div>
           <div className="plat-subjects-v2__stat">
             <strong>{loading ? "—" : stats.open}</strong>
-            <span>Open</span>
+            <span>{t("platformUi.supportStatusOpen")}</span>
           </div>
           <div className="plat-subjects-v2__stat">
             <strong>{loading ? "—" : stats.active}</strong>
-            <span>In progress</span>
+            <span>{t("platformUi.supportStatInProgress")}</span>
           </div>
         </div>
       </header>
@@ -176,25 +185,25 @@ export function PlatformSupportInbox() {
           <DashIcon name="students" className="dash-icon--sm" />
           <input
             type="search"
-            placeholder="Search school, subject, reporter…"
+            placeholder={t("platformUi.supportSearchPh")}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            aria-label="Search support tickets"
+            aria-label={t("platformUi.supportSearchAria")}
           />
         </div>
         <div className="plat-filter-tabs plat-subjects-v2__filters" role="tablist">
-          {STATUS_FILTERS.map((f) => (
+          {STATUS_FILTER_IDS.map((id) => (
             <button
-              key={f.id}
+              key={id}
               type="button"
               role="tab"
-              aria-selected={statusFilter === f.id}
+              aria-selected={statusFilter === id}
               className={`plat-filter-tab${
-                statusFilter === f.id ? " plat-filter-tab--active" : ""
+                statusFilter === id ? " plat-filter-tab--active" : ""
               }`}
-              onClick={() => setStatusFilter(f.id)}
+              onClick={() => setStatusFilter(id)}
             >
-              {f.label}
+              {id === "ALL" ? t("platformUi.filterAll") : supportStatusText(id, t)}
             </button>
           ))}
         </div>
@@ -203,33 +212,31 @@ export function PlatformSupportInbox() {
       <div className="plat-support-v2__layout">
         <section className="plat-support-v2__list-panel">
           {loading ? (
-            <p className="plat-curriculum-table__empty">Loading tickets…</p>
+            <p className="plat-curriculum-table__empty">{t("platformUi.supportLoadingTickets")}</p>
           ) : filtered.length === 0 ? (
-            <p className="plat-curriculum-table__empty">
-              No support tickets match this filter.
-            </p>
+            <p className="plat-curriculum-table__empty">{t("platformUi.supportNoMatch")}</p>
           ) : (
             <ul className="plat-support-v2__list">
-              {filtered.map((t) => (
-                <li key={t.id}>
+              {filtered.map((ticket) => (
+                <li key={ticket.id}>
                   <button
                     type="button"
                     className={`plat-support-v2__row${
-                      selectedId === t.id ? " plat-support-v2__row--active" : ""
+                      selectedId === ticket.id ? " plat-support-v2__row--active" : ""
                     }`}
-                    onClick={() => setSelectedId(t.id)}
+                    onClick={() => setSelectedId(ticket.id)}
                   >
                     <div className="plat-support-v2__row-top">
-                      <strong>{t.subject}</strong>
+                      <strong>{ticket.subject}</strong>
                       <span
-                        className={`plat-support-v2__pill plat-support-v2__pill--${t.status.toLowerCase()}`}
+                        className={`plat-support-v2__pill plat-support-v2__pill--${ticket.status.toLowerCase()}`}
                       >
-                        {supportStatusLabel(t.status)}
+                        {supportStatusText(ticket.status, t)}
                       </span>
                     </div>
                     <p className="plat-support-v2__row-meta">
-                      {t.school.name} · {supportCategoryLabel(t.category)} ·{" "}
-                      {formatDate(t.createdAt)}
+                      {ticket.school.name} · {supportCategoryLabel(ticket.category)} ·{" "}
+                      {formatDate(ticket.createdAt, locale)}
                     </p>
                   </button>
                 </li>
@@ -240,9 +247,7 @@ export function PlatformSupportInbox() {
 
         <section className="plat-support-v2__detail-panel">
           {!selected ? (
-            <p className="plat-curriculum-table__empty">
-              Select a ticket to review and respond.
-            </p>
+            <p className="plat-curriculum-table__empty">{t("platformUi.supportSelectTicket")}</p>
           ) : (
             <>
               <header className="plat-support-v2__detail-head">
@@ -252,38 +257,41 @@ export function PlatformSupportInbox() {
                   {supportCategoryLabel(selected.category)}
                 </p>
                 <p className="plat-support-v2__reporter">
-                  Reported by {selected.reporter.name} · {selected.reporter.email}
+                  {t("platformUi.supportReportedBy", {
+                    name: selected.reporter.name,
+                    email: selected.reporter.email,
+                  })}
                 </p>
               </header>
 
               <div className="plat-support-v2__body">
-                <strong>Issue details</strong>
+                <strong>{t("platformUi.supportIssueDetails")}</strong>
                 <p>{selected.body}</p>
               </div>
 
               <div className="plat-support-v2__form">
                 <label>
-                  <span>Status</span>
+                  <span>{t("platformUi.supportStatus")}</span>
                   <select
                     value={statusDraft}
                     onChange={(e) =>
                       setStatusDraft(e.target.value as SupportTicketStatus)
                     }
                   >
-                    {SUPPORT_STATUSES.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.label}
+                    {SUPPORT_STATUSES.map((statusRow) => (
+                      <option key={statusRow.id} value={statusRow.id}>
+                        {supportStatusText(statusRow.id, t)}
                       </option>
                     ))}
                   </select>
                 </label>
                 <label>
-                  <span>Note to school</span>
+                  <span>{t("platformUi.supportNoteToSchool")}</span>
                   <textarea
                     rows={5}
                     value={noteDraft}
                     onChange={(e) => setNoteDraft(e.target.value)}
-                    placeholder="Visible to the school admin on their Support page…"
+                    placeholder={t("platformUi.supportNotePh")}
                   />
                 </label>
                 <button
@@ -292,7 +300,7 @@ export function PlatformSupportInbox() {
                   disabled={saving}
                   onClick={() => void saveSelected()}
                 >
-                  {saving ? "Saving…" : "Update ticket"}
+                  {saving ? t("common.saving") : t("platformUi.supportUpdateTicket")}
                 </button>
               </div>
             </>

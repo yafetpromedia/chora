@@ -12,6 +12,7 @@ import { PlatformPaymentPanel } from "@/components/school-billing/platform-payme
 import { getSchoolBillingOverview, type SchoolBillingOverview } from "@/lib/school-billing";
 import { BRAND_NAME } from "@/lib/brand";
 import { EtbAmount } from "@/components/billing/etb-amount";
+import { useLocale } from "@/components/i18n/locale-provider";
 
 function formatDate(iso: string | null) {
   if (!iso) return "—";
@@ -32,12 +33,6 @@ function planStatusClass(sub: SchoolBillingOverview["subscription"]) {
   return "sb-v2__status--active";
 }
 
-function planStatusLabel(sub: SchoolBillingOverview["subscription"]) {
-  if (sub.expired || !sub.isActive) return "Inactive";
-  if (sub.plan === "TRIAL") return "Trial";
-  return "Active";
-}
-
 function heroBadgeClass(sub: SchoolBillingOverview["subscription"]) {
   if (sub.expired || !sub.isActive) return "sb-v2__hero-badge--off";
   if (sub.plan === "TRIAL") return "sb-v2__hero-badge--trial";
@@ -46,6 +41,7 @@ function heroBadgeClass(sub: SchoolBillingOverview["subscription"]) {
 
 export default function SchoolBillingPage() {
   const router = useRouter();
+  const { t, tp } = useLocale();
   const [data, setData] = useState<SchoolBillingOverview | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -53,7 +49,9 @@ export default function SchoolBillingPage() {
   function reload() {
     void getSchoolBillingOverview()
       .then(setData)
-      .catch((e) => setError(e instanceof Error ? e.message : "Could not load billing"));
+      .catch((e) =>
+        setError(e instanceof Error ? e.message : t("adminBillingPageUi.loadFailed")),
+      );
   }
 
   useEffect(() => {
@@ -65,41 +63,54 @@ export default function SchoolBillingPage() {
     }
     void getSchoolBillingOverview()
       .then(setData)
-      .catch((e) => setError(e instanceof Error ? e.message : "Could not load billing"))
+      .catch((e) =>
+        setError(e instanceof Error ? e.message : t("adminBillingPageUi.loadFailed")),
+      )
       .finally(() => setLoading(false));
-  }, [router]);
+  }, [router, t]);
 
   const sub = data?.subscription;
 
+  const planStatusLabel = (s: NonNullable<typeof sub>) => {
+    if (s.expired || !s.isActive) return t("adminBillingPageUi.statusInactive");
+    if (s.plan === "TRIAL") return t("adminBillingPageUi.statusTrial");
+    return t("adminBillingPageUi.statusActive");
+  };
+
   return (
-    <DashboardPage role="admin" title="Billing">
+    <DashboardPage role="admin" title={tp("Billing")}>
       <SchoolBillingShell
-        title={`${BRAND_NAME} billing`}
+        title={t("adminBillingPageUi.titleBilling", { brand: BRAND_NAME })}
         subtitle={
           sub
-            ? `${sub.planLabel} plan · ${planStatusLabel(sub).toLowerCase()} subscription for your school workspace`
-            : `Manage your ${BRAND_NAME} subscription, invoices, and seat usage.`
+            ? t("adminBillingPageUi.subActive", {
+                plan: sub.planLabel,
+                status: planStatusLabel(sub).toLowerCase(),
+              })
+            : t("adminBillingPageUi.subDefault", { brand: BRAND_NAME })
         }
         stats={
           sub
             ? [
                 {
-                  label: "Open invoices",
+                  label: t("adminBillingPageUi.statOpenInvoices"),
                   value: data?.invoices.openCount ?? 0,
-                  hint: `${data?.invoices.total ?? 0} total`,
+                  hint: t("adminBillingPageUi.statTotalHint", {
+                    count: data?.invoices.total ?? 0,
+                  }),
                 },
                 {
-                  label: "Amount due",
+                  label: t("adminBillingPageUi.statAmountDue"),
                   value: `$${(data?.invoices.outstandingUsd ?? 0).toLocaleString()}`,
                   hint: `${(data?.invoices.outstandingEtb ?? 0).toLocaleString()} ETB`,
                   accent: (data?.invoices.outstandingUsd ?? 0) > 0,
                 },
                 {
-                  label: "Next due",
+                  label: t("adminBillingPageUi.statNextDue"),
                   value: formatDate(data?.invoices.nextDueAt ?? null),
                 },
                 {
-                  label: "Students",
+                  label: t("usageMetersUi.students"),
                   value: `${sub.usage.students}${sub.limits.students != null ? ` / ${sub.limits.students}` : ""}`,
                 },
               ]
@@ -118,7 +129,7 @@ export default function SchoolBillingPage() {
         error={error}
         onDismissError={() => setError("")}
         loading={loading}
-        loadingLabel="Loading billing overview…"
+        loadingLabel={t("adminBillingPageUi.loadingBilling")}
       >
         {sub ? (
           <div className="sb-v2__grid sb-v2__grid--2">
@@ -129,8 +140,10 @@ export default function SchoolBillingPage() {
                   <p className="sb-v2__card-sub">{sub.planDescription}</p>
                   {sub.plan === "TRIAL" && sub.trialEndsAt ? (
                     <p className="sb-v2__card-sub">
-                      Trial ends {formatDate(sub.trialEndsAt)}
-                      {sub.daysRemaining != null ? ` · ${sub.daysRemaining} days left` : ""}
+                      {t("adminBillingPageUi.trialEnds", { date: formatDate(sub.trialEndsAt) })}
+                      {sub.daysRemaining != null
+                        ? t("adminBillingPageUi.daysLeft", { days: sub.daysRemaining })
+                        : ""}
                     </p>
                   ) : null}
                   {data?.planPrice && sub.plan !== "TRIAL" && sub.plan !== "ENTERPRISE" ? (
@@ -148,15 +161,15 @@ export default function SchoolBillingPage() {
               <div className="sb-v2__actions">
                 {sub.plan === "TRIAL" || sub.expired ? (
                   <Link href="/admin/billing/plans" className="sb-v2__btn sb-v2__btn--primary">
-                    Upgrade plan
+                    {t("adminBillingPageUi.upgradePlan")}
                   </Link>
                 ) : (
                   <Link href="/admin/billing/plans" className="sb-v2__btn">
-                    Change plan
+                    {t("adminBillingPageUi.changePlan")}
                   </Link>
                 )}
                 <Link href="/admin/billing/invoices" className="sb-v2__btn">
-                  View invoices
+                  {t("adminBillingPageUi.viewInvoices")}
                 </Link>
               </div>
             </article>
@@ -164,16 +177,16 @@ export default function SchoolBillingPage() {
             <article className="sb-v2__card">
               <div className="sb-v2__card-head">
                 <div>
-                  <h3 className="sb-v2__card-title">Seat usage</h3>
+                  <h3 className="sb-v2__card-title">{t("adminBillingPageUi.seatUsageTitle")}</h3>
                   <p className="sb-v2__card-sub">
-                    Students, teachers, and admins on your {sub.planLabel} plan.
+                    {t("adminBillingPageUi.seatUsageSub", { plan: sub.planLabel })}
                   </p>
                 </div>
               </div>
               <UsageMeters subscription={sub} />
               <div className="sb-v2__actions" style={{ marginTop: "0.85rem" }}>
                 <Link href="/admin/billing/usage" className="sb-v2__btn">
-                  Usage details
+                  {t("adminBillingPageUi.usageDetails")}
                 </Link>
               </div>
             </article>

@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { SchoolBrandLockup } from "@/components/dashboard/school-brand-lockup";
+import { useLocale } from "@/components/i18n/locale-provider";
 import { fileToSchoolLogoDataUrl } from "@/lib/student-photo";
 import { AppToast } from "@/components/ui/app-toast";
 import { BRAND_NAME } from "@/lib/brand";
@@ -13,6 +14,7 @@ type Props = {
 };
 
 export function SchoolLogoUpload({ schoolName, value, onChange }: Props) {
+  const { t } = useLocale();
   const inputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState("");
 
@@ -23,7 +25,7 @@ export function SchoolLogoUpload({ schoolName, value, onChange }: Props) {
       const dataUrl = await fileToSchoolLogoDataUrl(file);
       onChange(dataUrl);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Invalid image");
+      setError(err instanceof Error ? err.message : t("schoolBrandUploadUi.invalidImage"));
     }
   }
 
@@ -31,14 +33,16 @@ export function SchoolLogoUpload({ schoolName, value, onChange }: Props) {
 
   return (
     <div className="cfg-logo-upload">
-      <p className="cfg-logo-upload__label">School logo</p>
+      <p className="cfg-logo-upload__label">{t("schoolBrandUploadUi.logoLabel")}</p>
       <p className="cfg-section__lead" style={{ marginTop: 0 }}>
-        Shown beside the {BRAND_NAME} mark in the sidebar for all staff, teachers, students, and
-        parents at your school.
+        {t("schoolBrandUploadUi.logoLead", { brand: BRAND_NAME })}
       </p>
 
       <div className="cfg-logo-upload__preview-wrap">
-        <SchoolBrandLockup schoolName={schoolName || "Your school"} schoolLogoUrl={previewLogo} />
+        <SchoolBrandLockup
+          schoolName={schoolName || t("schoolBrandUploadUi.yourSchool")}
+          schoolLogoUrl={previewLogo}
+        />
       </div>
 
       <div className="cfg-logo-upload__row">
@@ -46,7 +50,7 @@ export function SchoolLogoUpload({ schoolName, value, onChange }: Props) {
           {previewLogo ? (
             <img src={previewLogo} alt="" />
           ) : (
-            <span className="cfg-logo-upload__placeholder">No logo</span>
+            <span className="cfg-logo-upload__placeholder">{t("schoolBrandUploadUi.noLogo")}</span>
           )}
         </div>
         <div className="cfg-logo-upload__actions">
@@ -55,11 +59,11 @@ export function SchoolLogoUpload({ schoolName, value, onChange }: Props) {
             className="cfg-btn cfg-btn--ghost"
             onClick={() => inputRef.current?.click()}
           >
-            {previewLogo ? "Upload new" : "Upload image"}
+            {previewLogo ? t("schoolBrandUploadUi.uploadNew") : t("schoolBrandUploadUi.uploadImage")}
           </button>
           {previewLogo ? (
             <button type="button" className="cfg-btn cfg-btn--ghost" onClick={() => onChange("")}>
-              Remove
+              {t("common.remove")}
             </button>
           ) : null}
           <input
@@ -73,11 +77,11 @@ export function SchoolLogoUpload({ schoolName, value, onChange }: Props) {
       </div>
 
       <label className="cfg-field" style={{ marginTop: "1rem" }}>
-        <span>Or paste image URL</span>
+        <span>{t("schoolBrandUploadUi.pasteUrl")}</span>
         <input
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          placeholder="https://yourschool.edu/logo.png"
+          placeholder={t("schoolBrandUploadUi.logoUrlPh")}
         />
       </label>
 

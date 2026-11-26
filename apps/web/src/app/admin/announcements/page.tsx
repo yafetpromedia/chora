@@ -10,6 +10,7 @@ import { DashboardPage } from "@/components/dashboard/dashboard-page";
 import { Announcement, apiFetch, apiPost } from "@/lib/api";
 import { draftAnnouncement, getAiStatus } from "@/lib/ai";
 import { AppToast } from "@/components/ui/app-toast";
+import { useLocale } from "@/components/i18n/locale-provider";
 
 function formatDate(iso: string) {
   try {
@@ -32,6 +33,7 @@ function isThisWeek(iso: string) {
 }
 
 export default function AdminAnnouncementsPage() {
+  const { t, tp } = useLocale();
   const [items, setItems] = useState<Announcement[]>([]);
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
@@ -62,7 +64,8 @@ export default function AdminAnnouncementsPage() {
         }),
     ])
       .catch((err) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : "Load failed");
+        if (!cancelled)
+          setError(err instanceof Error ? err.message : t("announcementsUi.loadFailed"));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -92,10 +95,10 @@ export default function AdminAnnouncementsPage() {
       setTitle("");
       setBody("");
       setAiPrompt("");
-      setSuccess("Announcement published to your school.");
+      setSuccess(t("announcementsUi.publishedSuccess"));
       await refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not post");
+      setError(err instanceof Error ? err.message : t("announcementsUi.postFailed"));
     } finally {
       setPosting(false);
     }
@@ -104,11 +107,11 @@ export default function AdminAnnouncementsPage() {
   async function onAiDraft() {
     const prompt = aiPrompt.trim();
     if (!prompt) {
-      setError("Describe the announcement you want the AI to draft.");
+      setError(t("announcementsUi.aiPromptRequired"));
       return;
     }
     if (prompt.length > 4000) {
-      setError("AI prompt must be 4000 characters or less.");
+      setError(t("announcementsUi.aiPromptTooLong"));
       return;
     }
     setDrafting(true);
@@ -121,41 +124,50 @@ export default function AdminAnnouncementsPage() {
       });
       setTitle(res.title);
       setBody(res.body);
-      setSuccess("AI draft ready — review and publish when you're happy.");
+      setSuccess(t("announcementsUi.aiDraftReady"));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "AI draft failed");
+      setError(err instanceof Error ? err.message : t("announcementsUi.aiDraftFailed"));
     } finally {
       setDrafting(false);
     }
   }
 
   return (
-    <DashboardPage role="admin" title="Announcements">
+    <DashboardPage role="admin" title={tp("Announcements")}>
       <div className="ann-v2">
         <AcademicsHero
-          title="School announcements"
+          title={t("announcementsUi.title")}
           subtitle={
             stats.total > 0
-              ? `${stats.total} published update${stats.total === 1 ? "" : "s"} · visible to parents, teachers, and students on their dashboards`
-              : "Publish updates for parents, teachers, and students across your school workspace."
+              ? t("announcementsUi.subtitleWithCount", {
+                  count: stats.total,
+                  plural: stats.total === 1 ? "" : "s",
+                })
+              : t("announcementsUi.subtitleEmpty")
           }
           stats={[
-            { label: "Published", value: loading ? "—" : stats.total },
-            { label: "This week", value: loading ? "—" : stats.thisWeek },
+            { label: t("announcementsUi.statPublished"), value: loading ? "—" : stats.total },
+            { label: t("announcementsUi.statThisWeek"), value: loading ? "—" : stats.thisWeek },
             {
-              label: "Latest post",
+              label: t("announcementsUi.statLatest"),
               value: loading || !stats.latest ? "—" : formatDate(stats.latest),
             },
             {
-              label: "AI drafts",
-              value: loading ? "—" : aiConfigured ? "Ready" : "Off",
+              label: t("announcementsUi.statAiDrafts"),
+              value: loading
+                ? "—"
+                : aiConfigured
+                  ? t("announcementsUi.statReady")
+                  : t("announcementsUi.statOff"),
             },
           ]}
           badges={
             <>
-              <AcademicsBadge variant="live">Live to school</AcademicsBadge>
+              <AcademicsBadge variant="live">{t("announcementsUi.badgeLive")}</AcademicsBadge>
               {aiConfigured ? (
-                <span className="ann-v2__hero-badge ann-v2__hero-badge--ai">AI assistant on</span>
+                <span className="ann-v2__hero-badge ann-v2__hero-badge--ai">
+                  {t("announcementsUi.badgeAiOn")}
+                </span>
               ) : null}
             </>
           }
@@ -165,14 +177,12 @@ export default function AdminAnnouncementsPage() {
         <AppToast message={success} tone="success" onDismiss={() => setSuccess("")} />
 
         <div className="ann-v2__toolbar">
-          <div className="ann-v2__audience" aria-label="Audience">
-            <span className="ann-v2__audience-pill">Parents</span>
-            <span className="ann-v2__audience-pill">Teachers</span>
-            <span className="ann-v2__audience-pill">Students</span>
+          <div className="ann-v2__audience" aria-label={t("announcementsUi.audienceAria")}>
+            <span className="ann-v2__audience-pill">{t("announcementsUi.audienceParents")}</span>
+            <span className="ann-v2__audience-pill">{t("announcementsUi.audienceTeachers")}</span>
+            <span className="ann-v2__audience-pill">{t("announcementsUi.audienceStudents")}</span>
           </div>
-          <p className="ann-v2__toolbar-note">
-            Posts appear on role dashboards after you publish.
-          </p>
+          <p className="ann-v2__toolbar-note">{t("announcementsUi.toolbarNote")}</p>
         </div>
 
         <div className="ann-v2__grid">
@@ -182,10 +192,8 @@ export default function AdminAnnouncementsPage() {
                 <DashIcon name="announcements" className="dash-icon--sm" />
               </span>
               <div>
-                <h3 className="ann-v2__card-title">Compose announcement</h3>
-                <p className="ann-v2__card-sub">
-                  Write a clear title and message. Use AI to draft from a short brief.
-                </p>
+                <h3 className="ann-v2__card-title">{t("announcementsUi.composeTitle")}</h3>
+                <p className="ann-v2__card-sub">{t("announcementsUi.composeSub")}</p>
               </div>
             </div>
 
@@ -193,12 +201,12 @@ export default function AdminAnnouncementsPage() {
               {aiConfigured ? (
                 <div className="ann-v2__ai-box">
                   <div className="ann-v2__ai-head">
-                    <span className="ann-v2__ai-label">Draft with AI</span>
-                    <span className="ann-v2__ai-badge">Powered by AI</span>
+                    <span className="ann-v2__ai-label">{t("announcementsUi.aiDraftLabel")}</span>
+                    <span className="ann-v2__ai-badge">{t("announcementsUi.aiPowered")}</span>
                   </div>
                   <textarea
                     className="ann-v2__textarea"
-                    placeholder="e.g. School closed Friday for staff training; buses run as usual Monday…"
+                    placeholder={t("announcementsUi.aiPlaceholder")}
                     rows={3}
                     maxLength={4000}
                     value={aiPrompt}
@@ -206,7 +214,9 @@ export default function AdminAnnouncementsPage() {
                   />
                   <div className="ann-v2__actions">
                     <span className="ann-v2__ai-count" aria-live="polite">
-                      {aiPrompt.trim().length}/4000
+                      {t("announcementsUi.aiChars", {
+                        count: aiPrompt.trim().length,
+                      })}
                     </span>
                     <button
                       type="button"
@@ -214,7 +224,7 @@ export default function AdminAnnouncementsPage() {
                       disabled={drafting || aiPrompt.trim().length < 3}
                       onClick={() => void onAiDraft()}
                     >
-                      {drafting ? "Drafting…" : "Generate draft"}
+                      {drafting ? t("announcementsUi.drafting") : t("announcementsUi.generateDraft")}
                     </button>
                   </div>
                 </div>
@@ -222,12 +232,12 @@ export default function AdminAnnouncementsPage() {
 
               <div className="ann-v2__field">
                 <label className="ann-v2__label" htmlFor="ann-title">
-                  Title
+                  {t("announcementsUi.fieldTitle")}
                 </label>
                 <input
                   id="ann-title"
                   className="ann-v2__input"
-                  placeholder="e.g. School closed Friday"
+                  placeholder={t("announcementsUi.titlePlaceholder")}
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   required
@@ -236,12 +246,12 @@ export default function AdminAnnouncementsPage() {
 
               <div className="ann-v2__field">
                 <label className="ann-v2__label" htmlFor="ann-body">
-                  Message
+                  {t("announcementsUi.fieldMessage")}
                 </label>
                 <textarea
                   id="ann-body"
                   className="ann-v2__textarea"
-                  placeholder="Message for parents and staff…"
+                  placeholder={t("announcementsUi.messagePlaceholder")}
                   rows={5}
                   value={body}
                   onChange={(e) => setBody(e.target.value)}
@@ -251,7 +261,7 @@ export default function AdminAnnouncementsPage() {
 
               <div className="ann-v2__actions">
                 <button type="submit" className="ann-v2__btn ann-v2__btn--primary" disabled={posting}>
-                  {posting ? "Publishing…" : "Publish announcement"}
+                  {posting ? t("announcementsUi.publishing") : t("announcementsUi.publish")}
                 </button>
               </div>
             </form>
@@ -263,10 +273,8 @@ export default function AdminAnnouncementsPage() {
                 <DashIcon name="calendar" className="dash-icon--sm" />
               </span>
               <div>
-                <h3 className="ann-v2__card-title">Published feed</h3>
-                <p className="ann-v2__card-sub">
-                  Recent announcements your school has sent out.
-                </p>
+                <h3 className="ann-v2__card-title">{t("announcementsUi.feedTitle")}</h3>
+                <p className="ann-v2__card-sub">{t("announcementsUi.feedSub")}</p>
               </div>
               <span className="ann-v2__card-count">{items.length}</span>
             </div>
@@ -274,14 +282,12 @@ export default function AdminAnnouncementsPage() {
             {loading ? (
               <div className="ann-v2__loading" aria-busy="true">
                 <span className="ann-v2__loading-spinner" aria-hidden />
-                <p>Loading announcements…</p>
+                <p>{t("announcementsUi.loadingFeed")}</p>
               </div>
             ) : items.length === 0 ? (
               <div className="ann-v2__empty">
-                <p className="ann-v2__empty-title">No announcements yet</p>
-                <p className="ann-v2__empty-sub">
-                  Your first post will show up here and on parent, teacher, and student dashboards.
-                </p>
+                <p className="ann-v2__empty-title">{t("announcementsUi.emptyTitle")}</p>
+                <p className="ann-v2__empty-sub">{t("announcementsUi.emptySub")}</p>
               </div>
             ) : (
               <div className="ann-v2__feed">

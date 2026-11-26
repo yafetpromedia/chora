@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { useLocale } from "@/components/i18n/locale-provider";
 import { useHydrated } from "@/lib/use-client-snapshot";
 import {
   getMyReportCard,
@@ -33,6 +34,7 @@ export function StudentReportCardPanel({
   studentProfileId,
   resultsHref,
 }: Props) {
+  const { t, tn } = useLocale();
   const hydrated = useHydrated();
   const [loading, setLoading] = useState(true);
   const [terms, setTerms] = useState<AcademicTerm[]>([]);
@@ -58,7 +60,9 @@ export function StudentReportCardPanel({
         const current = available.find((t) => t.isCurrent) ?? available[0];
         if (current) setTermId(current.id);
       })
-      .catch((err) => setReportError(err instanceof Error ? err.message : "Load failed"))
+      .catch((err) =>
+        setReportError(err instanceof Error ? err.message : t("resultsUi.loadFailed")),
+      )
       .finally(() => setLoading(false));
   }, []);
 
@@ -76,12 +80,12 @@ export function StudentReportCardPanel({
         setReport(await getMyReportCard(termId, studentProfileId));
       }
     } catch (err) {
-      setReportError(err instanceof Error ? err.message : "Failed to load report card");
+      setReportError(err instanceof Error ? err.message : t("resultsUi.loadReportFailed"));
       setReportPublished(false);
     } finally {
       setReportLoading(false);
     }
-  }, [termId, role, studentProfileId]);
+  }, [termId, role, studentProfileId, t]);
 
   const autoLoad = hydrated && !loading && Boolean(termId) && !waitingForChild;
   const autoLoadKey = autoLoad ? `${termId}|${role}|${studentProfileId ?? ""}` : "";
@@ -106,7 +110,7 @@ export function StudentReportCardPanel({
           setReport(await getMyReportCard(termId, studentProfileId));
         }
       } catch (err) {
-        setReportError(err instanceof Error ? err.message : "Failed to load report card");
+        setReportError(err instanceof Error ? err.message : t("resultsUi.loadReportFailed"));
         setReportPublished(false);
       } finally {
         setReportLoading(false);
@@ -116,36 +120,38 @@ export function StudentReportCardPanel({
 
   return (
     <div className="stu-res stu-res--report-page">
-      <section className="stu-res__panel stu-res__panel--report" aria-label="Report card">
+      <section className="stu-res__panel stu-res__panel--report" aria-label={t("resultsUi.reportCardAria")}>
         <header className="stu-res__hero stu-res__hero--report">
           <div>
-            <p className="stu-res__eyebrow">Official document</p>
+            <p className="stu-res__eyebrow">{t("resultsUi.officialDocument")}</p>
             <h2 className="stu-res__hero-title">
-              {printMode === "annual" ? "Year-end report card" : "Term report card"}
+              {printMode === "annual"
+                ? t("resultsUi.yearEndReportCard")
+                : t("resultsUi.termReportCard")}
             </h2>
             <p className="stu-res__hero-sub">
               {printMode === "annual"
                 ? role === "parent"
-                  ? "Full-year summary for your child. After promotion is recorded, the printout includes a promotion stamp."
-                  : "Full-year summary with all terms. After promotion is recorded, the printout includes a promotion stamp for the next grade."
+                  ? t("resultsUi.reportSubAnnualParent")
+                  : t("resultsUi.reportSubAnnualStudent")
                 : role === "parent"
-                  ? "Half-page term card (front only) — two fit on one A4. Your school publishes this after results are approved."
-                  : "Half-page term card (front only) — two fit on one A4. Your school publishes this after results are approved."}
+                  ? t("resultsUi.reportSubTermParent")
+                  : t("resultsUi.reportSubTermStudent")}
             </p>
           </div>
           {reportPublished ? (
-            <span className="stu-res__status stu-res__status--published">Published</span>
+            <span className="stu-res__status stu-res__status--published">{t("resultsUi.published")}</span>
           ) : reportPublished === false ? (
             <span className="stu-res__status stu-res__status--locked">
               <LockIcon className="stu-res__status-icon" />
-              Not published
+              {t("resultsUi.notPublished")}
             </span>
           ) : null}
         </header>
 
         <div className="stu-res__report-controls">
           <label className="stu-res__field">
-            <span>Academic period</span>
+            <span>{t("resultsUi.academicPeriod")}</span>
             <select
               className="stu-res__select"
               value={termId}
@@ -153,7 +159,7 @@ export function StudentReportCardPanel({
               disabled={selectDisabled}
             >
               {terms.length === 0 ? (
-                <option value="">No terms</option>
+                <option value="">{t("resultsUi.noTerms")}</option>
               ) : (
                 terms.map((term) => (
                   <option key={term.id} value={term.id}>
@@ -163,8 +169,8 @@ export function StudentReportCardPanel({
               )}
             </select>
           </label>
-          <div className="stu-res__field" role="group" aria-label="Report type">
-            <span>Report type</span>
+          <div className="stu-res__field" role="group" aria-label={t("resultsUi.reportTypeGroupAria")}>
+            <span>{t("resultsUi.reportType")}</span>
             <div className="stu-res__mode-toggle">
               <button
                 type="button"
@@ -172,7 +178,7 @@ export function StudentReportCardPanel({
                 aria-pressed={printMode === "term"}
                 onClick={() => setPrintMode("term")}
               >
-                Term
+                {t("resultsUi.modeTerm")}
               </button>
               <button
                 type="button"
@@ -180,7 +186,7 @@ export function StudentReportCardPanel({
                 aria-pressed={printMode === "annual"}
                 onClick={() => setPrintMode("annual")}
               >
-                Year-end
+                {t("resultsUi.modeYearEnd")}
               </button>
             </div>
           </div>
@@ -191,7 +197,7 @@ export function StudentReportCardPanel({
               onClick={() => void loadReport()}
               disabled={refreshDisabled || waitingForChild}
             >
-              {reportLoading ? "Loading…" : "Refresh report card"}
+              {reportLoading ? t("common.loading") : t("resultsUi.refreshReportCard")}
             </button>
             {reportPublished && termId ? (
               <button
@@ -204,7 +210,7 @@ export function StudentReportCardPanel({
                   })
                 }
               >
-                Print / PDF
+                {t("resultsUi.printPdf")}
               </button>
             ) : null}
           </div>
@@ -215,31 +221,31 @@ export function StudentReportCardPanel({
         {waitingForChild ? (
           <div className="stu-res__loading">
             <span className="stu-res__spinner" aria-hidden />
-            <p>Select a child to view their report card…</p>
+            <p>{t("resultsUi.selectChildReport")}</p>
           </div>
         ) : reportLoading ? (
           <div className="stu-res__loading">
             <span className="stu-res__spinner" aria-hidden />
-            <p>Checking report card status…</p>
+            <p>{t("resultsUi.checkingReport")}</p>
           </div>
         ) : reportPublished === false ? (
           <div className="stu-res__empty stu-res__empty--report">
             <LockIcon className="stu-res__empty-icon" />
-            <h3>Report card not ready</h3>
+            <h3>{t("resultsUi.reportNotReady")}</h3>
             <p>
               {currentTerm
                 ? role === "parent"
-                  ? `The ${currentTerm.name} report card has not been published yet.`
-                  : `Your ${currentTerm.name} report card has not been published yet.`
+                  ? t("resultsUi.reportNotPublishedTermParent", { term: currentTerm.name })
+                  : t("resultsUi.reportNotPublishedTermStudent", { term: currentTerm.name })
                 : role === "parent"
-                  ? "This report card has not been published yet."
-                  : "Your report card has not been published yet."}{" "}
-              The school releases this at the end of the term after all subjects are approved.
+                  ? t("resultsUi.reportNotPublishedGenericParent")
+                  : t("resultsUi.reportNotPublishedGenericStudent")}{" "}
+              {t("resultsUi.reportReleaseNote")}
             </p>
             <p className="stu-res__empty-note">
-              For day-to-day marks, see{" "}
+              {t("resultsUi.forDayToDay")}{" "}
               <Link href={resolvedResultsHref} className="stu-res__inline-link">
-                Results
+                {tn("Results")}
               </Link>
               .
             </p>
@@ -263,7 +269,7 @@ export function StudentReportCardPanel({
 
             <div className="stu-res__report-summary">
               <div className="stu-res__report-kpi">
-                <span>Overall</span>
+                <span>{t("resultsUi.overall")}</span>
                 <strong>
                   {report.overallAverage ?? "—"}%
                   {report.overallLetter ? ` (${report.overallLetter})` : ""}
@@ -271,7 +277,7 @@ export function StudentReportCardPanel({
               </div>
               {report.rank ? (
                 <div className="stu-res__report-kpi">
-                  <span>Class rank</span>
+                  <span>{t("resultsUi.classRank")}</span>
                   <strong>
                     {report.rank} / {report.classSize}
                   </strong>
@@ -279,7 +285,7 @@ export function StudentReportCardPanel({
               ) : null}
               {report.attendance?.rate != null ? (
                 <div className="stu-res__report-kpi">
-                  <span>Attendance</span>
+                  <span>{t("resultsUi.attendance")}</span>
                   <strong>{report.attendance.rate}%</strong>
                 </div>
               ) : null}
@@ -288,9 +294,9 @@ export function StudentReportCardPanel({
             <table className="stu-res__report-table">
               <thead>
                 <tr>
-                  <th>Subject</th>
-                  <th>Average</th>
-                  <th>Grade</th>
+                  <th>{t("resultsUi.subjectCol")}</th>
+                  <th>{t("resultsUi.averageCol")}</th>
+                  <th>{t("resultsUi.gradeCol")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -308,13 +314,13 @@ export function StudentReportCardPanel({
               <div className="stu-res__report-comments">
                 {report.teacherComment ? (
                   <div>
-                    <h4>Teacher comment</h4>
+                    <h4>{t("resultsUi.teacherComment")}</h4>
                     <p>{report.teacherComment}</p>
                   </div>
                 ) : null}
                 {report.principalComment ? (
                   <div>
-                    <h4>Principal comment</h4>
+                    <h4>{t("resultsUi.principalComment")}</h4>
                     <p>{report.principalComment}</p>
                   </div>
                 ) : null}

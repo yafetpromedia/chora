@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { PaymentMethod, PaymentStatus, StudentFeeStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -11,6 +12,7 @@ import { DEFAULT_FEE_TYPES } from './finance.constants';
 import { AssignGradeFeesDto } from './dto/assign-grade-fees.dto';
 import { CreateAcademicYearDto } from './dto/create-academic-year.dto';
 import { CreateFeeScheduleDto } from './dto/create-fee-schedule.dto';
+import { EmailService } from '../email/email.service';
 import { RecordPaymentDto } from './dto/record-payment.dto';
 
 export function computeAmountDue(
@@ -35,6 +37,7 @@ export class FinanceService {
     private readonly prisma: PrismaService,
     private readonly subscriptionsService: SubscriptionsService,
     private readonly chapaService: ChapaService,
+    @Optional() private readonly email?: EmailService,
   ) {}
 
   async seedDemoFinance(schoolId: string) {
@@ -152,6 +155,7 @@ export class FinanceService {
         name: dto.name.trim(),
         startDate: new Date(dto.startDate),
         endDate: new Date(dto.endDate),
+        calendarSystem: dto.calendarSystem ?? 'ETHIOPIAN',
         isCurrent: dto.isCurrent ?? false,
       },
     });
@@ -1300,6 +1304,7 @@ export class FinanceService {
 
     await this.notifyParentPaymentApproved(
       schoolId,
+      pending.id,
       pending.studentProfileId,
       pending.amountCents,
       pending.receiptNumber,
@@ -1362,6 +1367,7 @@ export class FinanceService {
 
   private async notifyParentPaymentApproved(
     schoolId: string,
+    paymentId: string,
     studentProfileId: string,
     amountCents: number,
     receiptNumber: string,
@@ -1379,6 +1385,7 @@ export class FinanceService {
     const name = student
       ? `${student.user.firstName} ${student.user.lastName}`
       : 'your child';
+    const childName = student?.user.firstName ?? 'your child';
 
     await this.prisma.parentNotification.createMany({
       data: links.map((l) => ({
@@ -1389,6 +1396,26 @@ export class FinanceService {
         body: `${formatEtb(amountCents)} for ${name} was verified.\nReceipt #: ${receiptNumber}`,
       })),
     });
+
+    try {
+      await this.email?.notifyParents({
+        schoolId,
+        preference: 'paymentConfirmationEnabled',
+        category: 'payment_receipt',
+        templateId: 'payment_receipt',
+        messages: links.map((link) => ({
+          parentId: link.parentId,
+          idempotencyKey: `payment-receipt:${paymentId}:${link.parentId}`,
+          vars: {
+            childName,
+            amount: formatEtb(amountCents),
+            receiptNumber,
+          },
+        })),
+      });
+    } catch {
+      // In-app payment notice is already stored.
+    }
   }
 
   private async assertParentAccess(parentId: string, studentProfileId: string) {

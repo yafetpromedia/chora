@@ -2,6 +2,8 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { DashIcon } from "@/components/dashboard/dash-icons";
+import { useLocale } from "@/components/i18n/locale-provider";
+import type { AppLocale } from "@/lib/i18n";
 import {
   PLATFORM_USER_KEY,
   type PlatformUser,
@@ -13,9 +15,13 @@ import {
 } from "@/lib/platform-profile";
 import { AppToast } from "@/components/ui/app-toast";
 
-function formatDate(iso: string) {
+function dateLocaleTag(locale: AppLocale) {
+  return locale === "am" ? "am-ET" : undefined;
+}
+
+function formatDate(iso: string, dateLocale?: string) {
   try {
-    return new Date(iso).toLocaleDateString(undefined, {
+    return new Date(iso).toLocaleDateString(dateLocale, {
       month: "long",
       day: "numeric",
       year: "numeric",
@@ -25,9 +31,9 @@ function formatDate(iso: string) {
   }
 }
 
-function formatShortDate(iso: string) {
+function formatShortDate(iso: string, dateLocale?: string) {
   try {
-    return new Date(iso).toLocaleDateString(undefined, {
+    return new Date(iso).toLocaleDateString(dateLocale, {
       month: "short",
       year: "numeric",
     });
@@ -47,6 +53,8 @@ type Props = {
 };
 
 export function PlatformProfilePanel({ onUserUpdated }: Props) {
+  const { t, locale } = useLocale();
+  const dateLocale = dateLocaleTag(locale);
   const [profile, setProfile] = useState<PlatformProfile | null>(null);
   const [email, setEmail] = useState("");
   const [firstName, setFirstName] = useState("");
@@ -66,7 +74,7 @@ export function PlatformProfilePanel({ onUserUpdated }: Props) {
         setLastName(data.user.lastName);
       })
       .catch((err) =>
-        setError(err instanceof Error ? err.message : "Could not load profile"),
+        setError(err instanceof Error ? err.message : t("platformProfileUi.loadFailed")),
       )
       .finally(() => setLoading(false));
   }, []);
@@ -88,7 +96,7 @@ export function PlatformProfilePanel({ onUserUpdated }: Props) {
       setFirstName(updated.user.firstName);
       setLastName(updated.user.lastName);
       setNewPassword("");
-      setToast("Profile saved.");
+      setToast(t("platformProfileUi.profileSaved"));
       const sessionUser: PlatformUser = {
         id: updated.user.id,
         email: updated.user.email,
@@ -101,7 +109,7 @@ export function PlatformProfilePanel({ onUserUpdated }: Props) {
       localStorage.setItem(PLATFORM_USER_KEY, JSON.stringify(sessionUser));
       onUserUpdated?.(sessionUser);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not save profile");
+      setError(err instanceof Error ? err.message : t("platformProfileUi.saveFailed"));
     } finally {
       setSaving(false);
     }
@@ -119,7 +127,7 @@ export function PlatformProfilePanel({ onUserUpdated }: Props) {
   if (!profile) {
     return (
       <p className="auth-alert auth-alert--error">
-        {error || "Profile unavailable."}
+        {error || t("platformProfileUi.unavailable")}
       </p>
     );
   }
@@ -140,7 +148,7 @@ export function PlatformProfilePanel({ onUserUpdated }: Props) {
             {initials(firstName, lastName)}
           </span>
           <div>
-            <p className="plat-subjects-v2__eyebrow">Platform operator</p>
+            <p className="plat-subjects-v2__eyebrow">{t("platformProfileUi.eyebrow")}</p>
             <h2 className="plat-subjects-v2__title">{displayName}</h2>
             <p className="plat-subjects-v2__sub">{user.email}</p>
           </div>
@@ -148,32 +156,39 @@ export function PlatformProfilePanel({ onUserUpdated }: Props) {
         <div className="plat-subjects-v2__hero-stats">
           <div className="plat-subjects-v2__stat">
             <strong>{user.role}</strong>
-            <span>Role</span>
+            <span>{t("platformProfileUi.role")}</span>
           </div>
           <div className="plat-subjects-v2__stat">
             <strong>{user.permissions.length}</strong>
-            <span>Capabilities</span>
+            <span>{t("platformProfileUi.capabilities")}</span>
           </div>
           <div className="plat-subjects-v2__stat">
-            <strong>{formatShortDate(user.createdAt)}</strong>
-            <span>Member since</span>
+            <strong>{formatShortDate(user.createdAt, dateLocale)}</strong>
+            <span>{t("platformProfileUi.memberSince")}</span>
           </div>
         </div>
       </header>
 
       <div className="plat-profile-v2__layout">
-        <section className="plat-profile-v2__facts" aria-label="Account details">
+        <section
+          className="plat-profile-v2__facts"
+          aria-label={t("platformProfileUi.accountDetailsAria")}
+        >
           <div className="plat-profile-v2__fact">
-            <span>Email</span>
+            <span>{t("platformProfileUi.email")}</span>
             <strong>{user.email}</strong>
           </div>
           <div className="plat-profile-v2__fact">
-            <span>Member since</span>
-            <strong>{formatDate(user.createdAt)}</strong>
+            <span>{t("platformProfileUi.memberSince")}</span>
+            <strong>{formatDate(user.createdAt, dateLocale)}</strong>
           </div>
           <div className="plat-profile-v2__fact">
-            <span>Permissions</span>
-            <strong>{user.permissions.length} capabilities</strong>
+            <span>{t("platformProfileUi.permissions")}</span>
+            <strong>
+              {t("platformProfileUi.capabilitiesCount", {
+                count: user.permissions.length,
+              })}
+            </strong>
           </div>
         </section>
 
@@ -181,17 +196,14 @@ export function PlatformProfilePanel({ onUserUpdated }: Props) {
           <div className="plat-profile-v2__panel-head">
             <DashIcon name="profile" className="dash-icon--sm" />
             <div>
-              <h3>Edit profile</h3>
-              <p>
-                Update your email, name, or password. Your first and last name appear in the
-                header and sidebar after you save.
-              </p>
+              <h3>{t("platformProfileUi.editTitle")}</h3>
+              <p>{t("platformProfileUi.editSub")}</p>
             </div>
           </div>
 
           <form className="plat-profile-v2__form" onSubmit={(e) => void onSubmit(e)}>
             <label className="plat-field">
-              <span>Email</span>
+              <span>{t("platformProfileUi.email")}</span>
               <input
                 type="email"
                 value={email}
@@ -202,7 +214,7 @@ export function PlatformProfilePanel({ onUserUpdated }: Props) {
             </label>
             <div className="plat-profile-v2__row">
               <label className="plat-field">
-                <span>First name</span>
+                <span>{t("platformProfileUi.firstName")}</span>
                 <input
                   value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
@@ -211,7 +223,7 @@ export function PlatformProfilePanel({ onUserUpdated }: Props) {
                 />
               </label>
               <label className="plat-field">
-                <span>Last name</span>
+                <span>{t("platformProfileUi.lastName")}</span>
                 <input
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
@@ -221,13 +233,13 @@ export function PlatformProfilePanel({ onUserUpdated }: Props) {
               </label>
             </div>
             <label className="plat-field">
-              <span>New password</span>
+              <span>{t("platformProfileUi.newPassword")}</span>
               <input
                 type="password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 minLength={8}
-                placeholder="Leave blank to keep current"
+                placeholder={t("platformProfileUi.keepPassword")}
                 autoComplete="new-password"
               />
             </label>
@@ -237,7 +249,7 @@ export function PlatformProfilePanel({ onUserUpdated }: Props) {
                 className="plat-btn plat-btn--primary"
                 disabled={saving}
               >
-                {saving ? "Saving…" : "Save changes"}
+                {saving ? t("platformProfileUi.saving") : t("platformProfileUi.saveChanges")}
               </button>
             </div>
           </form>

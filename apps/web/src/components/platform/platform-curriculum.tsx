@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DashIcon, type DashIconName } from "@/components/dashboard/dash-icons";
 import { AppToast } from "@/components/ui/app-toast";
+import { useLocale } from "@/components/i18n/locale-provider";
 import { LIBRARY_RESOURCE_TYPES } from "@/lib/library";
 import {
   PLATFORM_TOKEN_KEY,
@@ -103,15 +104,11 @@ type PackageDetail = PackageRow & {
 
 type DetailTab = "overview" | "subjects" | "structure" | "library" | "templates";
 
-const TEMPLATE_CHANNELS: {
-  value: string;
-  label: string;
-  icon: DashIconName;
-}[] = [
-  { value: "SMS", label: "Parent SMS", icon: "message" },
-  { value: "EMAIL", label: "Email", icon: "mail" },
-  { value: "TEACHER", label: "Teacher", icon: "teachers" },
-];
+const TEMPLATE_CHANNEL_DEFS = [
+  { value: "SMS", icon: "message" as DashIconName },
+  { value: "EMAIL", icon: "mail" as DashIconName },
+  { value: "TEACHER", icon: "teachers" as DashIconName },
+] as const;
 
 const DEFAULT_KEY = "ETHIOPIAN_PRIVATE";
 
@@ -137,27 +134,28 @@ function formatOrgType(value: string | null) {
 }
 
 function ContentMixChart({ detail }: { detail: PackageDetail }) {
+  const { t } = useLocale();
   const items = [
     {
-      label: "Subjects",
+      label: t("platformUi.currStatSubjects"),
       value: detail.subjects.length,
       color: "var(--brand-teal-dark)",
       icon: "subjects" as DashIconName,
     },
     {
-      label: "Departments",
+      label: t("platformUi.currDepartmentsTitle"),
       value: detail.departments.length,
       color: "var(--brand-teal)",
       icon: "building" as DashIconName,
     },
     {
-      label: "eLibrary",
+      label: t("platformUi.currTabLibrary"),
       value: detail.libraryItems.length,
       color: "var(--brand-cyan)",
       icon: "library" as DashIconName,
     },
     {
-      label: "Templates",
+      label: t("platformUi.currTabTemplates"),
       value: detail.templates.length,
       color: "#5eead4",
       icon: "templates" as DashIconName,
@@ -205,6 +203,7 @@ type OverviewPanelProps = {
 };
 
 function PackageOverviewPanel({ detail, onNavigate }: OverviewPanelProps) {
+  const { t } = useLocale();
   const accent = packageAccent(detail.key);
   const totalItems =
     detail.subjects.length +
@@ -221,28 +220,28 @@ function PackageOverviewPanel({ detail, onNavigate }: OverviewPanelProps) {
   }[] = [
     {
       tab: "subjects",
-      label: "Subjects",
+      label: t("platformUi.currStatSubjects"),
       value: detail.subjects.length,
       icon: "subjects",
       tone: "teal",
     },
     {
       tab: "structure",
-      label: "Departments",
+      label: t("platformUi.currDepartmentsTitle"),
       value: detail.departments.length,
       icon: "building",
       tone: "cyan",
     },
     {
       tab: "library",
-      label: "eLibrary",
+      label: t("platformUi.currTabLibrary"),
       value: detail.libraryItems.length,
       icon: "library",
       tone: "mint",
     },
     {
       tab: "templates",
-      label: "Templates",
+      label: t("platformUi.currTabTemplates"),
       value: detail.templates.length,
       icon: "templates",
       tone: "slate",
@@ -250,9 +249,9 @@ function PackageOverviewPanel({ detail, onNavigate }: OverviewPanelProps) {
   ];
 
   const autoItems = [
-    { label: "Academic year + semesters", detail: "Auto-created on provision" },
-    { label: "Grading scale A–F", detail: "Default letter grades" },
-    { label: "Grade levels & sections", detail: "From package preset" },
+    { label: t("platformUi.currAcademicYear"), detail: t("platformUi.currAutoCreated") },
+    { label: t("platformUi.currGradingScale"), detail: t("platformUi.currLetterGrades") },
+    { label: t("platformUi.currGradeLevels"), detail: t("platformUi.currFromPreset") },
   ];
 
   return (
@@ -263,7 +262,7 @@ function PackageOverviewPanel({ detail, onNavigate }: OverviewPanelProps) {
             <DashIcon name="library" className="dash-icon--sm" />
           </span>
           <div>
-            <h4>Starter pack snapshot</h4>
+            <h4>{t("platformUi.currSnapshot")}</h4>
             <p>
               {totalItems} catalog items copy into each new tenant when this package
               provisions their workspace.
@@ -272,7 +271,7 @@ function PackageOverviewPanel({ detail, onNavigate }: OverviewPanelProps) {
         </div>
         <div className="plat-overview-v2__hero-stat">
           <strong>{totalItems}</strong>
-          <span>Total items</span>
+          <span>{t("platformUi.currTotalItems")}</span>
         </div>
       </div>
 
@@ -282,7 +281,7 @@ function PackageOverviewPanel({ detail, onNavigate }: OverviewPanelProps) {
             <DashIcon name="calendar" className="dash-icon--sm" />
           </span>
           <div>
-            <span className="plat-overview-v2__meta-label">Grade structure</span>
+            <span className="plat-overview-v2__meta-label">{t("platformUi.currGradeStructure")}</span>
             <strong>{formatPreset(detail.gradePreset)}</strong>
           </div>
         </article>
@@ -291,7 +290,7 @@ function PackageOverviewPanel({ detail, onNavigate }: OverviewPanelProps) {
             <DashIcon name="users" className="dash-icon--sm" />
           </span>
           <div>
-            <span className="plat-overview-v2__meta-label">Organization type</span>
+            <span className="plat-overview-v2__meta-label">{t("platformUi.currOrgType")}</span>
             <strong>{formatOrgType(detail.schoolType)}</strong>
           </div>
         </article>
@@ -300,7 +299,7 @@ function PackageOverviewPanel({ detail, onNavigate }: OverviewPanelProps) {
             <DashIcon name="templates" className="dash-icon--sm" />
           </span>
           <div>
-            <span className="plat-overview-v2__meta-label">Package key</span>
+            <span className="plat-overview-v2__meta-label">{t("platformUi.currPackageKey")}</span>
             <code>{detail.key}</code>
           </div>
         </article>
@@ -331,8 +330,8 @@ function PackageOverviewPanel({ detail, onNavigate }: OverviewPanelProps) {
         <section className="plat-overview-v2__panel">
           <header className="plat-overview-v2__panel-head">
             <div>
-              <h4>Content mix</h4>
-              <p>Relative share of each starter category in this package.</p>
+              <h4>{t("platformUi.currContentMix")}</h4>
+              <p>{t("platformUi.currContentMixSub")}</p>
             </div>
           </header>
           <ContentMixChart detail={detail} />
@@ -341,8 +340,8 @@ function PackageOverviewPanel({ detail, onNavigate }: OverviewPanelProps) {
         <section className="plat-overview-v2__panel">
           <header className="plat-overview-v2__panel-head">
             <div>
-              <h4>Also provisioned</h4>
-              <p>System defaults applied automatically for every new tenant.</p>
+              <h4>{t("platformUi.currAlsoProvisioned")}</h4>
+              <p>{t("platformUi.currAlsoProvisionedSub")}</p>
             </div>
           </header>
           <ul className="plat-overview-v2__auto">
@@ -383,16 +382,6 @@ function resourceLabel(type: string) {
   return type.replace(/_/g, " ").toLowerCase();
 }
 
-function templateChannelMeta(channel: string) {
-  return (
-    TEMPLATE_CHANNELS.find((c) => c.value === channel) ?? {
-      value: channel,
-      label: channel,
-      icon: "templates" as DashIconName,
-    }
-  );
-}
-
 function departmentIconName(name: string): DashIconName {
   const n = name.toLowerCase();
   if (n.includes("ict") || n.includes("computer") || n.includes("tech")) return "monitor";
@@ -410,17 +399,37 @@ function templatePreview(body: string, max = 120) {
   return `${flat.slice(0, max)}…`;
 }
 
-const DEPARTMENT_SUGGESTIONS = [
-  "Natural Science",
-  "Social Science",
-  "Languages",
-  "ICT",
-  "Mathematics",
-  "Arts",
-];
+const DEPARTMENT_SUGGESTION_KEYS = [
+  "platformUi.currDeptNatural",
+  "platformUi.currDeptSocial",
+  "platformUi.currDeptLanguages",
+  "platformUi.currDeptIct",
+  "platformUi.currDeptMath",
+  "platformUi.currDeptArts",
+] as const;
 
 export function PlatformCurriculum() {
+  const { t } = useLocale();
   const router = useRouter();
+  const TEMPLATE_CHANNELS = TEMPLATE_CHANNEL_DEFS.map((c) => ({
+    ...c,
+    label:
+      c.value === "SMS"
+        ? t("platformUi.channelParentSms")
+        : c.value === "EMAIL"
+          ? t("platformUi.channelEmail")
+          : t("platformUi.channelTeacher"),
+  }));
+  const DEPARTMENT_SUGGESTIONS = DEPARTMENT_SUGGESTION_KEYS.map((k) => t(k));
+  function templateChannelMeta(channel: string) {
+    return (
+      TEMPLATE_CHANNELS.find((c) => c.value === channel) ?? {
+        value: channel,
+        label: channel,
+        icon: "templates" as DashIconName,
+      }
+    );
+  }
   const [packages, setPackages] = useState<PackageRow[]>([]);
   const [detail, setDetail] = useState<PackageDetail | null>(null);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
@@ -489,7 +498,7 @@ export function PlatformCurriculum() {
       setPackages(rows);
       setSelectedKey((prev) => prev ?? rows[0]?.key ?? null);
     } catch (err) {
-      fail(err, "Load failed");
+      fail(err, t("platformUi.loadFailed"));
     } finally {
       setLoading(false);
     }
@@ -519,7 +528,7 @@ export function PlatformCurriculum() {
       setEditingDepartmentId(null);
       void platformFetch<PackageDetail>(`/platform/curriculum-packages/${selectedKey}`)
         .then(setDetail)
-        .catch((err) => fail(err, "Could not load package"))
+        .catch((err) => fail(err, t("platformUi.currErrLoadPackage")))
         .finally(() => setDetailLoading(false));
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -642,7 +651,7 @@ export function PlatformCurriculum() {
       await loadPlatformSubjects();
       await reloadDetail();
     } catch (err) {
-      fail(err, "Could not add subject");
+      fail(err, t("platformUi.currErrAddSubject"));
     } finally {
       setSubjectBusy(false);
     }
@@ -673,7 +682,7 @@ export function PlatformCurriculum() {
       await loadPlatformSubjects();
       await reloadDetail();
     } catch (err) {
-      fail(err, "Could not create subject");
+      fail(err, t("platformUi.currErrCreateSubject"));
     } finally {
       setSubjectBusy(false);
     }
@@ -692,7 +701,7 @@ export function PlatformCurriculum() {
       await loadPlatformSubjects();
       await reloadDetail();
     } catch (err) {
-      fail(err, "Could not remove subject");
+      fail(err, t("platformUi.currErrRemoveSubject"));
     } finally {
       setSubjectBusy(false);
     }
@@ -711,7 +720,7 @@ export function PlatformCurriculum() {
       await loadPlatformLibrary();
       await reloadDetail();
     } catch (err) {
-      fail(err, "Could not add resource");
+      fail(err, t("platformUi.currErrAddResource"));
     } finally {
       setLibraryBusy(false);
     }
@@ -756,7 +765,7 @@ export function PlatformCurriculum() {
       await loadPlatformLibrary();
       await reloadDetail();
     } catch (err) {
-      fail(err, "Could not create resource");
+      fail(err, t("platformUi.currErrCreateResource"));
     } finally {
       setLibraryBusy(false);
     }
@@ -775,7 +784,7 @@ export function PlatformCurriculum() {
       await loadPlatformLibrary();
       await reloadDetail();
     } catch (err) {
-      fail(err, "Could not remove resource");
+      fail(err, t("platformUi.currErrRemoveResource"));
     } finally {
       setLibraryBusy(false);
     }
@@ -794,7 +803,7 @@ export function PlatformCurriculum() {
       await loadPlatformTemplates();
       await reloadDetail();
     } catch (err) {
-      fail(err, "Could not add template");
+      fail(err, t("platformUi.currErrAddTemplate"));
     } finally {
       setTemplateBusy(false);
     }
@@ -828,7 +837,7 @@ export function PlatformCurriculum() {
       await loadPlatformTemplates();
       await reloadDetail();
     } catch (err) {
-      fail(err, "Could not create template");
+      fail(err, t("platformUi.currErrCreateTemplate"));
     } finally {
       setTemplateBusy(false);
     }
@@ -867,7 +876,7 @@ export function PlatformCurriculum() {
       cancelEditTemplate();
       await reloadDetail();
     } catch (err) {
-      fail(err, "Could not save template");
+      fail(err, t("platformUi.currErrSaveTemplate"));
     } finally {
       setTemplateBusy(false);
     }
@@ -887,7 +896,7 @@ export function PlatformCurriculum() {
       await loadPlatformTemplates();
       await reloadDetail();
     } catch (err) {
-      fail(err, "Could not remove template");
+      fail(err, t("platformUi.currErrRemoveTemplate"));
     } finally {
       setTemplateBusy(false);
     }
@@ -906,7 +915,7 @@ export function PlatformCurriculum() {
       setNewDepartmentName("");
       await reloadDetail();
     } catch (err) {
-      fail(err, "Could not add department");
+      fail(err, t("platformUi.currErrAddDept"));
     } finally {
       setStructureBusy(false);
     }
@@ -937,7 +946,7 @@ export function PlatformCurriculum() {
       cancelEditDepartment();
       await reloadDetail();
     } catch (err) {
-      fail(err, "Could not save department");
+      fail(err, t("platformUi.currErrSaveDept"));
     } finally {
       setStructureBusy(false);
     }
@@ -956,7 +965,7 @@ export function PlatformCurriculum() {
       if (editingDepartmentId === department.id) cancelEditDepartment();
       await reloadDetail();
     } catch (err) {
-      fail(err, "Could not remove department");
+      fail(err, t("platformUi.currErrRemoveDept"));
     } finally {
       setStructureBusy(false);
     }
@@ -1067,7 +1076,7 @@ export function PlatformCurriculum() {
       );
       setDetail(refreshed);
     } catch (err) {
-      fail(err, "Save failed");
+      fail(err, t("platformUi.saveFailed"));
     }
   }
 
@@ -1131,8 +1140,8 @@ export function PlatformCurriculum() {
             <DashIcon name="results" className="dash-icon--md" />
           </span>
           <div>
-            <p className="plat-subjects-v2__eyebrow">Content & Curriculum Engine</p>
-            <h2 className="plat-subjects-v2__title">Curriculum packages</h2>
+            <p className="plat-subjects-v2__eyebrow">{t("platformUi.contentEngineEyebrow")}</p>
+            <h2 className="plat-subjects-v2__title">{t("platformUi.currTitle")}</h2>
             <p className="plat-subjects-v2__sub">
               Packages pick subjects and eLibrary resources from the master
               repositories, then copy them into each new school on provision.
@@ -1142,15 +1151,15 @@ export function PlatformCurriculum() {
         <div className="plat-subjects-v2__hero-stats">
           <div className="plat-subjects-v2__stat">
             <strong>{packages.length}</strong>
-            <span>Packages</span>
+            <span>{t("platformUi.currStatPackages")}</span>
           </div>
           <div className="plat-subjects-v2__stat">
             <strong>{totals.subjects}</strong>
-            <span>Subjects</span>
+            <span>{t("platformUi.currStatSubjects")}</span>
           </div>
           <div className="plat-subjects-v2__stat">
             <strong>{totals.library}</strong>
-            <span>Library</span>
+            <span>{t("platformUi.currStatLibrary")}</span>
           </div>
         </div>
       </header>
@@ -1160,10 +1169,10 @@ export function PlatformCurriculum() {
           <DashIcon name="library" className="dash-icon--sm" />
           <input
             type="search"
-            placeholder="Search packages…"
+            placeholder={t("platformUi.currSearchPh")}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            aria-label="Search curriculum packages"
+            aria-label={t("platformUi.currSearchAria")}
           />
         </div>
         <button
@@ -1178,7 +1187,7 @@ export function PlatformCurriculum() {
       <div className="plat-curriculum-workspace plat-curriculum-v2__workspace">
         <aside className="plat-curriculum-sidebar plat-curriculum-v2__sidebar" aria-label="Packages">
           {filteredPackages.length === 0 ? (
-            <p className="plat-empty">No packages match your search.</p>
+            <p className="plat-empty">{t("platformUi.currNoMatch")}</p>
           ) : (
             filteredPackages.map((p) => {
               const accent = packageAccent(p.key);
@@ -1224,7 +1233,7 @@ export function PlatformCurriculum() {
         <main className="plat-curriculum-main plat-curriculum-v2__main">
           {!detail && !detailLoading ? (
             <div className="plat-curriculum-empty">
-              <p>Select a package to manage its catalog.</p>
+              <p>{t("platformUi.currSelectHint")}</p>
             </div>
           ) : null}
 
@@ -1254,7 +1263,7 @@ export function PlatformCurriculum() {
                         className="plat-btn plat-btn--ghost plat-btn--xs"
                         onClick={() => setEditingMeta((v) => !v)}
                       >
-                        {editingMeta ? "Cancel edit" : "Edit package"}
+                        {editingMeta ? t("platformUi.cancelEdit") : t("platformUi.currEditRenames")}
                       </button>
                     ) : null}
                     <button
@@ -1262,12 +1271,12 @@ export function PlatformCurriculum() {
                       className="plat-btn plat-btn--ghost plat-btn--xs"
                       onClick={() => void copyKey()}
                     >
-                      {copied ? "Copied" : "Copy package key"}
+                      {copied ? "Copied" : t("platformUi.currCopyKey")}
                     </button>
                   </div>
                   {!detail.isBlank ? (
                     <p className="plat-curriculum-v2__action-hint">
-                      <strong>Edit</strong> renames this package · use the tabs below to add,
+                      <strong>{t("common.edit")}</strong> renames this package · use the tabs below to add,
                       edit, or remove starter items
                     </p>
                   ) : null}
@@ -1279,12 +1288,12 @@ export function PlatformCurriculum() {
                   <input
                     value={editLabel}
                     onChange={(e) => setEditLabel(e.target.value)}
-                    placeholder="Package label"
+                    placeholder={t("platformUi.currPackageLabel")}
                   />
                   <textarea
                     value={editDescription}
                     onChange={(e) => setEditDescription(e.target.value)}
-                    placeholder="Description"
+                    placeholder={t("platformUi.description")}
                     rows={2}
                   />
                   <button
@@ -1299,7 +1308,7 @@ export function PlatformCurriculum() {
 
               {detail.isBlank ? (
                 <div className="plat-curriculum-blank">
-                  <strong>Blank provisioning</strong>
+                  <strong>{t("platformUi.currBlankTitle")}</strong>
                   <p>
                     New tenants get no subjects, grades, or library content until
                     the admin completes setup manually.
@@ -1311,20 +1320,20 @@ export function PlatformCurriculum() {
                     className="plat-filter-tabs plat-curriculum-tabs"
                     role="tablist"
                   >
-                    {tabs.map((t) => (
+                    {tabs.map((tabItem) => (
                       <button
-                        key={t.id}
+                        key={tabItem.id}
                         type="button"
                         role="tab"
-                        aria-selected={tab === t.id}
+                        aria-selected={tab === tabItem.id}
                         className={`plat-filter-tab${
-                          tab === t.id ? " plat-filter-tab--active" : ""
+                          tab === tabItem.id ? " plat-filter-tab--active" : ""
                         }`}
-                        onClick={() => setTab(t.id)}
+                        onClick={() => setTab(tabItem.id)}
                       >
-                        {t.label}
-                        {t.count != null && t.count > 0 ? (
-                          <span className="plat-filter-count">{t.count}</span>
+                        {tabItem.label}
+                        {tabItem.count != null && tabItem.count > 0 ? (
+                          <span className="plat-filter-count">{tabItem.count}</span>
                         ) : null}
                       </button>
                     ))}
@@ -1346,12 +1355,12 @@ export function PlatformCurriculum() {
                               <select
                                 value={addSubjectId}
                                 onChange={(e) => setAddSubjectId(e.target.value)}
-                                aria-label="Subject to add"
+                                aria-label={t("platformUi.currSubjectToAdd")}
                               >
                                 <option value="">
                                   {availableSubjects.length === 0
-                                    ? "No more subjects in repository…"
-                                    : "Add from subject repository…"}
+                                    ? t("platformUi.currNoMoreSubjects")
+                                    : t("platformUi.currAddFromRepo")}
                                 </option>
                                 {availableSubjects.map((s) => (
                                   <option key={s.id} value={s.id}>
@@ -1365,16 +1374,16 @@ export function PlatformCurriculum() {
                                 disabled={!addSubjectId || subjectBusy}
                                 title={
                                   addSubjectId
-                                    ? "Add selected subject to this package"
-                                    : "Choose a subject from the dropdown first"
+                                    ? t("platformUi.currAddSubject")
+                                    : t("platformUi.currChooseSubjectFirst")
                                 }
                                 onClick={() => void addSubjectToPackage()}
                               >
-                                {subjectBusy ? "Saving…" : "Add subject"}
+                                {subjectBusy ? t("platformUi.saving") : t("platformUi.currAddSubject")}
                               </button>
                               <span className="plat-curriculum-v2__subject-hint">
                                 {availableSubjects.length === 0
-                                  ? "Every repository subject is already in this package."
+                                  ? t("platformUi.currEverySubjectIn")
                                   : addSubjectId
                                     ? `${availableSubjects.length} available · pick then Add`
                                     : `Select one of ${availableSubjects.length} available, then Add`}
@@ -1392,19 +1401,19 @@ export function PlatformCurriculum() {
                                 className="plat-btn plat-btn--ghost plat-btn--xs"
                                 onClick={() => setCreateSubjectOpen((v) => !v)}
                               >
-                                {createSubjectOpen ? "Hide create form" : "+ Create new subject"}
+                                {createSubjectOpen ? t("platformUi.currHideCreate") : "+ Create new subject"}
                               </button>
                               {createSubjectOpen ? (
                                 <div className="plat-curriculum-form plat-curriculum-v2__subject-form">
                                   <input
-                                    placeholder="Code (e.g. AMH)"
+                                    placeholder={t("platformUi.currCodePh")}
                                     value={newSubjectCode}
                                     onChange={(e) =>
                                       setNewSubjectCode(e.target.value.toUpperCase())
                                     }
                                   />
                                   <input
-                                    placeholder="Name (e.g. Amharic)"
+                                    placeholder={t("platformUi.currNamePh")}
                                     value={newSubjectName}
                                     onChange={(e) => setNewSubjectName(e.target.value)}
                                   />
@@ -1412,9 +1421,9 @@ export function PlatformCurriculum() {
                                     value={newSubjectLevel}
                                     onChange={(e) => setNewSubjectLevel(e.target.value)}
                                   >
-                                    <option value="ALL">All levels</option>
-                                    <option value="PRIMARY">Primary</option>
-                                    <option value="SECONDARY">Secondary</option>
+                                    <option value="ALL">{t("platformUi.allLevels")}</option>
+                                    <option value="PRIMARY">{t("platformUi.primary")}</option>
+                                    <option value="SECONDARY">{t("platformUi.secondary")}</option>
                                   </select>
                                   <button
                                     type="button"
@@ -1426,7 +1435,7 @@ export function PlatformCurriculum() {
                                     }
                                     onClick={() => void createAndAddSubject()}
                                   >
-                                    {subjectBusy ? "Saving…" : "Create & add to package"}
+                                    {subjectBusy ? t("platformUi.saving") : t("platformUi.currCreateAdd")}
                                   </button>
                                 </div>
                               ) : null}
@@ -1436,19 +1445,19 @@ export function PlatformCurriculum() {
                         <div className="plat-search plat-search--compact">
                           <input
                             type="search"
-                            placeholder="Filter subjects…"
+                            placeholder={t("platformUi.currFilterSubjectsPh")}
                             value={subjectQ}
                             onChange={(e) => setSubjectQ(e.target.value)}
-                            aria-label="Filter subjects"
+                            aria-label={t("platformUi.currFilterSubjects")}
                           />
                         </div>
                         <div className="plat-curriculum-table-wrap">
                           <table className="plat-curriculum-table">
                             <thead>
                               <tr>
-                                <th>Code</th>
-                                <th>Subject</th>
-                                <th>Level</th>
+                                <th>{t("platformUi.code")}</th>
+                                <th>{t("platformUi.currSubjectCol")}</th>
+                                <th>{t("platformUi.level")}</th>
                                 {!detail.isBlank ? <th aria-label="Actions" /> : null}
                               </tr>
                             </thead>
@@ -1511,10 +1520,10 @@ export function PlatformCurriculum() {
                             <div className="plat-curriculum-v2__subject-actions">
                               <input
                                 type="text"
-                                placeholder="Department name (e.g. Natural Science)"
+                                placeholder={t("platformUi.currDeptNamePh")}
                                 value={newDepartmentName}
                                 onChange={(e) => setNewDepartmentName(e.target.value)}
-                                aria-label="New department name"
+                                aria-label={t("platformUi.currNewDeptAria")}
                               />
                               <button
                                 type="button"
@@ -1522,12 +1531,12 @@ export function PlatformCurriculum() {
                                 disabled={structureBusy || !newDepartmentName.trim()}
                                 onClick={() => void addDepartment()}
                               >
-                                {structureBusy ? "Saving…" : "Add department"}
+                                {structureBusy ? t("platformUi.saving") : t("platformUi.currAddDepartment")}
                               </button>
                             </div>
                             {departmentSuggestions.length > 0 ? (
                               <div className="plat-structure-v2__suggestions">
-                                <span>Quick add:</span>
+                                <span>{t("platformUi.currQuickAdd")}</span>
                                 {departmentSuggestions.map((name) => (
                                   <button
                                     key={name}
@@ -1551,10 +1560,10 @@ export function PlatformCurriculum() {
                         <div className="plat-search plat-search--compact">
                           <input
                             type="search"
-                            placeholder="Filter departments…"
+                            placeholder={t("platformUi.currFilterDeptsPh")}
                             value={structureQ}
                             onChange={(e) => setStructureQ(e.target.value)}
-                            aria-label="Filter departments"
+                            aria-label={t("platformUi.currFilterDepts")}
                           />
                         </div>
 
@@ -1586,7 +1595,7 @@ export function PlatformCurriculum() {
                                         onChange={(e) =>
                                           setEditDepartmentName(e.target.value)
                                         }
-                                        placeholder="Department name"
+                                        placeholder={t("platformUi.currDeptName")}
                                       />
                                       <div className="plat-structure-v2__edit-actions">
                                         <button
@@ -1654,12 +1663,12 @@ export function PlatformCurriculum() {
                               <select
                                 value={addLibraryId}
                                 onChange={(e) => setAddLibraryId(e.target.value)}
-                                aria-label="Resource to add"
+                                aria-label={t("platformUi.currResourceToAdd")}
                               >
                                 <option value="">
                                   {availableLibrary.length === 0
-                                    ? "No more resources in repository…"
-                                    : "Add from eLibrary repository…"}
+                                    ? t("platformUi.currNoMoreResources")
+                                    : t("platformUi.currAddFromLibRepo")}
                                 </option>
                                 {availableLibrary.map((r) => (
                                   <option key={r.id} value={r.id}>
@@ -1673,16 +1682,16 @@ export function PlatformCurriculum() {
                                 disabled={!addLibraryId || libraryBusy}
                                 title={
                                   addLibraryId
-                                    ? "Add selected resource to this package"
-                                    : "Choose a resource from the dropdown first"
+                                    ? t("platformUi.currAddResource")
+                                    : t("platformUi.currChooseResourceFirst")
                                 }
                                 onClick={() => void addLibraryItemToPackage()}
                               >
-                                {libraryBusy ? "Saving…" : "Add resource"}
+                                {libraryBusy ? t("platformUi.saving") : t("platformUi.currAddResource")}
                               </button>
                               <span className="plat-curriculum-v2__subject-hint">
                                 {availableLibrary.length === 0
-                                  ? "Every repository resource is already in this package."
+                                  ? t("platformUi.currEveryResourceIn")
                                   : addLibraryId
                                     ? `${availableLibrary.length} available · pick then Add`
                                     : `Select one of ${availableLibrary.length} available, then Add`}
@@ -1695,13 +1704,13 @@ export function PlatformCurriculum() {
                                 onClick={() => setCreateLibraryOpen((v) => !v)}
                               >
                                 {createLibraryOpen
-                                  ? "Hide create form"
+                                  ? t("platformUi.currHideCreate")
                                   : "+ Create new starter resource"}
                               </button>
                               {createLibraryOpen ? (
                                 <div className="plat-curriculum-form plat-curriculum-v2__subject-form">
                                   <input
-                                    placeholder="Title (e.g. Amharic Reader — Grade 3)"
+                                    placeholder={t("platformUi.currTitlePh")}
                                     value={newLibraryTitle}
                                     onChange={(e) => setNewLibraryTitle(e.target.value)}
                                   />
@@ -1709,7 +1718,7 @@ export function PlatformCurriculum() {
                                     value={newLibraryCategoryId}
                                     onChange={(e) => setNewLibraryCategoryId(e.target.value)}
                                   >
-                                    <option value="">Category</option>
+                                    <option value="">{t("platformUi.category")}</option>
                                     {libraryCategories.map((c) => (
                                       <option key={c.id} value={c.id}>
                                         {c.name}
@@ -1727,17 +1736,17 @@ export function PlatformCurriculum() {
                                     ))}
                                   </select>
                                   <input
-                                    placeholder="Subject (optional)"
+                                    placeholder={t("platformUi.currSubjectOptional")}
                                     value={newLibrarySubject}
                                     onChange={(e) => setNewLibrarySubject(e.target.value)}
                                   />
                                   <input
-                                    placeholder="Grade label (optional)"
+                                    placeholder={t("platformUi.currGradeOptional")}
                                     value={newLibraryGrade}
                                     onChange={(e) => setNewLibraryGrade(e.target.value)}
                                   />
                                   <label className="plat-curriculum-v2__file-field">
-                                    <span>Main file (PDF, EPUB, etc.)</span>
+                                    <span>{t("platformUi.currMainFile")}</span>
                                     <input
                                       type="file"
                                       accept=".pdf,.epub,.doc,.docx,.ppt,.pptx,.mp4,.mp3"
@@ -1756,7 +1765,7 @@ export function PlatformCurriculum() {
                                     )}
                                   </label>
                                   <input
-                                    placeholder="Or external link (Google Drive, YouTube…)"
+                                    placeholder={t("platformUi.currOrExternal")}
                                     value={newLibraryExternalUrl}
                                     onChange={(e) => setNewLibraryExternalUrl(e.target.value)}
                                   />
@@ -1770,7 +1779,7 @@ export function PlatformCurriculum() {
                                     }
                                     onClick={() => void createAndAddLibraryItem()}
                                   >
-                                    {libraryBusy ? "Saving…" : "Create & add to package"}
+                                    {libraryBusy ? t("platformUi.saving") : t("platformUi.currCreateAdd")}
                                   </button>
                                 </div>
                               ) : null}
@@ -1780,20 +1789,20 @@ export function PlatformCurriculum() {
                         <div className="plat-search plat-search--compact">
                           <input
                             type="search"
-                            placeholder="Filter resources…"
+                            placeholder={t("platformUi.currFilterResourcesPh")}
                             value={libraryQ}
                             onChange={(e) => setLibraryQ(e.target.value)}
-                            aria-label="Filter library resources"
+                            aria-label={t("platformUi.currFilterResources")}
                           />
                         </div>
                         <div className="plat-curriculum-table-wrap">
                           <table className="plat-curriculum-table">
                             <thead>
                               <tr>
-                                <th>Resource</th>
-                                <th>Category</th>
-                                <th>Type</th>
-                                <th>Subject</th>
+                                <th>{t("platformUi.currResourceCol")}</th>
+                                <th>{t("platformUi.category")}</th>
+                                <th>{t("platformUi.type")}</th>
+                                <th>{t("platformUi.currSubjectCol")}</th>
                                 {!detail.isBlank ? <th aria-label="Actions" /> : null}
                               </tr>
                             </thead>
@@ -1854,16 +1863,16 @@ export function PlatformCurriculum() {
                               <select
                                 value={addTemplateId}
                                 onChange={(e) => setAddTemplateId(e.target.value)}
-                                aria-label="Template to add"
+                                aria-label={t("platformUi.currTemplateToAdd")}
                               >
                                 <option value="">
                                   {availableTemplates.length === 0
-                                    ? "No more templates in repository…"
-                                    : "Add from template repository…"}
+                                    ? t("platformUi.currNoMoreTemplates")
+                                    : t("platformUi.currAddFromTplRepo")}
                                 </option>
-                                {availableTemplates.map((t) => (
-                                  <option key={t.id} value={t.id}>
-                                    {t.name} ({templateChannelMeta(t.channel).label})
+                                {availableTemplates.map((tpl) => (
+                                  <option key={tpl.id} value={tpl.id}>
+                                    {tpl.name} ({templateChannelMeta(tpl.channel).label})
                                   </option>
                                 ))}
                               </select>
@@ -1873,20 +1882,20 @@ export function PlatformCurriculum() {
                                 disabled={!addTemplateId || templateBusy}
                                 onClick={() => void addTemplateToPackage()}
                               >
-                                {templateBusy ? "Saving…" : "Add template"}
+                                {templateBusy ? t("platformUi.saving") : t("platformUi.currAddTemplate")}
                               </button>
                               <button
                                 type="button"
                                 className="plat-btn plat-btn--ghost plat-btn--xs"
                                 onClick={() => setCreateTemplateOpen((v) => !v)}
                               >
-                                {createTemplateOpen ? "Hide create form" : "+ Create new"}
+                                {createTemplateOpen ? t("platformUi.currHideCreate") : "+ Create new"}
                               </button>
                             </div>
                             {createTemplateOpen ? (
                               <div className="plat-curriculum-form plat-templates-v2__create">
                                 <input
-                                  placeholder="Key (e.g. fee_reminder)"
+                                  placeholder={t("platformUi.currKeyPh")}
                                   value={newTemplateKey}
                                   onChange={(e) =>
                                     setNewTemplateKey(
@@ -1895,7 +1904,7 @@ export function PlatformCurriculum() {
                                   }
                                 />
                                 <input
-                                  placeholder="Display name"
+                                  placeholder={t("platformUi.currDisplayName")}
                                   value={newTemplateName}
                                   onChange={(e) => setNewTemplateName(e.target.value)}
                                 />
@@ -1910,7 +1919,7 @@ export function PlatformCurriculum() {
                                   ))}
                                 </select>
                                 <textarea
-                                  placeholder="Message body…"
+                                  placeholder={t("platformUi.currMessageBodyPh")}
                                   rows={6}
                                   value={newTemplateBody}
                                   onChange={(e) => setNewTemplateBody(e.target.value)}
@@ -1926,7 +1935,7 @@ export function PlatformCurriculum() {
                                   }
                                   onClick={() => void createAndAddTemplate()}
                                 >
-                                  {templateBusy ? "Saving…" : "Create & add to package"}
+                                  {templateBusy ? t("platformUi.saving") : t("platformUi.currCreateAdd")}
                                 </button>
                               </div>
                             ) : null}
@@ -1937,10 +1946,10 @@ export function PlatformCurriculum() {
                           <div className="plat-search plat-search--compact">
                             <input
                               type="search"
-                              placeholder="Filter templates…"
+                              placeholder={t("platformUi.currFilterTemplatesPh")}
                               value={templateQ}
                               onChange={(e) => setTemplateQ(e.target.value)}
-                              aria-label="Filter templates"
+                              aria-label={t("platformUi.currFilterTemplates")}
                             />
                           </div>
                           <div
@@ -1997,19 +2006,19 @@ export function PlatformCurriculum() {
                           </p>
                         ) : (
                           <div className="plat-templates-v2__grid">
-                            {filteredTemplates.map((t) => {
-                              const meta = templateChannelMeta(t.channel);
-                              const editing = editingTemplateId === t.id;
+                            {filteredTemplates.map((tpl) => {
+                              const meta = templateChannelMeta(tpl.channel);
+                              const editing = editingTemplateId === tpl.id;
                               return (
                                 <article
-                                  key={t.id}
+                                  key={tpl.id}
                                   className={`plat-templates-v2__card${
                                     editing ? " plat-templates-v2__card--editing" : ""
                                   }`}
                                 >
                                   <header className="plat-templates-v2__card-head">
                                     <span
-                                      className={`plat-templates-v2__badge plat-templates-v2__badge--${t.channel.toLowerCase()}`}
+                                      className={`plat-templates-v2__badge plat-templates-v2__badge--${tpl.channel.toLowerCase()}`}
                                     >
                                       <DashIcon
                                         name={meta.icon}
@@ -2027,7 +2036,7 @@ export function PlatformCurriculum() {
                                               disabled={templateBusy}
                                               onClick={() => void saveEditTemplate()}
                                             >
-                                              Save
+                                              {t("common.save")}
                                             </button>
                                             <button
                                               type="button"
@@ -2035,7 +2044,7 @@ export function PlatformCurriculum() {
                                               disabled={templateBusy}
                                               onClick={cancelEditTemplate}
                                             >
-                                              Cancel
+                                              {t("common.cancel")}
                                             </button>
                                           </>
                                         ) : (
@@ -2044,19 +2053,19 @@ export function PlatformCurriculum() {
                                               type="button"
                                               className="plat-btn plat-btn--ghost plat-btn--xs"
                                               disabled={templateBusy}
-                                              onClick={() => startEditTemplate(t)}
+                                              onClick={() => startEditTemplate(tpl)}
                                             >
-                                              Edit
+                                              {t("common.edit")}
                                             </button>
                                             <button
                                               type="button"
                                               className="plat-btn plat-btn--ghost plat-btn--xs plat-btn--danger"
                                               disabled={templateBusy}
                                               onClick={() =>
-                                                void removeTemplateFromPackage(t)
+                                                void removeTemplateFromPackage(tpl)
                                               }
                                             >
-                                              Remove
+                                              {t("common.remove")}
                                             </button>
                                           </>
                                         )}
@@ -2069,7 +2078,7 @@ export function PlatformCurriculum() {
                                       <input
                                         value={editTemplateName}
                                         onChange={(e) => setEditTemplateName(e.target.value)}
-                                        placeholder="Name"
+                                        placeholder={t("platformUi.name")}
                                       />
                                       <select
                                         value={editTemplateChannel}
@@ -2087,19 +2096,19 @@ export function PlatformCurriculum() {
                                         rows={8}
                                         value={editTemplateBody}
                                         onChange={(e) => setEditTemplateBody(e.target.value)}
-                                        placeholder="Message body"
+                                        placeholder={t("platformUi.currMessageBody")}
                                       />
                                     </div>
                                   ) : (
                                     <>
-                                      <h4 className="plat-templates-v2__title">{t.name}</h4>
-                                      <code className="plat-templates-v2__key">{t.key}</code>
+                                      <h4 className="plat-templates-v2__title">{tpl.name}</h4>
+                                      <code className="plat-templates-v2__key">{tpl.key}</code>
                                       <p className="plat-templates-v2__preview">
-                                        {templatePreview(t.body)}
+                                        {templatePreview(tpl.body)}
                                       </p>
                                       <details className="plat-templates-v2__body">
-                                        <summary>View full message</summary>
-                                        <pre>{t.body}</pre>
+                                        <summary>{t("platformUi.currViewFullMessage")}</summary>
+                                        <pre>{tpl.body}</pre>
                                       </details>
                                     </>
                                   )}

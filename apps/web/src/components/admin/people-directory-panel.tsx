@@ -22,12 +22,27 @@ import {
   type TeacherRecord,
 } from "@/lib/teachers";
 import { AppToast } from "@/components/ui/app-toast";
+import { useLocale } from "@/components/i18n/locale-provider";
 
 type Props = {
   group: PeopleGroup;
 };
 
+function officeTeamLabel(
+  slug: string | null | undefined,
+  portalRole: string | null | undefined,
+  t: (key: string) => string,
+) {
+  if (slug === "finance_officer") return t("peopleDirectoryUi.teamFinance");
+  if (slug === "reception") return t("peopleDirectoryUi.teamReception");
+  if (slug === "attendance_officer") return t("peopleDirectoryUi.teamAttendance");
+  if (slug === "registrar") return t("peopleDirectoryUi.teamRegistrar");
+  if (portalRole === "admin") return t("peopleDirectoryUi.teamLeadership");
+  return t("peopleDirectoryUi.teamOperations");
+}
+
 export function PeopleDirectoryPanel({ group }: Props) {
+  const { t } = useLocale();
   const isTeachers = group === "teachers";
   const addableSlugs = isTeachers ? [...TEACHER_ROLE_SLUGS] : [...OFFICE_STAFF_ROLE_SLUGS];
 
@@ -68,7 +83,7 @@ export function PeopleDirectoryPanel({ group }: Props) {
       setPeople(rows);
       setTemplates(tpls);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load directory");
+      setError(err instanceof Error ? err.message : t("peopleDirectoryUi.loadFailed"));
     } finally {
       setLoading(false);
     }
@@ -92,7 +107,9 @@ export function PeopleDirectoryPanel({ group }: Props) {
         setTemplates(tpls);
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Could not load directory");
+          setError(
+            err instanceof Error ? err.message : t("peopleDirectoryUi.loadFailed"),
+          );
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -106,7 +123,7 @@ export function PeopleDirectoryPanel({ group }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [group]);
+  }, [group, t]);
 
   function resetForm() {
     setEmail("");
@@ -138,9 +155,7 @@ export function PeopleDirectoryPanel({ group }: Props) {
 
   async function openPermissions(userId: string) {
     if (currentUserId && userId === currentUserId) {
-      setError(
-        "You cannot edit your own permissions. Ask another school admin to adjust your access.",
-      );
+      setError(t("peopleDirectoryUi.ownPermissionsBlocked"));
       return;
     }
     setBusy(true);
@@ -159,7 +174,9 @@ export function PeopleDirectoryPanel({ group }: Props) {
       setPermDraft(draft);
       setPermDrawerOpen(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load permissions");
+      setError(
+        err instanceof Error ? err.message : t("peopleDirectoryUi.permissionsLoadFailed"),
+      );
     } finally {
       setBusy(false);
     }
@@ -182,7 +199,9 @@ export function PeopleDirectoryPanel({ group }: Props) {
       setPermDrawerOpen(false);
       setPermDetail(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not save permissions");
+      setError(
+        err instanceof Error ? err.message : t("peopleDirectoryUi.permissionsSaveFailed"),
+      );
     } finally {
       setBusy(false);
     }
@@ -218,7 +237,7 @@ export function PeopleDirectoryPanel({ group }: Props) {
       resetForm();
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Save failed");
+      setError(err instanceof Error ? err.message : t("peopleDirectoryUi.saveFailed"));
     } finally {
       setBusy(false);
     }
@@ -230,20 +249,24 @@ export function PeopleDirectoryPanel({ group }: Props) {
 
       <div className="tch-toolbar">
         <button type="button" className="att-btn att-btn--primary" onClick={openCreate}>
-          {isTeachers ? "+ Add teacher" : "+ Add staff member"}
+          {isTeachers ? t("peopleDirectoryUi.addTeacher") : t("peopleDirectoryUi.addStaff")}
         </button>
       </div>
 
       {loading ? (
-        <p className="setup-hint">Loading…</p>
+        <p className="setup-hint">{t("peopleDirectoryUi.loading")}</p>
       ) : (
         <div className="tch-table-wrap">
           <table className="tch-table">
             <thead>
               <tr>
-                <th>Name</th>
-                <th>Role</th>
-                {isTeachers ? <th>Homeroom / subjects</th> : <th>Team</th>}
+                <th>{t("peopleDirectoryUi.colName")}</th>
+                <th>{t("peopleDirectoryUi.colRole")}</th>
+                {isTeachers ? (
+                  <th>{t("peopleDirectoryUi.colHomeroom")}</th>
+                ) : (
+                  <th>{t("peopleDirectoryUi.colTeam")}</th>
+                )}
                 <th />
               </tr>
             </thead>
@@ -251,48 +274,63 @@ export function PeopleDirectoryPanel({ group }: Props) {
               {people.length === 0 ? (
                 <tr>
                   <td colSpan={4} className="tch-meta">
-                    {isTeachers ? "No teachers yet." : "No staff members yet."}
+                    {isTeachers
+                      ? t("peopleDirectoryUi.noTeachers")
+                      : t("peopleDirectoryUi.noStaff")}
                   </td>
                 </tr>
               ) : (
-                people.map((t) => (
-                  <tr key={t.userId}>
+                people.map((person) => (
+                  <tr key={person.userId}>
                     <td>
-                      <strong>{t.name}</strong>
-                      <div className="tch-meta">{t.email}</div>
+                      <strong>{person.name}</strong>
+                      <div className="tch-meta">{person.email}</div>
                     </td>
                     <td>
                       <span className="tch-role-pill">
-                        {t.roleTemplateName ??
-                          (t.roleTemplateSlug
-                            ? ROLE_TEMPLATE_LABELS[t.roleTemplateSlug]
-                            : "—")}
+                        {person.roleTemplateName ??
+                          (person.roleTemplateSlug
+                            ? ROLE_TEMPLATE_LABELS[person.roleTemplateSlug]
+                            : t("peopleDirectoryUi.emptyDash"))}
                       </span>
                     </td>
                     <td>
                       {isTeachers ? (
                         <>
-                          {t.homeroom ? (
+                          {person.homeroom ? (
                             <div>
-                              Homeroom: {t.homeroom.gradeName}
-                              {t.homeroom.sectionName
-                                ? ` · ${t.homeroom.sectionName}`
-                                : ""}
+                              {t("peopleDirectoryUi.homeroom", {
+                                grade: person.homeroom.gradeName,
+                                section: person.homeroom.sectionName
+                                  ? t("peopleDirectoryUi.homeroomSection", {
+                                      section: person.homeroom.sectionName,
+                                    })
+                                  : "",
+                              })}
                             </div>
                           ) : (
-                            <div className="tch-meta">No homeroom</div>
+                            <div className="tch-meta">{t("peopleDirectoryUi.noHomeroom")}</div>
                           )}
-                          {(t.teachingSlots ?? []).length > 0 ? (
-                            (t.teachingSlots ?? []).map((slot, i) => (
-                              <div key={`${slot.gradeName}-${slot.subjectName}-${i}`} className="tch-meta">
-                                Teaches: {slot.gradeName}
-                                {slot.sectionName ? ` ${slot.sectionName}` : ""} ·{" "}
-                                {slot.subjectName}
+                          {(person.teachingSlots ?? []).length > 0 ? (
+                            (person.teachingSlots ?? []).map((slot, i) => (
+                              <div
+                                key={`${slot.gradeName}-${slot.subjectName}-${i}`}
+                                className="tch-meta"
+                              >
+                                {t("peopleDirectoryUi.teaches", {
+                                  grade: slot.gradeName,
+                                  section: slot.sectionName
+                                    ? t("peopleDirectoryUi.teachesSection", {
+                                        section: slot.sectionName,
+                                      })
+                                    : "",
+                                  subject: slot.subjectName,
+                                })}
                               </div>
                             ))
-                          ) : t.assignments.filter((a) => !a.isHomeroom).length ===
+                          ) : person.assignments.filter((a) => !a.isHomeroom).length ===
                               0 ? null : (
-                            t.assignments
+                            person.assignments
                               .filter((a) => !a.isHomeroom)
                               .map((a) => (
                                 <div key={a.id} className="tch-meta">
@@ -302,29 +340,25 @@ export function PeopleDirectoryPanel({ group }: Props) {
                                 </div>
                               ))
                           )}
-                          {!t.homeroom &&
-                          (t.teachingSlots ?? []).length === 0 &&
-                          t.assignments.filter((a) => !a.isHomeroom).length ===
+                          {!person.homeroom &&
+                          (person.teachingSlots ?? []).length === 0 &&
+                          person.assignments.filter((a) => !a.isHomeroom).length ===
                             0 ? (
                             <div className="tch-meta">
-                              No subject classes — use{" "}
-                              <Link href="/admin/subjects/assign">Subject assignment</Link>
+                              {t("peopleDirectoryUi.noSubjectsHint")}{" "}
+                              <Link href="/admin/subjects/assign">
+                                {t("peopleDirectoryUi.subjectAssignment")}
+                              </Link>
                             </div>
                           ) : null}
                         </>
                       ) : (
                         <span className="tch-meta">
-                          {t.roleTemplateSlug === "finance_officer"
-                            ? "Finance"
-                            : t.roleTemplateSlug === "reception"
-                              ? "Reception"
-                              : t.roleTemplateSlug === "attendance_officer"
-                                ? "Attendance"
-                                : t.roleTemplateSlug === "registrar"
-                                  ? "Registrar"
-                                  : t.portalRole === "admin"
-                                    ? "Leadership"
-                                    : "Operations"}
+                          {officeTeamLabel(
+                            person.roleTemplateSlug,
+                            person.portalRole,
+                            t,
+                          )}
                         </span>
                       )}
                     </td>
@@ -333,20 +367,20 @@ export function PeopleDirectoryPanel({ group }: Props) {
                         <button
                           type="button"
                           className="att-btn att-btn--ghost"
-                          onClick={() => openEdit(t)}
+                          onClick={() => openEdit(person)}
                         >
-                          Edit
+                          {t("peopleDirectoryUi.edit")}
                         </button>
                       ) : null}
-                      {currentUserId && t.userId === currentUserId ? (
-                        <span className="tch-you-pill">You</span>
+                      {currentUserId && person.userId === currentUserId ? (
+                        <span className="tch-you-pill">{t("peopleDirectoryUi.you")}</span>
                       ) : (
                         <button
                           type="button"
                           className="att-btn att-btn--ghost"
-                          onClick={() => void openPermissions(t.userId)}
+                          onClick={() => void openPermissions(person.userId)}
                         >
-                          Permissions
+                          {t("peopleDirectoryUi.permissions")}
                         </button>
                       )}
                     </td>
@@ -378,20 +412,24 @@ export function PeopleDirectoryPanel({ group }: Props) {
             className="stu-drawer"
             onClick={(e) => e.stopPropagation()}
             role="dialog"
-            aria-label={isTeachers ? "Teacher" : "Staff member"}
+            aria-label={
+              isTeachers
+                ? t("peopleDirectoryUi.drawerTeacher")
+                : t("peopleDirectoryUi.drawerStaff")
+            }
           >
             <h2 className="stu-drawer__title">
               {editTarget
                 ? isTeachers
-                  ? "Edit teacher"
-                  : "Edit staff member"
+                  ? t("peopleDirectoryUi.editTeacher")
+                  : t("peopleDirectoryUi.editStaff")
                 : isTeachers
-                  ? "Add teacher"
-                  : "Add staff member"}
+                  ? t("peopleDirectoryUi.addTeacherTitle")
+                  : t("peopleDirectoryUi.addStaffTitle")}
             </h2>
             <form className="tch-drawer" onSubmit={(e) => void onSubmit(e)}>
               <label>
-                Role
+                {t("peopleDirectoryUi.fieldRole")}
                 <select
                   value={roleTemplateSlug}
                   onChange={(e) => setRoleTemplateSlug(e.target.value)}
@@ -408,7 +446,7 @@ export function PeopleDirectoryPanel({ group }: Props) {
               {!editTarget ? (
                 <>
                   <label>
-                    First name
+                    {t("peopleDirectoryUi.fieldFirstName")}
                     <input
                       value={firstName}
                       onChange={(e) => setFirstName(e.target.value)}
@@ -416,7 +454,7 @@ export function PeopleDirectoryPanel({ group }: Props) {
                     />
                   </label>
                   <label>
-                    Last name
+                    {t("peopleDirectoryUi.fieldLastName")}
                     <input
                       value={lastName}
                       onChange={(e) => setLastName(e.target.value)}
@@ -424,7 +462,7 @@ export function PeopleDirectoryPanel({ group }: Props) {
                     />
                   </label>
                   <label>
-                    Email
+                    {t("peopleDirectoryUi.fieldEmail")}
                     <input
                       type="email"
                       value={email}
@@ -433,13 +471,13 @@ export function PeopleDirectoryPanel({ group }: Props) {
                     />
                   </label>
                   <label>
-                    Temporary password
+                    {t("peopleDirectoryUi.tempPassword")}
                     <input
                       type="password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       minLength={8}
-                      placeholder="Min 8 characters"
+                      placeholder={t("peopleDirectoryUi.passwordPlaceholder")}
                     />
                   </label>
                 </>
@@ -447,7 +485,7 @@ export function PeopleDirectoryPanel({ group }: Props) {
               {isTeachers ? (
                 <>
                   <label>
-                    Homeroom grade
+                    {t("peopleDirectoryUi.homeroomGrade")}
                     <select
                       value={homeroomGradeId}
                       onChange={(e) => {
@@ -455,7 +493,7 @@ export function PeopleDirectoryPanel({ group }: Props) {
                         setHomeroomSectionId("");
                       }}
                     >
-                      <option value="">Select grade</option>
+                      <option value="">{t("peopleDirectoryUi.selectGrade")}</option>
                       {grades.map((g) => (
                         <option key={g.id} value={g.id}>
                           {g.name}
@@ -465,12 +503,12 @@ export function PeopleDirectoryPanel({ group }: Props) {
                   </label>
                   {homeroomGrade && homeroomGrade.sections.length > 0 ? (
                     <label>
-                      Section
+                      {t("peopleDirectoryUi.section")}
                       <select
                         value={homeroomSectionId}
                         onChange={(e) => setHomeroomSectionId(e.target.value)}
                       >
-                        <option value="">Select section</option>
+                        <option value="">{t("peopleDirectoryUi.selectSection")}</option>
                         {homeroomGrade.sections.map((s) => (
                           <option key={s.id} value={s.id}>
                             {s.name}
@@ -483,7 +521,11 @@ export function PeopleDirectoryPanel({ group }: Props) {
               ) : null}
               <div className="tch-drawer__actions">
                 <button type="submit" className="att-btn att-btn--primary" disabled={busy}>
-                  {busy ? "Saving…" : editTarget ? "Save changes" : "Create account"}
+                  {busy
+                    ? t("common.saving")
+                    : editTarget
+                      ? t("peopleDirectoryUi.saveChanges")
+                      : t("peopleDirectoryUi.createAccount")}
                 </button>
                 <button
                   type="button"
@@ -493,7 +535,7 @@ export function PeopleDirectoryPanel({ group }: Props) {
                     resetForm();
                   }}
                 >
-                  Cancel
+                  {t("common.cancel")}
                 </button>
               </div>
             </form>

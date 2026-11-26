@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useLocale } from "@/components/i18n/locale-provider";
 import { DashIcon } from "@/components/dashboard/dash-icons";
 import { ScoreCorrectionsPanel } from "@/components/results/score-corrections-panel";
 import { ScoreMatrixPanel } from "@/components/results/score-matrix-panel";
@@ -23,19 +24,6 @@ type Props = {
 
 type WorkspaceTab = "matrix" | "student" | "approvals";
 
-const TABS: Array<{ id: WorkspaceTab; label: string }> = [
-  { id: "matrix", label: "Class sheet" },
-  { id: "student", label: "By student" },
-  { id: "approvals", label: "Approvals" },
-];
-
-const SETUP_LINKS = [
-  { href: "/admin/results/terms", label: "Terms & calendar" },
-  { href: "/admin/results/templates", label: "Assessment templates" },
-  { href: "/admin/results/academic-years", label: "Academic years" },
-  { href: "/admin/results/promotion", label: "Year-end promotion" },
-];
-
 function parseTab(searchParams: URLSearchParams): WorkspaceTab {
   if (searchParams.get("section") === "approvals") return "approvals";
   if (searchParams.get("mode") === "student") return "student";
@@ -43,8 +31,28 @@ function parseTab(searchParams: URLSearchParams): WorkspaceTab {
 }
 
 export function ResultsWorkspace({ students, onError }: Props) {
+  const { t, tn, tp } = useLocale();
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  const TABS: Array<{ id: WorkspaceTab; label: string }> = useMemo(
+    () => [
+      { id: "matrix", label: t("resultsWorkspaceUi.tabMatrix") },
+      { id: "student", label: t("resultsWorkspaceUi.tabStudent") },
+      { id: "approvals", label: t("resultsWorkspaceUi.tabApprovals") },
+    ],
+    [t],
+  );
+
+  const SETUP_LINKS = useMemo(
+    () => [
+      { href: "/admin/results/terms", label: t("resultsWorkspaceUi.setupTerms") },
+      { href: "/admin/results/templates", label: tn("Assessment templates") },
+      { href: "/admin/results/academic-years", label: t("resultsWorkspaceUi.setupYears") },
+      { href: "/admin/results/promotion", label: t("resultsWorkspaceUi.setupPromotion") },
+    ],
+    [t, tn],
+  );
 
   const [terms, setTerms] = useState<AcademicTerm[]>([]);
   const [classCount, setClassCount] = useState(0);
@@ -55,6 +63,7 @@ export function ResultsWorkspace({ students, onError }: Props) {
   const [error, setError] = useState("");
 
   const activeTab = parseTab(searchParams);
+  const emptyDash = t("resultsWorkspaceUi.emptyDash");
 
   useEffect(() => {
     if (searchParams.get("section") === "reports") {
@@ -90,21 +99,21 @@ export function ResultsWorkspace({ students, onError }: Props) {
     });
     void (async () => {
       try {
-        const [t, cs, corrections] = await Promise.all([
+        const [tList, cs, corrections] = await Promise.all([
           listTerms(),
           listClassSubjects(),
           listScoreCorrections({ status: "PROPOSED" }).catch(() => []),
         ]);
         if (cancelled) return;
-        setTerms(t);
+        setTerms(tList);
         setClassCount(cs.length);
         setPendingCorrections(corrections.length);
-        const current = t.find((x) => x.isCurrent) ?? t[0];
+        const current = tList.find((x) => x.isCurrent) ?? tList[0];
         if (current) setTermId((prev) => prev || current.id);
         if (students[0]) setViewStudentId((prev) => prev || students[0].id);
       } catch (err) {
         if (!cancelled) {
-          setErr(err instanceof Error ? err.message : "Could not load results workspace");
+          setErr(err instanceof Error ? err.message : t("resultsWorkspaceUi.loadFailed"));
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -113,20 +122,26 @@ export function ResultsWorkspace({ students, onError }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [setErr, students]);
+  }, [setErr, students, t]);
 
-  const currentTerm = terms.find((t) => t.isCurrent) ?? terms.find((t) => t.id === termId);
+  const currentTerm = terms.find((term) => term.isCurrent) ?? terms.find((term) => term.id === termId);
 
   const heroStats = useMemo(
     () => [
-      { label: "Students", value: loading ? "—" : students.length },
-      { label: "Class sheets", value: loading ? "—" : classCount },
       {
-        label: "Corrections",
-        value: loading ? "—" : pendingCorrections,
+        label: t("resultsWorkspaceUi.statStudents"),
+        value: loading ? emptyDash : students.length,
+      },
+      {
+        label: t("resultsWorkspaceUi.statClassSheets"),
+        value: loading ? emptyDash : classCount,
+      },
+      {
+        label: t("resultsWorkspaceUi.statCorrections"),
+        value: loading ? emptyDash : pendingCorrections,
       },
     ],
-    [loading, students.length, classCount, pendingCorrections],
+    [loading, students.length, classCount, pendingCorrections, t, emptyDash],
   );
 
   const studentOptions = useMemo(
@@ -146,10 +161,17 @@ export function ResultsWorkspace({ students, onError }: Props) {
 
   const heroSub =
     activeTab === "approvals"
-      ? "Approve teacher-proposed score fixes after families report a published mark."
+      ? t("resultsWorkspaceUi.heroSubApprovals")
       : activeTab === "student"
-        ? "View all subjects for one student in a single read-only sheet."
-        : "Teachers enter scores while components are open. Publish a sheet when it’s ready for families.";
+        ? t("resultsWorkspaceUi.heroSubStudent")
+        : t("resultsWorkspaceUi.heroSubMatrix");
+
+  const panelAria =
+    activeTab === "approvals"
+      ? t("resultsWorkspaceUi.panelApprovals")
+      : activeTab === "matrix"
+        ? t("resultsWorkspaceUi.panelMatrix")
+        : t("resultsWorkspaceUi.panelStudent");
 
   return (
     <div className="acad-page acad-page--results res-v2">
@@ -157,7 +179,7 @@ export function ResultsWorkspace({ students, onError }: Props) {
         <div className="res-v2__hero-glow" aria-hidden />
         <div className="res-v2__hero-inner">
           <div className="res-v2__hero-main">
-            <h2 className="res-v2__hero-title">Grading workspace</h2>
+            <h2 className="res-v2__hero-title">{t("resultsWorkspaceUi.title")}</h2>
             <p className="res-v2__hero-sub">{heroSub}</p>
             {currentTerm ? (
               <div className="res-v2__hero-badges">
@@ -177,7 +199,7 @@ export function ResultsWorkspace({ students, onError }: Props) {
       </header>
 
       <div className="res-v2__toolbar">
-        <div className="res-v2__subtabs" role="tablist" aria-label="Results workspace">
+        <div className="res-v2__subtabs" role="tablist" aria-label={t("resultsWorkspaceUi.tabsAria")}>
           {TABS.map((item) => (
             <button
               key={item.id}
@@ -199,7 +221,7 @@ export function ResultsWorkspace({ students, onError }: Props) {
           <details className="res-v2__setup-menu">
             <summary>
               <DashIcon name="settings" className="dash-icon--sm" />
-              Setup
+              {t("resultsWorkspaceUi.setup")}
             </summary>
             <div className="res-v2__setup-links">
               {SETUP_LINKS.map((link) => (
@@ -214,16 +236,7 @@ export function ResultsWorkspace({ students, onError }: Props) {
 
       <AppToast message={error} tone="error" onDismiss={() => setError("")} />
 
-      <section
-        className="res-v2__panel"
-        aria-label={
-          activeTab === "approvals"
-            ? "Score corrections"
-            : activeTab === "matrix"
-              ? "Class sheet"
-              : "By student"
-        }
-      >
+      <section className="res-v2__panel" aria-label={panelAria}>
         {activeTab === "approvals" ? (
           <ScoreCorrectionsPanel
             mode="admin"
@@ -245,15 +258,15 @@ export function ResultsWorkspace({ students, onError }: Props) {
       </section>
 
       <p className="res-v2__footer-hint">
-        Generate and print report cards from{" "}
+        {t("resultsWorkspaceUi.footerPrefix")}{" "}
         <Link href="/admin/report-cards" className="res-v2__text-link">
-          Report cards
+          {tp("Report cards")}
         </Link>
-        . Calendar and grading rules live under{" "}
+        . {t("resultsWorkspaceUi.footerMid")}{" "}
         <Link href="/admin/results/terms" className="res-v2__text-link">
-          Setup
+          {t("resultsWorkspaceUi.setup")}
         </Link>{" "}
-        — terms, templates, academic years, and promotion.
+        {t("resultsWorkspaceUi.footerEnd")}
       </p>
     </div>
   );

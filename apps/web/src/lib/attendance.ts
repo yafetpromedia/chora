@@ -137,11 +137,18 @@ export async function saveBulkAttendance(body: {
   return apiPost("/attendance/bulk", body);
 }
 
-export async function getAttendanceSummary(studentProfileId?: string) {
-  const q = studentProfileId
-    ? `?studentProfileId=${encodeURIComponent(studentProfileId)}`
-    : "";
-  return apiFetch<AttendanceSummary>(`/attendance/student/summary${q}`);
+export async function getAttendanceSummary(
+  studentProfileId?: string,
+  range?: { from?: string; to?: string },
+) {
+  const q = new URLSearchParams();
+  if (studentProfileId) q.set("studentProfileId", studentProfileId);
+  if (range?.from) q.set("from", range.from);
+  if (range?.to) q.set("to", range.to);
+  const qs = q.toString();
+  return apiFetch<AttendanceSummary>(
+    `/attendance/student/summary${qs ? `?${qs}` : ""}`,
+  );
 }
 
 export async function getAttendanceAnalytics(date?: string) {

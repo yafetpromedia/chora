@@ -6,8 +6,10 @@ import { DashboardPage } from "@/components/dashboard/dashboard-page";
 import { TimetablePortalView } from "@/components/timetable/timetable-portal-view";
 import { getMyTimetableToday, getMyTimetableWeek, type Weekday } from "@/lib/timetable";
 import { AUTH_TOKEN_KEY } from "@/lib/auth";
+import { useLocale } from "@/components/i18n/locale-provider";
 
 export default function TeacherTimetablePage() {
+  const { t } = useLocale();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -32,7 +34,9 @@ export default function TeacherTimetablePage() {
         setTodaySlots(today.slots);
         setWeekDays(week.days);
       })
-      .catch((err) => setError(err instanceof Error ? err.message : "Load failed"))
+      .catch((err) =>
+        setError(err instanceof Error ? err.message : t("timetableUi.errLoad")),
+      )
       .finally(() => setLoading(false));
   }, [router]);
 
@@ -49,8 +53,9 @@ export default function TeacherTimetablePage() {
         todayWeekday={todayWeekday}
         todaySlots={todaySlots}
         weekDays={weekDays}
-        heroSub="See when and where you teach — today and across the week."
-        todayEmptyMessage="No classes on your timetable today. Check the full week or ask your admin to publish the schedule."
+        showTeacher={false}
+        heroSub={t("timetableUi.teacherHeroSub")}
+        todayEmptyMessage={t("timetableUi.teacherEmptyToday")}
       />
     </DashboardPage>
   );

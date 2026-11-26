@@ -14,9 +14,11 @@ import type { GradeWithSections } from "@/lib/api";
 import { listAcademicYears, type AcademicYear } from "@/lib/results";
 import { AUTH_ROLE_KEY, AUTH_TOKEN_KEY, isSchoolWorkspaceRole } from "@/lib/auth";
 import { AppToast } from "@/components/ui/app-toast";
+import { useLocale } from "@/components/i18n/locale-provider";
 
 export default function YearPromotionPage() {
   const router = useRouter();
+  const { t, tp } = useLocale();
   const [years, setYears] = useState<AcademicYear[]>([]);
   const [fromYearId, setFromYearId] = useState("");
   const [toYearId, setToYearId] = useState("");
@@ -45,7 +47,9 @@ export default function YearPromotionPage() {
         const current = y.find((x) => x.isCurrent) ?? y[0];
         if (current) setFromYearId(current.id);
       })
-      .catch((err) => setError(err instanceof Error ? err.message : "Load failed"))
+      .catch((err) =>
+        setError(err instanceof Error ? err.message : t("adminPromotionUi.loadFailed")),
+      )
       .finally(() => setLoading(false));
   }, [router]);
 
@@ -68,7 +72,8 @@ export default function YearPromotionPage() {
         }
         setMappings(map);
       } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : "Preview failed");
+        if (!cancelled)
+          setError(err instanceof Error ? err.message : t("adminPromotionUi.previewFailed"));
       }
     })();
     return () => {
@@ -81,9 +86,14 @@ export default function YearPromotionPage() {
     setError("");
     try {
       const res = await syncEnrollments();
-      setSuccess(`Synced ${res.synced} enrollments for ${res.academicYearName ?? "current year"}.`);
+      setSuccess(
+        t("adminPromotionUi.syncSuccess", {
+          count: res.synced,
+          year: res.academicYearName ?? "",
+        }),
+      );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Sync failed");
+      setError(err instanceof Error ? err.message : t("adminPromotionUi.syncFailed"));
     } finally {
       setBusy(false);
     }
@@ -93,7 +103,7 @@ export default function YearPromotionPage() {
     if (!preview || !toYearId) return;
     if (
       !window.confirm(
-        "Promote all students per the mapping below? This updates active grade/section and creates enrollment history. Continue?",
+        t("adminPromotionUi.confirmPromote"),
       )
     ) {
       return;
@@ -115,7 +125,7 @@ export default function YearPromotionPage() {
       const y = await listAcademicYears();
       setYears(y);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Promotion failed");
+      setError(err instanceof Error ? err.message : t("adminPromotionUi.promotionFailed"));
     } finally {
       setBusy(false);
     }
@@ -124,30 +134,30 @@ export default function YearPromotionPage() {
   return (
     <DashboardPage
       role="admin"
-      title="End-of-year promotion"
+      title={tp("End-of-year promotion")}
     >
       <AppToast message={error} tone="error" onDismiss={() => setError("")} />
       <AppToast message={success} tone="success" onDismiss={() => setSuccess("")} />
 
       <section className="att-admin-section" style={{ borderTop: "none" }}>
-        <h2 className="setup-panel-label">Before you promote</h2>
+        <h2 className="setup-panel-label">{t("adminPromotionUi.sectionBefore")}</h2>
         <button
           type="button"
           className="dash-copy-btn"
           disabled={busy}
           onClick={() => void onSync()}
         >
-          Sync enrollments for current year
+          {t("adminPromotionUi.syncBtn")}
         </button>
       </section>
 
       {loading ? (
-        <p className="setup-hint">Loading…</p>
+        <p className="setup-hint">{t("common.loading")}</p>
       ) : (
         <>
           <div className="att-mark-toolbar">
             <div className="att-field">
-              <span>Closing year</span>
+              <span>{t("adminPromotionUi.closingYear")}</span>
               <select
                 value={fromYearId}
                 onChange={(e) => setFromYearId(e.target.value)}
@@ -155,15 +165,15 @@ export default function YearPromotionPage() {
                 {years.map((y) => (
                   <option key={y.id} value={y.id}>
                     {y.name}
-                    {y.isCurrent ? " (current)" : ""}
+                    {y.isCurrent ? t("adminPromotionUi.currentSuffix") : ""}
                   </option>
                 ))}
               </select>
             </div>
             <div className="att-field">
-              <span>Promote into</span>
+              <span>{t("adminPromotionUi.promoteInto")}</span>
               <select value={toYearId} onChange={(e) => setToYearId(e.target.value)}>
-                <option value="">Select year</option>
+                <option value="">{t("adminPromotionUi.selectYear")}</option>
                 {(preview?.availableTargetYears ?? years.filter((y) => y.id !== fromYearId)).map(
                   (y) => (
                     <option key={y.id} value={y.id}>
@@ -180,9 +190,9 @@ export default function YearPromotionPage() {
               <table className="res-matrix">
                 <thead>
                   <tr>
-                    <th>From grade</th>
-                    <th>Students</th>
-                    <th>Promote to</th>
+                    <th>{t("adminPromotionUi.thFromGrade")}</th>
+                    <th>{t("adminPromotionUi.thStudents")}</th>
+                    <th>{t("adminPromotionUi.thPromoteTo")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -201,7 +211,7 @@ export default function YearPromotionPage() {
                             }))
                           }
                         >
-                          <option value="">Graduate / leave</option>
+                          <option value="">{t("adminPromotionUi.graduateLeave")}</option>
                           {grades.map((g) => (
                             <option key={g.id} value={g.id}>
                               {g.name}
@@ -220,7 +230,7 @@ export default function YearPromotionPage() {
                   disabled={busy || !toYearId}
                   onClick={() => void onPromote()}
                 >
-                  {busy ? "Promoting…" : "Run promotion"}
+                  {busy ? t("adminPromotionUi.promoting") : t("adminPromotionUi.runPromotion")}
                 </button>
               </div>
             </>

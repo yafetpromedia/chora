@@ -5,22 +5,24 @@ import { useRef, type CSSProperties } from "react";
 import { DashIcon, type DashIconName } from "@/components/dashboard/dash-icons";
 import { BrandMark } from "@/components/brand-mark";
 import { BirrSymbol } from "@/components/billing/birr-symbol";
+import { useLocale } from "@/components/i18n/locale-provider";
 
-const NAV: { label: string; icon: DashIconName; active?: boolean }[] = [
-  { label: "Overview", icon: "overview", active: true },
-  { label: "Students", icon: "students" },
-  { label: "Attendance", icon: "attendance" },
-  { label: "Results", icon: "results" },
-  { label: "Finance", icon: "finance" },
+const NAV: { msgKey: string; icon: DashIconName; active?: boolean }[] = [
+  { msgKey: "productPreviewUi.overview", icon: "overview", active: true },
+  { msgKey: "productPreviewUi.students", icon: "students" },
+  { msgKey: "productPreviewUi.attendance", icon: "attendance" },
+  { msgKey: "productPreviewUi.results", icon: "results" },
+  { msgKey: "productPreviewUi.finance", icon: "finance" },
 ];
 
-const COMMUNITY = [
-  { label: "Students", value: 486, tone: "teal" },
-  { label: "Parents", value: 412, tone: "blue" },
-  { label: "Teachers", value: 38, tone: "amber" },
-];
+const COMMUNITY_KEYS = [
+  { msgKey: "productPreviewUi.students", tone: "teal", value: 486 },
+  { msgKey: "productPreviewUi.parents", tone: "blue", value: 412 },
+  { msgKey: "productPreviewUi.teachers", tone: "amber", value: 38 },
+] as const;
 
 export function ProductPreview() {
+  const { t } = useLocale();
   const ref = useRef<HTMLDivElement>(null);
   const inView = useInView(ref, { once: true, margin: "-60px" });
   const reduce = useReducedMotion();
@@ -39,7 +41,7 @@ export function ProductPreview() {
           <span />
           <span />
         </div>
-        <span className="lp3-preview__url">everest-youth.chora.app/admin</span>
+        <span className="lp3-preview__url">{t("productPreviewUi.adminUrl")}</span>
         <span className="lp3-preview__notify" aria-hidden>
           2
         </span>
@@ -50,15 +52,15 @@ export function ProductPreview() {
           <div className="lp3-preview__side-brand">
             <BrandMark />
             <div>
-              <strong>Everest Youth</strong>
-              <em>Admin workspace</em>
+              <strong>{t("productPreviewUi.schoolName")}</strong>
+              <em>{t("productPreviewUi.adminWorkspace")}</em>
             </div>
           </div>
           <ul>
             {NAV.map((item) => (
-              <li key={item.label} className={item.active ? "is-active" : ""}>
+              <li key={item.msgKey} className={item.active ? "is-active" : ""}>
                 <DashIcon name={item.icon} className="lp3-preview__nav-icon" />
-                {item.label}
+                {t(item.msgKey)}
               </li>
             ))}
           </ul>
@@ -67,12 +69,12 @@ export function ProductPreview() {
         <div className="lp3-preview__main">
           <div className="lp3-preview__dash-hero">
             <div>
-              <p>Thursday, July 10</p>
-              <h3>Everest Youth Academy</h3>
+              <p>{t("productPreviewUi.demoDate")}</p>
+              <h3>{t("productPreviewUi.academyName")}</h3>
             </div>
             <div className="lp3-preview__hero-chips">
-              <span>2025/26 · Term 2</span>
-              <span className="lp3-preview__live">Live</span>
+              <span>{t("productPreviewUi.termLive")}</span>
+              <span className="lp3-preview__live">{t("productPreviewUi.live")}</span>
             </div>
           </div>
 
@@ -82,9 +84,9 @@ export function ProductPreview() {
                 <DashIcon name="attendance" className="lp3-preview__kpi-svg" />
               </span>
               <div>
-                <span>Attendance today</span>
+                <span>{t("productPreviewUi.attendanceToday")}</span>
                 <strong>94%</strong>
-                <em>412 marked · 28 absent</em>
+                <em>{t("productPreviewUi.markedAbsent")}</em>
               </div>
             </article>
             <article>
@@ -92,11 +94,11 @@ export function ProductPreview() {
                 <DashIcon name="finance" className="lp3-preview__kpi-svg" />
               </span>
               <div>
-                <span>Collected</span>
+                <span>{t("productPreviewUi.collected")}</span>
                 <strong>
                   1.2M <BirrSymbol size={12} />
                 </strong>
-                <em>78% of expected</em>
+                <em>{t("productPreviewUi.percentExpected")}</em>
               </div>
             </article>
             <article>
@@ -104,9 +106,9 @@ export function ProductPreview() {
                 <DashIcon name="students" className="lp3-preview__kpi-svg" />
               </span>
               <div>
-                <span>Enrolled</span>
+                <span>{t("productPreviewUi.enrolled")}</span>
                 <strong>486</strong>
-                <em>Across 24 sections</em>
+                <em>{t("productPreviewUi.acrossSections")}</em>
               </div>
             </article>
           </div>
@@ -114,8 +116,8 @@ export function ProductPreview() {
           <div className="lp3-preview__widgets">
             <article className="lp3-preview__widget">
               <div className="lp3-preview__widget-head">
-                <strong>Fee collection</strong>
-                <span>Finance →</span>
+                <strong>{t("productPreviewUi.feeCollection")}</strong>
+                <span>{t("productPreviewUi.financeLink")}</span>
               </div>
               <div className="lp3-preview__ring-wrap">
                 <div className="lp3-preview__ring" style={{ "--pct": "78" } as CSSProperties}>
@@ -123,13 +125,13 @@ export function ProductPreview() {
                 </div>
                 <ul>
                   <li>
-                    <span>Collected</span>
+                    <span>{t("productPreviewUi.collected")}</span>
                     <strong>
                       940K <BirrSymbol size={11} />
                     </strong>
                   </li>
                   <li>
-                    <span>Outstanding</span>
+                    <span>{t("productPreviewUi.outstanding")}</span>
                     <strong>
                       260K <BirrSymbol size={11} />
                     </strong>
@@ -140,17 +142,19 @@ export function ProductPreview() {
 
             <article className="lp3-preview__widget">
               <div className="lp3-preview__widget-head">
-                <strong>Community</strong>
-                <span>Parents →</span>
+                <strong>{t("productPreviewUi.community")}</strong>
+                <span>{t("productPreviewUi.parentsLink")}</span>
               </div>
               <ul className="lp3-preview__community">
-                {COMMUNITY.map((row) => (
-                  <li key={row.label} className={`lp3-preview__community-row--${row.tone}`}>
-                    <span>{row.label}</span>
+                {COMMUNITY_KEYS.map((row) => (
+                  <li key={row.msgKey} className={`lp3-preview__community-row--${row.tone}`}>
+                    <span>{t(row.msgKey)}</span>
                     <div className="lp3-preview__community-bar">
                       <motion.i
                         initial={{ width: 0 }}
-                        animate={inView ? { width: `${Math.min(100, (row.value / 486) * 100)}%` } : { width: 0 }}
+                        animate={
+                          inView ? { width: `${Math.min(100, (row.value / 486) * 100)}%` } : { width: 0 }
+                        }
                         transition={{ duration: 0.7, delay: 0.2 }}
                       />
                     </div>

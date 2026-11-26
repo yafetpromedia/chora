@@ -11,6 +11,8 @@ import {
   type LibraryResource,
 } from "@/lib/library";
 import type { AttendanceSummary } from "@/lib/attendance";
+import { useLocale } from "@/components/i18n/locale-provider";
+import type { AppLocale } from "@/lib/i18n";
 
 type Props = {
   schoolName: string;
@@ -23,9 +25,13 @@ type Props = {
   error: string;
 };
 
-function formatDate(iso: string) {
+function localeTag(locale: AppLocale) {
+  return locale === "am" ? "am-ET" : undefined;
+}
+
+function formatDate(iso: string, locale: AppLocale) {
   try {
-    return new Date(iso).toLocaleDateString(undefined, {
+    return new Date(iso).toLocaleDateString(localeTag(locale), {
       month: "short",
       day: "numeric",
       year: "numeric",
@@ -35,15 +41,21 @@ function formatDate(iso: string) {
   }
 }
 
-function formatWeekday(iso: string) {
+function formatWeekday(iso: string, locale: AppLocale) {
   try {
-    return new Date(iso).toLocaleDateString(undefined, { weekday: "short" });
+    return new Date(iso).toLocaleDateString(localeTag(locale), { weekday: "short" });
   } catch {
     return "";
   }
 }
 
-function statusLabel(status: string) {
+function statusLabel(status: string, t: (key: string) => string) {
+  const s = status.toUpperCase();
+  if (s === "PRESENT") return t("common.present");
+  if (s === "ABSENT") return t("common.absent");
+  if (s === "LATE") return t("common.late");
+  if (s === "EXCUSED") return t("common.excused");
+  if (!status || s === "UNKNOWN" || s === "NOT_MARKED") return t("common.notMarked");
   return status.charAt(0).toUpperCase() + status.slice(1);
 }
 
@@ -81,7 +93,13 @@ function aggregateResultsBySubject(results: ResultRecord[]): ResultRecord[] {
   }));
 }
 
-function AttendanceRing({ rate }: { rate: number | null }) {
+function AttendanceRing({
+  rate,
+  attendanceLabel,
+}: {
+  rate: number | null;
+  attendanceLabel: string;
+}) {
   const r = 42;
   const c = 2 * Math.PI * r;
   const value = rate != null ? Math.max(0, Math.min(100, rate)) : 0;
@@ -103,25 +121,33 @@ function AttendanceRing({ rate }: { rate: number | null }) {
       </svg>
       <div className="stu-chart-ring__label">
         <strong>{rate != null ? `${rate}%` : "—"}</strong>
-        <span>Attendance</span>
+        <span>{attendanceLabel}</span>
       </div>
     </div>
   );
 }
 
-function SubjectBars({ results }: { results: ResultRecord[] }) {
+function SubjectBars({
+  results,
+  emptyText,
+  chartAria,
+}: {
+  results: ResultRecord[];
+  emptyText: string;
+  chartAria: string;
+}) {
   const max = Math.max(100, ...results.map((r) => r.score), 1);
   if (results.length === 0) {
     return (
       <div className="stu-dash__empty stu-dash__empty--compact">
         <DashIcon name="results" className="dash-icon--lg" />
-        <p>No published scores yet</p>
+        <p>{emptyText}</p>
       </div>
     );
   }
 
   return (
-    <div className="stu-chart-bars" role="img" aria-label="Subject scores">
+    <div className="stu-chart-bars" role="img" aria-label={chartAria}>
       {results.slice(0, 8).map((row) => {
         const h = Math.max(8, Math.round((row.score / max) * 100));
         const tone =
@@ -155,16 +181,18 @@ function SubjectBars({ results }: { results: ResultRecord[] }) {
 
 function AttendanceBreakdown({
   counts,
+  labels,
 }: {
   counts: AttendanceSummary["counts"];
+  labels: { present: string; absent: string; late: string; excused: string };
 }) {
   const total =
     counts.present + counts.absent + counts.late + counts.excused || 1;
   const segments = [
-    { key: "present", label: "Present", value: counts.present, tone: "present" },
-    { key: "absent", label: "Absent", value: counts.absent, tone: "absent" },
-    { key: "late", label: "Late", value: counts.late, tone: "late" },
-    { key: "excused", label: "Excused", value: counts.excused, tone: "excused" },
+    { key: "present", label: labels.present, value: counts.present, tone: "present" },
+    { key: "absent", label: labels.absent, value: counts.absent, tone: "absent" },
+    { key: "late", label: labels.late, value: counts.late, tone: "late" },
+    { key: "excused", label: labels.excused, value: counts.excused, tone: "excused" },
   ];
 
   return (
@@ -203,22 +231,31 @@ export function StudentDashboard({
   studentResources,
   error,
 }: Props) {
+  const { t, locale } = useLocale();
   const mounted = useHydrated();
+  const dateLocale = localeTag(locale);
   const now = mounted ? new Date() : null;
   const today = now
-    ? now.toLocaleDateString(undefined, {
+    ? now.toLocaleDateString(dateLocale, {
         weekday: "long",
         month: "long",
         day: "numeric",
       })
     : "";
   const todayShort = now
-    ? now.toLocaleDateString(undefined, {
+    ? now.toLocaleDateString(dateLocale, {
         weekday: "short",
         month: "short",
         day: "numeric",
       })
     : "";
+
+  const attendanceBreakdownLabels = {
+    present: t("common.present"),
+    absent: t("common.absent"),
+    late: t("common.late"),
+    excused: t("common.excused"),
+  };
 
   const attendanceRate =
     typeof dashboard?.attendanceRate === "number"
@@ -265,7 +302,7 @@ export function StudentDashboard({
   );
 
   return (
-    <DashboardShell role="student" title="Student dashboard">
+    <DashboardShell role="student" title={t("dash.studentDashboard")}>
       <div className="stu-dash stu-dash--modern">
         {error ? (
           <div className="stu-dash__alert stu-dash__alert--error" role="alert">
@@ -281,47 +318,46 @@ export function StudentDashboard({
                 <span className="stu-dash__hero-chip">{todayShort}</span>
               ) : null}
               <h2 className="stu-dash__hero-title">
-                {hello ? `Hi, ${hello}` : "Your student workspace"}
+                {hello ? t("dash.hi", { name: hello }) : t("dash.studentWorkspace")}
               </h2>
               <p className="stu-dash__hero-sub">
                 {mounted && today ? `${today} · ` : ""}
                 {schoolName}
-                {classLabel ? ` · ${classLabel}` : ""}. Check attendance, scores,
-                and today&apos;s work.
+                {classLabel ? ` · ${classLabel}` : ""}. {t("dash.heroStudentSub")}
               </p>
             </div>
             <div className="stu-dash__hero-stats">
               <div className="stu-dash__stat">
                 <strong>{attendanceRate != null ? `${attendanceRate}%` : "—"}</strong>
-                <span>Attendance</span>
+                <span>{t("dash.attendance")}</span>
               </div>
               <div className="stu-dash__stat">
                 <strong>{avgScore != null ? `${avgScore}%` : "—"}</strong>
-                <span>Avg score</span>
+                <span>{t("dash.avgScore")}</span>
               </div>
               <Link href="/student/classwork" className="stu-dash__stat stu-dash__stat--link">
                 <strong>{upcomingAssignments}</strong>
-                <span>Tasks</span>
+                <span>{t("dash.tasks")}</span>
               </Link>
               <div className="stu-dash__stat stu-dash__stat--accent">
                 <strong>{announcements.length}</strong>
-                <span>News</span>
+                <span>{t("dash.news")}</span>
               </div>
             </div>
           </div>
         </header>
 
-        <section className="stu-dash__kpis" aria-label="Shortcuts">
+        <section className="stu-dash__kpis" aria-label={t("dash.shortcuts")}>
           <Link href="/student/attendance" className="stu-dash__kpi">
             <span className="stu-dash__kpi-icon stu-dash__kpi-icon--green" aria-hidden>
               <DashIcon name="attendance" />
             </span>
             <div>
-              <p className="stu-dash__kpi-label">Attendance</p>
+              <p className="stu-dash__kpi-label">{t("dash.attendance")}</p>
               <p className="stu-dash__kpi-value">
                 {attendanceRate != null ? `${attendanceRate}%` : "—"}
               </p>
-              <p className="stu-dash__kpi-hint">Overall rate</p>
+              <p className="stu-dash__kpi-hint">{t("dash.overallRate")}</p>
             </div>
           </Link>
           <Link href="/student/results" className="stu-dash__kpi">
@@ -329,14 +365,16 @@ export function StudentDashboard({
               <DashIcon name="results" />
             </span>
             <div>
-              <p className="stu-dash__kpi-label">Results</p>
+              <p className="stu-dash__kpi-label">{t("dash.results")}</p>
               <p className="stu-dash__kpi-value">
                 {avgScore != null ? `${avgScore}%` : "—"}
               </p>
               <p className="stu-dash__kpi-hint">
                 {sortedResults.length > 0
-                  ? `${sortedResults.length} subject${sortedResults.length === 1 ? "" : "s"}`
-                  : "Published scores"}
+                  ? sortedResults.length === 1
+                    ? t("dash.subjectOne")
+                    : t("dash.subjectsCount", { count: sortedResults.length })
+                  : t("dash.publishedScores")}
               </p>
             </div>
           </Link>
@@ -345,9 +383,9 @@ export function StudentDashboard({
               <DashIcon name="assign" />
             </span>
             <div>
-              <p className="stu-dash__kpi-label">Assignments</p>
+              <p className="stu-dash__kpi-label">{t("dash.assignments")}</p>
               <p className="stu-dash__kpi-value">{upcomingAssignments}</p>
-              <p className="stu-dash__kpi-hint">Open tasks</p>
+              <p className="stu-dash__kpi-hint">{t("dash.openTasks")}</p>
             </div>
           </Link>
         </section>
@@ -358,21 +396,26 @@ export function StudentDashboard({
               <article className="stu-dash__panel stu-dash__panel--chart">
                 <header className="stu-dash__panel-head">
                   <div>
-                    <h3 className="stu-dash__panel-title">Attendance</h3>
-                    <p className="stu-dash__panel-sub">Overall rate and status mix</p>
+                    <h3 className="stu-dash__panel-title">{t("dash.attendance")}</h3>
+                    <p className="stu-dash__panel-sub">{t("dash.overallRateMix")}</p>
                   </div>
                   <Link href="/student/attendance" className="stu-dash__panel-link">
-                    Details <DashIcon name="chevron" className="dash-icon--xs" />
+                    {t("dash.details")}{" "}
+                    <DashIcon name="chevron" className="dash-icon--xs" />
                   </Link>
                 </header>
                 <div className="stu-dash__chart-layout">
-                  <AttendanceRing rate={attendanceRate} />
+                  <AttendanceRing
+                    rate={attendanceRate}
+                    attendanceLabel={t("dash.attendance")}
+                  />
                   {attendanceSummary ? (
-                    <AttendanceBreakdown counts={attendanceSummary.counts} />
+                    <AttendanceBreakdown
+                      counts={attendanceSummary.counts}
+                      labels={attendanceBreakdownLabels}
+                    />
                   ) : (
-                    <p className="stu-dash__muted">
-                      Attendance summary will appear here once marked.
-                    </p>
+                    <p className="stu-dash__muted">{t("dash.attendancePendingSummary")}</p>
                   )}
                 </div>
               </article>
@@ -380,14 +423,19 @@ export function StudentDashboard({
               <article className="stu-dash__panel stu-dash__panel--chart">
                 <header className="stu-dash__panel-head">
                   <div>
-                    <h3 className="stu-dash__panel-title">Subject scores</h3>
-                    <p className="stu-dash__panel-sub">Published averages by subject</p>
+                    <h3 className="stu-dash__panel-title">{t("dash.subjectScores")}</h3>
+                    <p className="stu-dash__panel-sub">{t("dash.publishedAverages")}</p>
                   </div>
                   <Link href="/student/results" className="stu-dash__panel-link">
-                    View all <DashIcon name="chevron" className="dash-icon--xs" />
+                    {t("dash.viewAll")}{" "}
+                    <DashIcon name="chevron" className="dash-icon--xs" />
                   </Link>
                 </header>
-                <SubjectBars results={sortedResults} />
+                <SubjectBars
+                  results={sortedResults}
+                  emptyText={t("dash.noPublishedScores")}
+                  chartAria={t("dash.subjectScoresChart")}
+                />
               </article>
             </div>
 
@@ -395,18 +443,18 @@ export function StudentDashboard({
               <article className="stu-dash__panel">
                 <header className="stu-dash__panel-head">
                   <div>
-                    <h3 className="stu-dash__panel-title">Recent attendance</h3>
-                    <p className="stu-dash__panel-sub">Latest roll call days</p>
+                    <h3 className="stu-dash__panel-title">{t("dash.recentAttendance")}</h3>
+                    <p className="stu-dash__panel-sub">{t("dash.latestRollCall")}</p>
                   </div>
                   <Link href="/student/attendance" className="stu-dash__panel-link">
-                    Permission
+                    {t("dash.permission")}
                   </Link>
                 </header>
 
                 {recentAttendance.length === 0 ? (
                   <div className="stu-dash__empty">
                     <DashIcon name="attendance" className="dash-icon--lg" />
-                    <p>No attendance records yet</p>
+                    <p>{t("dash.noAttendanceYet")}</p>
                   </div>
                 ) : (
                   <ul className="stu-dash__list">
@@ -414,14 +462,14 @@ export function StudentDashboard({
                       <li key={row.id} className="stu-dash__list-row">
                         <div className="stu-dash__list-date">
                           <span className="stu-dash__list-weekday">
-                            {formatWeekday(row.date)}
+                            {formatWeekday(row.date, locale)}
                           </span>
-                          <p className="stu-dash__list-title">{formatDate(row.date)}</p>
+                          <p className="stu-dash__list-title">{formatDate(row.date, locale)}</p>
                         </div>
                         <span
                           className={`stu-dash__badge stu-dash__badge--${row.status}`}
                         >
-                          {statusLabel(row.status)}
+                          {statusLabel(row.status, t)}
                         </span>
                       </li>
                     ))}
@@ -432,18 +480,18 @@ export function StudentDashboard({
               <article className="stu-dash__panel">
                 <header className="stu-dash__panel-head">
                   <div>
-                    <h3 className="stu-dash__panel-title">Top subjects</h3>
-                    <p className="stu-dash__panel-sub">Highest published scores</p>
+                    <h3 className="stu-dash__panel-title">{t("dash.topSubjects")}</h3>
+                    <p className="stu-dash__panel-sub">{t("dash.highestScores")}</p>
                   </div>
                   <Link href="/student/report-card" className="stu-dash__panel-link">
-                    Report card
+                    {t("dash.reportCard")}
                   </Link>
                 </header>
 
                 {sortedResults.length === 0 ? (
                   <div className="stu-dash__empty">
                     <DashIcon name="results" className="dash-icon--lg" />
-                    <p>No results published yet</p>
+                    <p>{t("dash.noResultsYet")}</p>
                   </div>
                 ) : (
                   <ul className="stu-dash__list stu-dash__list--scores">
@@ -462,21 +510,21 @@ export function StudentDashboard({
             <article className="stu-dash__panel">
               <header className="stu-dash__panel-head">
                 <div>
-                  <h3 className="stu-dash__panel-title">Learning resources</h3>
-                  <p className="stu-dash__panel-sub">Books and materials from your school</p>
+                  <h3 className="stu-dash__panel-title">{t("dash.learningResources")}</h3>
+                  <p className="stu-dash__panel-sub">{t("dash.booksFromSchool")}</p>
                 </div>
                 <Link
                   href="/student/library"
                   className="stu-dash__panel-link stu-dash__panel-link--primary"
                 >
-                  Open eLibrary
+                  {t("dash.openELibrary")}
                 </Link>
               </header>
 
               {studentResources.length === 0 ? (
                 <div className="stu-dash__empty">
                   <DashIcon name="library" className="dash-icon--lg" />
-                  <p>No resources published yet</p>
+                  <p>{t("dash.noResourcesYet")}</p>
                 </div>
               ) : (
                 <ul className="stu-dash__resource-list">
@@ -501,7 +549,7 @@ export function StudentDashboard({
                           className="stu-dash__resource-btn"
                           target={resource.externalUrl ? "_blank" : undefined}
                         >
-                          Open
+                          {t("dash.open")}
                         </Link>
                       </li>
                     );
@@ -515,8 +563,8 @@ export function StudentDashboard({
             <article className="stu-dash__panel stu-dash__panel--aside">
               <header className="stu-dash__panel-head">
                 <div>
-                  <h3 className="stu-dash__panel-title">Announcements</h3>
-                  <p className="stu-dash__panel-sub">News from your school</p>
+                  <h3 className="stu-dash__panel-title">{t("dash.announcements")}</h3>
+                  <p className="stu-dash__panel-sub">{t("dash.newsFromSchool")}</p>
                 </div>
                 <span className="stu-dash__panel-badge">{announcements.length}</span>
               </header>
@@ -524,7 +572,7 @@ export function StudentDashboard({
               {announcements.length === 0 ? (
                 <div className="stu-dash__empty stu-dash__empty--compact">
                   <DashIcon name="announcements" className="dash-icon--lg" />
-                  <p>No announcements yet</p>
+                  <p>{t("dash.noAnnouncements")}</p>
                 </div>
               ) : (
                 <ul className="stu-dash__announce-list">
@@ -534,7 +582,7 @@ export function StudentDashboard({
                       <div>
                         <p className="stu-dash__announce-title">{item.title}</p>
                         <p className="stu-dash__announce-meta">
-                          {formatDate(item.createdAt)}
+                          {formatDate(item.createdAt, locale)}
                         </p>
                         {item.body ? (
                           <p className="stu-dash__announce-body">{item.body}</p>

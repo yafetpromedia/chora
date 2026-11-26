@@ -13,6 +13,7 @@ import {
 } from "@/lib/platform-billing";
 import { handlePlatformAuthFailure } from "@/lib/platform-auth";
 import { DashIcon } from "@/components/dashboard/dash-icons";
+import { useLocale } from "@/components/i18n/locale-provider";
 import { AppToast } from "@/components/ui/app-toast";
 import { PlatformPaymentProofs } from "./platform-payment-proofs";
 import type { PlatformSchoolRow } from "./platform-types";
@@ -21,18 +22,34 @@ type Props = {
   schools: PlatformSchoolRow[];
 };
 
-const STATUS_FILTERS: { id: InvoiceStatus | "ALL"; label: string }[] = [
-  { id: "ALL", label: "All" },
-  { id: "DRAFT", label: "Draft" },
-  { id: "SENT", label: "Sent" },
-  { id: "PAID", label: "Paid" },
-  { id: "OVERDUE", label: "Overdue" },
-  { id: "VOID", label: "Void" },
+const STATUS_FILTER_IDS: (InvoiceStatus | "ALL")[] = [
+  "ALL",
+  "DRAFT",
+  "SENT",
+  "PAID",
+  "OVERDUE",
+  "VOID",
 ];
 
-function formatDate(iso: string) {
+function invoiceStatusLabel(status: InvoiceStatus, t: (key: string) => string) {
+  const map: Record<InvoiceStatus, string> = {
+    DRAFT: t("platformUi.invoiceStatusDraft"),
+    SENT: t("platformUi.invoiceStatusSent"),
+    PAID: t("platformUi.invoiceStatusPaid"),
+    OVERDUE: t("platformUi.invoiceStatusOverdue"),
+    VOID: t("platformUi.invoiceStatusVoid"),
+  };
+  return map[status] ?? status;
+}
+
+function invoiceFilterLabel(id: InvoiceStatus | "ALL", t: (key: string) => string) {
+  if (id === "ALL") return t("platformUi.filterAll");
+  return invoiceStatusLabel(id, t);
+}
+
+function formatDate(iso: string, locale: string) {
   try {
-    return new Date(iso).toLocaleDateString(undefined, {
+    return new Date(iso).toLocaleDateString(locale === "am" ? "am-ET" : undefined, {
       month: "short",
       day: "numeric",
       year: "numeric",
@@ -58,6 +75,7 @@ function monthBounds(offset = 0) {
 }
 
 export function PlatformInvoices({ schools }: Props) {
+  const { t, locale } = useLocale();
   const router = useRouter();
   const [invoices, setInvoices] = useState<PlatformInvoice[]>([]);
   const [loading, setLoading] = useState(true);
@@ -101,7 +119,7 @@ export function PlatformInvoices({ schools }: Props) {
     queueMicrotask(() => {
       setLoading(true);
       void load()
-        .catch((e) => fail(e, "Failed to load invoices"))
+        .catch((e) => fail(e, t("platformUi.errLoadInvoices")))
         .finally(() => setLoading(false));
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -134,7 +152,7 @@ export function PlatformInvoices({ schools }: Props) {
 
   async function createInvoice() {
     if (!form.schoolId) {
-      setError("Select a school");
+      setError(t("platformUi.invoicesErrSelectSchool"));
       return;
     }
     setSaving(true);
@@ -151,10 +169,10 @@ export function PlatformInvoices({ schools }: Props) {
         notes: form.notes.trim() || undefined,
       });
       setShowCreate(false);
-      setMessage("Invoice created as draft.");
+      setMessage(t("platformUi.invoicesCreatedDraft"));
       await load();
     } catch (e) {
-      fail(e, "Could not create invoice");
+      fail(e, t("platformUi.invoicesErrCreate"));
     } finally {
       setSaving(false);
     }
@@ -167,7 +185,7 @@ export function PlatformInvoices({ schools }: Props) {
       await updatePlatformInvoice(id, { status });
       await load();
     } catch (e) {
-      fail(e, "Update failed");
+      fail(e, t("platformUi.errUpdateFailed"));
     } finally {
       setBusyId("");
     }
@@ -193,25 +211,23 @@ export function PlatformInvoices({ schools }: Props) {
             <DashIcon name="fees" className="dash-icon--md" />
           </span>
           <div>
-            <p className="plat-subjects-v2__eyebrow">Accounts receivable</p>
-            <h2 className="plat-subjects-v2__title">Invoices</h2>
-            <p className="plat-subjects-v2__sub">
-              Issue monthly invoices to schools and track payment status.
-            </p>
+            <p className="plat-subjects-v2__eyebrow">{t("platformUi.invoicesEyebrow")}</p>
+            <h2 className="plat-subjects-v2__title">{t("platformUi.invoicesTitle")}</h2>
+            <p className="plat-subjects-v2__sub">{t("platformUi.invoicesSub")}</p>
           </div>
         </div>
         <div className="plat-subjects-v2__hero-stats">
           <div className="plat-subjects-v2__stat">
             <strong>{stats.total}</strong>
-            <span>Total</span>
+            <span>{t("platformUi.invoicesStatTotal")}</span>
           </div>
           <div className="plat-subjects-v2__stat">
             <strong>${stats.outstandingUsd.toLocaleString()}</strong>
-            <span>Outstanding</span>
+            <span>{t("platformUi.billingOutstanding")}</span>
           </div>
           <div className="plat-subjects-v2__stat">
             <strong>{stats.overdue}</strong>
-            <span>Overdue</span>
+            <span>{t("platformUi.invoiceStatusOverdue")}</span>
           </div>
         </div>
       </header>
@@ -221,21 +237,21 @@ export function PlatformInvoices({ schools }: Props) {
           <DashIcon name="templates" className="dash-icon--sm" />
           <div>
             <strong>{stats.draft}</strong>
-            <span>Draft</span>
+            <span>{t("platformUi.invoiceStatusDraft")}</span>
           </div>
         </article>
         <article className="plat-subjects-v2__kpi">
           <DashIcon name="mail" className="dash-icon--sm" />
           <div>
             <strong>{stats.sent}</strong>
-            <span>Sent</span>
+            <span>{t("platformUi.invoiceStatusSent")}</span>
           </div>
         </article>
         <article className="plat-subjects-v2__kpi">
           <DashIcon name="finance" className="dash-icon--sm" />
           <div>
             <strong>{stats.paid}</strong>
-            <span>Paid</span>
+            <span>{t("platformUi.invoiceStatusPaid")}</span>
           </div>
         </article>
       </div>
@@ -245,25 +261,25 @@ export function PlatformInvoices({ schools }: Props) {
           <DashIcon name="fees" className="dash-icon--sm" />
           <input
             type="search"
-            placeholder="Search invoice or school…"
+            placeholder={t("platformUi.invoicesSearchPh")}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            aria-label="Search invoices"
+            aria-label={t("platformUi.invoicesSearchAria")}
           />
         </div>
         <div className="plat-filter-tabs plat-subjects-v2__filters" role="tablist">
-          {STATUS_FILTERS.map((f) => (
+          {STATUS_FILTER_IDS.map((id) => (
             <button
-              key={f.id}
+              key={id}
               type="button"
               role="tab"
-              aria-selected={statusFilter === f.id}
+              aria-selected={statusFilter === id}
               className={`plat-filter-tab${
-                statusFilter === f.id ? " plat-filter-tab--active" : ""
+                statusFilter === id ? " plat-filter-tab--active" : ""
               }`}
-              onClick={() => setStatusFilter(f.id)}
+              onClick={() => setStatusFilter(id)}
             >
-              {f.label}
+              {invoiceFilterLabel(id, t)}
             </button>
           ))}
         </div>
@@ -273,25 +289,23 @@ export function PlatformInvoices({ schools }: Props) {
           onClick={() => setShowCreate((v) => !v)}
         >
           <DashIcon name="plus" className="dash-icon--sm" />
-          {showCreate ? "Cancel" : "New invoice"}
+          {showCreate ? t("common.cancel") : t("platformUi.invoicesNew")}
         </button>
       </div>
 
       {showCreate ? (
         <section className="plat-billing-v2__panel plat-billing-v2__form">
-          <h3 className="plat-billing-v2__panel-title">Create invoice</h3>
-          <p className="plat-billing-v2__panel-hint">
-            Amounts default from the plan catalog. Invoice starts as draft.
-          </p>
+          <h3 className="plat-billing-v2__panel-title">{t("platformUi.invoicesCreateTitle")}</h3>
+          <p className="plat-billing-v2__panel-hint">{t("platformUi.invoicesCreateHint")}</p>
           <div className="plat-invoice-form__grid">
             <label className="plat-field">
-              <span>School</span>
+              <span>{t("platformUi.invoicesSchool")}</span>
               <select
                 className="plat-select"
                 value={form.schoolId}
                 onChange={(e) => setForm((f) => ({ ...f, schoolId: e.target.value }))}
               >
-                <option value="">Select school…</option>
+                <option value="">{t("platformUi.invoicesSelectSchool")}</option>
                 {schools.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.name} ({s.subscription?.plan ?? "—"})
@@ -300,19 +314,19 @@ export function PlatformInvoices({ schools }: Props) {
               </select>
             </label>
             <label className="plat-field">
-              <span>Plan</span>
+              <span>{t("platformUi.invoicesPlan")}</span>
               <select
                 className="plat-select"
                 value={form.plan}
                 onChange={(e) => setForm((f) => ({ ...f, plan: e.target.value as PlanType }))}
               >
-                <option value="STARTER">Starter</option>
-                <option value="PROFESSIONAL">Professional</option>
-                <option value="ENTERPRISE">Enterprise</option>
+                <option value="STARTER">{t("platformUi.planStarter")}</option>
+                <option value="PROFESSIONAL">{t("platformUi.planProfessional")}</option>
+                <option value="ENTERPRISE">{t("platformUi.planEnterprise")}</option>
               </select>
             </label>
             <label className="plat-field">
-              <span>Billing period start</span>
+              <span>{t("platformUi.invoicesPeriodStart")}</span>
               <input
                 type="date"
                 value={form.periodStart}
@@ -320,7 +334,7 @@ export function PlatformInvoices({ schools }: Props) {
               />
             </label>
             <label className="plat-field">
-              <span>Billing period end</span>
+              <span>{t("platformUi.invoicesPeriodEnd")}</span>
               <input
                 type="date"
                 value={form.periodEnd}
@@ -328,7 +342,7 @@ export function PlatformInvoices({ schools }: Props) {
               />
             </label>
             <label className="plat-field">
-              <span>Due date</span>
+              <span>{t("platformUi.invoicesDueDate")}</span>
               <input
                 type="date"
                 value={form.dueAt}
@@ -336,7 +350,7 @@ export function PlatformInvoices({ schools }: Props) {
               />
             </label>
             <label className="plat-field">
-              <span>Currency</span>
+              <span>{t("platformUi.invoicesCurrency")}</span>
               <select
                 className="plat-select"
                 value={form.currency}
@@ -350,11 +364,11 @@ export function PlatformInvoices({ schools }: Props) {
             </label>
           </div>
           <label className="plat-field">
-            <span>Notes (optional)</span>
+            <span>{t("platformUi.invoicesNotesOptional")}</span>
             <input
               value={form.notes}
               onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-              placeholder="PO number, bank reference…"
+              placeholder={t("platformUi.invoicesNotesPh")}
             />
           </label>
           <div className="plat-subjects-v2__actions">
@@ -363,7 +377,7 @@ export function PlatformInvoices({ schools }: Props) {
               className="plat-btn plat-btn--ghost"
               onClick={() => setShowCreate(false)}
             >
-              Cancel
+              {t("common.cancel")}
             </button>
             <button
               type="button"
@@ -371,7 +385,7 @@ export function PlatformInvoices({ schools }: Props) {
               disabled={saving}
               onClick={() => void createInvoice()}
             >
-              {saving ? "Creating…" : "Create draft"}
+              {saving ? t("platformUi.invoicesCreating") : t("platformUi.invoicesCreateDraft")}
             </button>
           </div>
         </section>
@@ -387,20 +401,20 @@ export function PlatformInvoices({ schools }: Props) {
         <table className="plat-subjects-v2__table">
           <thead>
             <tr>
-              <th>Invoice</th>
-              <th>School</th>
-              <th>Period</th>
-              <th>Amount</th>
-              <th>Due</th>
-              <th>Status</th>
-              <th aria-label="Actions" />
+              <th>{t("platformUi.invoicesColInvoice")}</th>
+              <th>{t("platformUi.invoicesColSchool")}</th>
+              <th>{t("platformUi.invoicesColPeriod")}</th>
+              <th>{t("platformUi.invoicesColAmount")}</th>
+              <th>{t("platformUi.invoicesColDue")}</th>
+              <th>{t("platformUi.invoicesColStatus")}</th>
+              <th aria-label={t("platformUi.invoicesColActionsAria")} />
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
               <tr>
                 <td colSpan={7} className="plat-subjects-v2__empty">
-                  No invoices yet. Create one for a paid school.
+                  {t("platformUi.invoicesEmpty")}
                 </td>
               </tr>
             ) : (
@@ -417,19 +431,19 @@ export function PlatformInvoices({ schools }: Props) {
                     <code className="plat-subjects-v2__code">{inv.joinCode}</code>
                   </td>
                   <td className="plat-billing-v2__muted">
-                    {formatDate(inv.periodStart)} – {formatDate(inv.periodEnd)}
+                    {formatDate(inv.periodStart, locale)} – {formatDate(inv.periodEnd, locale)}
                   </td>
                   <td>
                     <span className="plat-subjects-v2__count">
                       {formatMoney(inv.amountUsd, inv.amountEtb, inv.currency)}
                     </span>
                   </td>
-                  <td className="plat-billing-v2__muted">{formatDate(inv.dueAt)}</td>
+                  <td className="plat-billing-v2__muted">{formatDate(inv.dueAt, locale)}</td>
                   <td>
                     <span
                       className={`plat-invoice-status plat-invoice-status--${inv.status.toLowerCase()}`}
                     >
-                      {inv.status}
+                      {invoiceStatusLabel(inv.status, t)}
                     </span>
                   </td>
                   <td>
@@ -441,7 +455,7 @@ export function PlatformInvoices({ schools }: Props) {
                           disabled={busyId === inv.id}
                           onClick={() => void setStatus(inv.id, "SENT")}
                         >
-                          Mark sent
+                          {t("platformUi.invoicesMarkSent")}
                         </button>
                       ) : null}
                       {inv.status === "SENT" || inv.status === "OVERDUE" ? (
@@ -451,7 +465,7 @@ export function PlatformInvoices({ schools }: Props) {
                           disabled={busyId === inv.id}
                           onClick={() => void setStatus(inv.id, "PAID")}
                         >
-                          Mark paid
+                          {t("platformUi.invoicesMarkPaid")}
                         </button>
                       ) : null}
                       {inv.status !== "VOID" && inv.status !== "PAID" ? (
@@ -461,7 +475,7 @@ export function PlatformInvoices({ schools }: Props) {
                           disabled={busyId === inv.id}
                           onClick={() => void setStatus(inv.id, "VOID")}
                         >
-                          Void
+                          {t("platformUi.invoiceStatusVoid")}
                         </button>
                       ) : null}
                     </div>

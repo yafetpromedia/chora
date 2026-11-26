@@ -1,12 +1,16 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { SupportTicketCategory, SupportTicketStatus } from '@prisma/client';
+import { EmailService } from '../email/email.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateSupportTicketDto } from './dto/create-support-ticket.dto';
 import { UpdateSupportTicketDto } from './dto/update-support-ticket.dto';
 
 @Injectable()
 export class SupportService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly email?: EmailService,
+  ) {}
 
   private readonly ticketInclude = {
     school: {
@@ -42,6 +46,20 @@ export class SupportService {
       },
       include: this.ticketInclude,
     });
+    if (ticket.createdBy.email) {
+      await this.email?.enqueueSafe({
+        to: ticket.createdBy.email,
+        schoolId,
+        category: 'support_confirmation',
+        templateId: 'support_confirmation',
+        idempotencyKey: `support:${ticket.id}`,
+        vars: {
+          firstName: ticket.createdBy.firstName,
+          title: ticket.subject,
+          schoolName: ticket.school.name,
+        },
+      });
+    }
     return this.serialize(ticket);
   }
 

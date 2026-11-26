@@ -26,13 +26,18 @@ import {
 } from "@/lib/auth";
 import { DEFAULT_SCHOOL_THEME, persistSchoolBrand } from "@/lib/school-brand";
 import {
+  DEFAULT_WEEKEND_DAYS,
   getSchoolSettings,
   updateSchoolSettings,
+  WEEKDAY_OPTIONS,
   type SchoolSettings,
+  type Weekday,
 } from "@/lib/school-settings";
 import { BRAND_NAME } from "@/lib/brand";
+import { SchoolEmailPreferences } from "@/components/school/school-email-preferences";
+import { useLocale } from "@/components/i18n/locale-provider";
 
-type Tab = "school" | "attendance" | "access" | "plan";
+type Tab = "school" | "attendance" | "notifications" | "access" | "plan";
 
 const SCHOOL_TYPES: { value: SchoolType; label: string }[] = [
   { value: "KINDERGARTEN", label: "Kindergarten" },
@@ -53,9 +58,10 @@ const ATTENDANCE_MODES: {
   { value: "BOTH", label: "Both", desc: "Daily + period tracking", mark: "B" },
 ];
 
-const TABS: { id: Tab; label: string; icon: "settings" | "attendance" | "users" | "finance" }[] = [
+const TABS: { id: Tab; label: string; icon: "settings" | "attendance" | "users" | "finance" | "announcements" }[] = [
   { id: "school", label: "School profile", icon: "settings" },
   { id: "attendance", label: "Attendance", icon: "attendance" },
+  { id: "notifications", label: "Notifications", icon: "announcements" },
   { id: "access", label: "Access & invites", icon: "users" },
   { id: "plan", label: "Plan & reports", icon: "finance" },
 ];
@@ -70,7 +76,15 @@ function attendanceLabel(mode: AttendanceMode) {
 
 export default function AdminSettingsPage() {
   const router = useRouter();
+  const { t } = useLocale();
   const [tab, setTab] = useState<Tab>("school");
+  const tabLabels: Record<Tab, string> = {
+    school: t("adminSettingsUi.tabSchool"),
+    attendance: t("adminSettingsUi.tabAttendance"),
+    notifications: t("adminSettingsUi.tabNotifications"),
+    access: t("adminSettingsUi.tabAccess"),
+    plan: t("adminSettingsUi.tabPlan"),
+  };
   const [school, setSchool] = useState<SchoolSettings | null>(null);
   const [subscription, setSubscription] = useState<SubscriptionStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -113,6 +127,8 @@ export default function AdminSettingsPage() {
   const [reportShowRank, setReportShowRank] = useState(true);
   const [reportShowAttendance, setReportShowAttendance] = useState(true);
   const [attendanceMode, setAttendanceMode] = useState<AttendanceMode>("DAILY");
+  const [weekendDays, setWeekendDays] = useState<Weekday[]>(DEFAULT_WEEKEND_DAYS);
+  const [savingWeekends, setSavingWeekends] = useState(false);
 
   function applySchool(s: SchoolSettings) {
     setSchool(s);
@@ -144,6 +160,9 @@ export default function AdminSettingsPage() {
     setReportShowRank(s.reportShowRank ?? true);
     setReportShowAttendance(s.reportShowAttendance ?? true);
     setAttendanceMode(s.attendanceMode);
+    setWeekendDays(
+      s.weekendDays?.length ? s.weekendDays : [...DEFAULT_WEEKEND_DAYS],
+    );
   }
 
   useEffect(() => {
@@ -234,6 +253,31 @@ export default function AdminSettingsPage() {
     }
   }
 
+  function toggleWeekendDay(day: Weekday) {
+    setWeekendDays((prev) =>
+      prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day],
+    );
+  }
+
+  async function onSaveWeekendDays() {
+    if (weekendDays.length === 0) {
+      setError("Select at least one weekend day.");
+      return;
+    }
+    setSavingWeekends(true);
+    setError("");
+    setToast(null);
+    try {
+      const updated = await updateSchoolSettings({ weekendDays });
+      applySchool(updated);
+      setToast("Weekend days updated.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not update weekend days");
+    } finally {
+      setSavingWeekends(false);
+    }
+  }
+
   function copyJoinCode() {
     if (!school?.joinCode) return;
     void navigator.clipboard.writeText(school.joinCode);
@@ -302,7 +346,7 @@ export default function AdminSettingsPage() {
                 onClick={() => setTab(item.id)}
               >
                 <DashIcon name={item.icon} className="dash-icon--sm" />
-                {item.label}
+                {tabLabels[item.id]}
               </button>
             ))}
           </nav>
@@ -679,8 +723,43 @@ export default function AdminSettingsPage() {
               To mark attendance day-to-day, use{" "}
               <Link href="/admin/attendance">Attendance → Mark</Link>.
             </p>
+
+            <div className="set-v2__weekend">
+              <h3 className="set-v2__weekend-title">Weekend days</h3>
+              <p className="set-v2__panel-sub">
+                These days are not school days. Unmarked attendance on them is
+                not counted as “not marked.”
+              </p>
+              <div className="set-v2__weekend-grid" role="group" aria-label="Weekend days">
+                {WEEKDAY_OPTIONS.map((d) => {
+                  const on = weekendDays.includes(d.value);
+                  return (
+                    <button
+                      key={d.value}
+                      type="button"
+                      className={`set-v2__weekend-chip${on ? " set-v2__weekend-chip--on" : ""}`}
+                      aria-pressed={on}
+                      onClick={() => toggleWeekendDay(d.value)}
+                    >
+                      <span className="set-v2__weekend-short">{d.short}</span>
+                      <span className="set-v2__weekend-label">{d.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <button
+                type="button"
+                className="cfg-btn"
+                disabled={savingWeekends || weekendDays.length === 0}
+                onClick={() => void onSaveWeekendDays()}
+              >
+                {savingWeekends ? "Saving…" : "Save weekend days"}
+              </button>
+            </div>
           </section>
         ) : null}
+
+        {!loading && tab === "notifications" ? <SchoolEmailPreferences /> : null}
 
         {!loading && tab === "access" && school ? (
           <div className="set-v2__stack">

@@ -6,8 +6,10 @@ import { DashboardPage } from "@/components/dashboard/dashboard-page";
 import { TimetablePortalView } from "@/components/timetable/timetable-portal-view";
 import { getMyTimetableToday, getMyTimetableWeek, type Weekday } from "@/lib/timetable";
 import { AUTH_TOKEN_KEY } from "@/lib/auth";
+import { useLocale } from "@/components/i18n/locale-provider";
 
 export default function StudentTimetablePage() {
+  const { t } = useLocale();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -32,7 +34,9 @@ export default function StudentTimetablePage() {
         setTodaySlots(today.slots);
         setWeekDays(week.days);
       })
-      .catch((err) => setError(err instanceof Error ? err.message : "Load failed"))
+      .catch((err) =>
+        setError(err instanceof Error ? err.message : t("timetableUi.errLoad")),
+      )
       .finally(() => setLoading(false));
   }, [router]);
 
@@ -49,8 +53,8 @@ export default function StudentTimetablePage() {
         todayWeekday={todayWeekday}
         todaySlots={todaySlots}
         weekDays={weekDays}
-        heroSub="Know what's next — your subjects, periods, and rooms."
-        todayEmptyMessage="No classes scheduled today. Enjoy the break or check the full week."
+        heroSub={t("timetableUi.studentHeroSub")}
+        todayEmptyMessage={t("timetableUi.studentEmptyToday")}
       />
     </DashboardPage>
   );

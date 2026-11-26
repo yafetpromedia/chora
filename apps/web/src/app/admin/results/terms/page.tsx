@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { DashboardPage } from "@/components/dashboard/dashboard-page";
@@ -27,15 +27,16 @@ import {
 } from "@/lib/results";
 import { AUTH_ROLE_KEY, AUTH_TOKEN_KEY, isSchoolWorkspaceRole } from "@/lib/auth";
 import { AppToast } from "@/components/ui/app-toast";
+import { useLocale } from "@/components/i18n/locale-provider";
 
 function toDateInput(iso: string) {
   return iso.slice(0, 10);
 }
 
-function suggestNextTerm(terms: AcademicTerm[]) {
+function suggestNextTerm(terms: AcademicTerm[], termLabel: (n: number) => string) {
   const termNumber = terms.length + 1;
   return {
-    name: `Term ${termNumber}`,
+    name: termLabel(termNumber),
     termNumber: String(termNumber),
   };
 }
@@ -46,6 +47,7 @@ function termNumberToSortOrder(termNumber: string) {
 }
 
 export default function AcademicTermsPage() {
+  const { t, tp } = useLocale();
   const router = useRouter();
   const [years, setYears] = useState<AcademicYear[]>([]);
   const [terms, setTerms] = useState<AcademicTerm[]>([]);
@@ -62,8 +64,13 @@ export default function AcademicTermsPage() {
   const [editingTermId, setEditingTermId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
+  const termNameFor = useCallback(
+    (n: number) => t("adminAcademicTermsUi.suggestTermName", { n }),
+    [t],
+  );
+
   function applyFormDefaults(termList: AcademicTerm[]) {
-    const suggestion = suggestNextTerm(termList);
+    const suggestion = suggestNextTerm(termList, termNameFor);
     setName(suggestion.name);
     setTermNumber(suggestion.termNumber);
     setStartDate("");
@@ -121,7 +128,8 @@ export default function AcademicTermsPage() {
         applyFormDefaults(applyTermsData(data));
       })
       .catch((err) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : "Load failed");
+        if (!cancelled)
+          setError(err instanceof Error ? err.message : t("adminAcademicTermsUi.loadFailed"));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -141,14 +149,14 @@ export default function AcademicTermsPage() {
       setTerms(loadedTerms);
       applyFormDefaults(loadedTerms);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Load failed");
+      setError(err instanceof Error ? err.message : t("adminAcademicTermsUi.loadFailed"));
     }
   }
 
   async function onSave(e: FormEvent) {
     e.preventDefault();
     if (!academicYearId) {
-      setError("Create an academic year first.");
+      setError(t("adminAcademicTermsUi.createYearFirst"));
       return;
     }
     setSaving(true);
@@ -163,7 +171,7 @@ export default function AcademicTermsPage() {
           sortOrder: termNumberToSortOrder(termNumber),
           isCurrent,
         });
-        setSuccess(`${name.trim()} updated.`);
+        setSuccess(t("adminAcademicTermsUi.termUpdated", { name: name.trim() }));
       } else {
         await createTerm({
           academicYearId,
@@ -173,40 +181,40 @@ export default function AcademicTermsPage() {
           sortOrder: termNumberToSortOrder(termNumber),
           isCurrent,
         });
-        setSuccess(`${name.trim()} is ready — teachers can enter scores for this term.`);
+        setSuccess(t("adminAcademicTermsUi.termReady", { name: name.trim() }));
       }
       const loadedTerms = await load(academicYearId);
       applyFormDefaults(loadedTerms);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Save failed");
+      setError(err instanceof Error ? err.message : t("adminAcademicTermsUi.saveFailed"));
     } finally {
       setSaving(false);
     }
   }
 
   async function onDelete(term: AcademicTerm) {
-    const ok = window.confirm(
-      `Delete "${term.name}"? This only works if the term has no scores or report data yet.`,
-    );
+    const ok = window.confirm(t("adminAcademicTermsUi.deleteConfirm", { name: term.name }));
     if (!ok) return;
     setDeletingId(term.id);
     setError("");
     setSuccess("");
     try {
       await deleteTerm(term.id);
-      setSuccess(`${term.name} deleted.`);
+      setSuccess(t("adminAcademicTermsUi.termDeleted", { name: term.name }));
       const loadedTerms = await load(academicYearId);
       applyFormDefaults(loadedTerms);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Delete failed");
+      setError(err instanceof Error ? err.message : t("adminAcademicTermsUi.deleteFailed"));
     } finally {
       setDeletingId(null);
     }
   }
 
   const selectedYear = years.find((y) => y.id === academicYearId);
-  const currentTerm = terms.find((t) => t.isCurrent);
-  const activeTerm = terms.find((t) => termStatus(t.startDate, t.endDate) === "active");
+  const currentTerm = terms.find((term) => term.isCurrent);
+  const activeTerm = terms.find(
+    (term) => termStatus(term.startDate, term.endDate) === "active",
+  );
 
   const stats = useMemo(() => {
     const yearPct = selectedYear
@@ -215,44 +223,56 @@ export default function AcademicTermsPage() {
     const daysLeft = currentTerm ? termDaysRemaining(currentTerm.endDate) : null;
     return [
       {
-        label: "Terms",
+        label: t("adminAcademicTermsUi.statTerms"),
         value: loading ? "—" : terms.length,
-        hint: terms.length < 3 ? "Often 3 per year" : "Configured",
+        hint:
+          terms.length < 3
+            ? t("adminAcademicTermsUi.hintFewTerms")
+            : t("adminAcademicTermsUi.hintConfigured"),
       },
       {
-        label: "Current term",
-        value: currentTerm?.name ?? "None",
+        label: t("adminAcademicTermsUi.statCurrent"),
+        value: currentTerm?.name ?? t("adminAcademicTermsUi.none"),
         hint: activeTerm
-          ? `${termProgress(activeTerm.startDate, activeTerm.endDate)}% elapsed`
-          : "Mark one current",
+          ? t("adminAcademicTermsUi.percentElapsed", {
+              n: termProgress(activeTerm.startDate, activeTerm.endDate),
+            })
+          : t("adminAcademicTermsUi.markOneCurrent"),
       },
       {
-        label: "Year progress",
+        label: t("adminAcademicTermsUi.statYearProgress"),
         value: selectedYear ? `${yearPct}%` : "—",
-        hint: daysLeft != null ? `${daysLeft} days left` : selectedYear?.name,
+        hint:
+          daysLeft != null
+            ? t("adminAcademicTermsUi.daysLeft", { n: daysLeft })
+            : (selectedYear?.name ?? ""),
         accent: true,
       },
     ];
-  }, [loading, terms, currentTerm, activeTerm, selectedYear]);
+  }, [loading, terms, currentTerm, activeTerm, selectedYear, t]);
 
   return (
-    <DashboardPage role="admin" title="Terms">
+    <DashboardPage role="admin" title={tp("Terms")}>
       <div className="acad-page acad-page--terms">
         <AcademicsHero
-          chip="Academics"
+          chip={t("adminAcademicTermsUi.chip")}
           compact
           backHref="/admin/academics"
-          title="Terms & semesters"
-          subtitle="Results, attendance, and report cards are scoped to a term. Set up Term 1, 2, and 3 for the school year."
+          title={t("adminAcademicTermsUi.heroTitle")}
+          subtitle={t("adminAcademicTermsUi.heroSub")}
           badges={
             <>
               {selectedYear ? (
-                <AcademicsBadge variant="default">Year: {selectedYear.name}</AcademicsBadge>
+                <AcademicsBadge variant="default">
+                  {t("adminAcademicTermsUi.yearBadge", { name: selectedYear.name })}
+                </AcademicsBadge>
               ) : null}
               {currentTerm ? (
-                <AcademicsBadge variant="live">Current: {currentTerm.name}</AcademicsBadge>
+                <AcademicsBadge variant="live">
+                  {t("adminAcademicTermsUi.currentBadge", { name: currentTerm.name })}
+                </AcademicsBadge>
               ) : (
-                <AcademicsBadge variant="muted">No current term</AcademicsBadge>
+                <AcademicsBadge variant="muted">{t("adminAcademicTermsUi.noCurrentTerm")}</AcademicsBadge>
               )}
             </>
           }
@@ -266,7 +286,7 @@ export default function AcademicTermsPage() {
           <div className="acad-year-picker acad-year-picker--inline">
             <div className="acad-year-picker__label">
               <DashIcon name="calendar" className="dash-icon--xs" />
-              <span>Academic year</span>
+              <span>{t("adminAcademicTermsUi.academicYear")}</span>
             </div>
             <select
               className="acad-year-picker__select"
@@ -275,18 +295,18 @@ export default function AcademicTermsPage() {
               disabled={years.length === 0}
             >
               {years.length === 0 ? (
-                <option value="">No years — create one first</option>
+                <option value="">{t("adminAcademicTermsUi.noYearsOption")}</option>
               ) : null}
               {years.map((y) => (
                 <option key={y.id} value={y.id}>
                   {y.name}
-                  {y.isCurrent ? " (current)" : ""}
+                  {y.isCurrent ? t("adminAcademicTermsUi.yearCurrentSuffix") : ""}
                 </option>
               ))}
             </select>
             {years.length === 0 ? (
               <Link href="/admin/results/academic-years" className="acad-year-picker__link">
-                Create year →
+                {t("adminAcademicTermsUi.createYearLink")}
               </Link>
             ) : null}
           </div>
@@ -297,17 +317,21 @@ export default function AcademicTermsPage() {
             <header className="acad-terms-main__head">
               <div>
                 <h2 className="acad-terms-main__title">
-                  {selectedYear ? selectedYear.name : "Terms"}
+                  {selectedYear ? selectedYear.name : t("adminAcademicTermsUi.statTerms")}
                 </h2>
                 <p className="acad-terms-main__sub">
                   {terms.length === 0
-                    ? "Add your first term to unlock results and grading."
-                    : `${terms.length} term${terms.length === 1 ? "" : "s"} configured`}
+                    ? t("adminAcademicTermsUi.addFirstTerm")
+                    : terms.length === 1
+                      ? t("adminAcademicTermsUi.termsConfigured", { count: terms.length })
+                      : t("adminAcademicTermsUi.termsConfiguredPlural", { count: terms.length })}
                 </p>
               </div>
               {selectedYear ? (
                 <span className="acad-terms-main__pct">
-                  {yearProgress(selectedYear.startDate, selectedYear.endDate)}% of year
+                  {t("adminAcademicTermsUi.percentOfYear", {
+                    n: yearProgress(selectedYear.startDate, selectedYear.endDate),
+                  })}
                 </span>
               ) : null}
             </header>
@@ -315,21 +339,21 @@ export default function AcademicTermsPage() {
             {loading ? (
               <div className="acad-terms-loading">
                 <span className="acad-terms-loading__spinner" aria-hidden />
-                <p>Loading terms…</p>
+                <p>{t("adminAcademicTermsUi.loadingTerms")}</p>
               </div>
             ) : terms.length === 0 ? (
-              <AcademicsEmpty message="No terms yet. Use the form to add Term 1 — typically June–July for the first semester." />
+              <AcademicsEmpty message={t("adminAcademicTermsUi.emptyTerms")} />
             ) : (
               <ul className="acad-terms-timeline">
-                {terms.map((t, index) => {
-                  const status = termStatus(t.startDate, t.endDate);
-                  const progress = termProgress(t.startDate, t.endDate);
-                  const duration = termDurationDays(t.startDate, t.endDate);
-                  const daysLeft = termDaysRemaining(t.endDate);
+                {terms.map((term, index) => {
+                  const status = termStatus(term.startDate, term.endDate);
+                  const progress = termProgress(term.startDate, term.endDate);
+                  const duration = termDurationDays(term.startDate, term.endDate);
+                  const daysLeft = termDaysRemaining(term.endDate);
                   return (
                     <li
-                      key={t.id}
-                      className={`acad-term-item acad-term-item--${status}${t.isCurrent ? " acad-term-item--current" : ""}`}
+                      key={term.id}
+                      className={`acad-term-item acad-term-item--${status}${term.isCurrent ? " acad-term-item--current" : ""}`}
                     >
                       <div className="acad-term-item__rail" aria-hidden>
                         <span className="acad-term-item__dot" />
@@ -340,29 +364,37 @@ export default function AcademicTermsPage() {
                       <div className="acad-term-item__body">
                         <div className="acad-term-item__top">
                           <div>
-                            <span className="acad-term-item__order">Term {t.sortOrder + 1}</span>
-                            <h3 className="acad-term-item__name">{t.name}</h3>
+                            <span className="acad-term-item__order">
+                              {t("adminAcademicTermsUi.termOrder", { n: term.sortOrder + 1 })}
+                            </span>
+                            <h3 className="acad-term-item__name">{term.name}</h3>
                           </div>
                           <div className="acad-term-item__badges">
-                            {t.isCurrent ? (
-                              <AcademicsBadge variant="live">Current</AcademicsBadge>
+                            {term.isCurrent ? (
+                              <AcademicsBadge variant="live">{t("adminAcademicTermsUi.current")}</AcademicsBadge>
                             ) : null}
                             <span className={`acad-term-item__status acad-term-item__status--${status}`}>
                               {status === "active"
-                                ? "In progress"
+                                ? t("adminAcademicTermsUi.inProgress")
                                 : status === "upcoming"
-                                  ? "Upcoming"
-                                  : "Completed"}
+                                  ? t("adminAcademicTermsUi.upcoming")
+                                  : t("adminAcademicTermsUi.completed")}
                             </span>
                           </div>
                         </div>
                         <p className="acad-term-item__dates">
-                          {formatAcadDate(t.startDate)} – {formatAcadDate(t.endDate)}
+                          {formatAcadDate(term.startDate)} – {formatAcadDate(term.endDate)}
                           <span className="acad-term-item__duration">
-                            · {duration} days
+                            ·{" "}
+                            {duration === 1
+                              ? t("adminAcademicTermsUi.dayDuration", { n: duration })
+                              : t("adminAcademicTermsUi.daysDuration", { n: duration })}
                           </span>
                         </p>
-                        <div className="acad-term-item__bar" title={`${progress}% complete`}>
+                        <div
+                          className="acad-term-item__bar"
+                          title={t("adminAcademicTermsUi.percentComplete", { n: progress })}
+                        >
                           <span
                             className={`acad-term-item__bar-fill acad-term-item__bar-fill--${status}`}
                             style={{ width: `${status === "upcoming" ? 0 : progress}%` }}
@@ -370,26 +402,28 @@ export default function AcademicTermsPage() {
                         </div>
                         <p className="acad-term-item__meta">
                           {status === "active"
-                            ? `${progress}% complete · ${daysLeft} days remaining`
+                            ? `${t("adminAcademicTermsUi.percentComplete", { n: progress })} · ${t("adminAcademicTermsUi.daysRemaining", { n: daysLeft })}`
                             : status === "upcoming"
-                              ? "Starts soon"
-                              : "Term ended"}
+                              ? t("adminAcademicTermsUi.startsSoon")
+                              : t("adminAcademicTermsUi.termEnded")}
                         </p>
                         <div className="acad-term-item__actions">
                           <button
                             type="button"
                             className="acad-btn acad-btn--ghost acad-btn--sm"
-                            onClick={() => startEdit(t)}
+                            onClick={() => startEdit(term)}
                           >
-                            Edit
+                            {t("adminAcademicTermsUi.edit")}
                           </button>
                           <button
                             type="button"
                             className="acad-btn acad-btn--danger acad-btn--sm"
-                            disabled={deletingId === t.id}
-                            onClick={() => void onDelete(t)}
+                            disabled={deletingId === term.id}
+                            onClick={() => void onDelete(term)}
                           >
-                            {deletingId === t.id ? "Deleting…" : "Delete"}
+                            {deletingId === term.id
+                              ? t("adminAcademicTermsUi.deleting")
+                              : t("adminAcademicTermsUi.delete")}
                           </button>
                         </div>
                       </div>
@@ -408,31 +442,33 @@ export default function AcademicTermsPage() {
                 </div>
                 <div>
                   <h3 className="acad-terms-form__title">
-                    {editingTermId ? "Edit term" : "Add term"}
+                    {editingTermId ? t("adminAcademicTermsUi.editTerm") : t("adminAcademicTermsUi.addTerm")}
                   </h3>
                   <p className="acad-terms-form__sub">
                     {editingTermId
-                      ? "Update dates, name, or current term flag."
+                      ? t("adminAcademicTermsUi.editSub")
                       : terms.length === 0
-                        ? "Start with Term 1"
-                        : `Next up: ${suggestNextTerm(terms).name}`}
+                        ? t("adminAcademicTermsUi.startTerm1")
+                        : t("adminAcademicTermsUi.nextUp", {
+                            name: suggestNextTerm(terms, termNameFor).name,
+                          })}
                   </p>
                 </div>
               </header>
 
               <div className="acad-terms-form__fields">
                 <label>
-                  Term name
+                  {t("adminAcademicTermsUi.termName")}
                   <input
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    placeholder="Term 1"
+                    placeholder={t("adminAcademicTermsUi.termNamePh")}
                     required
                   />
                 </label>
                 <div className="acad-form__row">
                   <label>
-                    Start date
+                    {t("adminAcademicTermsUi.startDate")}
                     <input
                       type="date"
                       value={startDate}
@@ -441,7 +477,7 @@ export default function AcademicTermsPage() {
                     />
                   </label>
                   <label>
-                    End date
+                    {t("adminAcademicTermsUi.endDate")}
                     <input
                       type="date"
                       value={endDate}
@@ -451,7 +487,7 @@ export default function AcademicTermsPage() {
                   </label>
                 </div>
                 <label>
-                  Term number
+                  {t("adminAcademicTermsUi.termNumber")}
                   <input
                     type="number"
                     min={1}
@@ -466,7 +502,7 @@ export default function AcademicTermsPage() {
                     checked={isCurrent}
                     onChange={(e) => setIsCurrent(e.target.checked)}
                   />
-                  Set as current term
+                  {t("adminAcademicTermsUi.setCurrent")}
                 </label>
               </div>
 
@@ -477,10 +513,10 @@ export default function AcademicTermsPage() {
                   disabled={saving || years.length === 0}
                 >
                   {saving
-                    ? "Saving…"
+                    ? t("common.saving")
                     : editingTermId
-                      ? "Save changes"
-                      : "Create term"}
+                      ? t("adminAcademicTermsUi.saveChanges")
+                      : t("adminAcademicTermsUi.createTerm")}
                 </button>
                 {editingTermId ? (
                   <button
@@ -489,13 +525,10 @@ export default function AcademicTermsPage() {
                     disabled={saving}
                     onClick={cancelEdit}
                   >
-                    Cancel edit
+                    {t("adminAcademicTermsUi.cancelEdit")}
                   </button>
                 ) : null}
-                <p className="acad-terms-form__hint">
-                  Click <strong>Edit</strong> on a term in the list, or use the form to add a new one.
-                  Delete is only allowed before any scores exist.
-                </p>
+                <p className="acad-terms-form__hint">{t("adminAcademicTermsUi.formHint")}</p>
               </div>
             </form>
           </aside>

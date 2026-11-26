@@ -6,8 +6,10 @@ import { TeacherIdCardView } from "@/components/teacher/teacher-id-card";
 import { AUTH_TOKEN_KEY } from "@/lib/auth";
 import { listTeacherIdCards, type TeacherIdCard } from "@/lib/teacher-cards";
 import { BRAND_NAME } from "@/lib/brand";
+import { useLocale } from "@/components/i18n/locale-provider";
 
 export default function PrintTeacherIdCardsPage() {
+  const { t } = useLocale();
   const router = useRouter();
   const [cards, setCards] = useState<TeacherIdCard[]>([]);
   const [error, setError] = useState("");
@@ -23,13 +25,15 @@ export default function PrintTeacherIdCardsPage() {
         setCards(rows);
         setReady(true);
       })
-      .catch((err) => setError(err instanceof Error ? err.message : "Load failed"));
-  }, [router]);
+      .catch((err) =>
+        setError(err instanceof Error ? err.message : t("idCardPrintChromeUi.loadFailed")),
+      );
+  }, [router, t]);
 
   useEffect(() => {
     if (!ready || cards.length === 0) return;
-    const t = window.setTimeout(() => window.print(), 600);
-    return () => window.clearTimeout(t);
+    const timeout = window.setTimeout(() => window.print(), 600);
+    return () => window.clearTimeout(timeout);
   }, [ready, cards.length]);
 
   if (error) {
@@ -43,7 +47,7 @@ export default function PrintTeacherIdCardsPage() {
   if (!ready) {
     return (
       <div className="sid-print-page">
-        <p className="sid-print-page__loading">Preparing faculty cards…</p>
+        <p className="sid-print-page__loading">{t("idCardPrintChromeUi.preparingFaculty")}</p>
       </div>
     );
   }
@@ -51,7 +55,7 @@ export default function PrintTeacherIdCardsPage() {
   if (cards.length === 0) {
     return (
       <div className="sid-print-page sid-print-page--error">
-        <p>No teacher cards. Generate TCH IDs from Admin → Teacher ID cards.</p>
+        <p>{t("idCardPrintChromeUi.noTeacherCards")}</p>
       </div>
     );
   }
@@ -59,10 +63,11 @@ export default function PrintTeacherIdCardsPage() {
   return (
     <div className="sid-print-page sid-print-page--bulk">
       <header className="sid-print-meta sid-print-meta--page no-print">
-        <p className="sid-print-meta__brand">{BRAND_NAME} · Faculty ID bulk print</p>
+        <p className="sid-print-meta__brand">
+          {t("idCardPrintChromeUi.facultyBulkPrint", { brand: BRAND_NAME })}
+        </p>
         <p className="sid-print-meta__sub">
-          {cards.length} card{cards.length === 1 ? "" : "s"} · Enable background graphics ·
-          Double-sided long edge
+          {t("idCardPrintChromeUi.facultyBulkSub", { count: cards.length })}
         </p>
       </header>
 
@@ -75,7 +80,9 @@ export default function PrintTeacherIdCardsPage() {
       </div>
 
       <div className="sid-bulk-sheet">
-        <p className="sid-bulk-sheet__label sid-bulk-sheet__label--back">Back sides</p>
+        <p className="sid-bulk-sheet__label sid-bulk-sheet__label--back">
+          {t("idCardPrintChromeUi.backSides")}
+        </p>
         <div className="sid-bulk-grid sid-bulk-grid--6">
           {cards.map((c) => (
             <div key={`${c.userId}-back`} className="sid-bulk-cell">

@@ -6,13 +6,9 @@ import { DashboardPage } from "@/components/dashboard/dashboard-page";
 import { ScoreMatrixPanel } from "@/components/results/score-matrix-panel";
 import { StudentSubjectScoresPanel } from "@/components/results/student-subject-scores-panel";
 import { AUTH_ROLE_KEY, AUTH_TOKEN_KEY } from "@/lib/auth";
+import { useLocale } from "@/components/i18n/locale-provider";
 
 export type TeacherResultsSection = "class-sheet" | "by-student";
-
-const SUBTITLES: Record<TeacherResultsSection, string> = {
-  "class-sheet": "Enter scores for all students in one subject",
-  "by-student": "One row per subject — columns from your assessment templates",
-};
 
 type Props = {
   section: TeacherResultsSection;
@@ -20,6 +16,11 @@ type Props = {
 
 export function TeacherResultsPage({ section }: Props) {
   const router = useRouter();
+  const { t } = useLocale();
+  const subtitle =
+    section === "class-sheet"
+      ? t("pages.teacherScores.subtitleClassSheet")
+      : t("pages.teacherScores.subtitleByStudent");
   const searchParams = useSearchParams();
   const initialClassSubjectId = searchParams.get("classSubjectId");
 
@@ -35,8 +36,8 @@ export function TeacherResultsPage({ section }: Props) {
   }, [router]);
 
   return (
-    <DashboardPage role="teacher" title="Scores" subtitle={SUBTITLES[section]}>
-      <div className="res-teacher-page">
+    <DashboardPage role="teacher" title={t("pages.teacherScores.title")} subtitle={subtitle}>
+      <div className="res-teacher-page tch-day tch-scores">
         {section === "class-sheet" ? (
           <ScoreMatrixPanel
             role="teacher"

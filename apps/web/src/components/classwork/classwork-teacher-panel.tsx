@@ -28,6 +28,12 @@ import {
 
 } from "@/lib/classwork";
 import { AppToast } from "@/components/ui/app-toast";
+import { useLocale } from "@/components/i18n/locale-provider";
+import {
+  classworkStatusLabel,
+  cwField,
+  teacherPrefix,
+} from "@/components/classwork/classwork-i18n";
 
 
 
@@ -56,58 +62,6 @@ function CwSheetIcon({ className }: { className?: string }) {
   );
 }
 
-const MODE_COPY: Record<
-  ClassworkType,
-  {
-    modeLabel: string;
-    heroSub: string;
-    newTitle: string;
-    newSub: string;
-    listTitle: string;
-    listSub: string;
-    empty: string;
-    emptyHint: string;
-    singular: string;
-    plural: string;
-    titlePlaceholder: string;
-    instructionsPlaceholder: string;
-    fileHint: string;
-  }
-> = {
-  ASSIGNMENT: {
-    modeLabel: "Homework hub",
-    heroSub: "Create, publish, and track graded homework with due dates.",
-    newTitle: "New assignment",
-    newSub: "Draft first — publish when students should start.",
-    listTitle: "Assignment queue",
-    listSub: "Open one to publish, close, or review submissions.",
-    empty: "No assignments yet",
-    emptyHint: "Post homework with instructions and an optional due date.",
-    singular: "assignment",
-    plural: "assignments",
-    titlePlaceholder: "e.g. Chapter 5 homework — cell division",
-    instructionsPlaceholder: "What should students submit? Add reading, links, or rubric notes.",
-    fileHint: "Attach a PDF brief or question sheet",
-  },
-  WORKSHEET: {
-    modeLabel: "Worksheet hub",
-    heroSub: "Create, publish, and track practice sheets for your classes.",
-    newTitle: "New worksheet",
-    newSub: "Draft first — publish when students should start.",
-    listTitle: "Worksheet queue",
-    listSub: "Open one to publish, close, or review submissions.",
-    empty: "No worksheets yet",
-    emptyHint: "Post a practice sheet with instructions and an optional due date.",
-    singular: "worksheet",
-    plural: "worksheets",
-    titlePlaceholder: "e.g. Chapter 5 worksheet — photosynthesis drill",
-    instructionsPlaceholder: "What should students complete? Add page numbers, links, or notes.",
-    fileHint: "Attach a PDF worksheet or question sheet",
-  },
-};
-
-
-
 function formatDue(dueAt: string | null | undefined): string | null {
 
   if (!dueAt) return null;
@@ -130,26 +84,39 @@ function formatDue(dueAt: string | null | undefined): string | null {
 
 
 
-function StatusBadge({ status }: { status: ClassworkStatus }) {
-
+function StatusBadge({
+  status,
+  label,
+}: {
+  status: ClassworkStatus;
+  label: string;
+}) {
   return (
-
-    <span className={`cw-status cw-status--${status.toLowerCase()}`}>
-
-      {status}
-
-    </span>
-
+    <span className={`cw-status cw-status--${status.toLowerCase()}`}>{label}</span>
   );
-
 }
 
 
 
 export function ClassworkTeacherPanel({ mode }: Props) {
-
   const router = useRouter();
-  const copy = MODE_COPY[mode];
+  const { t } = useLocale();
+  const prefix = teacherPrefix(mode);
+  const copy = {
+    modeLabel: cwField(t, prefix, "modeLabel"),
+    heroSub: cwField(t, prefix, "heroSub"),
+    newTitle: cwField(t, prefix, "newTitle"),
+    newSub: cwField(t, prefix, "newSub"),
+    listTitle: cwField(t, prefix, "listTitle"),
+    listSub: cwField(t, prefix, "listSub"),
+    empty: cwField(t, prefix, "empty"),
+    emptyHint: cwField(t, prefix, "emptyHint"),
+    singular: cwField(t, prefix, "singular"),
+    plural: cwField(t, prefix, "plural"),
+    titlePlaceholder: cwField(t, prefix, "titlePlaceholder"),
+    instructionsPlaceholder: cwField(t, prefix, "instructionsPlaceholder"),
+    fileHint: cwField(t, prefix, "fileHint"),
+  };
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -231,7 +198,7 @@ export function ClassworkTeacherPanel({ mode }: Props) {
 
       .catch((err) =>
 
-        setError(err instanceof Error ? err.message : "Load failed"),
+        setError(err instanceof Error ? err.message : t("classworkUi.loadFailed")),
 
       )
 
@@ -263,7 +230,8 @@ export function ClassworkTeacherPanel({ mode }: Props) {
 
       .catch((err) => {
 
-        if (!cancelled) setError(err instanceof Error ? err.message : "Load failed");
+        if (!cancelled)
+          setError(err instanceof Error ? err.message : t("classworkUi.loadFailed"));
 
       });
 
@@ -283,7 +251,7 @@ export function ClassworkTeacherPanel({ mode }: Props) {
 
     if (!classSubjectId || !title.trim()) {
 
-      setError("Select a class and enter a title.");
+      setError(t("classworkUi.selectClassAndTitle"));
 
       return;
 
@@ -327,7 +295,7 @@ export function ClassworkTeacherPanel({ mode }: Props) {
 
       if (fileInputRef.current) fileInputRef.current.value = "";
 
-      setSaved("Draft created.");
+      setSaved(t("classworkUi.draftCreated"));
 
       await loadItems();
 
@@ -335,7 +303,7 @@ export function ClassworkTeacherPanel({ mode }: Props) {
 
     } catch (err) {
 
-      setError(err instanceof Error ? err.message : "Create failed");
+      setError(err instanceof Error ? err.message : t("classworkUi.createFailed"));
 
     } finally {
 
@@ -355,7 +323,7 @@ export function ClassworkTeacherPanel({ mode }: Props) {
 
         <div className="cw-loading__spinner" aria-hidden />
 
-        <p>Loading your classes…</p>
+        <p>{t("classworkUi.loadingClasses")}</p>
 
       </div>
 
@@ -371,13 +339,10 @@ export function ClassworkTeacherPanel({ mode }: Props) {
 
       <div className="cw-empty">
 
-        <p className="cw-empty__title">No classes assigned yet</p>
+        <p className="cw-empty__title">{t("classworkUi.noClassesTitle")}</p>
 
         <p className="cw-empty__sub">
-
-          Ask your admin to set homeroom or subject assignments, then return here
-
-          to post {copy.plural}.
+          {t("classworkUi.noClassesSub", { items: copy.plural })}
 
         </p>
 
@@ -391,14 +356,14 @@ export function ClassworkTeacherPanel({ mode }: Props) {
 
   return (
 
-    <div className={`cw-page cw-page--${mode === "ASSIGNMENT" ? "assignment" : "worksheet"}`}>
+    <div className={`cw-page cw-page--modern cw-page--${mode === "ASSIGNMENT" ? "assignment" : "worksheet"}`}>
 
       <AppToast message={error} tone="error" onDismiss={() => setError("")} />
       <AppToast message={saved} tone="success" onDismiss={() => setSaved("")} />
 
 
 
-      <header className="cw-hero">
+      <header className="cw-hero cw-hero--day">
 
         <div className="cw-hero__main">
 
@@ -416,7 +381,7 @@ export function ClassworkTeacherPanel({ mode }: Props) {
 
           <h2 className="cw-hero__title">
 
-            {selectedClass?.label ?? "Select a class"}
+            {selectedClass?.label ?? t("classworkUi.selectClassTitle")}
 
           </h2>
 
@@ -440,7 +405,7 @@ export function ClassworkTeacherPanel({ mode }: Props) {
 
             <span className="cw-stat__value">{stats.total}</span>
 
-            <span className="cw-stat__label">Total</span>
+            <span className="cw-stat__label">{t("classworkUi.statTotal")}</span>
 
           </div>
 
@@ -448,7 +413,7 @@ export function ClassworkTeacherPanel({ mode }: Props) {
 
             <span className="cw-stat__value">{stats.published}</span>
 
-            <span className="cw-stat__label">Live</span>
+            <span className="cw-stat__label">{t("classworkUi.statLive")}</span>
 
           </div>
 
@@ -456,7 +421,7 @@ export function ClassworkTeacherPanel({ mode }: Props) {
 
             <span className="cw-stat__value">{stats.draft}</span>
 
-            <span className="cw-stat__label">Drafts</span>
+            <span className="cw-stat__label">{t("classworkUi.statDrafts")}</span>
 
           </div>
 
@@ -466,7 +431,7 @@ export function ClassworkTeacherPanel({ mode }: Props) {
 
               <span className="cw-stat__value">{stats.closed}</span>
 
-              <span className="cw-stat__label">Closed</span>
+              <span className="cw-stat__label">{t("classworkUi.statClosed")}</span>
 
             </div>
 
@@ -482,7 +447,7 @@ export function ClassworkTeacherPanel({ mode }: Props) {
 
         <label className="cw-field">
 
-          <span>Class</span>
+          <span>{t("classworkUi.classLabel")}</span>
 
           <select
 
@@ -534,7 +499,7 @@ export function ClassworkTeacherPanel({ mode }: Props) {
 
             <label className="cw-field">
 
-              <span>Title</span>
+              <span>{t("classworkUi.titleLabel")}</span>
 
               <input
 
@@ -552,7 +517,7 @@ export function ClassworkTeacherPanel({ mode }: Props) {
 
             <label className="cw-field">
 
-              <span>Due date (optional)</span>
+              <span>{t("classworkUi.dueOptional")}</span>
 
               <input
 
@@ -568,7 +533,7 @@ export function ClassworkTeacherPanel({ mode }: Props) {
 
             <label className="cw-field">
 
-              <span>Instructions</span>
+              <span>{t("classworkUi.instructions")}</span>
 
               <textarea
 
@@ -598,7 +563,7 @@ export function ClassworkTeacherPanel({ mode }: Props) {
 
                   <strong>
 
-                    {attachFile ? attachFile.name : "Choose a file"}
+                    {attachFile ? attachFile.name : t("classworkUi.chooseFile")}
 
                   </strong>
 
@@ -606,7 +571,7 @@ export function ClassworkTeacherPanel({ mode }: Props) {
 
                     ? `${(attachFile.size / 1024).toFixed(0)} KB`
 
-                    : "or drag and drop here"}
+                    : t("classworkUi.dragDrop")}
 
                 </span>
 
@@ -634,7 +599,7 @@ export function ClassworkTeacherPanel({ mode }: Props) {
 
             >
 
-              {busy ? "Saving…" : "Save as draft"}
+              {busy ? t("classworkUi.saving") : t("classworkUi.saveDraft")}
 
             </button>
 
@@ -664,18 +629,18 @@ export function ClassworkTeacherPanel({ mode }: Props) {
 
           {items.length === 0 ? (
 
-            <div className="cw-empty" style={{ padding: "1.5rem 1rem" }}>
-
+            <div className="cw-empty cw-empty--panel">
+              <div className="cw-empty__icon" aria-hidden>
+                {mode === "ASSIGNMENT" ? <CwAssignIcon /> : <CwSheetIcon />}
+              </div>
               <p className="cw-empty__title">{copy.empty}</p>
-
               <p className="cw-empty__sub">{copy.emptyHint}</p>
-
             </div>
 
           ) : (
             <>
               <p className="cw-inbox__hint">
-                Open a {copy.singular} to review submissions and grade student work.
+                {t("classworkUi.inboxHint", { item: copy.singular })}
               </p>
 
               <div className="cw-inbox">
@@ -700,16 +665,20 @@ export function ClassworkTeacherPanel({ mode }: Props) {
 
                       <span className="cw-inbox__title">{row.title}</span>
 
-                      <StatusBadge status={row.status} />
+                      <StatusBadge
+                        status={row.status}
+                        label={classworkStatusLabel(t, row.status)}
+                      />
 
                     </div>
 
                     <span className="cw-inbox__meta">
 
-                      {due ? `Due ${due}` : "No due date"}
-
+                      {due ? t("classworkUi.duePrefix", { date: due }) : t("classworkUi.noDueDate")}
                       {row.submissionCount > 0
-                        ? ` · ${row.submissionCount} submission${row.submissionCount === 1 ? "" : "s"}`
+                        ? row.submissionCount === 1
+                          ? t("classworkUi.submissionOne", { count: row.submissionCount })
+                          : t("classworkUi.submissionMany", { count: row.submissionCount })
                         : ""}
 
                     </span>

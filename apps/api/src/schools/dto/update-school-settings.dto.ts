@@ -1,5 +1,7 @@
-import { AttendanceMode, SchoolType } from '@prisma/client';
+import { AttendanceMode, SchoolType, Weekday } from '@prisma/client';
 import {
+  ArrayUnique,
+  IsArray,
   IsBoolean,
   IsEmail,
   IsEnum,
@@ -83,6 +85,13 @@ export class UpdateSchoolSettingsDto {
   @IsEnum(AttendanceMode)
   @IsOptional()
   attendanceMode?: AttendanceMode;
+
+  /** Days with no school — attendance is not expected. */
+  @IsOptional()
+  @IsArray()
+  @ArrayUnique()
+  @IsEnum(Weekday, { each: true })
+  weekendDays?: Weekday[];
 
   @IsString()
   @IsOptional()

@@ -5,17 +5,23 @@ import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AuthInput } from "@/components/auth/auth-input";
 import { LoginShell } from "@/components/auth/login-shell";
+import { useLocale } from "@/components/i18n/locale-provider";
 import { login, validateSchoolCode } from "@/lib/api";
 import { persistAuthSession } from "@/lib/auth-session";
-import { getRolePath } from "@/lib/auth";
-import { persistSchoolBrand } from "@/lib/school-brand";
+import {
+  AUTH_SCHOOL_JOIN_CODE_KEY,
+  AUTH_SCHOOL_NAME_KEY,
+  clearRememberedSchool,
+  getRolePath,
+} from "@/lib/auth";
+import { persistSchoolBrand, readSchoolBrand } from "@/lib/school-brand";
 
-const REMEMBER_SCHOOL_KEY = "campusone_remember_school";
 const REMEMBER_USER_KEY = "campusone_remember_username";
 
 type LoginStep = "school" | "credentials";
 
 export default function LoginPage() {
+  const { t } = useLocale();
   const [step, setStep] = useState<LoginStep>("school");
   const [schoolCode, setSchoolCode] = useState("");
   const [schoolName, setSchoolName] = useState("");
@@ -24,29 +30,74 @@ export default function LoginPage() {
   const [remember, setRemember] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [restoringSchool, setRestoringSchool] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
-    queueMicrotask(() => {
+    let cancelled = false;
+
+    async function restoreLastSchool() {
       try {
-        const savedSchool = localStorage.getItem(REMEMBER_SCHOOL_KEY);
         const savedUser = localStorage.getItem(REMEMBER_USER_KEY);
-        if (savedSchool) setSchoolCode(savedSchool);
         if (savedUser) {
           setUsername(savedUser);
           setRemember(true);
         }
+
+        const savedCode =
+          localStorage.getItem(AUTH_SCHOOL_JOIN_CODE_KEY)?.trim().toUpperCase() ??
+          "";
+        if (savedCode.length < 4) {
+          if (!cancelled) setRestoringSchool(false);
+          return;
+        }
+
+        const cachedName = localStorage.getItem(AUTH_SCHOOL_NAME_KEY)?.trim() ?? "";
+        const brand = readSchoolBrand();
+        if (brand) {
+          persistSchoolBrand(brand);
+        }
+
+        try {
+          const school = await validateSchoolCode(savedCode);
+          if (cancelled) return;
+          setSchoolCode(school.joinCode);
+          setSchoolName(school.name);
+          localStorage.setItem(AUTH_SCHOOL_JOIN_CODE_KEY, school.joinCode);
+          localStorage.setItem(AUTH_SCHOOL_NAME_KEY, school.name);
+          persistSchoolBrand({
+            name: school.name,
+            logoUrl: school.logoUrl ?? null,
+            primaryColor: school.primaryColor ?? null,
+            accentColor: school.accentColor ?? null,
+            accentDeep: school.accentDeep ?? null,
+          });
+          setStep("credentials");
+        } catch {
+          clearRememberedSchool();
+          if (!cancelled) {
+            setSchoolCode(savedCode);
+            if (cachedName) setSchoolName(cachedName);
+          }
+        }
       } catch {
-        /* ignore */
+        /* ignore storage errors */
+      } finally {
+        if (!cancelled) setRestoringSchool(false);
       }
-    });
+    }
+
+    void restoreLastSchool();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   async function onValidateSchool(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const code = schoolCode.trim().toUpperCase();
     if (code.length < 4) {
-      setError("Enter your school code.");
+      setError(t("auth.enterSchoolCode"));
       return;
     }
     setLoading(true);
@@ -55,6 +106,8 @@ export default function LoginPage() {
       const school = await validateSchoolCode(code);
       setSchoolCode(school.joinCode);
       setSchoolName(school.name);
+      localStorage.setItem(AUTH_SCHOOL_JOIN_CODE_KEY, school.joinCode);
+      localStorage.setItem(AUTH_SCHOOL_NAME_KEY, school.name);
       persistSchoolBrand({
         name: school.name,
         logoUrl: school.logoUrl ?? null,
@@ -78,11 +131,16 @@ export default function LoginPage() {
     try {
       const response = await login(trimmedUser, password, schoolCode);
       if (remember) {
-        localStorage.setItem(REMEMBER_SCHOOL_KEY, schoolCode.trim().toUpperCase());
         localStorage.setItem(REMEMBER_USER_KEY, trimmedUser);
       } else {
-        localStorage.removeItem(REMEMBER_SCHOOL_KEY);
         localStorage.removeItem(REMEMBER_USER_KEY);
+      }
+      if (response.school?.joinCode) {
+        localStorage.setItem(AUTH_SCHOOL_JOIN_CODE_KEY, response.school.joinCode);
+        localStorage.setItem(AUTH_SCHOOL_NAME_KEY, response.school.name);
+      } else {
+        localStorage.setItem(AUTH_SCHOOL_JOIN_CODE_KEY, schoolCode.trim().toUpperCase());
+        if (schoolName) localStorage.setItem(AUTH_SCHOOL_NAME_KEY, schoolName);
       }
       persistAuthSession(response);
       router.push(getRolePath(response.user.role));
@@ -94,9 +152,21 @@ export default function LoginPage() {
   }
 
   function backToSchoolStep() {
+    clearRememberedSchool();
     setStep("school");
+    setSchoolName("");
     setError("");
     setPassword("");
+  }
+
+  if (restoringSchool) {
+    return (
+      <LoginShell>
+        <div className="reg-form login-form">
+          <p className="login-form__lead">{t("auth.checkingSchool")}</p>
+        </div>
+      </LoginShell>
+    );
   }
 
   return (
@@ -104,14 +174,12 @@ export default function LoginPage() {
       {step === "school" ? (
         <form onSubmit={(e) => void onValidateSchool(e)} className="reg-form login-form">
           <div className="reg-form__step">
-            <h2 className="reg-form__title">Find your school</h2>
-            <p className="login-form__lead">
-              Enter your school code first. We&apos;ll verify it before you sign in.
-            </p>
+            <h2 className="reg-form__title">{t("auth.findSchool")}</h2>
+            <p className="login-form__lead">{t("auth.findSchoolLead")}</p>
             <div className="reg-form__grid reg-form__grid--single login-form__fields">
               <AuthInput
                 id="login-school"
-                label="School code"
+                label={t("auth.schoolCode")}
                 type="text"
                 icon="none"
                 variant="login"
@@ -127,7 +195,7 @@ export default function LoginPage() {
           <div className="reg-form__actions login-form__actions">
             <span />
             <button type="submit" className="reg-form__next" disabled={loading}>
-              {loading ? "Checking…" : "Continue →"}
+              {loading ? t("auth.checking") : t("auth.continueArrow")}
             </button>
           </div>
         </form>
@@ -136,24 +204,26 @@ export default function LoginPage() {
           <div className="reg-form__step">
             <div className="login-form__school-bar">
               <div>
-                <p className="login-form__school-label">School verified</p>
+                <p className="login-form__school-label">{t("auth.schoolVerified")}</p>
                 <p className="login-form__school-name">{schoolName}</p>
-                <p className="login-form__school-code">Code: {schoolCode}</p>
+                <p className="login-form__school-code">
+                  {t("auth.codeLabel", { code: schoolCode })}
+                </p>
               </div>
               <button
                 type="button"
                 className="login-form__change-school"
                 onClick={backToSchoolStep}
               >
-                Change
+                {t("auth.change")}
               </button>
             </div>
 
-            <h2 className="reg-form__title">Sign in</h2>
+            <h2 className="reg-form__title">{t("auth.loginTitle")}</h2>
             <div className="reg-form__grid reg-form__grid--single login-form__fields">
               <AuthInput
                 id="login-username"
-                label="Username"
+                label={t("auth.username")}
                 type="text"
                 icon="user"
                 variant="login"
@@ -165,12 +235,12 @@ export default function LoginPage() {
               />
               <AuthInput
                 id="login-password"
-                label="Password"
+                label={t("auth.password")}
                 type="password"
                 icon="password"
                 variant="login"
                 autoComplete="current-password"
-                placeholder="Your password"
+                placeholder="••••••••"
                 value={password}
                 onChange={setPassword}
                 required
@@ -184,10 +254,10 @@ export default function LoginPage() {
                   checked={remember}
                   onChange={(e) => setRemember(e.target.checked)}
                 />
-                <span>Remember me</span>
+                <span>{t("auth.rememberUsername")}</span>
               </label>
               <Link href="/register" className="login-form__link">
-                Create account
+                {t("auth.createAccount")}
               </Link>
             </div>
           </div>
@@ -199,10 +269,10 @@ export default function LoginPage() {
               onClick={backToSchoolStep}
               disabled={loading}
             >
-              ← Back
+              {t("auth.back")}
             </button>
             <button type="submit" className="reg-form__next" disabled={loading}>
-              {loading ? "Signing in…" : "Sign in →"}
+              {loading ? t("auth.signingIn") : t("auth.signInArrow")}
             </button>
           </div>
         </form>

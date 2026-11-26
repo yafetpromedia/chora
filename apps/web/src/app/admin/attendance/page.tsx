@@ -15,6 +15,7 @@ import {
 import { AUTH_ROLE_KEY, AUTH_TOKEN_KEY, isSchoolWorkspaceRole } from "@/lib/auth";
 import { hasPermission, Permission } from "@/lib/permissions";
 import { AppToast } from "@/components/ui/app-toast";
+import { useLocale } from "@/components/i18n/locale-provider";
 
 type Tab = "mark" | "scan";
 
@@ -40,6 +41,7 @@ function formatHeroDate(iso: string) {
 
 export default function AdminAttendancePage() {
   const router = useRouter();
+  const { t, tp } = useLocale();
   const [tab, setTab] = useState<Tab>("mark");
   const [analytics, setAnalytics] = useState<AttendanceAnalytics | null>(null);
   const [analyticsDate, setAnalyticsDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -60,7 +62,9 @@ export default function AdminAttendancePage() {
     }
     void getAttendanceAnalytics()
       .then(setAnalytics)
-      .catch((err) => setError(err instanceof Error ? err.message : "Load failed"))
+      .catch((err) =>
+        setError(err instanceof Error ? err.message : t("adminAttendanceUi.loadFailed")),
+      )
       .finally(() => setLoading(false));
   }, [router]);
 
@@ -70,7 +74,9 @@ export default function AdminAttendancePage() {
     try {
       setAnalytics(await getAttendanceAnalytics(date));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load analytics");
+      setError(
+        err instanceof Error ? err.message : t("adminAttendanceUi.analyticsLoadFailed"),
+      );
     } finally {
       setLoading(false);
     }
@@ -83,7 +89,7 @@ export default function AdminAttendancePage() {
   }, [analytics]);
 
   return (
-    <DashboardPage role="admin" title="Attendance">
+    <DashboardPage role="admin" title={tp("Attendance")}>
       <div className="att-v2">
         <AppToast message={error} tone="error" onDismiss={() => setError("")} />
         <AppToast message={toast} tone="success" onDismiss={() => setToast("")} />
@@ -92,18 +98,18 @@ export default function AdminAttendancePage() {
           <div className="att-v2__hero-glow" aria-hidden />
           <div className="att-v2__hero-inner">
             <div className="att-v2__hero-main">
-              <h2 className="att-v2__hero-title">Daily attendance</h2>
+              <h2 className="att-v2__hero-title">{t("adminAttendanceUi.heroTitle")}</h2>
               <p className="att-v2__hero-sub">
                 {tab === "mark"
-                  ? `Roll call for ${heroDate} — mark students by grade and section.`
-                  : `Scan student ID cards for ${heroDate}.`}
+                  ? t("adminAttendanceUi.heroSubMark", { date: heroDate })
+                  : t("adminAttendanceUi.heroSubScan", { date: heroDate })}
               </p>
               {analytics ? (
                 <div className="att-v2__hero-badges">
                   <span className="att-v2__badge">{heroDate}</span>
                   {analytics.todayRate != null ? (
                     <span className="att-v2__badge att-v2__badge--live">
-                      {analytics.todayRate}% rate
+                      {t("adminAttendanceUi.rateBadge", { rate: analytics.todayRate })}
                     </span>
                   ) : null}
                 </div>
@@ -118,33 +124,33 @@ export default function AdminAttendancePage() {
                       ? `${analytics.todayRate}%`
                       : "—"}
                 </strong>
-                <span>Rate</span>
+                <span>{t("adminAttendanceUi.statRate")}</span>
               </div>
               <div className="att-v2__stat">
                 <strong>{loading || !analytics ? "—" : analytics.presentToday}</strong>
-                <span>Present</span>
+                <span>{t("common.present")}</span>
               </div>
               <div className="att-v2__stat">
                 <strong>{loading || !analytics ? "—" : analytics.absentToday}</strong>
-                <span>Absent</span>
+                <span>{t("common.absent")}</span>
               </div>
               <div className="att-v2__stat att-v2__stat--accent">
                 <strong>{loading || !analytics ? "—" : markedLabel}</strong>
-                <span>Marked</span>
+                <span>{t("adminAttendanceUi.statMarked")}</span>
               </div>
             </div>
           </div>
         </header>
 
         <div className="att-v2__toolbar">
-          <nav className="att-v2__tabs" aria-label="Attendance">
+          <nav className="att-v2__tabs" aria-label={t("adminAttendanceUi.tabsAria")}>
             <button
               type="button"
               className={`att-v2__tab${tab === "mark" ? " att-v2__tab--active" : ""}`}
               onClick={() => setTab("mark")}
             >
               <DashIcon name="attendance" className="dash-icon--sm" />
-              Mark manually
+              {t("adminAttendanceUi.tabMark")}
             </button>
             <button
               type="button"
@@ -152,17 +158,17 @@ export default function AdminAttendancePage() {
               onClick={() => setTab("scan")}
             >
               <DashIcon name="students" className="dash-icon--sm" />
-              Scan QR
+              {t("adminAttendanceUi.tabScan")}
             </button>
             <Link href="/admin/settings" className="att-v2__tab att-v2__tab--link">
               <DashIcon name="settings" className="dash-icon--sm" />
-              Settings
+              {t("adminAttendanceUi.tabSettings")}
             </Link>
           </nav>
 
           <label className="att-v2__date">
             <DashIcon name="calendar" className="dash-icon--sm" />
-            <span className="att-v2__date-label">View date</span>
+            <span className="att-v2__date-label">{t("adminAttendanceUi.viewDate")}</span>
             <input
               type="date"
               value={analyticsDate}
@@ -174,7 +180,7 @@ export default function AdminAttendancePage() {
         {hasPermission(Permission.ATTENDANCE_ANALYTICS) ? (
           <div className="att-v2__toolbar att-v2__toolbar--export">
             <label className="att-v2__date">
-              <span className="att-v2__date-label">Export from</span>
+              <span className="att-v2__date-label">{t("adminAttendanceUi.exportFrom")}</span>
               <input
                 type="date"
                 value={exportFrom}
@@ -182,7 +188,7 @@ export default function AdminAttendancePage() {
               />
             </label>
             <label className="att-v2__date">
-              <span className="att-v2__date-label">Export to</span>
+              <span className="att-v2__date-label">{t("adminAttendanceUi.exportTo")}</span>
               <input
                 type="date"
                 value={exportTo}
@@ -196,14 +202,16 @@ export default function AdminAttendancePage() {
               onClick={() => {
                 setExportBusy(true);
                 void downloadAttendanceExport(exportFrom, exportTo)
-                  .then(() => setToast("Attendance CSV downloaded"))
+                  .then(() => setToast(t("adminAttendanceUi.exportSuccess")))
                   .catch((err) =>
-                    setError(err instanceof Error ? err.message : "Export failed"),
+                    setError(
+                      err instanceof Error ? err.message : t("adminAttendanceUi.exportFailed"),
+                    ),
                   )
                   .finally(() => setExportBusy(false));
               }}
             >
-              {exportBusy ? "Exporting…" : "Export CSV"}
+              {exportBusy ? t("adminAttendanceUi.exporting") : t("adminAttendanceUi.exportCsv")}
             </button>
           </div>
         ) : null}

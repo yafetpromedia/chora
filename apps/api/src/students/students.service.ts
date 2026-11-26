@@ -14,6 +14,7 @@ import { CreateStudentDto } from './dto/create-student.dto';
 import { UpdateStudentDto } from './dto/update-student.dto';
 import {
   buildCardScanPayload,
+  buildStudentCardPublicResultsUrl,
   buildStudentPortalEmail,
   generateSchoolStudentId,
   generateStudentCardCode,
@@ -1585,6 +1586,10 @@ export class StudentsService {
       studentProfileId: profile.id,
       cardCode,
       scanPayload: buildCardScanPayload(cardCode),
+      publicResultsUrl: buildStudentCardPublicResultsUrl(
+        school.joinCode,
+        cardCode,
+      ),
       name,
       firstName: profile.user.firstName,
       lastName: profile.user.lastName,

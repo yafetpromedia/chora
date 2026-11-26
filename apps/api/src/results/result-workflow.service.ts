@@ -3,9 +3,11 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { ResultWorkflowStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { EmailService } from '../email/email.service';
 import { TeacherScopeService } from '../teachers/teacher-scope.service';
 
 @Injectable()
@@ -13,6 +15,7 @@ export class ResultWorkflowService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly teacherScope: TeacherScopeService,
+    @Optional() private readonly email?: EmailService,
   ) {}
 
   async getOrCreateSheet(
@@ -663,6 +666,7 @@ export class ResultWorkflowService {
         `${s.user.firstName} ${s.user.lastName}`.trim(),
       ]),
     );
+    const firstById = new Map(students.map((s) => [s.id, s.user.firstName]));
     const subjectName = cs.subject.name;
     const termName = term?.name ?? 'this term';
 
@@ -680,6 +684,29 @@ export class ResultWorkflowService {
           };
         }),
     });
+
+    const emailLinks = links.filter((link) => allowedIds.has(link.studentId));
+    try {
+      await this.email?.notifyParents({
+        schoolId,
+        preference: 'examinationEnabled',
+        category: 'results_published',
+        templateId: 'results_published',
+        messages: emailLinks.map((link) => {
+          const child = firstById.get(link.studentId) ?? 'your child';
+          return {
+            parentId: link.parentId,
+            idempotencyKey: `results:${schoolId}:${classSubjectId}:${termId}:${link.studentId}:${link.parentId}`,
+            vars: {
+              childName: child,
+              message: `${subjectName} results for ${child} are published (${termName}).`,
+            },
+          };
+        }),
+      });
+    } catch {
+      // In-app result notice is already stored.
+    }
   }
 
   /**
@@ -773,11 +800,11 @@ export class ResultWorkflowService {
         `${s.user.firstName} ${s.user.lastName}`.trim(),
       ]),
     );
+    const firstById = new Map(students.map((s) => [s.id, s.user.firstName]));
+    const emailLinks = links.filter((link) => allowedIds.has(link.studentId));
 
     await this.prisma.parentNotification.createMany({
-      data: links
-        .filter((link) => allowedIds.has(link.studentId))
-        .map((link) => {
+      data: emailLinks.map((link) => {
           const info = byStudent.get(link.studentId);
           const child = nameById.get(link.studentId) ?? 'your child';
           const subjects = info ? [...info.subjects].sort() : [];
@@ -797,6 +824,34 @@ export class ResultWorkflowService {
           };
         }),
     });
+
+    try {
+      await this.email?.notifyParents({
+        schoolId,
+        preference: 'examinationEnabled',
+        category: 'results_published',
+        templateId: 'results_published',
+        messages: emailLinks.map((link) => {
+          const child = firstById.get(link.studentId) ?? 'your child';
+          const info = byStudent.get(link.studentId);
+          const subjects = info ? [...info.subjects].sort() : [];
+          const subjectLabel =
+            subjects.length <= 3
+              ? subjects.join(', ')
+              : `${subjects.slice(0, 3).join(', ')} and ${subjects.length - 3} more`;
+          return {
+            parentId: link.parentId,
+            idempotencyKey: `results-bulk:${schoolId}:${link.studentId}:${link.parentId}:${subjects.join('|')}`,
+            vars: {
+              childName: child,
+              message: `${subjectLabel || 'Subject'} results for ${child} are published.`,
+            },
+          };
+        }),
+      });
+    } catch {
+      // In-app result notice is already stored.
+    }
   }
 
   private async notifyParentsOfStudentResultsPublish(
@@ -838,6 +893,31 @@ export class ResultWorkflowService {
         body,
       })),
     });
+
+    const childFirst = student.user.firstName;
+    try {
+      await this.email?.notifyParents({
+        schoolId,
+        preference: options.reportCardReady
+          ? 'reportCardEnabled'
+          : 'examinationEnabled',
+        category: options.reportCardReady ? 'report_card' : 'results_published',
+        templateId: options.reportCardReady ? 'report_card' : 'results_published',
+        messages: links.map((link) => ({
+          parentId: link.parentId,
+          idempotencyKey: `results-student:${schoolId}:${studentProfileId}:${termName}:${options.reportCardReady ? 'card' : 'scores'}:${link.parentId}`,
+          vars: {
+            childName: childFirst,
+            termName,
+            message: options.reportCardReady
+              ? `${termName} results for ${childFirst} are published. The report card is available in Chora.`
+              : `${termName} results for ${childFirst} were published.`,
+          },
+        })),
+      });
+    } catch {
+      // In-app result notice is already stored.
+    }
   }
 
   private formatSheet(sheet: {

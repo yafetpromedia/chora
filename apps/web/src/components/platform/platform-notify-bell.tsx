@@ -8,6 +8,7 @@ import {
   type MouseEvent,
 } from "react";
 import { DashIcon } from "@/components/dashboard/dash-icons";
+import { useLocale } from "@/components/i18n/locale-provider";
 import {
   canAccessPlatformSection,
   hasPlatformPermission,
@@ -77,6 +78,7 @@ type Props = {
 };
 
 export function PlatformNotifyBell({ user, onOpenSection }: Props) {
+  const { t, locale } = useLocale();
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -119,7 +121,7 @@ export function PlatformNotifyBell({ user, onOpenSection }: Props) {
               (row): AlertItem => ({
                 id: `payment:${row.id}`,
                 kind: "payment",
-                title: `Receipt · ${row.invoiceNumber}`,
+                title: t("platformUi.notifyReceiptTitle", { invoice: row.invoiceNumber }),
                 body: `${row.schoolName} · ${row.method.replace(/_/g, " ")} · ${row.transactionId}`,
                 createdAt: row.createdAt,
                 section: "invoices",
@@ -136,8 +138,11 @@ export function PlatformNotifyBell({ user, onOpenSection }: Props) {
               (row): AlertItem => ({
                 id: `concern-school:${row.schoolId}`,
                 kind: "concern",
-                title: `${row.openCount} attendance concern${row.openCount === 1 ? "" : "s"}`,
-                body: `${row.schoolName} · resolve in school portal`,
+                title: t("platformUi.notifyConcernTitle", {
+                  count: row.openCount,
+                  s: row.openCount === 1 ? "" : "s",
+                }),
+                body: t("platformUi.notifyConcernBody", { school: row.schoolName }),
                 createdAt: row.latestAt ?? new Date().toISOString(),
                 section: "schools",
               }),
@@ -161,7 +166,7 @@ export function PlatformNotifyBell({ user, onOpenSection }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [canNotify, canSupport, canBilling, canSchools]);
+  }, [canNotify, canSupport, canBilling, canSchools, t]);
 
   useEffect(() => {
     if (!user || !canNotify) return;
@@ -232,14 +237,15 @@ export function PlatformNotifyBell({ user, onOpenSection }: Props) {
               <p className="dash-notify-title">{item.title}</p>
               <p className="dash-notify-body">{item.body}</p>
               <p className="dash-notify-time">
-                Tap to open · {new Date(item.createdAt).toLocaleString()}
+                {t("shell.tapToOpenDot")}
+                {new Date(item.createdAt).toLocaleString(locale === "am" ? "am-ET" : undefined)}
               </p>
             </button>
             <button
               type="button"
               className="dash-notify-dismiss"
-              aria-label={`Dismiss ${item.title}`}
-              title="Dismiss for today"
+              aria-label={t("shell.dismissAlert", { label: item.title })}
+              title={t("shell.dismissForToday")}
               onClick={(e) => dismissAlert(item, e)}
             >
               ×
@@ -257,8 +263,10 @@ export function PlatformNotifyBell({ user, onOpenSection }: Props) {
         className="dash-notify"
         title={
           badgeCount > 0
-            ? `${badgeCount} notification${badgeCount === 1 ? "" : "s"}`
-            : "Notifications"
+            ? badgeCount === 1
+              ? t("shell.notificationCountOne")
+              : t("shell.notificationsCount", { count: badgeCount })
+            : t("common.notifications")
         }
         onClick={() => void toggle()}
       >
@@ -270,42 +278,42 @@ export function PlatformNotifyBell({ user, onOpenSection }: Props) {
         ) : null}
       </button>
       {open ? (
-        <section className="dash-notify-panel" aria-label="Notifications">
+        <section className="dash-notify-panel" aria-label={t("common.notifications")}>
           <header className="dash-notify-head">
-            <h2>Notifications</h2>
+            <h2>{t("common.notifications")}</h2>
             <button
               type="button"
               className="dash-notify-mark-all"
               onClick={dismissAll}
               disabled={visible.length === 0}
             >
-              Dismiss all
+              {t("platformUi.notifyDismissAll")}
             </button>
           </header>
           {loading ? (
-            <p className="dash-notify-empty">Loading…</p>
+            <p className="dash-notify-empty">{t("common.loading")}</p>
           ) : visible.length === 0 ? (
-            <p className="dash-notify-empty">No notifications yet.</p>
+            <p className="dash-notify-empty">{t("common.noNotifications")}</p>
           ) : (
             <>
               {paymentItems.length > 0 ? (
                 <>
-                  <p className="dash-notify-section">Payment receipts</p>
+                  <p className="dash-notify-section">{t("platformUi.notifyPaymentReceipts")}</p>
                   {renderList(paymentItems)}
                 </>
               ) : null}
               {supportItems.length > 0 ? (
                 <>
-                  <p className="dash-notify-section">Support inbox</p>
+                  <p className="dash-notify-section">{t("platformUi.notifySupportInbox")}</p>
                   {renderList(supportItems)}
                 </>
               ) : null}
               {concernItems.length > 0 ? (
                 <>
-                  <p className="dash-notify-section">Attendance concerns</p>
+                  <p className="dash-notify-section">{t("platformUi.notifyAttendanceConcerns")}</p>
                   {renderList(concernItems)}
                   <p className="dash-notify-empty" style={{ paddingTop: 0 }}>
-                    Homeroom / school admin resolve these in the school portal.
+                    {t("platformUi.notifyConcernsHint")}
                   </p>
                 </>
               ) : null}

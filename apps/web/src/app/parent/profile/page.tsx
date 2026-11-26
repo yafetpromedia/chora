@@ -3,12 +3,15 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { DashboardPage } from "@/components/dashboard/dashboard-page";
+import { useLocale } from "@/components/i18n/locale-provider";
+import { ParentEmailPreferences } from "@/components/parent/parent-email-preferences";
 import { ParentLinkedChildren } from "@/components/parent/parent-linked-children";
 import { UserProfilePanel } from "@/components/profile/user-profile-panel";
 import { AUTH_ROLE_KEY, AUTH_TOKEN_KEY } from "@/lib/auth";
 
 export default function ParentProfilePage() {
   const router = useRouter();
+  const { t } = useLocale();
 
   useEffect(() => {
     if (!localStorage.getItem(AUTH_TOKEN_KEY)) {
@@ -23,11 +26,12 @@ export default function ParentProfilePage() {
   return (
     <DashboardPage
       role="parent"
-      title="My profile"
-      subtitle="Your account and linked children"
+      title={t("pages.parentProfile.title")}
+      subtitle={t("pages.parentProfile.subtitle")}
     >
       <div className="par-portal-stack">
         <UserProfilePanel />
+        <ParentEmailPreferences />
         <ParentLinkedChildren />
       </div>
     </DashboardPage>

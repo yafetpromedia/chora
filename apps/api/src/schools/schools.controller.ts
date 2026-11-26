@@ -83,6 +83,7 @@ export class SchoolsController {
       accentColor: dto.accentColor,
       accentDeep: dto.accentDeep,
       attendanceMode: dto.attendanceMode,
+      weekendDays: dto.weekendDays,
       bankName: dto.bankName,
       bankAccountHolder: dto.bankAccountHolder,
       bankAccountNumber: dto.bankAccountNumber,

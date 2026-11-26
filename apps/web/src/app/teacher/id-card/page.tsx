@@ -22,8 +22,8 @@ export default function TeacherIdCardPage() {
   return (
     <DashboardPage
       role="teacher"
-      title="Faculty ID card"
-      subtitle="Official campus identification for staff"
+      title="Staff ID card"
+      subtitle="Official staff identification for your school"
     >
       <TeacherIdCardPanel />
     </DashboardPage>

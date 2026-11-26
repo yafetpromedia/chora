@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { BarChart } from "@/components/dashboard/staff-dashboard-shared";
+import { useLocale } from "@/components/i18n/locale-provider";
 import { AppToast } from "@/components/ui/app-toast";
 import {
   STAFF_DEPARTMENT_LABELS,
@@ -25,6 +26,7 @@ function today() {
 }
 
 export function StaffAttendanceAnalyticsPanel() {
+  const { t, tn } = useLocale();
   const [from, setFrom] = useState(monthStart);
   const [to, setTo] = useState(today);
   const [department, setDepartment] = useState<StaffDepartment | "">("");
@@ -45,7 +47,9 @@ export function StaffAttendanceAnalyticsPanel() {
         }),
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load analytics");
+      setError(
+        err instanceof Error ? err.message : t("staffAttendanceAnalyticsUi.loadFailed"),
+      );
     } finally {
       setLoading(false);
     }
@@ -79,13 +83,22 @@ export function StaffAttendanceAnalyticsPanel() {
   );
   const trendRows = useMemo(
     () =>
-      (data?.trend ?? []).map((t) => ({
-        label: t.date.slice(5),
-        value: t.present + t.late,
+      (data?.trend ?? []).map((tRow) => ({
+        label: tRow.date.slice(5),
+        value: tRow.present + tRow.late,
         color: "var(--brand-teal)",
       })),
     [data?.trend],
   );
+
+  const statLabels = {
+    Rate: t("staffAttendanceAnalyticsUi.rate"),
+    Present: t("staffAttendanceAnalyticsUi.present"),
+    Late: t("staffAttendanceAnalyticsUi.late"),
+    Absent: t("staffAttendanceAnalyticsUi.absent"),
+    "On leave": t("staffAttendanceAnalyticsUi.onLeave"),
+    "OT minutes": t("staffAttendanceAnalyticsUi.otMin"),
+  } as const;
 
   return (
     <div className="sa-page">
@@ -96,16 +109,15 @@ export function StaffAttendanceAnalyticsPanel() {
         <div className="tch-v2__hero-glow" aria-hidden />
         <div className="tch-v2__hero-inner">
           <div className="tch-v2__hero-main">
-            <span className="tch-v2__chip">Analytics</span>
-            <h2 className="tch-v2__hero-title">Staff attendance analytics</h2>
+            <span className="tch-v2__chip">{t("staffAttendanceAnalyticsUi.chip")}</span>
+            <h2 className="tch-v2__hero-title">{t("staffAttendanceAnalyticsUi.title")}</h2>
             <p className="tch-v2__hero-sub">
-              Rates exclude approved leave from the denominator. Rankings are
-              administrative reports only. Back to{" "}
+              {t("staffAttendanceAnalyticsUi.heroSub")}
               <Link
                 href="/admin/staff-attendance"
                 className="tch-v2__hero-link"
               >
-                Staff Attendance
+                {tn("Staff Attendance")}
               </Link>
               .
             </p>
@@ -115,21 +127,21 @@ export function StaffAttendanceAnalyticsPanel() {
               <strong>
                 {loading || data?.rate == null ? "—" : `${data.rate}%`}
               </strong>
-              <span>Rate</span>
+              <span>{t("staffAttendanceAnalyticsUi.rate")}</span>
             </div>
             <div className="tch-v2__stat">
               <strong>{loading || c == null ? "—" : c.present}</strong>
-              <span>Present</span>
+              <span>{t("staffAttendanceAnalyticsUi.present")}</span>
             </div>
             <div className="tch-v2__stat">
               <strong>{loading || c == null ? "—" : c.absent}</strong>
-              <span>Absent</span>
+              <span>{t("staffAttendanceAnalyticsUi.absent")}</span>
             </div>
             <div className="tch-v2__stat tch-v2__stat--accent">
               <strong>
                 {loading || data == null ? "—" : data.overtimeMinutes}
               </strong>
-              <span>OT min</span>
+              <span>{t("staffAttendanceAnalyticsUi.otMin")}</span>
             </div>
           </div>
         </div>
@@ -145,34 +157,36 @@ export function StaffAttendanceAnalyticsPanel() {
               to,
               department: department || undefined,
             })
-              .then(() => setToast("Payroll hours exported"))
+              .then(() => setToast(t("staffAttendanceAnalyticsUi.exportOk")))
               .catch((err) =>
-                setError(err instanceof Error ? err.message : "Export failed"),
+                setError(
+                  err instanceof Error ? err.message : t("staffAttendanceAnalyticsUi.exportFailed"),
+                ),
               )
           }
         >
-          Export payroll hours
+          {t("staffAttendanceAnalyticsUi.exportPayroll")}
         </button>
       </div>
 
       <div className="sa-toolbar">
         <label className="sa-field">
-          <span>From</span>
+          <span>{t("staffAttendanceAnalyticsUi.from")}</span>
           <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
         </label>
         <label className="sa-field">
-          <span>To</span>
+          <span>{t("staffAttendanceAnalyticsUi.to")}</span>
           <input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
         </label>
         <label className="sa-field">
-          <span>Department</span>
+          <span>{t("staffAttendanceAnalyticsUi.department")}</span>
           <select
             value={department}
             onChange={(e) =>
               setDepartment(e.target.value as StaffDepartment | "")
             }
           >
-            <option value="">All</option>
+            <option value="">{t("common.all")}</option>
             {Object.entries(STAFF_DEPARTMENT_LABELS).map(([k, v]) => (
               <option key={k} value={k}>
                 {v}
@@ -194,7 +208,7 @@ export function StaffAttendanceAnalyticsPanel() {
           ] as const
         ).map(([label, value, tone]) => (
           <div key={label} className={`sa-stat sa-stat--${tone}`}>
-            <span className="sa-stat__label">{label}</span>
+            <span className="sa-stat__label">{statLabels[label]}</span>
             <strong className="sa-stat__value">
               {loading || value == null ? "—" : value}
             </strong>
@@ -203,22 +217,25 @@ export function StaffAttendanceAnalyticsPanel() {
       </div>
 
       <p className="sa-hours-note">
-        Worked {formatWorkedHours(data?.workedMinutes ?? null)} · Late total{" "}
-        {data?.lateMinutes ?? 0} min · Leave days {data?.leaveDays ?? 0}
+        {t("staffAttendanceAnalyticsUi.hoursNote", {
+          worked: formatWorkedHours(data?.workedMinutes ?? null),
+          late: data?.lateMinutes ?? 0,
+          leave: data?.leaveDays ?? 0,
+        })}
       </p>
 
       <div className="sa-analytics-charts">
         <section className="sa-analytics-chart">
-          <h3>Attendance trend (present + late)</h3>
-          <BarChart rows={trendRows} emptyText="No trend data in range." />
+          <h3>{t("staffAttendanceAnalyticsUi.trendTitle")}</h3>
+          <BarChart rows={trendRows} emptyText={t("staffAttendanceAnalyticsUi.trendEmpty")} />
         </section>
         <section className="sa-analytics-chart">
-          <h3>Most late (minutes)</h3>
-          <BarChart rows={lateRows} emptyText="No lateness in range." />
+          <h3>{t("staffAttendanceAnalyticsUi.mostLateTitle")}</h3>
+          <BarChart rows={lateRows} emptyText={t("staffAttendanceAnalyticsUi.mostLateEmpty")} />
         </section>
         <section className="sa-analytics-chart">
-          <h3>Most absent (days)</h3>
-          <BarChart rows={absentRows} emptyText="No absences in range." />
+          <h3>{t("staffAttendanceAnalyticsUi.mostAbsentTitle")}</h3>
+          <BarChart rows={absentRows} emptyText={t("staffAttendanceAnalyticsUi.mostAbsentEmpty")} />
         </section>
       </div>
     </div>

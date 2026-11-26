@@ -8,13 +8,8 @@ import {
   type LibrarySection,
 } from "@/components/library/library-hub";
 import { AUTH_ROLE_KEY, AUTH_TOKEN_KEY } from "@/lib/auth";
+import { useLocale } from "@/components/i18n/locale-provider";
 import { hasPermission, Permission } from "@/lib/permissions";
-
-const SUBTITLES: Record<LibrarySection, string> = {
-  main: "Browse books, notes, exams, and videos for your classes",
-  progress: "Track uploads waiting for approval and materials you published",
-  ai: "Summarize, quiz, and translate your library materials",
-};
 
 type Props = {
   section: LibrarySection;
@@ -22,6 +17,13 @@ type Props = {
 
 export function TeacherLibraryPage({ section }: Props) {
   const router = useRouter();
+  const { t } = useLocale();
+  const subtitle =
+    section === "main"
+      ? t("pages.teacherLibrary.subtitleMain")
+      : section === "progress"
+        ? t("pages.teacherLibrary.subtitleProgress")
+        : t("pages.teacherLibrary.subtitleAi");
   const hydrated = useSyncExternalStore(
     () => () => {},
     () => true,
@@ -40,8 +42,12 @@ export function TeacherLibraryPage({ section }: Props) {
   }, [router]);
 
   return (
-    <DashboardPage role="teacher" title="eLibrary" subtitle={SUBTITLES[section]}>
-      <LibraryHubView role="teacher" canUpload={canUpload} librarySection={section} />
+    <DashboardPage role="teacher" title={t("pages.teacherLibrary.title")} subtitle={subtitle}>
+      <LibraryHubView
+        role="teacher"
+        canUpload={canUpload}
+        librarySection={section}
+      />
     </DashboardPage>
   );
 }

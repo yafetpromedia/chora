@@ -24,6 +24,7 @@ import {
   type Subject,
 } from "@/lib/results";
 import { AUTH_ROLE_KEY, AUTH_TOKEN_KEY, isSchoolWorkspaceRole } from "@/lib/auth";
+import { useLocale } from "@/components/i18n/locale-provider";
 
 type AssignView = "class" | "teacher";
 
@@ -42,6 +43,7 @@ function assignClassHref(cs: ClassSubject, teacherId?: string) {
 }
 
 export function SubjectAssignmentContent() {
+  const { t, tp, tn } = useLocale();
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -74,6 +76,16 @@ export function SubjectAssignmentContent() {
 
   const highlightTeacher = teachers.find((t) => t.userId === highlightTeacherId);
   const assignedCount = assignments.filter((a) => a.teacher?.id).length;
+
+  const sectionSubjectCounts = useMemo(() => {
+    const map = new Map<string, number>();
+    if (!gradeId) return map;
+    for (const cs of allClassSubjects) {
+      if (cs.grade.id !== gradeId || !cs.section?.id) continue;
+      map.set(cs.section.id, (map.get(cs.section.id) ?? 0) + 1);
+    }
+    return map;
+  }, [allClassSubjects, gradeId]);
 
   const fetchAssignments = useCallback(async (): Promise<
     ClassSubjectAssignment[] | null
@@ -129,7 +141,7 @@ export function SubjectAssignmentContent() {
           .then(setAllClassSubjects)
           .catch(() => setAllClassSubjects([]));
       })
-      .catch((err) => setError(err instanceof Error ? err.message : "Load failed"))
+      .catch((err) => setError(err instanceof Error ? err.message : t("subjectAssignUi.loadFailed")))
       .finally(() => setLoading(false));
   }, [router, searchParams]);
 
@@ -141,7 +153,7 @@ export function SubjectAssignmentContent() {
         if (!cancelled && list) setAssignments(list);
       })
       .catch((err) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : "Load failed");
+        if (!cancelled) setError(err instanceof Error ? err.message : t("subjectAssignUi.loadFailed"));
       });
     return () => {
       cancelled = true;
@@ -169,9 +181,7 @@ export function SubjectAssignmentContent() {
         teacherId: teacherId || null,
       });
       setSaved(
-        teacherId
-          ? "Teacher assigned."
-          : "Subject removed from teacher.",
+        teacherId ? t("subjectAssignUi.teacherAssigned") : t("subjectAssignUi.teacherRemoved"),
       );
       await loadAssignments();
       if (academicYearId) {
@@ -179,14 +189,14 @@ export function SubjectAssignmentContent() {
         setAllClassSubjects(all);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Save failed");
+      setError(err instanceof Error ? err.message : t("subjectAssignUi.saveFailed"));
     } finally {
       setBusyId("");
     }
   }
 
   function openRemoveDialog(classSubjectId: string, subjectName: string) {
-    const gradeLabel = selectedGrade?.name ?? "this class";
+    const gradeLabel = selectedGrade?.name ?? t("subjectAssignUi.thisClass");
     const sectionLabel = sectionId
       ? selectedGrade?.sections.find((s) => s.id === sectionId)?.name
       : null;
@@ -205,7 +215,7 @@ export function SubjectAssignmentContent() {
     setBusyId(removeTarget.id);
     try {
       await deleteClassSubject(removeTarget.id);
-      setSaved(`${removeTarget.subjectName} removed from class.`);
+      setSaved(t("subjectAssignUi.removedFromClass", { name: removeTarget.subjectName }));
       setRemoveTarget(null);
       await loadAssignments();
       if (academicYearId) {
@@ -213,7 +223,7 @@ export function SubjectAssignmentContent() {
         setAllClassSubjects(all);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Remove failed");
+      setError(err instanceof Error ? err.message : t("subjectAssignUi.removeFailed"));
     } finally {
       setBusyId("");
     }
@@ -224,20 +234,20 @@ export function SubjectAssignmentContent() {
     setSaved("");
     try {
       await updateClassSubject(classSubjectId, { weeklySessions });
-      setSaved("Saved.");
+      setSaved(t("subjectAssignUi.saved"));
       await loadAssignments();
       if (academicYearId) {
         const all = await listClassSubjects(academicYearId);
         setAllClassSubjects(all);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Save failed");
+      setError(err instanceof Error ? err.message : t("subjectAssignUi.saveFailed"));
     }
   }
 
   async function onAddSubject() {
     if (!gradeId || !addSubjectId) {
-      setError("Select a class and subject.");
+      setError(t("subjectAssignUi.selectClassSubject"));
       return;
     }
     let yearId = academicYearId;
@@ -247,12 +257,12 @@ export function SubjectAssignmentContent() {
         yearId = year.id;
         setAcademicYearId(yearId);
       } catch {
-        setError("Could not resolve academic year.");
+        setError(t("subjectAssignUi.yearFailed"));
         return;
       }
     }
     if (hasSections && !sectionId) {
-      setError("Select a section for this class.");
+      setError(t("subjectAssignUi.selectSection"));
       return;
     }
     setError("");
@@ -264,12 +274,12 @@ export function SubjectAssignmentContent() {
         gradeId,
         sectionId: sectionId || undefined,
       });
-      setSaved("Subject added.");
+      setSaved(t("subjectAssignUi.subjectAdded"));
       await loadAssignments();
       const all = await listClassSubjects(yearId);
       setAllClassSubjects(all);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Add failed");
+      setError(err instanceof Error ? err.message : t("subjectAssignUi.addFailed"));
     }
   }
 
@@ -308,21 +318,28 @@ export function SubjectAssignmentContent() {
   const readyToView = !hasSections || Boolean(sectionId);
 
   return (
-    <DashboardPage role="admin" title="Subject assignment">
+    <DashboardPage role="admin" title={tp("Subject assignment")}>
       <div className="acad-page acad-page--assign sub-assign">
         <AppToast message={error} tone="error" onDismiss={() => setError("")} />
         <AppToast message={saved} tone="success" onDismiss={() => setSaved("")} />
         <AppConfirmDialog
           open={Boolean(removeTarget)}
           tone="danger"
-          title={`Remove ${removeTarget?.subjectName ?? "subject"} from class?`}
+          title={
+            removeTarget
+              ? t("subjectAssignUi.removeTitle", { name: removeTarget.subjectName })
+              : t("subjectAssignUi.removeTitle", { name: "" })
+          }
           message={
             removeTarget
-              ? `This will unlink ${removeTarget.subjectName} from ${removeTarget.classLabel}. Draft scores and assessments for this class will also be deleted.`
+              ? t("subjectAssignUi.removeMessageDraft", {
+                  subject: removeTarget.subjectName,
+                  classLabel: removeTarget.classLabel,
+                })
               : ""
           }
-          confirmLabel="Remove subject"
-          cancelLabel="Keep subject"
+          confirmLabel={t("subjectAssignUi.confirmRemove")}
+          cancelLabel={t("subjectAssignUi.cancelKeep")}
           busy={Boolean(removeTarget && busyId === removeTarget.id)}
           onCancel={() => {
             if (busyId) return;
@@ -333,8 +350,8 @@ export function SubjectAssignmentContent() {
 
         {subjects.length === 0 ? (
           <div className="sub-assign__notice">
-            No subjects in catalog.{" "}
-            <Link href="/admin/subjects">Add subjects first</Link>.
+            {t("subjectAssignUi.noCatalog")}{" "}
+            <Link href="/admin/subjects">{t("subjectAssignUi.addSubjectsLink")}</Link>.
           </div>
         ) : null}
 
@@ -343,40 +360,38 @@ export function SubjectAssignmentContent() {
             <Link
               href="/admin/academics"
               className="sub-assign__back"
-              aria-label="Back to Academics"
+              aria-label={t("subjectAssignUi.backAcademics")}
             >
               <DashIcon name="chevron" className="dash-icon--xs" />
-              Academics
+              {t("subjectAssignUi.academics")}
             </Link>
-            <h2 className="sub-assign__title">Subject assignment</h2>
-            <p className="sub-assign__subtitle">
-              Choose a class, assign teachers, or review who teaches what.
-            </p>
+            <h2 className="sub-assign__title">{t("subjectAssignUi.title")}</h2>
+            <p className="sub-assign__subtitle">{t("subjectAssignUi.subtitle")}</p>
           </div>
           <p className="sub-assign__summary">
             <span>
-              <strong>{allClassSubjects.length}</strong> links
+              <strong>{allClassSubjects.length}</strong> {t("subjectAssignUi.links")}
             </span>
             <span>
               <strong>
                 {allClassSubjects.filter((cs) => cs.teacher?.id).length}
               </strong>{" "}
-              assigned
+              {t("subjectAssignUi.assigned")}
             </span>
             <span>
-              <strong>{teachers.length}</strong> teachers
+              <strong>{teachers.length}</strong> {t("subjectAssignUi.teachers")}
             </span>
           </p>
           {highlightTeacher ? (
             <div className="sub-assign__focus-chip">
-              <span>Focused</span>
+              <span>{t("subjectAssignUi.focused")}</span>
               <strong>{displayName(highlightTeacher)}</strong>
               <button
                 type="button"
                 className="sub-assign__focus-clear"
                 onClick={() => setHighlightTeacherId("")}
               >
-                Clear
+                {t("subjectAssignUi.clear")}
               </button>
             </div>
           ) : null}
@@ -387,7 +402,7 @@ export function SubjectAssignmentContent() {
             <div
               className="sub-assign__segment"
               role="tablist"
-              aria-label="Assignment view"
+              aria-label={t("subjectAssignUi.assignmentView")}
             >
               <button
                 type="button"
@@ -396,7 +411,7 @@ export function SubjectAssignmentContent() {
                 className={`sub-assign__segment-btn${view === "class" ? " sub-assign__segment-btn--active" : ""}`}
                 onClick={() => setView("class")}
               >
-                By class
+                {t("subjectAssignUi.byClass")}
               </button>
               <button
                 type="button"
@@ -405,18 +420,18 @@ export function SubjectAssignmentContent() {
                 className={`sub-assign__segment-btn${view === "teacher" ? " sub-assign__segment-btn--active" : ""}`}
                 onClick={() => setView("teacher")}
               >
-                By teacher
+                {t("subjectAssignUi.byTeacher")}
               </button>
             </div>
 
             {view === "class" ? (
               <div className="sub-assign__bar-controls">
                 <label className="sub-assign__control">
-                  <span>Grade</span>
+                  <span>{t("subjectAssignUi.grade")}</span>
                   <select
                     value={gradeId}
                     onChange={(e) => selectGrade(e.target.value)}
-                    aria-label="Select grade"
+                    aria-label={t("subjectAssignUi.selectGradeAria")}
                   >
                     {grades.map((g) => (
                       <option key={g.id} value={g.id}>
@@ -426,38 +441,65 @@ export function SubjectAssignmentContent() {
                   </select>
                 </label>
                 {hasSections ? (
-                  <label className="sub-assign__control">
-                    <span>Section</span>
-                    <select
-                      value={sectionId}
-                      onChange={(e) => selectSection(e.target.value)}
-                      aria-label="Select section"
+                  <div className="sub-assign__control sub-assign__control--sections">
+                    <span>{t("subjectAssignUi.section")}</span>
+                    <div
+                      className="sub-assign__section-checks"
+                      role="radiogroup"
+                      aria-label={t("subjectAssignUi.selectSectionAria")}
                     >
-                      {selectedGrade?.sections.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                      {selectedGrade?.sections.map((s) => {
+                        const selected = sectionId === s.id;
+                        const linked = sectionSubjectCounts.get(s.id) ?? 0;
+                        return (
+                          <button
+                            key={s.id}
+                            type="button"
+                            role="radio"
+                            aria-checked={selected}
+                            className={`sub-assign__section-check${
+                              selected ? " sub-assign__section-check--active" : ""
+                            }${linked > 0 ? " sub-assign__section-check--linked" : ""}`}
+                            onClick={() => selectSection(s.id)}
+                          >
+                            <span
+                              className="sub-assign__section-mark"
+                              aria-hidden
+                            >
+                              {selected ? "✓" : ""}
+                            </span>
+                            <span className="sub-assign__section-name">
+                              {s.name}
+                            </span>
+                            {linked > 0 ? (
+                              <span className="sub-assign__section-count">
+                                {linked}
+                              </span>
+                            ) : null}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 ) : null}
                 {readyToView && !loading ? (
                   <p className="sub-assign__bar-meta">
-                    {assignments.length} subject
-                    {assignments.length === 1 ? "" : "s"}
+                    {assignments.length === 1
+                      ? t("subjectAssignUi.subjectCount", { count: assignments.length })
+                      : t("subjectAssignUi.subjectCountPlural", { count: assignments.length })}
                     <span aria-hidden>·</span>
-                    {assignedCount} assigned
+                    {assignedCount} {t("subjectAssignUi.assigned")}
                   </p>
                 ) : null}
               </div>
             ) : (
               <label className="sub-assign__control sub-assign__control--search">
-                <span>Search</span>
+                <span>{t("subjectAssignUi.search")}</span>
                 <input
                   type="search"
                   value={teacherSearch}
                   onChange={(e) => setTeacherSearch(e.target.value)}
-                  placeholder="Teacher name…"
+                  placeholder={t("subjectAssignUi.teacherNamePh")}
                 />
               </label>
             )}
@@ -467,13 +509,13 @@ export function SubjectAssignmentContent() {
             {loading ? (
               <div className="sub-assign__loading">
                 <span className="sub-assign__spinner" aria-hidden />
-                <p>Loading…</p>
+                <p>{t("subjectAssignUi.loading")}</p>
               </div>
             ) : view === "teacher" ? (
               teacherRoster.length === 0 ? (
-                <AcademicsEmpty message="No subject assignments yet. Switch to By class to assign." />
+                <AcademicsEmpty message={t("subjectAssignUi.emptyAssign")} />
               ) : visibleRoster.length === 0 ? (
-                <AcademicsEmpty message="No teachers match this filter." />
+                <AcademicsEmpty message={t("subjectAssignUi.emptyTeacherFilter")} />
               ) : (
                 <ul className="sub-assign__roster">
                   {visibleRoster.map(({ teacher, slots }) => {
@@ -496,15 +538,16 @@ export function SubjectAssignmentContent() {
                             <strong>{displayName(teacher)}</strong>
                             {teacher.homeroom ? (
                               <span className="sub-assign__roster-homeroom">
-                                Homeroom · {teacher.homeroom.gradeName}
+                                {t("subjectAssignUi.homeroom")} · {teacher.homeroom.gradeName}
                                 {teacher.homeroom.sectionName
                                   ? ` · ${teacher.homeroom.sectionName}`
                                   : ""}
                               </span>
                             ) : (
                               <span className="sub-assign__roster-homeroom">
-                                {slots.length} subject
-                                {slots.length === 1 ? "" : "s"} assigned
+                                {slots.length === 1
+                                  ? t("subjectAssignUi.subjectsAssigned", { count: slots.length })
+                                  : t("subjectAssignUi.subjectsAssignedPlural", { count: slots.length })}
                               </span>
                             )}
                           </div>
@@ -512,7 +555,7 @@ export function SubjectAssignmentContent() {
                         <div className="sub-assign__roster-slots">
                           {slots.length === 0 ? (
                             <span className="sub-assign__roster-empty">
-                              No subjects assigned
+                              {t("subjectAssignUi.noSubjectsAssigned")}
                             </span>
                           ) : (
                             slots.map((cs) => (
@@ -523,7 +566,7 @@ export function SubjectAssignmentContent() {
                                 <Link
                                   href={assignClassHref(cs, teacher.userId)}
                                   className="sub-assign__slot-chip-link"
-                                  title="Open class to edit"
+                                  title={t("subjectAssignUi.openClassEdit")}
                                   onClick={() => {
                                     setView("class");
                                     setGradeId(cs.grade.id);
@@ -543,8 +586,14 @@ export function SubjectAssignmentContent() {
                                   type="button"
                                   className="sub-assign__slot-remove"
                                   disabled={busyId === cs.id}
-                                  title={`Remove ${cs.subject.name} from ${displayName(teacher)}`}
-                                  aria-label={`Remove ${cs.subject.name} from ${displayName(teacher)}`}
+                                  title={t("subjectAssignUi.removeFromTeacher", {
+                                    subject: cs.subject.name,
+                                    teacher: displayName(teacher),
+                                  })}
+                                  aria-label={t("subjectAssignUi.removeFromTeacher", {
+                                    subject: cs.subject.name,
+                                    teacher: displayName(teacher),
+                                  })}
                                   onClick={() =>
                                     void onTeacherChange(cs.id, "")
                                   }
@@ -561,23 +610,23 @@ export function SubjectAssignmentContent() {
                 </ul>
               )
             ) : !readyToView ? (
-              <AcademicsEmpty message="Select a section to view and assign subjects." />
+              <AcademicsEmpty message={t("subjectAssignUi.selectSectionView")} />
             ) : assignments.length === 0 ? (
               <div className="sub-assign__empty">
                 <DashIcon name="assign" className="dash-icon--lg" />
                 <p>
                   {unassignedSubjects.length > 0
-                    ? "No subjects linked to this class yet. Add one below."
-                    : "All catalog subjects are already linked or the catalog is empty."}
+                    ? t("subjectAssignUi.emptyClassAdd")
+                    : t("subjectAssignUi.emptyCatalog")}
                 </p>
               </div>
             ) : (
               <div className="sub-assign__table">
                 <div className="sub-assign__table-head" aria-hidden>
-                  <span>Subject</span>
-                  <span>Teacher</span>
-                  <span>Per week</span>
-                  <span>Remove</span>
+                  <span>{t("subjectAssignUi.colSubject")}</span>
+                  <span>{t("subjectAssignUi.colTeacher")}</span>
+                  <span>{t("subjectAssignUi.perWeek")}</span>
+                  <span>{t("subjectAssignUi.colRemove")}</span>
                 </div>
                 <ul className="sub-assign__list">
                   {assignments.map((row) => {
@@ -605,7 +654,7 @@ export function SubjectAssignmentContent() {
                         <div className="sub-assign__teacher-cell">
                           <label className="sub-assign__field">
                             <span className="sub-assign__field-label">
-                              Teacher
+                              {t("subjectAssignUi.colTeacher")}
                             </span>
                             <select
                               className={`sub-assign__select${hasTeacher ? "" : " sub-assign__select--empty"}`}
@@ -614,12 +663,12 @@ export function SubjectAssignmentContent() {
                               onChange={(e) =>
                                 void onTeacherChange(row.id, e.target.value)
                               }
-                              aria-label={`Teacher for ${row.subject.name}`}
+                              aria-label={`${t("subjectAssignUi.colTeacher")} ${row.subject.name}`}
                             >
-                              <option value="">Unassigned</option>
-                              {teacherOptions.map((t) => (
-                                <option key={t.userId} value={t.userId}>
-                                  {displayName(t)}
+                              <option value="">{t("subjectAssignUi.unassigned")}</option>
+                              {teacherOptions.map((teacherRec) => (
+                                <option key={teacherRec.userId} value={teacherRec.userId}>
+                                  {displayName(teacherRec)}
                                 </option>
                               ))}
                             </select>
@@ -629,8 +678,12 @@ export function SubjectAssignmentContent() {
                               type="button"
                               className="sub-assign__clear"
                               disabled={busyId === row.id}
-                              title={`Remove teacher from ${row.subject.name}`}
-                              aria-label={`Remove teacher from ${row.subject.name}`}
+                              title={t("subjectAssignUi.removeTeacherFrom", {
+                                subject: row.subject.name,
+                              })}
+                              aria-label={t("subjectAssignUi.removeTeacherFrom", {
+                                subject: row.subject.name,
+                              })}
                               onClick={() => void onTeacherChange(row.id, "")}
                             >
                               ×
@@ -640,7 +693,7 @@ export function SubjectAssignmentContent() {
 
                         <label className="sub-assign__field">
                           <span className="sub-assign__field-label">
-                            Per week
+                            {t("subjectAssignUi.perWeek")}
                           </span>
                           <select
                             className="sub-assign__select sub-assign__select--compact"
@@ -651,7 +704,7 @@ export function SubjectAssignmentContent() {
                                 Number.parseInt(e.target.value, 10),
                               )
                             }
-                            aria-label={`Sessions per week for ${row.subject.name}`}
+                            aria-label={`${t("subjectAssignUi.perWeek")} ${row.subject.name}`}
                           >
                             <option value="1">1×</option>
                             <option value="2">2×</option>
@@ -663,13 +716,17 @@ export function SubjectAssignmentContent() {
                             type="button"
                             className="sub-assign__remove"
                             disabled={busyId === row.id}
-                            title={`Remove ${row.subject.name} from class`}
-                            aria-label={`Remove ${row.subject.name} from class`}
+                            title={t("subjectAssignUi.removeSubjectFromClass", {
+                              subject: row.subject.name,
+                            })}
+                            aria-label={t("subjectAssignUi.removeSubjectFromClass", {
+                              subject: row.subject.name,
+                            })}
                             onClick={() =>
                               openRemoveDialog(row.id, row.subject.name)
                             }
                           >
-                            Remove
+                            {t("subjectAssignUi.colRemove")}
                           </button>
                         </div>
                       </li>
@@ -686,7 +743,7 @@ export function SubjectAssignmentContent() {
           unassignedSubjects.length > 0 ? (
             <footer className="sub-assign__add">
               <label className="sub-assign__control sub-assign__control--grow">
-                <span>Add subject</span>
+                <span>{t("subjectAssignUi.addSubject")}</span>
                 <select
                   value={addSubjectId}
                   onChange={(e) => setAddSubjectId(e.target.value)}
@@ -703,7 +760,7 @@ export function SubjectAssignmentContent() {
                 className="sub-assign__add-btn"
                 onClick={() => void onAddSubject()}
               >
-                Add to class
+                {t("subjectAssignUi.addToClass")}
               </button>
             </footer>
           ) : null}

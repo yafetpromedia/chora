@@ -104,6 +104,12 @@ enum Gender {
   OTHER
 }
 
+enum TeacherPhotoReviewStatus {
+  NONE
+  PENDING
+  REJECTED
+}
+
 enum GradePreset {
   GRADES_1_8
   GRADES_9_12
@@ -249,6 +255,8 @@ model School {
   gradePreset           GradePreset?
   curriculumPackageKey  String?
   attendanceMode        AttendanceMode @default(DAILY)
+  /// Days with no school — not expected for attendance marking (default Sat+Sun).
+  weekendDays           Weekday[]      @default([SATURDAY, SUNDAY])
   /// Staff attendance expected check-in (HH:mm, school-local intent).
   staffCheckInTime      String         @default("08:00")
   /// Staff attendance expected check-out (HH:mm).
@@ -306,6 +314,8 @@ model School {
   couponRedemptions CouponRedemption[]
   supportTickets   SupportTicket[]
   scoreCorrections ScoreCorrectionRequest[]
+  emailPreference  SchoolEmailPreference?
+  emailDeliveries  EmailDelivery[]
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 }
@@ -608,6 +618,7 @@ model User {
   teacherProfile  TeacherProfile?
   parentLinks          ParentStudent[]      @relation("ParentUser")
   parentNotifications  ParentNotification[] @relation("ParentNotifications")
+  parentEmailPreference ParentEmailPreference?
   staffNotifications   StaffNotification[]  @relation("StaffNotifications")
   attendanceMarks      AttendanceRecord[]   @relation("AttendanceMarkedBy")
   attendanceConcernsReported AttendanceConcern[] @relation("AttendanceConcernReporter")
@@ -740,6 +751,8 @@ model StudentProfile {
   phone              String?
   fayedaVerifiedAt   DateTime?
   cardCode           String?
+  /// Homeroom learning group label (e.g. A, B, Advanced) set by homeroom teacher.
+  homeroomGroup      String?
   /// Shown to admins while student has not changed their portal password.
   portalTempPassword String?
   /// When false, linked parents cannot view results or report cards.
@@ -1984,14 +1997,22 @@ model PlatformSettings {
   updatedAt             DateTime         @updatedAt
 }
 
+/// Which civil calendar the school uses when labeling this academic year.
+enum AcademicCalendarSystem {
+  ETHIOPIAN
+  GREGORIAN
+}
+
 model AcademicYear {
-  id        String        @id @default(cuid())
-  schoolId  String
-  school    School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  name      String
-  startDate DateTime      @db.Date
-  endDate   DateTime      @db.Date
-  isCurrent Boolean       @default(false)
+  id             String                 @id @default(cuid())
+  schoolId       String
+  school         School                 @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  name           String
+  startDate      DateTime               @db.Date
+  endDate        DateTime               @db.Date
+  /// E.C. (Ethiopian) or G.C. (Gregorian) — controls how the year is labeled for the school.
+  calendarSystem AcademicCalendarSystem @default(ETHIOPIAN)
+  isCurrent      Boolean                @default(false)
   schedules           FeeSchedule[]
   studentFees         StudentFee[]
   academicTerms       AcademicTerm[]
@@ -2197,22 +2218,35 @@ model ExamSeatingAssignment {
 }
 
 model TeacherProfile {
-  id                String              @id @default(cuid())
-  userId            String              @unique
-  user              User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  schoolId          String
-  homeroomGradeId   String?
-  homeroomGrade     Grade?              @relation("TeacherHomeroomGrade", fields: [homeroomGradeId], references: [id], onDelete: SetNull)
-  homeroomSectionId String?
-  homeroomSection   Section?            @relation("TeacherHomeroomSection", fields: [homeroomSectionId], references: [id], onDelete: SetNull)
-  photoUrl          String?
-  cardCode          String?
-  assignments       TeacherAssignment[]
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
+  id                     String              @id @default(cuid())
+  userId                 String              @unique
+  user                   User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  schoolId               String
+  homeroomGradeId        String?
+  homeroomGrade          Grade?              @relation("TeacherHomeroomGrade", fields: [homeroomGradeId], references: [id], onDelete: SetNull)
+  homeroomSectionId      String?
+  homeroomSection        Section?            @relation("TeacherHomeroomSection", fields: [homeroomSectionId], references: [id], onDelete: SetNull)
+  photoUrl               String?
+  pendingPhotoUrl        String?
+  photoReviewStatus      TeacherPhotoReviewStatus @default(NONE)
+  photoSubmittedAt       DateTime?
+  photoReviewedAt        DateTime?
+  photoReviewedById      String?
+  photoReviewNote        String?
+  cardCode               String?
+  gender                 Gender?
+  dateOfBirth            DateTime?
+  bloodType              String?
+  address                String?
+  emergencyContactName   String?
+  emergencyContactPhone  String?
+  assignments            TeacherAssignment[]
+  createdAt              DateTime            @default(now())
+  updatedAt              DateTime            @updatedAt
 
   @@unique([schoolId, cardCode])
   @@index([schoolId])
+  @@index([schoolId, photoReviewStatus])
   @@index([homeroomGradeId, homeroomSectionId])
 }
 
@@ -2905,4 +2939,81 @@ model AdmissionPlacementRule {
   applications    AdmissionApplication[]
 
   @@index([cycleId, sortOrder])
+}
+
+enum EmailDeliveryStatus {
+  QUEUED
+  SENDING
+  SENT
+  FAILED
+  SKIPPED
+}
+
+/// Outbound transactional email. Message bodies and credentials are not stored.
+model EmailDelivery {
+  id                String              @id @default(cuid())
+  schoolId          String?
+  school            School?             @relation(fields: [schoolId], references: [id], onDelete: SetNull)
+  recipient         String
+  sender            String
+  replyTo           String?
+  subject           String
+  category          String
+  templateId        String
+  status            EmailDeliveryStatus @default(QUEUED)
+  attempts          Int                 @default(0)
+  maxAttempts       Int                 @default(5)
+  nextAttemptAt     DateTime            @default(now())
+  lastError         String?
+  idempotencyKey    String              @unique
+  providerMessageId String?
+  /// Template variables kept only until the attempt reaches a terminal status.
+  variables         Json?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  sentAt            DateTime?
+
+  @@index([status, nextAttemptAt])
+  @@index([schoolId, createdAt])
+  @@index([category, createdAt])
+}
+
+model SchoolEmailPreference {
+  schoolId                   String   @id
+  school                     School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  absenceEnabled             Boolean  @default(true)
+  lateEnabled                Boolean  @default(true)
+  examinationEnabled         Boolean  @default(true)
+  announcementEnabled        Boolean  @default(true)
+  paymentReminderEnabled     Boolean  @default(true)
+  paymentConfirmationEnabled Boolean  @default(true)
+  reportCardEnabled          Boolean  @default(true)
+  updatedAt                  DateTime @updatedAt
+}
+
+model ParentEmailPreference {
+  userId                     String   @id
+  user                       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  schoolId                   String
+  enabled                    Boolean  @default(true)
+  absenceEnabled             Boolean  @default(true)
+  lateEnabled                Boolean  @default(true)
+  examinationEnabled         Boolean  @default(true)
+  announcementEnabled        Boolean  @default(true)
+  paymentReminderEnabled     Boolean  @default(true)
+  paymentConfirmationEnabled Boolean  @default(true)
+  reportCardEnabled          Boolean  @default(true)
+  updatedAt                  DateTime @updatedAt
+
+  @@index([schoolId])
+}
+
+/// Last SMTP authentication test. Passwords are never stored here.
+model EmailSystemState {
+  id              String    @id @default("default")
+  lastTestAt      DateTime?
+  lastTestOk      Boolean?
+  lastTestError   String?
+  lastTestMailbox String?
+  updatedAt       DateTime  @updatedAt
 }

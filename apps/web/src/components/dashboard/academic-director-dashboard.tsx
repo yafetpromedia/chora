@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { useLocale } from "@/components/i18n/locale-provider";
 import { listStudents } from "@/lib/school-setup";
 import { listClassroomTeachers } from "@/lib/teachers";
 import { listSubjects } from "@/lib/results";
@@ -27,6 +28,7 @@ type Props = {
 };
 
 export function AcademicDirectorDashboard({ error }: Props) {
+  const { t } = useLocale();
   const [loading, setLoading] = useState(true);
   const [schoolName, setSchoolName] = useState(BRAND_NAME);
   const [adminDay, setAdminDay] = useState<AdminDayOverview | null>(null);
@@ -81,25 +83,25 @@ export function AcademicDirectorDashboard({ error }: Props) {
       adminDay={adminDay}
       error={error}
       loading={loading}
-      loadingText="Loading academic analytics…"
+      loadingText={t("staffDash.loadingAcademic")}
       chips={
         adminDay ? (
           <div className="dash-admin-hero__chip dash-admin-hero__chip--muted">
             <DashIcon name="calendar" className="dash-icon--sm" />
-            <span>{adminDay.staff.classesActive} classes active</span>
+            <span>{t("adminDash.classesActive", { count: adminDay.staff.classesActive })}</span>
           </div>
         ) : null
       }
     >
-      <StaffKpiGrid label="Academic metrics">
+      <StaffKpiGrid label={t("staffDash.academicMetrics")}>
         <Link href="/admin/students" className="dash-admin-kpi dash-admin-kpi--modern dash-admin-kpi--link">
           <span className="dash-admin-kpi__icon dash-admin-kpi__icon--teal">
             <DashIcon name="students" />
           </span>
           <div>
-            <p className="dash-admin-kpi__label">Students</p>
+            <p className="dash-admin-kpi__label">{t("adminDash.students")}</p>
             <p className="dash-admin-kpi__value">{students.length}</p>
-            <p className="dash-admin-kpi__hint">Enrolled on roll</p>
+            <p className="dash-admin-kpi__hint">{t("staffDash.enrolledOnRoll")}</p>
           </div>
         </Link>
 
@@ -108,9 +110,9 @@ export function AcademicDirectorDashboard({ error }: Props) {
             <DashIcon name="teachers" />
           </span>
           <div>
-            <p className="dash-admin-kpi__label">Teachers</p>
+            <p className="dash-admin-kpi__label">{t("adminDash.teachers")}</p>
             <p className="dash-admin-kpi__value">{teachers.length}</p>
-            <p className="dash-admin-kpi__hint">{homeroomCount} homeroom leads</p>
+            <p className="dash-admin-kpi__hint">{t("staffDash.homeroomLeads", { count: homeroomCount })}</p>
           </div>
         </Link>
 
@@ -119,9 +121,9 @@ export function AcademicDirectorDashboard({ error }: Props) {
             <DashIcon name="calendar" />
           </span>
           <div>
-            <p className="dash-admin-kpi__label">Subjects</p>
+            <p className="dash-admin-kpi__label">{t("staffDash.subjects")}</p>
             <p className="dash-admin-kpi__value">{subjects.length}</p>
-            <p className="dash-admin-kpi__hint">In curriculum</p>
+            <p className="dash-admin-kpi__hint">{t("staffDash.inCurriculum")}</p>
           </div>
         </Link>
 
@@ -130,40 +132,40 @@ export function AcademicDirectorDashboard({ error }: Props) {
             <DashIcon name="attendance" />
           </span>
           <div>
-            <p className="dash-admin-kpi__label">Classes active</p>
+            <p className="dash-admin-kpi__label">{t("staffDash.classesActiveLabel")}</p>
             <p className="dash-admin-kpi__value">{adminDay?.staff.classesActive ?? "—"}</p>
-            <p className="dash-admin-kpi__hint">This term</p>
+            <p className="dash-admin-kpi__hint">{t("staffDash.thisTerm")}</p>
           </div>
         </Link>
       </StaffKpiGrid>
 
-      <section className="da-analytics" aria-label="Academic analytics">
+      <section className="da-analytics" aria-label={t("staffDash.academicAnalyticsAria")}>
         <div className="da-analytics__grid">
           <article className="da-card da-card--span2">
             <header className="da-card__head">
               <div>
-                <h2 className="da-card__title">Enrollment by class</h2>
-                <p className="da-card__sub">Student distribution across grades</p>
+                <h2 className="da-card__title">{t("staffDash.enrollmentByClass")}</h2>
+                <p className="da-card__sub">{t("staffDash.studentDistribution")}</p>
               </div>
               <Link href="/admin/students" className="da-card__link">
-                Students <DashIcon name="chevron" className="dash-icon--xs" />
+                {t("adminDash.students")} <DashIcon name="chevron" className="dash-icon--xs" />
               </Link>
             </header>
-            <BarChart rows={classRows} emptyText="No students enrolled yet." />
+            <BarChart rows={classRows} emptyText={t("staffDash.noStudentsEnrolled")} />
           </article>
 
           <article className="da-card">
             <header className="da-card__head">
               <div>
-                <h2 className="da-card__title">Curriculum</h2>
-                <p className="da-card__sub">{subjects.length} subjects offered</p>
+                <h2 className="da-card__title">{t("staffDash.curriculum")}</h2>
+                <p className="da-card__sub">{t("staffDash.subjectsOffered", { count: subjects.length })}</p>
               </div>
               <Link href="/admin/academics/subjects" className="da-card__link">
-                Subjects <DashIcon name="chevron" className="dash-icon--xs" />
+                {t("staffDash.subjects")} <DashIcon name="chevron" className="dash-icon--xs" />
               </Link>
             </header>
             {subjects.length === 0 ? (
-              <div className="da-feed-empty"><p>No subjects configured yet.</p></div>
+              <div className="da-feed-empty"><p>{t("staffDash.noSubjectsConfigured")}</p></div>
             ) : (
               <ul className="reg-recent">
                 {subjects.slice(0, 6).map((s) => (
@@ -182,8 +184,8 @@ export function AcademicDirectorDashboard({ error }: Props) {
             <article className="da-card">
               <header className="da-card__head">
                 <div>
-                  <h2 className="da-card__title">Attendance by grade</h2>
-                  <p className="da-card__sub">Tap a grade for section detail</p>
+                  <h2 className="da-card__title">{t("adminDash.byGradeToday")}</h2>
+                  <p className="da-card__sub">{t("adminDash.byGradeTodaySub")}</p>
                 </div>
               </header>
               <GradeAttendanceBars grades={analytics.gradeAttendance} />
@@ -193,27 +195,27 @@ export function AcademicDirectorDashboard({ error }: Props) {
           <article className="da-card">
             <header className="da-card__head">
               <div>
-                <h2 className="da-card__title">Teaching staff</h2>
-                <p className="da-card__sub">Homeroom assignments</p>
+                <h2 className="da-card__title">{t("staffDash.teachingStaff")}</h2>
+                <p className="da-card__sub">{t("staffDash.homeroomAssignments")}</p>
               </div>
               <Link href="/admin/staff" className="da-card__link">
-                Staff <DashIcon name="chevron" className="dash-icon--xs" />
+                {t("adminDash.staff")} <DashIcon name="chevron" className="dash-icon--xs" />
               </Link>
             </header>
             <BarChart
               rows={[
                 {
-                  label: "Homeroom leads",
+                  label: t("staffDash.homeroomLeadsLabel"),
                   value: homeroomCount,
                   color: "var(--brand-teal-dark)",
                 },
                 {
-                  label: "Subject teachers",
+                  label: t("staffDash.subjectTeachers"),
                   value: Math.max(0, teachers.length - homeroomCount),
                   color: "var(--brand-teal)",
                 },
               ]}
-              emptyText="No teachers on record."
+              emptyText={t("staffDash.noTeachersOnRecord")}
             />
           </article>
         </div>

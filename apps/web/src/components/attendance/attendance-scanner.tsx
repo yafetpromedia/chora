@@ -2,26 +2,36 @@
 
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Html5Qrcode } from "html5-qrcode";
 import { listGradesForAttendance } from "@/lib/attendance";
 import type { GradeWithSections } from "@/lib/api";
 import { getMyTeacherProfile } from "@/lib/teachers";
 import { scanStudentAttendance, type ScanAttendanceResult } from "@/lib/student-cards";
+import {
+  createIdCardScanner,
+  ID_CARD_CAMERA_CONFIG,
+} from "@/lib/id-card-scanner";
+import { useLocale } from "@/components/i18n/locale-provider";
 import { AppToast } from "@/components/ui/app-toast";
+import { DashIcon } from "@/components/dashboard/dash-icons";
+import type { Html5Qrcode } from "html5-qrcode";
 
 const SCANNER_ID = "attendance-qr-reader";
 
-type Props = Record<string, never>;
+function AttendanceScannerFallback() {
+  const { t } = useLocale();
+  return <p className="tch-meta">{t("attendanceScan.loadingScanner")}</p>;
+}
 
-export function AttendanceScanner(_props: Props) {
+export function AttendanceScanner() {
   return (
-    <Suspense fallback={<p className="tch-meta">Loading scanner…</p>}>
+    <Suspense fallback={<AttendanceScannerFallback />}>
       <AttendanceScannerInner />
     </Suspense>
   );
 }
 
 function AttendanceScannerInner() {
+  const { t } = useLocale();
   const searchParams = useSearchParams();
   const initialGradeId = searchParams.get("gradeId") ?? "";
   const initialSectionId = searchParams.get("sectionId") ?? "";
@@ -36,6 +46,7 @@ function AttendanceScannerInner() {
   const [busy, setBusy] = useState(false);
   const [flash, setFlash] = useState<{ type: "ok" | "dup" | "err"; text: string } | null>(null);
   const [scanned, setScanned] = useState<ScanAttendanceResult[]>([]);
+  const [justMatched, setJustMatched] = useState(false);
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const processingRef = useRef(false);
 
@@ -86,17 +97,19 @@ function AttendanceScannerInner() {
           const without = prev.filter((p) => p.studentProfileId !== result.studentProfileId);
           return [result, ...without];
         });
+        setJustMatched(true);
+        window.setTimeout(() => setJustMatched(false), 850);
         setFlash({
           type: result.alreadyMarked ? "dup" : "ok",
           text: result.alreadyMarked
-            ? `✓ ${result.name} — already marked present`
-            : `✓ ${result.name} — marked present`,
+            ? t("attendanceScan.alreadyMarkedPresent", { name: result.name })
+            : t("attendanceScan.markedPresent", { name: result.name }),
         });
         if (typeof navigator !== "undefined" && navigator.vibrate) {
           navigator.vibrate(result.alreadyMarked ? [40, 30, 40] : 80);
         }
       } catch (err) {
-        const msg = err instanceof Error ? err.message : "Scan failed";
+        const msg = err instanceof Error ? err.message : t("attendanceScan.scanFailed");
         setFlash({ type: "err", text: msg });
         if (typeof navigator !== "undefined" && navigator.vibrate) {
           navigator.vibrate([60, 40, 60]);
@@ -108,18 +121,18 @@ function AttendanceScannerInner() {
         }, 600);
       }
     },
-    [date, gradeId, sectionId],
+    [date, gradeId, sectionId, t],
   );
 
   async function startCamera() {
     if (scannerRef.current) return;
-    const scanner = new Html5Qrcode(SCANNER_ID);
+    const scanner = createIdCardScanner(SCANNER_ID);
     scannerRef.current = scanner;
     setCameraOn(true);
     try {
       await scanner.start(
         { facingMode: "environment" },
-        { fps: 10, qrbox: { width: 200, height: 200 } },
+        ID_CARD_CAMERA_CONFIG,
         (decoded) => {
           void processCode(decoded);
         },
@@ -130,7 +143,7 @@ function AttendanceScannerInner() {
       scannerRef.current = null;
       setFlash({
         type: "err",
-        text: "Camera not available. Type the code from the card below.",
+        text: t("attendanceScan.cameraUnavailable"),
       });
     }
   }
@@ -155,53 +168,16 @@ function AttendanceScannerInner() {
 
   const classLabel = selectedGrade
     ? `${selectedGrade.name}${sectionId ? ` · ${selectedGrade.sections.find((s) => s.id === sectionId)?.name ?? ""}` : ""}`
-    : "Select class";
+    : t("attendanceScan.selectClass");
+  const statusLabel = busy
+    ? t("attendanceScan.marking")
+    : cameraOn
+      ? t("attendanceScan.live")
+      : t("attendanceScan.cameraOff");
+  const presentCount = scanned.filter((s) => !s.alreadyMarked).length;
 
   return (
-    <div className="att-v4__workspace">
-      <section className="att-v4__filters">
-        <div className="att-v4__field">
-          <span>Homeroom grade</span>
-          <select
-            value={gradeId}
-            onChange={(e) => {
-              setGradeId(e.target.value);
-              setSectionId("");
-              setScanned([]);
-            }}
-            disabled={grades.length === 0}
-          >
-            {grades.length === 0 ? (
-              <option value="">No classes assigned</option>
-            ) : null}
-            {grades.map((g) => (
-              <option key={g.id} value={g.id}>
-                {g.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="att-v4__field">
-          <span>Section</span>
-          <select value={sectionId} onChange={(e) => setSectionId(e.target.value)}>
-            <option value="">All sections</option>
-            {selectedGrade?.sections.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="att-v4__field">
-          <span>Date</span>
-          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-        </div>
-        <div className="att-v4__filter-meta">
-          <span className="att-v4__filter-class">{classLabel}</span>
-          <span className="att-v4__filter-count">{scanned.length} scanned</span>
-        </div>
-      </section>
-
+    <div className="att-scan">
       <AppToast
         message={flash?.type === "ok" ? flash.text : ""}
         tone="success"
@@ -218,99 +194,180 @@ function AttendanceScannerInner() {
         onDismiss={() => setFlash(null)}
       />
 
-      <div className="att-v4__scan-layout">
-        <section className="att-v4__scan-main">
-          <div className={`att-v4__camera${cameraOn ? " att-v4__camera--live" : ""}`}>
-            <div className="att-v4__camera-frame" aria-hidden />
-            <div id={SCANNER_ID} className="att-v4__camera-reader" />
+      <section className="att-scan__hero" aria-label={t("attendanceScan.homeroomScanAria")}>
+        <div className="att-scan__hero-copy">
+          <p className="att-scan__eyebrow">{t("attendanceScan.homeroomRoll")}</p>
+          <h2 className="att-scan__hero-title">{t("attendanceScan.heroTitle")}</h2>
+          <p className="att-scan__hero-sub">
+            {t("attendanceScan.heroSub", { classLabel })}
+          </p>
+        </div>
+        <div className="att-scan__hero-stats">
+          <div>
+            <strong>{scanned.length}</strong>
+            <span>{t("attendanceScan.scanned")}</span>
+          </div>
+          <div>
+            <strong>{presentCount}</strong>
+            <span>{t("attendanceScan.newMarks")}</span>
+          </div>
+        </div>
+      </section>
+
+      <section className="att-scan__filters">
+        <label className="att-scan__field">
+          <span>{t("attendanceScan.grade")}</span>
+          <select
+            value={gradeId}
+            onChange={(e) => {
+              setGradeId(e.target.value);
+              setSectionId("");
+              setScanned([]);
+            }}
+            disabled={grades.length === 0}
+          >
+            {grades.length === 0 ? (
+              <option value="">{t("attendanceScan.noClassesAssigned")}</option>
+            ) : null}
+            {grades.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="att-scan__field">
+          <span>{t("attendanceScan.section")}</span>
+          <select value={sectionId} onChange={(e) => setSectionId(e.target.value)}>
+            <option value="">{t("attendanceScan.allSections")}</option>
+            {selectedGrade?.sections.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="att-scan__field">
+          <span>{t("attendanceScan.date")}</span>
+          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+        </label>
+        <div className="att-scan__filter-meta">
+          <span>{classLabel}</span>
+        </div>
+      </section>
+
+      <div className="att-scan__layout">
+        <section className="att-scan__stage">
+          <div className="att-scan__stage-head">
+            <div>
+              <h3>{t("attendanceScan.scanner")}</h3>
+              <p>{t("attendanceScan.scannerSub")}</p>
+            </div>
+            <span
+              className={`att-scan__status${cameraOn ? " att-scan__status--live" : ""}${busy ? " att-scan__status--busy" : ""}`}
+            >
+              <i aria-hidden />
+              {statusLabel}
+            </span>
+          </div>
+
+          <div
+            className={`att-scan__camera${cameraOn ? " att-scan__camera--live" : ""}${justMatched ? " att-scan__camera--match" : ""}`}
+          >
+            <div id={SCANNER_ID} className="att-scan__reader" />
+            <div className="att-scan__frame" aria-hidden>
+              <span className="att-scan__corner att-scan__corner--tl" />
+              <span className="att-scan__corner att-scan__corner--tr" />
+              <span className="att-scan__corner att-scan__corner--bl" />
+              <span className="att-scan__corner att-scan__corner--br" />
+              {cameraOn ? <span className="att-scan__beam" /> : null}
+            </div>
             {!cameraOn ? (
-              <div className="att-v4__camera-idle">
-                <span className="att-v4__camera-icon" aria-hidden>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
-                    <path d="M7 3h10a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" />
-                    <path d="M7 7h10v10H7z" />
-                    <path d="M9 9h2v2H9zM13 9h2v2h-2zM9 13h2v2H9zM13 13h2v2h-2z" />
-                  </svg>
-                </span>
-                <p className="att-v4__camera-title">Ready to scan</p>
-                <p className="att-v4__camera-hint">Start the camera and point it at a student QR code</p>
+              <div className="att-scan__idle">
+                <div className="att-scan__idle-icon">
+                  <DashIcon name="attendance" />
+                </div>
+                <p className="att-scan__idle-title">{t("attendanceScan.readyTitle")}</p>
+                <p className="att-scan__idle-sub">{t("attendanceScan.readySub")}</p>
               </div>
             ) : null}
           </div>
 
-          <div className="att-v4__manual no-print">
+          <div className="att-scan__controls">
             {!cameraOn ? (
               <button
                 type="button"
-                className="att-v4__btn att-v4__btn--primary"
+                className="att-scan__btn att-scan__btn--primary"
                 onClick={() => void startCamera()}
+                disabled={!gradeId}
               >
-                Start camera
+                {t("attendanceScan.startCamera")}
               </button>
             ) : (
               <button
                 type="button"
-                className="att-v4__btn att-v4__btn--ghost"
+                className="att-scan__btn att-scan__btn--danger"
                 onClick={() => void stopCamera()}
               >
-                Stop camera
+                {t("attendanceScan.stopCamera")}
               </button>
             )}
-            <label className="att-v4__code-input">
-              <span className="sr-only">Card code</span>
-              <input
-                placeholder="Or type card code…"
-                value={manualCode}
-                onChange={(e) => setManualCode(e.target.value.toUpperCase())}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && manualCode.trim()) {
-                    void processCode(manualCode.trim());
-                    setManualCode("");
-                  }
-                }}
-              />
-            </label>
-            <button
-              type="button"
-              className="att-v4__btn att-v4__btn--ghost"
-              disabled={busy || !manualCode.trim()}
-              onClick={() => {
+            <form
+              className="att-scan__manual"
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!manualCode.trim() || busy || !gradeId) return;
                 void processCode(manualCode.trim());
                 setManualCode("");
               }}
             >
-              Mark
-            </button>
+              <input
+                value={manualCode}
+                onChange={(e) => setManualCode(e.target.value.toUpperCase())}
+                placeholder={t("attendanceScan.manualPlaceholder")}
+                autoComplete="off"
+                aria-label={t("attendanceScan.cardCodeAria")}
+              />
+              <button
+                type="submit"
+                className="att-scan__btn att-scan__btn--ghost"
+                disabled={busy || !manualCode.trim() || !gradeId}
+              >
+                {t("attendanceScan.mark")}
+              </button>
+            </form>
           </div>
-          <p className="att-v4__hint">
-            Each successful scan marks the student <strong>present</strong> for the selected date.
-          </p>
         </section>
 
-        <aside className="att-v4__log">
-          <header className="att-v4__log-head">
-            <h2 className="att-v4__log-title">Scanned today</h2>
-            <span className="att-v4__log-badge">{scanned.length}</span>
+        <aside className="att-scan__log">
+          <header className="att-scan__log-head">
+            <h3>{t("attendanceScan.sessionLog")}</h3>
+            <span>{scanned.length}</span>
           </header>
           {scanned.length === 0 ? (
-            <div className="att-v4__log-empty">
-              <span className="att-v4__log-empty-icon" aria-hidden>◎</span>
-              <p>No scans yet</p>
-              <span>Students appear here as you scan their cards</span>
+            <div className="att-scan__log-empty">
+              <DashIcon name="students" />
+              <p>{t("attendanceScan.noScansYet")}</p>
+              <span>{t("attendanceScan.noScansHint")}</span>
             </div>
           ) : (
-            <ul className="att-v4__log-list">
+            <ul className="att-scan__log-list">
               {scanned.map((s) => (
-                <li key={s.studentProfileId} className="att-v4__log-item">
-                  <span className="att-v4__log-check" aria-hidden>
-                    ✓
+                <li
+                  key={s.studentProfileId}
+                  className={`att-scan__log-item${s.alreadyMarked ? " att-scan__log-item--dup" : ""}`}
+                >
+                  <span className="att-scan__log-mark" aria-hidden>
+                    {s.alreadyMarked ? "·" : "✓"}
                   </span>
-                  <div className="att-v4__log-body">
-                    <p className="att-v4__log-name">{s.name}</p>
-                    <p className="att-v4__log-meta">
+                  <div>
+                    <strong>{s.name}</strong>
+                    <p>
                       {s.grade}
                       {s.section ? ` · ${s.section}` : ""}
-                      {s.cardCode ? ` · ${s.cardCode}` : ""}
+                      {s.alreadyMarked
+                        ? ` · ${t("attendanceScan.alreadyMarkedSuffix")}`
+                        : ` · ${t("attendanceScan.presentSuffix")}`}
                     </p>
                   </div>
                 </li>

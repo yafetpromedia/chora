@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DashIcon, type DashIconName } from "@/components/dashboard/dash-icons";
 import { AppToast } from "@/components/ui/app-toast";
+import { useLocale } from "@/components/i18n/locale-provider";
 import {
   handlePlatformAuthFailure,
   platformFetch,
@@ -19,26 +20,6 @@ type TemplateRow = {
   _count: { packageLinks: number; schoolTemplates: number };
 };
 
-const TEMPLATE_CHANNELS: {
-  value: string;
-  label: string;
-  icon: DashIconName;
-}[] = [
-  { value: "SMS", label: "Parent SMS", icon: "message" },
-  { value: "EMAIL", label: "Email", icon: "mail" },
-  { value: "TEACHER", label: "Teacher", icon: "teachers" },
-];
-
-function templateChannelMeta(channel: string) {
-  return (
-    TEMPLATE_CHANNELS.find((c) => c.value === channel) ?? {
-      value: channel,
-      label: channel,
-      icon: "templates" as DashIconName,
-    }
-  );
-}
-
 function templatePreview(body: string, max = 120) {
   const flat = body.replace(/\s+/g, " ").trim();
   if (flat.length <= max) return flat;
@@ -46,7 +27,26 @@ function templatePreview(body: string, max = 120) {
 }
 
 export function PlatformMessages() {
+  const { t } = useLocale();
   const router = useRouter();
+  const TEMPLATE_CHANNELS: {
+    value: string;
+    label: string;
+    icon: DashIconName;
+  }[] = [
+    { value: "SMS", label: t("platformUi.channelParentSms"), icon: "message" },
+    { value: "EMAIL", label: t("platformUi.channelEmail"), icon: "mail" },
+    { value: "TEACHER", label: t("platformUi.channelTeacher"), icon: "teachers" },
+  ];
+  function templateChannelMeta(channel: string) {
+    return (
+      TEMPLATE_CHANNELS.find((c) => c.value === channel) ?? {
+        value: channel,
+        label: channel,
+        icon: "templates" as DashIconName,
+      }
+    );
+  }
   const [templates, setTemplates] = useState<TemplateRow[]>([]);
   const [query, setQuery] = useState("");
   const [channelFilter, setChannelFilter] = useState("ALL");
@@ -86,7 +86,7 @@ export function PlatformMessages() {
     try {
       await loadTemplates();
     } catch (err) {
-      fail(err, "Load failed");
+      fail(err, t("platformUi.loadFailed"));
     } finally {
       setLoading(false);
     }
@@ -101,13 +101,13 @@ export function PlatformMessages() {
   }, [showArchived, loadTemplates, loading]);
 
   const stats = useMemo(() => {
-    const active = templates.filter((t) => !t.isArchived);
-    const byChannel = (ch: string) => active.filter((t) => t.channel === ch).length;
+    const active = templates.filter((row) => !row.isArchived);
+    const byChannel = (ch: string) => active.filter((row) => row.channel === ch).length;
     return {
       active: active.length,
-      archived: templates.filter((t) => t.isArchived).length,
-      inPackages: active.reduce((sum, t) => sum + t._count.packageLinks, 0),
-      inSchools: active.reduce((sum, t) => sum + t._count.schoolTemplates, 0),
+      archived: templates.filter((row) => row.isArchived).length,
+      inPackages: active.reduce((sum, row) => sum + row._count.packageLinks, 0),
+      inSchools: active.reduce((sum, row) => sum + row._count.schoolTemplates, 0),
       sms: byChannel("SMS"),
       email: byChannel("EMAIL"),
       teacher: byChannel("TEACHER"),
@@ -116,21 +116,21 @@ export function PlatformMessages() {
 
   const channelCounts = useMemo(() => {
     const map = new Map<string, number>();
-    for (const t of templates.filter((x) => !x.isArchived)) {
-      map.set(t.channel, (map.get(t.channel) ?? 0) + 1);
+    for (const row of templates.filter((x) => !x.isArchived)) {
+      map.set(row.channel, (map.get(row.channel) ?? 0) + 1);
     }
     return map;
   }, [templates]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return templates.filter((t) => {
-      if (channelFilter !== "ALL" && t.channel !== channelFilter) return false;
+    return templates.filter((row) => {
+      if (channelFilter !== "ALL" && row.channel !== channelFilter) return false;
       if (!q) return true;
       return (
-        t.name.toLowerCase().includes(q) ||
-        t.key.toLowerCase().includes(q) ||
-        t.body.toLowerCase().includes(q)
+        row.name.toLowerCase().includes(q) ||
+        row.key.toLowerCase().includes(q) ||
+        row.body.toLowerCase().includes(q)
       );
     });
   }, [templates, query, channelFilter]);
@@ -156,17 +156,17 @@ export function PlatformMessages() {
       setFormBody("");
       await loadTemplates();
     } catch (err) {
-      fail(err, "Create failed");
+      fail(err, t("platformUi.createFailed"));
     } finally {
       setBusy(false);
     }
   }
 
-  function startEdit(t: TemplateRow) {
-    setEditingId(t.id);
-    setEditName(t.name);
-    setEditChannel(t.channel);
-    setEditBody(t.body);
+  function startEdit(row: TemplateRow) {
+    setEditingId(row.id);
+    setEditName(row.name);
+    setEditChannel(row.channel);
+    setEditBody(row.body);
   }
 
   function cancelEdit() {
@@ -189,14 +189,14 @@ export function PlatformMessages() {
       cancelEdit();
       await loadTemplates();
     } catch (err) {
-      fail(err, "Save failed");
+      fail(err, t("platformUi.saveFailed"));
     } finally {
       setBusy(false);
     }
   }
 
   async function archiveTemplate(id: string) {
-    if (!confirm("Archive this template?")) return;
+    if (!confirm(t("platformUi.msgArchiveConfirm"))) return;
     setBusy(true);
     setError("");
     try {
@@ -206,7 +206,7 @@ export function PlatformMessages() {
       if (editingId === id) cancelEdit();
       await loadTemplates();
     } catch (err) {
-      fail(err, "Archive failed");
+      fail(err, t("platformUi.archiveFailed"));
     } finally {
       setBusy(false);
     }
@@ -231,25 +231,25 @@ export function PlatformMessages() {
             <DashIcon name="templates" className="dash-icon--md" />
           </span>
           <div>
-            <p className="plat-subjects-v2__eyebrow">Content & Curriculum Engine</p>
-            <h2 className="plat-subjects-v2__title">Communication templates</h2>
+            <p className="plat-subjects-v2__eyebrow">{t("platformUi.contentEngineEyebrow")}</p>
+            <h2 className="plat-subjects-v2__title">{t("platformUi.msgTitle")}</h2>
             <p className="plat-subjects-v2__sub">
-              SMS, email, and teacher templates copied to every provisioned school.
+              {t("platformUi.msgSub")}
             </p>
           </div>
         </div>
         <div className="plat-subjects-v2__hero-stats">
           <div className="plat-subjects-v2__stat">
             <strong>{stats.active}</strong>
-            <span>Templates</span>
+            <span>{t("platformUi.msgStatTemplates")}</span>
           </div>
           <div className="plat-subjects-v2__stat">
             <strong>{stats.inPackages}</strong>
-            <span>In packages</span>
+            <span>{t("platformUi.msgStatInPackages")}</span>
           </div>
           <div className="plat-subjects-v2__stat">
             <strong>{stats.inSchools}</strong>
-            <span>In schools</span>
+            <span>{t("platformUi.msgStatInSchools")}</span>
           </div>
         </div>
       </header>
@@ -259,21 +259,21 @@ export function PlatformMessages() {
           <DashIcon name="message" className="dash-icon--sm" />
           <div>
             <strong>{stats.sms}</strong>
-            <span>Parent SMS</span>
+            <span>{t("platformUi.channelParentSms")}</span>
           </div>
         </article>
         <article className="plat-subjects-v2__kpi">
           <DashIcon name="mail" className="dash-icon--sm" />
           <div>
             <strong>{stats.email}</strong>
-            <span>Email</span>
+            <span>{t("platformUi.channelEmail")}</span>
           </div>
         </article>
         <article className="plat-subjects-v2__kpi">
           <DashIcon name="teachers" className="dash-icon--sm" />
           <div>
             <strong>{stats.teacher}</strong>
-            <span>Teacher</span>
+            <span>{t("platformUi.channelTeacher")}</span>
           </div>
         </article>
       </div>
@@ -283,10 +283,10 @@ export function PlatformMessages() {
           <DashIcon name="templates" className="dash-icon--sm" />
           <input
             type="search"
-            placeholder="Search templates…"
+            placeholder={t("platformUi.msgSearchPh")}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            aria-label="Search templates"
+            aria-label={t("platformUi.msgSearchAria")}
           />
         </div>
         <div className="plat-filter-tabs plat-templates-v2__channels" role="tablist">
@@ -299,7 +299,7 @@ export function PlatformMessages() {
             }`}
             onClick={() => setChannelFilter("ALL")}
           >
-            All
+            {t("common.all")}
             <span className="plat-filter-count">{stats.active}</span>
           </button>
           {TEMPLATE_CHANNELS.map((c) => (
@@ -330,7 +330,7 @@ export function PlatformMessages() {
             checked={showArchived}
             onChange={(e) => setShowArchived(e.target.checked)}
           />
-          Show archived
+          {t("platformUi.showArchived")}
         </label>
         <button
           type="button"
@@ -338,21 +338,21 @@ export function PlatformMessages() {
           onClick={() => setFormOpen((v) => !v)}
         >
           <DashIcon name="plus" className="dash-icon--sm" />
-          {formOpen ? "Cancel" : "New template"}
+          {formOpen ? t("common.cancel") : t("platformUi.newTemplate")}
         </button>
       </div>
 
       {formOpen ? (
         <div className="plat-curriculum-form plat-templates-v2__create">
           <input
-            placeholder="Key (e.g. fee_reminder)"
+            placeholder={t("platformUi.msgKeyPh")}
             value={formKey}
             onChange={(e) =>
               setFormKey(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "_"))
             }
           />
           <input
-            placeholder="Display name"
+            placeholder={t("platformUi.msgDisplayName")}
             value={formName}
             onChange={(e) => setFormName(e.target.value)}
           />
@@ -364,7 +364,7 @@ export function PlatformMessages() {
             ))}
           </select>
           <textarea
-            placeholder="Message body…"
+            placeholder={t("platformUi.msgBodyPh")}
             rows={6}
             value={formBody}
             onChange={(e) => setFormBody(e.target.value)}
@@ -375,30 +375,30 @@ export function PlatformMessages() {
             disabled={busy || !formKey.trim() || !formName.trim() || !formBody.trim()}
             onClick={() => void createTemplate()}
           >
-            {busy ? "Saving…" : "Save template"}
+            {busy ? t("platformUi.saving") : t("platformUi.saveTemplate")}
           </button>
         </div>
       ) : null}
 
       {filtered.length === 0 ? (
         <p className="plat-curriculum-table__empty plat-templates-v2__empty">
-          No templates match your filters.
+          {t("platformUi.msgNoMatch")}
         </p>
       ) : (
         <div className="plat-templates-v2__grid">
-          {filtered.map((t) => {
-            const meta = templateChannelMeta(t.channel);
-            const editing = editingId === t.id;
+          {filtered.map((tpl) => {
+            const meta = templateChannelMeta(tpl.channel);
+            const editing = editingId === tpl.id;
             return (
               <article
-                key={t.id}
+                key={tpl.id}
                 className={`plat-templates-v2__card${
                   editing ? " plat-templates-v2__card--editing" : ""
-                }${t.isArchived ? " plat-subjects-v2__row--archived" : ""}`}
+                }${tpl.isArchived ? " plat-subjects-v2__row--archived" : ""}`}
               >
                 <header className="plat-templates-v2__card-head">
                   <span
-                    className={`plat-templates-v2__badge plat-templates-v2__badge--${t.channel.toLowerCase()}`}
+                    className={`plat-templates-v2__badge plat-templates-v2__badge--${tpl.channel.toLowerCase()}`}
                   >
                     <DashIcon
                       name={meta.icon}
@@ -415,7 +415,7 @@ export function PlatformMessages() {
                           disabled={busy}
                           onClick={() => void saveEdit()}
                         >
-                          Save
+                          {t("common.save")}
                         </button>
                         <button
                           type="button"
@@ -423,30 +423,30 @@ export function PlatformMessages() {
                           disabled={busy}
                           onClick={cancelEdit}
                         >
-                          Cancel
+                          {t("common.cancel")}
                         </button>
                       </>
-                    ) : !t.isArchived ? (
+                    ) : !tpl.isArchived ? (
                       <>
                         <button
                           type="button"
                           className="plat-btn plat-btn--ghost plat-btn--xs"
                           disabled={busy}
-                          onClick={() => startEdit(t)}
+                          onClick={() => startEdit(tpl)}
                         >
-                          Edit
+                          {t("common.edit")}
                         </button>
                         <button
                           type="button"
                           className="plat-btn plat-btn--ghost plat-btn--xs plat-btn--danger"
                           disabled={busy}
-                          onClick={() => void archiveTemplate(t.id)}
+                          onClick={() => void archiveTemplate(tpl.id)}
                         >
-                          Archive
+                          {t("platformUi.msgArchive")}
                         </button>
                       </>
                     ) : (
-                      <span className="plat-subjects-v2__archived-badge">Archived</span>
+                      <span className="plat-subjects-v2__archived-badge">{t("platformUi.archived")}</span>
                     )}
                   </div>
                 </header>
@@ -456,7 +456,7 @@ export function PlatformMessages() {
                     <input
                       value={editName}
                       onChange={(e) => setEditName(e.target.value)}
-                      placeholder="Name"
+                      placeholder={t("platformUi.name")}
                     />
                     <select
                       value={editChannel}
@@ -476,15 +476,15 @@ export function PlatformMessages() {
                   </div>
                 ) : (
                   <>
-                    <h3 className="plat-templates-v2__title">{t.name}</h3>
-                    <code className="plat-templates-v2__key">{t.key}</code>
+                    <h3 className="plat-templates-v2__title">{tpl.name}</h3>
+                    <code className="plat-templates-v2__key">{tpl.key}</code>
                     <p className="plat-templates-v2__preview">
-                      {t._count.packageLinks} package(s) · {t._count.schoolTemplates} school
+                      {tpl._count.packageLinks} package(s) · {tpl._count.schoolTemplates} school
                       copy(ies)
                     </p>
                     <details className="plat-templates-v2__body">
-                      <summary>{templatePreview(t.body)}</summary>
-                      <pre>{t.body}</pre>
+                      <summary>{templatePreview(tpl.body)}</summary>
+                      <pre>{tpl.body}</pre>
                     </details>
                   </>
                 )}

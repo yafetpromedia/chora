@@ -1,5 +1,6 @@
 "use client";
 
+import { useLocale } from "@/components/i18n/locale-provider";
 import type { ExamScheduleDay } from "@/lib/exam-schedule";
 
 type GradeCol = { id: string; name: string };
@@ -109,6 +110,7 @@ export function ExamScheduleBoard({
   days,
   grades,
 }: Props) {
+  const { t } = useLocale();
   const gradeIdsInUse = new Set<string>();
   for (const day of days) {
     for (const slot of day.slots) gradeIdsInUse.add(slot.gradeId);
@@ -127,19 +129,23 @@ export function ExamScheduleBoard({
       </header>
 
       {days.length === 0 ? (
-        <div className="ex-board__empty">Add exam days to see the schedule board.</div>
+        <div className="ex-board__empty">{t("examBoardUi.emptyDays")}</div>
       ) : (
         <div className="ex-board__scroll">
           <table className="ex-board__table">
             <thead>
               <tr>
-                <th className="ex-board__th ex-board__th--date">Date</th>
+                <th className="ex-board__th ex-board__th--date">
+                  {t("examBoardUi.thDate")}
+                </th>
                 {visibleGrades.map((g) => (
                   <th key={g.id} className="ex-board__th">
                     {g.name}
                   </th>
                 ))}
-                <th className="ex-board__th ex-board__th--time">Time</th>
+                <th className="ex-board__th ex-board__th--time">
+                  {t("examBoardUi.thTime")}
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -152,7 +158,7 @@ export function ExamScheduleBoard({
                         className="ex-board__study"
                         colSpan={Math.max(visibleGrades.length, 1) + 1}
                       >
-                        {day.studyNote?.trim() || "Off day for study"}
+                        {day.studyNote?.trim() || t("examBoardUi.studyDay")}
                       </td>
                     </tr>
                   );
@@ -217,7 +223,9 @@ export function ExamScheduleBoard({
                     <td className="ex-board__time">
                       <span className="ex-board__time-main">{dayTime}</span>
                       {mixedTimes ? (
-                        <span className="ex-board__time-hint">per subject</span>
+                        <span className="ex-board__time-hint">
+                          {t("examBoardUi.perSubject")}
+                        </span>
                       ) : null}
                     </td>
                   </tr>

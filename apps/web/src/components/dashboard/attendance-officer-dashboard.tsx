@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useLocale } from "@/components/i18n/locale-provider";
 import { listStudents } from "@/lib/school-setup";
 import { getAdminAnalytics, type AdminAnalyticsOverview } from "@/lib/dashboard-analytics";
 import type { AdminDayOverview } from "@/lib/dashboard-day";
@@ -22,6 +23,7 @@ type Props = {
 };
 
 export function AttendanceOfficerDashboard({ error }: Props) {
+  const { t } = useLocale();
   const [loading, setLoading] = useState(true);
   const [schoolName, setSchoolName] = useState(BRAND_NAME);
   const [adminDay, setAdminDay] = useState<AdminDayOverview | null>(null);
@@ -50,6 +52,7 @@ export function AttendanceOfficerDashboard({ error }: Props) {
 
   const today = analytics?.attendanceToday;
   const staffToday = analytics?.staffAttendanceToday;
+  const totalStudents = today?.totalStudents || studentCount;
 
   return (
     <StaffDashboardShell
@@ -59,13 +62,15 @@ export function AttendanceOfficerDashboard({ error }: Props) {
       adminDay={adminDay}
       error={error}
       loading={loading}
-      loadingText="Loading attendance analytics…"
+      loadingText={t("staffDash.loadingAttendance")}
       chips={
         today ? (
           <div className="dash-admin-hero__chip dash-admin-hero__chip--muted">
             <DashIcon name="attendance" className="dash-icon--sm" />
             <span>
-              {today.rate != null ? `${today.rate}% present today` : "No marks yet today"}
+              {today.rate != null
+                ? t("staffDash.presentTodayChip", { rate: today.rate })
+                : t("staffDash.noMarksYetToday")}
             </span>
           </div>
         ) : null
@@ -73,17 +78,17 @@ export function AttendanceOfficerDashboard({ error }: Props) {
     >
       {analytics && today ? (
         <>
-          <StaffKpiGrid label="Attendance metrics">
+          <StaffKpiGrid label={t("staffDash.attendanceMetrics")}>
             <Link href="/admin/attendance" className="dash-admin-kpi dash-admin-kpi--modern dash-admin-kpi--link">
               <span className="dash-admin-kpi__icon dash-admin-kpi__icon--green">
                 <DashIcon name="attendance" />
               </span>
               <div>
-                <p className="dash-admin-kpi__label">Attendance today</p>
+                <p className="dash-admin-kpi__label">{t("adminDash.attendanceToday")}</p>
                 <p className="dash-admin-kpi__value">
                   {today.rate != null ? `${today.rate}%` : "—"}
                 </p>
-                <p className="dash-admin-kpi__hint">Present rate</p>
+                <p className="dash-admin-kpi__hint">{t("staffDash.presentRate")}</p>
               </div>
             </Link>
 
@@ -92,9 +97,11 @@ export function AttendanceOfficerDashboard({ error }: Props) {
                 <DashIcon name="students" />
               </span>
               <div>
-                <p className="dash-admin-kpi__label">Marked today</p>
+                <p className="dash-admin-kpi__label">{t("staffDash.markedToday")}</p>
                 <p className="dash-admin-kpi__value">{today.marked}</p>
-                <p className="dash-admin-kpi__hint">of {today.totalStudents || studentCount} students</p>
+                <p className="dash-admin-kpi__hint">
+                  {t("staffDash.ofStudents", { count: totalStudents })}
+                </p>
               </div>
             </article>
 
@@ -103,9 +110,9 @@ export function AttendanceOfficerDashboard({ error }: Props) {
                 <DashIcon name="attendance" />
               </span>
               <div>
-                <p className="dash-admin-kpi__label">Absent</p>
+                <p className="dash-admin-kpi__label">{t("adminDash.absent")}</p>
                 <p className="dash-admin-kpi__value">{today.absent}</p>
-                <p className="dash-admin-kpi__hint">{today.present} present</p>
+                <p className="dash-admin-kpi__hint">{t("staffDash.presentHint", { count: today.present })}</p>
               </div>
             </article>
 
@@ -117,7 +124,7 @@ export function AttendanceOfficerDashboard({ error }: Props) {
                 <DashIcon name="users" />
               </span>
               <div>
-                <p className="dash-admin-kpi__label">Staff today</p>
+                <p className="dash-admin-kpi__label">{t("staffDash.staffToday")}</p>
                 <p className="dash-admin-kpi__value">
                   {staffToday
                     ? `${staffToday.present + staffToday.late}`
@@ -125,23 +132,27 @@ export function AttendanceOfficerDashboard({ error }: Props) {
                 </p>
                 <p className="dash-admin-kpi__hint">
                   {staffToday
-                    ? `${staffToday.marked} marked · ${staffToday.late} late`
-                    : "Open staff attendance"}
+                    ? t("adminDash.staffMarked", {
+                        marked: staffToday.marked,
+                        total: staffToday.totalStaff,
+                        late: staffToday.late,
+                      })
+                    : t("staffDash.openStaffAttendance")}
                 </p>
               </div>
             </Link>
           </StaffKpiGrid>
 
-          <section className="da-analytics" aria-label="Attendance analytics">
+          <section className="da-analytics" aria-label={t("staffDash.attendanceAnalyticsAria")}>
             <div className="da-analytics__grid">
               <article className="da-card da-card--span2">
                 <header className="da-card__head">
                   <div>
-                    <h2 className="da-card__title">Weekly trend</h2>
-                    <p className="da-card__sub">Daily attendance rate — last 7 days</p>
+                    <h2 className="da-card__title">{t("staffDash.weeklyTrend")}</h2>
+                    <p className="da-card__sub">{t("adminDash.dailyRate7")}</p>
                   </div>
                   <Link href="/admin/attendance" className="da-card__link">
-                    Mark attendance <DashIcon name="chevron" className="dash-icon--xs" />
+                    {t("dash.markAttendance")} <DashIcon name="chevron" className="dash-icon--xs" />
                   </Link>
                 </header>
                 <AttendanceTrendChart trend={analytics.attendanceTrend} />
@@ -150,8 +161,8 @@ export function AttendanceOfficerDashboard({ error }: Props) {
               <article className="da-card">
                 <header className="da-card__head">
                   <div>
-                    <h2 className="da-card__title">Today</h2>
-                    <p className="da-card__sub">Live roll status</p>
+                    <h2 className="da-card__title">{t("adminDash.today")}</h2>
+                    <p className="da-card__sub">{t("adminDash.liveAttendance")}</p>
                   </div>
                 </header>
                 <AttendanceTodayRing today={today} />
@@ -160,14 +171,15 @@ export function AttendanceOfficerDashboard({ error }: Props) {
               <article className="da-card">
                 <header className="da-card__head">
                   <div>
-                    <h2 className="da-card__title">By grade today</h2>
-                    <p className="da-card__sub">Tap a grade for section detail</p>
+                    <h2 className="da-card__title">{t("adminDash.byGradeToday")}</h2>
+                    <p className="da-card__sub">{t("adminDash.byGradeTodaySub")}</p>
                   </div>
                 </header>
                 <GradeAttendanceBars grades={analytics.gradeAttendance} />
                 {analytics.insights.mostAbsentGrade ? (
                   <p className="da-insight da-insight--warn">
-                    Needs attention: <strong>{analytics.insights.mostAbsentGrade.label}</strong> (
+                    {t("adminDash.needsAttention")}{" "}
+                    <strong>{analytics.insights.mostAbsentGrade.label}</strong> (
                     {analytics.insights.mostAbsentGrade.rate}%)
                   </p>
                 ) : null}
@@ -177,7 +189,7 @@ export function AttendanceOfficerDashboard({ error }: Props) {
         </>
       ) : (
         <div className="da-feed-empty">
-          <p>Attendance data is not available yet.</p>
+          <p>{t("staffDash.attendanceUnavailable")}</p>
         </div>
       )}
     </StaffDashboardShell>

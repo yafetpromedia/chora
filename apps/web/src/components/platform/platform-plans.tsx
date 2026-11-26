@@ -10,6 +10,7 @@ import {
   type PlatformPlanCatalog,
 } from "@/lib/platform-plans";
 import { DashIcon } from "@/components/dashboard/dash-icons";
+import { useLocale } from "@/components/i18n/locale-provider";
 import { AppToast } from "@/components/ui/app-toast";
 
 const ALL_PLANS: PlanType[] = ["TRIAL", "STARTER", "PROFESSIONAL", "ENTERPRISE"];
@@ -64,6 +65,7 @@ function planIcon(plan: PlanType) {
 }
 
 export function PlatformPlans() {
+  const { t } = useLocale();
   const router = useRouter();
   const [plans, setPlans] = useState<PlatformPlanCatalog[]>([]);
   const [draft, setDraft] = useState<Draft>({});
@@ -89,7 +91,7 @@ export function PlatformPlans() {
   useEffect(() => {
     queueMicrotask(() => {
       void load()
-        .catch((e) => fail(e, "Failed to load plans"))
+        .catch((e) => fail(e, t("platformUi.errLoadPlans")))
         .finally(() => setLoading(false));
     });
   }, [load, router]);
@@ -131,9 +133,9 @@ export function PlatformPlans() {
         isListed: d.isListed,
       });
       setPlans((prev) => prev.map((p) => (p.plan === plan ? updated : p)));
-      setMessage(`${updated.label} saved. Schools see new prices on upgrade.`);
+      setMessage(t("platformUi.plansSavedOk", { label: updated.label }));
     } catch (e) {
-      fail(e, "Save failed");
+      fail(e, t("platformUi.errSaveFailed"));
     } finally {
       setSaving(null);
     }
@@ -166,26 +168,23 @@ export function PlatformPlans() {
             <DashIcon name="settings" className="dash-icon--md" />
           </span>
           <div>
-            <p className="plat-subjects-v2__eyebrow">Subscription catalog</p>
-            <h2 className="plat-subjects-v2__title">Plan catalog</h2>
-            <p className="plat-subjects-v2__sub">
-              Size-band base fees only. Module add-on prices are defined in code
-              (attendance, results, finance, …) and selected per school at checkout.
-            </p>
+            <p className="plat-subjects-v2__eyebrow">{t("platformUi.plansEyebrow")}</p>
+            <h2 className="plat-subjects-v2__title">{t("platformUi.plansTitle")}</h2>
+            <p className="plat-subjects-v2__sub">{t("platformUi.plansSub")}</p>
           </div>
         </div>
         <div className="plat-subjects-v2__hero-stats">
           <div className="plat-subjects-v2__stat">
             <strong>{stats.total}</strong>
-            <span>Plans</span>
+            <span>{t("platformUi.plansStatPlans")}</span>
           </div>
           <div className="plat-subjects-v2__stat">
             <strong>{stats.listed}</strong>
-            <span>Listed</span>
+            <span>{t("platformUi.plansStatListed")}</span>
           </div>
           <div className="plat-subjects-v2__stat">
             <strong>${stats.avgUsd}</strong>
-            <span>Avg USD</span>
+            <span>{t("platformUi.plansStatAvgUsd")}</span>
           </div>
         </div>
       </header>
@@ -195,7 +194,7 @@ export function PlatformPlans() {
           <DashIcon name="finance" className="dash-icon--sm" />
           <div>
             <strong>{stats.listed}</strong>
-            <span>On upgrade page</span>
+            <span>{t("platformUi.plansOnUpgradePage")}</span>
           </div>
         </article>
         <article className="plat-subjects-v2__kpi">
@@ -204,14 +203,14 @@ export function PlatformPlans() {
             <strong>
               {plans.find((p) => p.plan === "TRIAL")?.trialDays ?? "—"}
             </strong>
-            <span>Trial days</span>
+            <span>{t("platformUi.plansTrialDays")}</span>
           </div>
         </article>
         <article className="plat-subjects-v2__kpi">
           <DashIcon name="building" className="dash-icon--sm" />
           <div>
             <strong>1</strong>
-            <span>Enterprise (custom)</span>
+            <span>{t("platformUi.plansEnterpriseCustom")}</span>
           </div>
         </article>
       </div>
@@ -236,10 +235,15 @@ export function PlatformPlans() {
                   {catalog ? (
                     <p className="plat-billing-v2__plan-price">
                       {isEnterprise
-                        ? "Custom pricing"
+                        ? t("platformUi.plansCustomPricing")
                         : isTrial
-                          ? `${d.trialDays || catalog.trialDays} day trial`
-                          : `$${d.usdMonthly}/mo · ${d.etbMonthly} ETB`}
+                          ? t("platformUi.plansDayTrial", {
+                              days: d.trialDays || catalog.trialDays || "",
+                            })
+                          : t("platformUi.plansPriceMo", {
+                              usd: d.usdMonthly,
+                              etb: d.etbMonthly,
+                            })}
                     </p>
                   ) : null}
                 </div>
@@ -250,18 +254,18 @@ export function PlatformPlans() {
                       checked={d.isListed}
                       onChange={(e) => patch(planKey, "isListed", e.target.checked)}
                     />
-                    Listed
+                    {t("platformUi.plansListed")}
                   </label>
                 ) : null}
               </header>
 
               <label className="plat-field">
-                <span>Display name</span>
+                <span>{t("platformUi.plansDisplayName")}</span>
                 <input value={d.label} onChange={(e) => patch(planKey, "label", e.target.value)} />
               </label>
 
               <label className="plat-field">
-                <span>Short description</span>
+                <span>{t("platformUi.plansShortDesc")}</span>
                 <input
                   value={d.description}
                   onChange={(e) => patch(planKey, "description", e.target.value)}
@@ -270,32 +274,32 @@ export function PlatformPlans() {
 
               <div className="plat-plan-editor__row">
                 <label className="plat-field">
-                  <span>USD / month</span>
+                  <span>{t("platformUi.plansUsdMonth")}</span>
                   <input
                     type="number"
                     min={0}
                     value={d.usdMonthly}
                     disabled={isEnterprise}
                     onChange={(e) => patch(planKey, "usdMonthly", e.target.value)}
-                    placeholder={isEnterprise ? "Custom" : "0"}
+                    placeholder={isEnterprise ? t("platformUi.plansCustom") : "0"}
                   />
                 </label>
                 <label className="plat-field">
-                  <span>ETB / month</span>
+                  <span>{t("platformUi.plansEtbMonth")}</span>
                   <input
                     type="number"
                     min={0}
                     value={d.etbMonthly}
                     disabled={isEnterprise}
                     onChange={(e) => patch(planKey, "etbMonthly", e.target.value)}
-                    placeholder={isEnterprise ? "Custom" : "0"}
+                    placeholder={isEnterprise ? t("platformUi.plansCustom") : "0"}
                   />
                 </label>
               </div>
 
               {isTrial ? (
                 <label className="plat-field">
-                  <span>Trial length (days)</span>
+                  <span>{t("platformUi.plansTrialLength")}</span>
                   <input
                     type="number"
                     min={1}
@@ -306,34 +310,34 @@ export function PlatformPlans() {
               ) : (
                 <div className="plat-plan-editor__row plat-plan-editor__row--3">
                   <label className="plat-field">
-                    <span>Max students</span>
+                    <span>{t("platformUi.plansMaxStudents")}</span>
                     <input
                       value={d.studentsLimit}
                       onChange={(e) => patch(planKey, "studentsLimit", e.target.value)}
-                      placeholder="∞ empty"
+                      placeholder={t("platformUi.plansLimitPh")}
                     />
                   </label>
                   <label className="plat-field">
-                    <span>Max teachers</span>
+                    <span>{t("platformUi.plansMaxTeachers")}</span>
                     <input
                       value={d.teachersLimit}
                       onChange={(e) => patch(planKey, "teachersLimit", e.target.value)}
-                      placeholder="∞ empty"
+                      placeholder={t("platformUi.plansLimitPh")}
                     />
                   </label>
                   <label className="plat-field">
-                    <span>Max admins</span>
+                    <span>{t("platformUi.plansMaxAdmins")}</span>
                     <input
                       value={d.adminsLimit}
                       onChange={(e) => patch(planKey, "adminsLimit", e.target.value)}
-                      placeholder="∞ empty"
+                      placeholder={t("platformUi.plansLimitPh")}
                     />
                   </label>
                 </div>
               )}
 
               <label className="plat-field">
-                <span>Features (one per line)</span>
+                <span>{t("platformUi.plansFeatures")}</span>
                 <textarea
                   rows={4}
                   value={d.featuresText}
@@ -347,7 +351,7 @@ export function PlatformPlans() {
                 disabled={saving !== null}
                 onClick={() => void save(planKey)}
               >
-                {saving === planKey ? "Saving…" : "Save plan"}
+                {saving === planKey ? t("common.saving") : t("platformUi.plansSavePlan")}
               </button>
             </article>
           );

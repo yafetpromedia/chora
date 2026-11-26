@@ -11,6 +11,7 @@ import { DashIcon } from "@/components/dashboard/dash-icons";
 import { AUTH_ROLE_KEY, AUTH_TOKEN_KEY } from "@/lib/auth";
 import { getAttendanceConcernsSummary } from "@/lib/attendance-concerns";
 import { getMyTeacherProfile } from "@/lib/teachers";
+import { useLocale } from "@/components/i18n/locale-provider";
 
 type Tab = "scan" | "manual" | "requests";
 
@@ -23,6 +24,7 @@ function todayLabel() {
 }
 
 export default function TeacherAttendancePage() {
+  const { t, tp } = useLocale();
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("scan");
   const [allowed, setAllowed] = useState<boolean | null>(null);
@@ -83,58 +85,63 @@ export default function TeacherAttendancePage() {
 
   if (allowed !== true) {
     return (
-      <DashboardPage role="teacher" title="Attendance">
+      <DashboardPage role="teacher" title={tp("Attendance")}>
         <div className="att-v4__loading">
           <span className="dash-loading-spinner" aria-hidden />
-          <p>Loading attendance…</p>
+          <p>{t("teacherAttendancePageUi.loading")}</p>
         </div>
       </DashboardPage>
     );
   }
 
   return (
-    <DashboardPage role="teacher" title="Mark attendance">
+    <DashboardPage role="teacher" title={tp("Mark attendance")}>
       <div className="att-v4">
         <header className="att-v4__hero">
           <div className="att-v4__hero-glow" aria-hidden />
           <div className="att-v4__hero-inner">
             <div className="att-v4__hero-main">
               <p className="att-v4__date">{todayLabel()}</p>
-              <h1 className="att-v4__title">Mark attendance</h1>
-              <p className="att-v4__sub">
-                Scan student ID cards with your camera, or switch to manual marking.
-              </p>
-              <span className="att-v4__tag">Homeroom</span>
+              <h1 className="att-v4__title">{tp("Mark attendance")}</h1>
+              <p className="att-v4__sub">{t("teacherAttendancePageUi.sub")}</p>
+              <span className="att-v4__tag">{t("teacherAttendancePageUi.homeroom")}</span>
               {openConcerns > 0 ? (
                 <Link
                   href="/teacher/attendance/concerns"
                   className="att-concern__hero-badge"
                 >
                   {todayConcerns > 0
-                    ? `${todayConcerns} concern${todayConcerns === 1 ? "" : "s"} today`
-                    : `${openConcerns} open concern${openConcerns === 1 ? "" : "s"}`}
+                    ? todayConcerns === 1
+                      ? t("teacherAttendancePageUi.concernToday", { count: todayConcerns })
+                      : t("teacherAttendancePageUi.concernsToday", { count: todayConcerns })
+                    : openConcerns === 1
+                      ? t("teacherAttendancePageUi.openConcern", { count: openConcerns })
+                      : t("teacherAttendancePageUi.openConcerns", { count: openConcerns })}
                 </Link>
               ) : null}
             </div>
             <div className="att-v4__hero-links">
-              <Link href="/teacher/attendance/concerns" className="att-v4__back">
-                Attendance concerns →
+              <Link href="/teacher/my-students" className="att-v4__back">
+                {t("teacherAttendancePageUi.myStudents")}
               </Link>
-              <Link href="/teacher" className="att-v4__back">
-                ← Back to overview
+              <Link href="/teacher/attendance/concerns" className="att-v4__back">
+                {t("teacherAttendancePageUi.concernsLink")}
               </Link>
             </div>
           </div>
         </header>
 
-        <nav className="att-v4__tabs att-v4__tabs--triple" aria-label="Attendance mode">
+        <nav
+          className="att-v4__tabs att-v4__tabs--triple"
+          aria-label={t("teacherAttendancePageUi.modeAria")}
+        >
           <button
             type="button"
             className={`att-v4__tab${tab === "scan" ? " att-v4__tab--active" : ""}`}
             onClick={() => setTab("scan")}
           >
             <DashIcon name="attendance" className="dash-icon--xs" />
-            Scan QR
+            {t("teacherAttendancePageUi.scan")}
           </button>
           <button
             type="button"
@@ -142,7 +149,7 @@ export default function TeacherAttendancePage() {
             onClick={() => setTab("manual")}
           >
             <DashIcon name="students" className="dash-icon--xs" />
-            Manual
+            {t("teacherAttendancePageUi.manual")}
           </button>
           <button
             type="button"
@@ -150,7 +157,7 @@ export default function TeacherAttendancePage() {
             onClick={() => setTab("requests")}
           >
             <DashIcon name="alert" className="dash-icon--xs" />
-            Requests
+            {t("teacherAttendancePageUi.requests")}
           </button>
         </nav>
 

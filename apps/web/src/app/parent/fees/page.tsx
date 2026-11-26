@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { DashboardPage } from "@/components/dashboard/dashboard-page";
+import { useLocale } from "@/components/i18n/locale-provider";
 import { ParentChildBar } from "@/components/parent/parent-child-bar";
 import { EtbAmount } from "@/components/billing/etb-amount";
 import {
@@ -48,10 +49,11 @@ function readProofAsDataUrl(file: File): Promise<string> {
 }
 
 export default function ParentFeesPage() {
+  const { t } = useLocale();
   return (
     <Suspense
       fallback={
-        <DashboardPage role="parent" title="Fees">
+        <DashboardPage role="parent" title={t("pages.parentFees.title")}>
           <div className="par-fees">
             <p className="stu-fees__row-meta">Loading fees…</p>
           </div>
@@ -65,6 +67,7 @@ export default function ParentFeesPage() {
 
 function ParentFeesPageContent() {
   const router = useRouter();
+  const { t } = useLocale();
   const searchParams = useSearchParams();
   const [overview, setOverview] = useState<ParentFinanceOverview | null>(null);
   const [children, setChildren] = useState<ParentChildOption[]>([]);
@@ -253,8 +256,8 @@ function ParentFeesPageContent() {
   return (
     <DashboardPage
       role="parent"
-      title="Fees & payments"
-      subtitle="Pay school fees for your linked children"
+      title={t("pages.parentFeesPay.title")}
+      subtitle={t("pages.parentFeesPay.subtitle")}
     >
       <div className="par-fees">
         {error ? <p className="stu-fees__alert stu-fees__alert--error">{error}</p> : null}

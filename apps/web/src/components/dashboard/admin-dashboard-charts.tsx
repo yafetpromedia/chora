@@ -1,5 +1,6 @@
 "use client";
 
+import { useLocale } from "@/components/i18n/locale-provider";
 import type { AdminAnalyticsOverview } from "@/lib/dashboard-analytics";
 
 const W = 560;
@@ -38,6 +39,7 @@ export function AttendanceAreaChart({
 }: {
   trend: AdminAnalyticsOverview["attendanceTrend"];
 }) {
+  const { t } = useLocale();
   const hasData = trend.some((d) => d.marked > 0);
   const pts = chartPoints(trend);
 
@@ -50,7 +52,7 @@ export function AttendanceAreaChart({
             <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
           </svg>
         </div>
-        <p>Mark attendance to unlock weekly trends</p>
+        <p>{t("adminDash.markToSeeTrends")}</p>
       </div>
     );
   }
@@ -62,7 +64,7 @@ export function AttendanceAreaChart({
         viewBox={`0 0 ${W} ${H}`}
         preserveAspectRatio="xMidYMid meet"
         role="img"
-        aria-label="Attendance rate over the last 7 days"
+        aria-label={t("adminDash.attendanceTrend7Aria")}
       >
         <defs>
           <linearGradient id="admChartGradient" x1="0" y1="0" x2="0" y2="1">
@@ -159,6 +161,7 @@ export function FinanceDonut({
   collectedPct: number;
   size?: number;
 }) {
+  const { t } = useLocale();
   const stroke = 12;
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;
@@ -195,7 +198,7 @@ export function FinanceDonut({
       </svg>
       <div className="adm-finance__center">
         <span className="adm-finance__pct">{collectedPct}%</span>
-        <span className="adm-today__lbl">collected</span>
+        <span className="adm-today__lbl">{t("adminDash.collectedLabel")}</span>
       </div>
     </div>
   );

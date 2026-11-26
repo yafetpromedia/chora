@@ -20,9 +20,11 @@ import {
   type AcademicYear,
 } from "@/lib/results";
 import { listTeachers } from "@/lib/teachers";
+import { useLocale } from "@/components/i18n/locale-provider";
 
 export default function AcademicsSetupPage() {
   const router = useRouter();
+  const { t, tp } = useLocale();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [years, setYears] = useState<AcademicYear[]>([]);
@@ -58,7 +60,9 @@ export default function AcademicsSetupPage() {
           setTermCount(terms.length);
         }
       })
-      .catch((err) => setError(err instanceof Error ? err.message : "Could not load academics"))
+      .catch((err) =>
+        setError(err instanceof Error ? err.message : t("adminAcademicsUi.loadFailed")),
+      )
       .finally(() => setLoading(false));
   }, [router]);
 
@@ -79,86 +83,101 @@ export default function AcademicsSetupPage() {
       {
         step: 1,
         href: "/admin/results/academic-years",
-        title: "Academic years",
-        detail: "Define the school year window and mark which year is active.",
+        title: t("adminAcademicsUi.stepYearsTitle"),
+        detail: t("adminAcademicsUi.stepYearsDetail"),
         icon: "calendar",
         status: status(hasYears, true),
         meta: hasYears
-          ? `${years.length} year${years.length === 1 ? "" : "s"}${currentYear ? ` · ${currentYear.name}` : ""}`
-          : "Start here — no years yet",
+          ? t("adminAcademicsUi.stepYearsMetaCount", {
+              count: years.length,
+              current: currentYear ? ` · ${currentYear.name}` : "",
+            })
+          : t("adminAcademicsUi.stepYearsMetaEmpty"),
       },
       {
         step: 2,
         href: "/admin/results/terms",
-        title: "Terms & semesters",
-        detail: "Split the year into terms with start and end dates.",
+        title: t("adminAcademicsUi.stepTermsTitle"),
+        detail: t("adminAcademicsUi.stepTermsDetail"),
         icon: "results",
         status: status(hasTerms, hasYears),
-        meta: hasTerms ? `${termCount} term${termCount === 1 ? "" : "s"}` : "Add terms after a year",
+        meta: hasTerms
+          ? t("adminAcademicsUi.stepTermsMetaCount", { count: termCount })
+          : t("adminAcademicsUi.stepTermsMetaEmpty"),
       },
       {
         step: 3,
         href: "/admin/teachers",
-        title: "Teachers",
-        detail: "Onboard staff, homeroom classes, and portal accounts.",
+        title: t("adminAcademicsUi.stepTeachersTitle"),
+        detail: t("adminAcademicsUi.stepTeachersDetail"),
         icon: "teachers",
         status: status(hasTeachers, hasTerms),
-        meta: hasTeachers ? `${teacherCount} on roster` : "No teachers yet",
+        meta: hasTeachers
+          ? t("adminAcademicsUi.stepTeachersMetaCount", { count: teacherCount })
+          : t("adminAcademicsUi.stepTeachersMetaEmpty"),
       },
       {
         step: 4,
         href: "/admin/subjects",
-        title: "Subject catalog",
-        detail: "Maintain codes and names used across the school.",
+        title: t("adminAcademicsUi.stepSubjectsTitle"),
+        detail: t("adminAcademicsUi.stepSubjectsDetail"),
         icon: "library",
         status: status(hasSubjects, hasTeachers),
-        meta: hasSubjects ? `${subjectCount} subjects` : "Add your subject list",
+        meta: hasSubjects
+          ? t("adminAcademicsUi.stepSubjectsMetaCount", { count: subjectCount })
+          : t("adminAcademicsUi.stepSubjectsMetaEmpty"),
       },
       {
         step: 5,
         href: "/admin/subjects/assign",
-        title: "Class assignments",
-        detail: "Link grade, section, subject, and teacher for the year.",
+        title: t("adminAcademicsUi.stepAssignTitle"),
+        detail: t("adminAcademicsUi.stepAssignDetail"),
         icon: "users",
         status: status(hasAssign, hasSubjects),
-        meta: hasAssign ? `${assignmentCount} assignments` : "Assign teachers to classes",
+        meta: hasAssign
+          ? t("adminAcademicsUi.stepAssignMetaCount", { count: assignmentCount })
+          : t("adminAcademicsUi.stepAssignMetaEmpty"),
       },
       {
         step: 6,
         href: "/admin/timetable",
-        title: "Timetable",
-        detail: "Build weekly periods once class subjects are in place.",
+        title: t("adminAcademicsUi.stepTimetableTitle"),
+        detail: t("adminAcademicsUi.stepTimetableDetail"),
         icon: "calendar",
         status: status(hasAssign, hasAssign),
-        meta: "Weekly schedule builder",
+        meta: t("adminAcademicsUi.stepTimetableMeta"),
       },
     ];
-  }, [years, termCount, teacherCount, subjectCount, assignmentCount, currentYear]);
+  }, [years, termCount, teacherCount, subjectCount, assignmentCount, currentYear, t]);
 
   const nextStep = steps.find((s) => s.status === "active") ?? steps.find((s) => s.status === "pending");
   const doneCount = steps.filter((s) => s.status === "done").length;
   const progressPct = Math.round((doneCount / steps.length) * 100);
 
   return (
-    <DashboardPage role="admin" title="Academics">
+    <DashboardPage role="admin" title={tp("Academics")}>
       <div className="acad-page acad-page--hub acad-v2">
         <AcademicsHero
-          chip="Academics"
+          chip={t("adminAcademicsUi.chip")}
           compact
-          title="Academic structure"
-          subtitle="Configure your year, terms, teachers, and class subjects. Each step opens its own workspace so registrar, academics, and HR can work independently."
+          title={t("adminAcademicsUi.heroTitle")}
+          subtitle={t("adminAcademicsUi.heroSub")}
           badges={
             loading ? null : (
               <>
                 {currentYear ? (
-                  <AcademicsBadge variant="live">Year: {currentYear.name}</AcademicsBadge>
+                  <AcademicsBadge variant="live">
+                    {t("adminAcademicsUi.yearBadge", { name: currentYear.name })}
+                  </AcademicsBadge>
                 ) : (
-                  <AcademicsBadge variant="muted">No current year</AcademicsBadge>
+                  <AcademicsBadge variant="muted">{t("adminAcademicsUi.noCurrentYear")}</AcademicsBadge>
                 )}
                 {nextStep ? (
-                  <AcademicsBadge variant="default">Next: {nextStep.title}</AcademicsBadge>
+                  <AcademicsBadge variant="default">
+                    {t("adminAcademicsUi.nextBadge", { title: nextStep.title })}
+                  </AcademicsBadge>
                 ) : (
-                  <AcademicsBadge variant="live">Setup complete</AcademicsBadge>
+                  <AcademicsBadge variant="live">{t("adminAcademicsUi.setupComplete")}</AcademicsBadge>
                 )}
               </>
             )
@@ -167,10 +186,18 @@ export default function AcademicsSetupPage() {
             loading
               ? undefined
               : [
-                  { label: "Years", value: years.length, hint: currentYear?.name },
-                  { label: "Terms", value: termCount },
-                  { label: "Teachers", value: teacherCount },
-                  { label: "Assignments", value: assignmentCount, accent: true },
+                  {
+                    label: t("adminAcademicsUi.statYears"),
+                    value: years.length,
+                    hint: currentYear?.name,
+                  },
+                  { label: t("adminAcademicsUi.statTerms"), value: termCount },
+                  { label: t("adminAcademicsUi.statTeachers"), value: teacherCount },
+                  {
+                    label: t("adminAcademicsUi.statAssignments"),
+                    value: assignmentCount,
+                    accent: true,
+                  },
                 ]
           }
         />
@@ -180,16 +207,19 @@ export default function AcademicsSetupPage() {
         {loading ? (
           <div className="acad-v2__loading">
             <span className="acad-v2__spinner" aria-hidden />
-            <p>Loading academics overview…</p>
+            <p>{t("adminAcademicsUi.loadingOverview")}</p>
           </div>
         ) : (
           <>
             <div className="acad-v2__progress">
               <div className="acad-v2__progress-copy">
                 <strong>
-                  {doneCount} of {steps.length} steps ready
+                  {t("adminAcademicsUi.stepsReady", {
+                    done: doneCount,
+                    total: steps.length,
+                  })}
                 </strong>
-                <span>{progressPct}% complete</span>
+                <span>{t("adminAcademicsUi.percentComplete", { pct: progressPct })}</span>
               </div>
               <div className="acad-v2__progress-bar" aria-hidden>
                 <span style={{ width: `${progressPct}%` }} />
@@ -198,18 +228,18 @@ export default function AcademicsSetupPage() {
 
             <section className="acad-v2__section">
               <header className="acad-v2__section-head">
-                <h3>Setup pipeline</h3>
-                <p>Work through each step in order — open any workspace when you are ready.</p>
+                <h3>{t("adminAcademicsUi.pipelineTitle")}</h3>
+                <p>{t("adminAcademicsUi.pipelineSub")}</p>
               </header>
               <AcademicsPipeline steps={steps} />
             </section>
 
-            <nav className="acad-v2__quick" aria-label="Related workspaces">
-              <a href="/admin/results">Results</a>
-              <a href="/admin/report-cards">Report cards</a>
-              <a href="/admin/results/templates">Assessment templates</a>
-              <Link href="/admin/students">Students</Link>
-              <a href="/admin/timetable">Timetable</a>
+            <nav className="acad-v2__quick" aria-label={t("adminAcademicsUi.relatedWorkspacesAria")}>
+              <a href="/admin/results">{t("adminAcademicsUi.quickResults")}</a>
+              <a href="/admin/report-cards">{t("adminAcademicsUi.quickReportCards")}</a>
+              <a href="/admin/results/templates">{t("adminAcademicsUi.quickTemplates")}</a>
+              <Link href="/admin/students">{t("adminAcademicsUi.quickStudents")}</Link>
+              <a href="/admin/timetable">{t("adminAcademicsUi.quickTimetable")}</a>
             </nav>
           </>
         )}

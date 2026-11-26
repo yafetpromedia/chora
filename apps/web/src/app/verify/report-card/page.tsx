@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { BrandMark } from "@/components/brand-mark";
 import { BRAND_NAME, BRAND_NAME_AM } from "@/lib/brand";
 import { getApiBaseUrl } from "@/lib/api";
+import { useLocale } from "@/components/i18n/locale-provider";
 
 type VerifyResult = {
   valid: boolean;
@@ -22,6 +23,7 @@ type VerifyResult = {
 };
 
 function VerifyInner() {
+  const { t } = useLocale();
   const searchParams = useSearchParams();
   const token = searchParams.get("t") ?? "";
   const [data, setData] = useState<VerifyResult | null>(null);
@@ -32,7 +34,7 @@ function VerifyInner() {
     let cancelled = false;
     void (async () => {
       if (!token) {
-        setError("This verification link is incomplete.");
+        setError(t("verifyReportCardUi.incomplete"));
         setLoading(false);
         return;
       }
@@ -47,7 +49,7 @@ function VerifyInner() {
         setLoading(false);
       } catch {
         if (cancelled) return;
-        setError("This report card could not be verified. The link may be invalid.");
+        setError(t("verifyReportCardUi.invalid"));
         setLoading(false);
       }
     })();
@@ -173,7 +175,7 @@ function VerifyInner() {
       `}</style>
 
       {loading ? (
-        <p className="rc-verify-loading">Verifying report card…</p>
+        <p className="rc-verify-loading">{t("verifyReportCardUi.loading")}</p>
       ) : error ? (
         <div className="rc-verify-card">
           <div className="rc-verify-card__head">

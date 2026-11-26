@@ -1,0 +1,117 @@
+/* Language switcher + Amharic typography */
+
+.lang-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.18rem;
+  border-radius: 999px;
+  border: 1px solid var(--brand-border, #c5e4e4);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.03);
+}
+
+.lang-switch__btn {
+  appearance: none;
+  border: 0;
+  margin: 0;
+  min-height: 1.85rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--brand-muted, #5f8f8f);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background 0.16s ease,
+    color 0.16s ease,
+    transform 0.16s ease;
+}
+
+.lang-switch__btn:hover {
+  color: var(--brand-ink, #1e4a4a);
+  background: rgba(15, 118, 110, 0.08);
+}
+
+.lang-switch__btn.is-active {
+  background: linear-gradient(135deg, #115e59, #0f766e);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(15, 118, 110, 0.22);
+}
+
+.lang-switch__btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.22);
+}
+
+.lang-switch--compact .lang-switch__btn {
+  min-height: 1.7rem;
+  padding: 0.28rem 0.62rem;
+  font-size: 0.68rem;
+}
+
+.lang-switch:not(.lang-switch--compact) .lang-switch__btn {
+  font-size: 0.74rem;
+  letter-spacing: 0.02em;
+  padding-inline: 0.8rem;
+}
+
+.dash-topbar-actions .lang-switch {
+  background: #fff;
+}
+
+.reg-top__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.lp3-nav__actions .lang-switch {
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.lp3-nav--over-hero .lang-switch {
+  border-color: rgba(255, 255, 255, 0.28);
+  background: rgba(15, 23, 42, 0.28);
+  backdrop-filter: blur(10px);
+  box-shadow: none;
+}
+
+.lp3-nav--over-hero .lang-switch__btn {
+  color: rgba(240, 253, 250, 0.72);
+}
+
+.lp3-nav--over-hero .lang-switch__btn:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.lp3-nav--over-hero .lang-switch__btn.is-active {
+  background: #14b8a6;
+  color: #042f2e;
+  box-shadow: 0 4px 14px rgba(20, 184, 166, 0.28);
+}
+
+/* Prefer Ethiopic glyphs when Amharic is active */
+body.locale-am {
+  font-family: var(--font-noto-ethiopic), var(--font-figtree), system-ui, sans-serif;
+}
+
+body.locale-am .dash-topbar-title,
+body.locale-am .dash-nav-label,
+body.locale-am .dash-tabbar__label,
+body.locale-am .par-att__title,
+body.locale-am .profile-hero__name {
+  letter-spacing: 0;
+  font-weight: 700;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lang-switch__btn {
+    transition: none;
+  }
+}

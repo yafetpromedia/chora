@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useLocale } from "@/components/i18n/locale-provider";
 import type { GradeWithSections, StudentRecord } from "@/lib/api";
 import { resetStudentPortalPassword, updateStudent } from "@/lib/school-setup";
 import { DashIcon } from "@/components/dashboard/dash-icons";
@@ -46,6 +47,16 @@ type Props = {
   onViewIdCard?: () => void;
 };
 
+function genderLabel(
+  value: string,
+  t: (key: string) => string,
+): string {
+  if (value === "MALE") return t("studentsUi.male");
+  if (value === "FEMALE") return t("studentsUi.female");
+  if (value === "OTHER") return t("studentsUi.other");
+  return value;
+}
+
 export function StudentManageDrawer({
   student,
   grades,
@@ -55,6 +66,7 @@ export function StudentManageDrawer({
   onRemove,
   onViewIdCard,
 }: Props) {
+  const { t } = useLocale();
   const [tab, setTab] = useState<ManageTab>("contact");
   const [idCard, setIdCard] = useState<StudentIdCard | null>(null);
   const [idCardLoading, setIdCardLoading] = useState(false);
@@ -116,13 +128,16 @@ export function StudentManageDrawer({
     [phone, fatherPhone, motherPhone, fatherName, motherName],
   );
 
-  const tabs: { id: ManageTab; label: string }[] = [
-    { id: "contact", label: "Contact" },
-    { id: "profile", label: "Profile" },
-    { id: "parents", label: "Parents" },
-    { id: "class", label: "Class" },
-    { id: "idcard", label: "ID card" },
-  ];
+  const tabs: { id: ManageTab; label: string }[] = useMemo(
+    () => [
+      { id: "contact", label: t("studentsUi.contact") },
+      { id: "profile", label: t("studentManageUi.tabProfile") },
+      { id: "parents", label: t("studentsUi.parents") },
+      { id: "class", label: t("studentsUi.class") },
+      { id: "idcard", label: t("studentsUi.idCard") },
+    ],
+    [t],
+  );
 
   const idCardKey = tab === "idcard" ? student.id : "";
   const [prevIdCardKey, setPrevIdCardKey] = useState("");
@@ -149,7 +164,7 @@ export function StudentManageDrawer({
         setStudentId(result.portalUsername);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not reset portal password");
+      setError(err instanceof Error ? err.message : t("studentManageUi.resetPortalFailed"));
     } finally {
       setPortalResetBusy(false);
     }
@@ -181,7 +196,7 @@ export function StudentManageDrawer({
       onSaved(updated);
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not save changes");
+      setError(err instanceof Error ? err.message : t("studentManageUi.saveFailed"));
     } finally {
       setSaving(false);
     }
@@ -207,7 +222,7 @@ export function StudentManageDrawer({
                 </span>
               )}
               <div>
-                <p className="stu-manage-hero__eyebrow">Manage student</p>
+                <p className="stu-manage-hero__eyebrow">{t("studentManageUi.manageStudent")}</p>
                 <h2 id="manage-title" className="stu-manage-hero__title">
                   {displayName}
                 </h2>
@@ -216,13 +231,17 @@ export function StudentManageDrawer({
                     href={`/admin/students/${student.id}/history`}
                     className="stu-manage-record-link"
                   >
-                    Open academic record →
+                    {t("studentManageUi.openAcademicRecord")}
                   </Link>
                 </p>
                 <p className="stu-manage-hero__ids">
-                  <span>{student.user.externalRef ?? "—"}</span>
+                  <span>{student.user.externalRef ?? t("studentsUi.emptyDash")}</span>
                   {student.fan || student.fcn ? (
-                    <span> · FAN {student.fan ?? student.fcn}</span>
+                    <span>
+                      {t("studentManageUi.fanWithId", {
+                        fan: student.fan ?? student.fcn ?? "",
+                      })}
+                    </span>
                   ) : null}
                 </p>
               </div>
@@ -231,7 +250,7 @@ export function StudentManageDrawer({
               type="button"
               className="stu-drawer__close stu-manage-close"
               onClick={onClose}
-              aria-label="Close"
+              aria-label={t("common.close")}
             >
               ×
             </button>
@@ -246,25 +265,31 @@ export function StudentManageDrawer({
             {age != null ? (
               <span className="stu-manage-badge">
                 <DashIcon name="calendar" className="dash-icon--xs" />
-                {age} yrs
+                {age} {t("studentsUi.yrs")}
               </span>
             ) : null}
             {gender ? (
-              <span className="stu-manage-badge stu-manage-badge--muted">{gender}</span>
+              <span className="stu-manage-badge stu-manage-badge--muted">
+                {genderLabel(gender, t)}
+              </span>
             ) : null}
           </div>
 
-          <nav className="stu-manage-tabs" role="tablist" aria-label="Student sections">
-            {tabs.map((t) => (
+          <nav
+            className="stu-manage-tabs"
+            role="tablist"
+            aria-label={t("studentManageUi.tabSectionsAria")}
+          >
+            {tabs.map((tabItem) => (
               <button
-                key={t.id}
+                key={tabItem.id}
                 type="button"
                 role="tab"
-                aria-selected={tab === t.id}
-                className={`stu-manage-tab${tab === t.id ? " stu-manage-tab--active" : ""}`}
-                onClick={() => setTab(t.id)}
+                aria-selected={tab === tabItem.id}
+                className={`stu-manage-tab${tab === tabItem.id ? " stu-manage-tab--active" : ""}`}
+                onClick={() => setTab(tabItem.id)}
               >
-                {t.label}
+                {tabItem.label}
               </button>
             ))}
           </nav>
@@ -278,21 +303,21 @@ export function StudentManageDrawer({
               <section className="stu-manage-card stu-manage-card--contact">
                 <h3 className="stu-manage-card__title">
                   <DashIcon name="students" className="dash-icon--sm" />
-                  Reach family & student
+                  {t("studentManageUi.reachFamily")}
                 </h3>
-                <p className="stu-manage-card__hint">Call or SMS directly from this panel.</p>
+                <p className="stu-manage-card__hint">{t("studentManageUi.reachFamilyHint")}</p>
                 <StudentContactLinks
-                  label="Student"
+                  label={t("studentsUi.student")}
                   name={displayName}
                   phone={contactPreview.studentPhone}
                 />
                 <StudentContactLinks
-                  label="Father"
+                  label={t("studentsUi.father")}
                   name={contactPreview.fatherName}
                   phone={contactPreview.fatherPhone}
                 />
                 <StudentContactLinks
-                  label="Mother"
+                  label={t("studentsUi.mother")}
                   name={contactPreview.motherName}
                   phone={contactPreview.motherPhone}
                 />
@@ -302,33 +327,33 @@ export function StudentManageDrawer({
             {tab === "profile" ? (
               <>
               <section className="stu-manage-card stu-portal-login">
-                <h3 className="stu-manage-card__title">Student portal login</h3>
-                <p className="stu-field-hint">
-                  Sign in at the login page with the username and password below.
-                </p>
+                <h3 className="stu-manage-card__title">
+                  {t("studentManageUi.studentPortalLogin")}
+                </h3>
+                <p className="stu-field-hint">{t("studentManageUi.portalSignInHint")}</p>
                 <dl className="stu-portal-login__fields">
                   <div>
-                    <dt>Username</dt>
+                    <dt>{t("studentManageUi.username")}</dt>
                     <dd>
                       {student.user.username?.trim() ||
                         student.user.externalRef?.trim() ||
-                        "—"}
+                        t("studentsUi.emptyDash")}
                     </dd>
                   </div>
                   <div>
-                    <dt>Password</dt>
+                    <dt>{t("auth.password")}</dt>
                     <dd>
                       {portalTempPassword ? (
                         <code className="stu-portal-login__code">{portalTempPassword}</code>
                       ) : (
                         <span className="stu-portal-login__changed">
-                          Changed by student — reset to issue a new temporary password.
+                          {t("studentManageUi.portalPasswordChanged")}
                         </span>
                       )}
                     </dd>
                   </div>
                   <div>
-                    <dt>Login email</dt>
+                    <dt>{t("studentManageUi.loginEmail")}</dt>
                     <dd className="stu-portal-login__email">{student.user.email}</dd>
                   </div>
                 </dl>
@@ -338,16 +363,22 @@ export function StudentManageDrawer({
                   disabled={portalResetBusy || saving}
                   onClick={() => void onResetPortalPassword()}
                 >
-                  {portalResetBusy ? "Resetting…" : "Reset portal password"}
+                  {portalResetBusy
+                    ? t("studentManageUi.resetting")
+                    : t("studentManageUi.resetPortalPassword")}
                 </button>
               </section>
 
               <section className="stu-manage-card">
-                <h3 className="stu-manage-card__title">Profile & photo</h3>
-                <StudentPhotoUpload value={photoUrl} onChange={setPhotoUrl} />
+                <h3 className="stu-manage-card__title">{t("studentManageUi.profileAndPhoto")}</h3>
+                <StudentPhotoUpload
+                  value={photoUrl}
+                  onChange={setPhotoUrl}
+                  label={t("studentRegisterUi.photoDefault")}
+                />
                 <div className="stu-field-row">
                   <div className="stu-field">
-                    <label htmlFor="m-fn">First name</label>
+                    <label htmlFor="m-fn">{t("profile.firstName")}</label>
                     <input
                       id="m-fn"
                       value={firstName}
@@ -356,7 +387,7 @@ export function StudentManageDrawer({
                     />
                   </div>
                   <div className="stu-field">
-                    <label htmlFor="m-middle">Middle name</label>
+                    <label htmlFor="m-middle">{t("admissionRegisterUi.middleName")}</label>
                     <input
                       id="m-middle"
                       value={middleName}
@@ -366,7 +397,7 @@ export function StudentManageDrawer({
                 </div>
                 <div className="stu-field-row">
                   <div className="stu-field">
-                    <label htmlFor="m-ln">Last name</label>
+                    <label htmlFor="m-ln">{t("profile.lastName")}</label>
                     <input
                       id="m-ln"
                       value={lastName}
@@ -375,7 +406,7 @@ export function StudentManageDrawer({
                     />
                   </div>
                   <div className="stu-field">
-                    <label htmlFor="m-id-number">FAN / FCN</label>
+                    <label htmlFor="m-id-number">{t("studentRegisterUi.fanOrFcn")}</label>
                     <input
                       id="m-id-number"
                       value={idNumber}
@@ -386,7 +417,7 @@ export function StudentManageDrawer({
                 </div>
                 <div className="stu-field-row">
                   <div className="stu-field">
-                    <label htmlFor="m-student-id">Student ID</label>
+                    <label htmlFor="m-student-id">{t("studentsUi.studentIdLabel")}</label>
                     <input
                       id="m-student-id"
                       value={studentId}
@@ -395,44 +426,44 @@ export function StudentManageDrawer({
                     />
                   </div>
                   <div className="stu-field">
-                    <label htmlFor="m-phone">Student phone</label>
+                    <label htmlFor="m-phone">{t("studentRegisterUi.studentPhone")}</label>
                     <input
                       id="m-phone"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
-                      placeholder="0911…"
+                      placeholder={t("studentRegisterUi.phoneFatherPlaceholder")}
                     />
                   </div>
                 </div>
                 <div className="stu-field">
-                  <label htmlFor="m-address">Home address</label>
+                  <label htmlFor="m-address">{t("studentRegisterUi.homeAddress")}</label>
                   <textarea
                     id="m-address"
                     className="stu-textarea"
                     rows={2}
                     value={address}
                     onChange={(e) => setAddress(e.target.value)}
-                    placeholder="House no., street, woreda, city…"
+                    placeholder={t("studentRegisterUi.addressPlaceholder")}
                   />
-                  <p className="stu-field-hint">Shown on the student ID card.</p>
+                  <p className="stu-field-hint">{t("studentManageUi.idCardAddressHint")}</p>
                 </div>
                 <div className="stu-field-row">
                   <div className="stu-field">
-                    <label htmlFor="m-gender">Sex</label>
+                    <label htmlFor="m-gender">{t("teachersUi.sex")}</label>
                     <select
                       id="m-gender"
                       value={gender}
                       onChange={(e) => setGender(e.target.value)}
                       required
                     >
-                      <option value="">Select</option>
-                      <option value="MALE">Male</option>
-                      <option value="FEMALE">Female</option>
-                      <option value="OTHER">Other</option>
+                      <option value="">{t("teachersUi.select")}</option>
+                      <option value="MALE">{t("studentsUi.male")}</option>
+                      <option value="FEMALE">{t("studentsUi.female")}</option>
+                      <option value="OTHER">{t("studentsUi.other")}</option>
                     </select>
                   </div>
                   <div className="stu-field">
-                    <label htmlFor="m-dob">Date of birth</label>
+                    <label htmlFor="m-dob">{t("admissionRegisterUi.dateOfBirth")}</label>
                     <input
                       id="m-dob"
                       type="date"
@@ -440,12 +471,18 @@ export function StudentManageDrawer({
                       onChange={(e) => setDateOfBirth(e.target.value)}
                       required
                     />
-                    {age != null ? <p className="stu-field-hint">Age: {age} years</p> : null}
+                    {age != null ? (
+                      <p className="stu-field-hint">
+                        {t("studentRegisterUi.ageYears", { age })}
+                      </p>
+                    ) : null}
                   </div>
                 </div>
                 {student.fayedaVerifiedAt ? (
                   <p className="stu-field-hint stu-manage-verified">
-                    Fayeda verified · FAN {student.fan ?? "—"}
+                    {t("studentManageUi.fayedaVerifiedFan", {
+                      fan: student.fan ?? t("studentsUi.emptyDash"),
+                    })}
                   </p>
                 ) : null}
               </section>
@@ -454,10 +491,12 @@ export function StudentManageDrawer({
 
             {tab === "parents" ? (
               <section className="stu-manage-card">
-                <h3 className="stu-manage-card__title">Parents / guardians</h3>
+                <h3 className="stu-manage-card__title">
+                  {t("studentRegisterUi.sectionParentsGuardians")}
+                </h3>
                 <div className="stu-field-row">
                   <div className="stu-field">
-                    <label htmlFor="m-father">Father full name</label>
+                    <label htmlFor="m-father">{t("studentRegisterUi.fatherFullName")}</label>
                     <input
                       id="m-father"
                       value={fatherName}
@@ -466,7 +505,7 @@ export function StudentManageDrawer({
                     />
                   </div>
                   <div className="stu-field">
-                    <label htmlFor="m-father-phone">Father phone</label>
+                    <label htmlFor="m-father-phone">{t("studentRegisterUi.fatherPhone")}</label>
                     <input
                       id="m-father-phone"
                       value={fatherPhone}
@@ -477,7 +516,7 @@ export function StudentManageDrawer({
                 </div>
                 <div className="stu-field-row">
                   <div className="stu-field">
-                    <label htmlFor="m-mother">Mother full name</label>
+                    <label htmlFor="m-mother">{t("studentRegisterUi.motherFullName")}</label>
                     <input
                       id="m-mother"
                       value={motherName}
@@ -486,7 +525,7 @@ export function StudentManageDrawer({
                     />
                   </div>
                   <div className="stu-field">
-                    <label htmlFor="m-mother-phone">Mother phone</label>
+                    <label htmlFor="m-mother-phone">{t("studentRegisterUi.motherPhone")}</label>
                     <input
                       id="m-mother-phone"
                       value={motherPhone}
@@ -500,10 +539,10 @@ export function StudentManageDrawer({
 
             {tab === "class" ? (
               <section className="stu-manage-card">
-                <h3 className="stu-manage-card__title">Class placement</h3>
+                <h3 className="stu-manage-card__title">{t("studentManageUi.classPlacement")}</h3>
                 <div className="stu-field-row">
                   <div className="stu-field">
-                    <label htmlFor="m-grade">Grade</label>
+                    <label htmlFor="m-grade">{t("teachersUi.grade")}</label>
                     <select
                       id="m-grade"
                       value={gradeId}
@@ -522,13 +561,13 @@ export function StudentManageDrawer({
                   </div>
                   {selectedGrade && selectedGrade.sections.length > 0 ? (
                     <div className="stu-field">
-                      <label htmlFor="m-section">Section</label>
+                      <label htmlFor="m-section">{t("teachersUi.section")}</label>
                       <select
                         id="m-section"
                         value={sectionId}
                         onChange={(e) => setSectionId(e.target.value)}
                       >
-                        <option value="">No section</option>
+                        <option value="">{t("studentRegisterUi.noSection")}</option>
                         {selectedGrade.sections.map((sec) => (
                           <option key={sec.id} value={sec.id}>
                             {sec.name}
@@ -543,15 +582,15 @@ export function StudentManageDrawer({
 
             {tab === "idcard" ? (
               <section className="stu-manage-card">
-                <h3 className="stu-manage-card__title">Campus ID preview</h3>
+                <h3 className="stu-manage-card__title">{t("studentManageUi.campusIdPreview")}</h3>
                 {idCardLoading ? (
-                  <p className="stu-field-hint">Loading card…</p>
+                  <p className="stu-field-hint">{t("studentManageUi.loadingCard")}</p>
                 ) : idCard ? (
                   <div className="sid-manage-preview">
                     <StudentIdCardView card={idCard} variant="standard" />
                   </div>
                 ) : (
-                  <p className="stu-field-hint">Could not load ID card.</p>
+                  <p className="stu-field-hint">{t("studentManageUi.loadCardFailed")}</p>
                 )}
                 {onViewIdCard ? (
                   <button
@@ -560,7 +599,7 @@ export function StudentManageDrawer({
                     style={{ marginTop: "0.75rem" }}
                     onClick={onViewIdCard}
                   >
-                    Open full card · Print
+                    {t("studentManageUi.openFullCardPrint")}
                   </button>
                 ) : null}
               </section>
@@ -575,11 +614,11 @@ export function StudentManageDrawer({
             disabled={busy || saving}
             onClick={() => onRemove(student)}
           >
-            Remove
+            {t("studentsUi.remove")}
           </button>
           <div className="stu-drawer__foot-actions">
             <button type="button" className="stu-btn stu-btn--ghost" onClick={onClose}>
-              Cancel
+              {t("common.cancel")}
             </button>
             {tab !== "idcard" ? (
               <button
@@ -588,7 +627,7 @@ export function StudentManageDrawer({
                 className="stu-btn stu-btn--primary"
                 disabled={saving}
               >
-                {saving ? "Saving…" : "Save changes"}
+                {saving ? t("common.saving") : t("profile.saveChanges")}
               </button>
             ) : null}
           </div>

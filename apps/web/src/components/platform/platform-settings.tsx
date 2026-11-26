@@ -4,6 +4,7 @@ import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DashIcon, type DashIconName } from "@/components/dashboard/dash-icons";
+import { useLocale } from "@/components/i18n/locale-provider";
 import {
   handlePlatformAuthFailure,
   type PlatformUser,
@@ -38,14 +39,16 @@ type Tab =
   | "ai"
   | "operations";
 
-const TABS: { id: Tab; label: string; icon: DashIconName }[] = [
-  { id: "general", label: "General", icon: "settings" },
-  { id: "onboarding", label: "Onboarding", icon: "plus" },
-  { id: "billing", label: "Billing", icon: "finance" },
-  { id: "communications", label: "Communications", icon: "mail" },
-  { id: "ai", label: "AI", icon: "flask" },
-  { id: "operations", label: "Operations", icon: "alert" },
-];
+function settingsTabs(t: (key: string) => string): { id: Tab; label: string; icon: DashIconName }[] {
+  return [
+    { id: "general", label: t("platformUi.settingsTabGeneral"), icon: "settings" },
+    { id: "onboarding", label: t("platformUi.settingsTabOnboarding"), icon: "plus" },
+    { id: "billing", label: t("platformUi.settingsTabBilling"), icon: "finance" },
+    { id: "communications", label: t("platformUi.settingsTabComms"), icon: "mail" },
+    { id: "ai", label: t("platformUi.settingsTabAi"), icon: "flask" },
+    { id: "operations", label: t("platformUi.settingsTabOps"), icon: "alert" },
+  ];
+}
 
 const AI_MODELS: Record<
   AiProviderId,
@@ -98,16 +101,28 @@ const TIMEZONES = [
   "America/New_York",
 ];
 
-const SHORTCUTS: {
-  href: string;
-  label: string;
-  desc: string;
-  icon: DashIconName;
-}[] = [
-  { href: "/", label: "Public site", desc: "Marketing & school registration", icon: "overview" },
-  { href: "/login", label: "School login", desc: "Staff, teachers, families", icon: "students" },
-  { href: "/register", label: "Register school", desc: "Self-serve tenant signup", icon: "plus" },
-];
+function settingsShortcuts(t: (key: string) => string) {
+  return [
+    {
+      href: "/",
+      label: t("platformUi.settingsShortcutPublic"),
+      desc: t("platformUi.settingsShortcutPublicDesc"),
+      icon: "overview" as const,
+    },
+    {
+      href: "/login",
+      label: t("platformUi.settingsShortcutLogin"),
+      desc: t("platformUi.settingsShortcutLoginDesc"),
+      icon: "students" as const,
+    },
+    {
+      href: "/register",
+      label: t("platformUi.settingsShortcutRegister"),
+      desc: t("platformUi.settingsShortcutRegisterDesc"),
+      icon: "plus" as const,
+    },
+  ];
+}
 
 function getApiUrl() {
   if (typeof window === "undefined") {
@@ -171,7 +186,10 @@ function applySettings(s: SettingsRow) {
 type Draft = ReturnType<typeof applySettings>;
 
 export function PlatformSettings({ user, onOpenProfile, onNavigate }: Props) {
+  const { t, locale } = useLocale();
   const router = useRouter();
+  const TABS = settingsTabs(t);
+  const SHORTCUTS = settingsShortcuts(t);
   const [tab, setTab] = useState<Tab>("general");
   const [settings, setSettings] = useState<SettingsRow | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -201,7 +219,7 @@ export function PlatformSettings({ user, onOpenProfile, onNavigate }: Props) {
   useEffect(() => {
     queueMicrotask(() => {
       void load()
-        .catch((err) => fail(err, "Failed to load settings"))
+        .catch((err) => fail(err, t("platformUi.errLoadSettings")))
         .finally(() => setLoading(false));
     });
   }, [load, router]);
@@ -209,11 +227,11 @@ export function PlatformSettings({ user, onOpenProfile, onNavigate }: Props) {
   const heroStats = useMemo(() => {
     if (!settings) return { reg: "—", trial: "—", maint: "—" };
     return {
-      reg: settings.allowSelfRegistration ? "Open" : "Closed",
+      reg: settings.allowSelfRegistration ? t("platformUi.settingsRegOpen") : t("platformUi.settingsRegClosed"),
       trial: `${settings.defaultTrialDays}d`,
-      maint: settings.maintenanceMode ? "On" : "Off",
+      maint: settings.maintenanceMode ? t("platformUi.settingsMaintOn") : t("platformUi.settingsMaintOff"),
     };
-  }, [settings]);
+  }, [settings, t]);
 
   function patch<K extends keyof Draft>(key: K, value: Draft[K]) {
     setDraft((prev) => (prev ? { ...prev, [key]: value } : prev));
@@ -273,9 +291,9 @@ export function PlatformSettings({ user, onOpenProfile, onNavigate }: Props) {
       });
       setSettings(updated);
       setDraft(applySettings(updated));
-      setToast("Platform settings saved.");
+      setToast(t("platformUi.settingsSaved"));
     } catch (err) {
-      fail(err, "Could not save settings");
+      fail(err, t("platformUi.settingsSaveFailed"));
     } finally {
       setSaving(false);
     }
@@ -290,9 +308,9 @@ export function PlatformSettings({ user, onOpenProfile, onNavigate }: Props) {
       const updated = await updatePlatformSettings({ aiApiKey: null });
       setSettings(updated);
       setDraft(applySettings(updated));
-      setToast("AI API key removed.");
+      setToast(t("platformUi.settingsAiKeyRemoved"));
     } catch (err) {
-      fail(err, "Could not clear AI key");
+      fail(err, t("platformUi.settingsAiKeyCleared"));
     } finally {
       setSaving(false);
     }
@@ -302,7 +320,7 @@ export function PlatformSettings({ user, onOpenProfile, onNavigate }: Props) {
     if (!isOwner || !draft) return;
     const key = draft.aiApiKey.trim();
     if (!key && !draft.aiConfigured) {
-      setError("Paste your Gemini API key, click Save settings, then Test connection.");
+      setError(t("platformUi.settingsAiPasteTest"));
       return;
     }
     setTestingAi(true);
@@ -317,12 +335,14 @@ export function PlatformSettings({ user, onOpenProfile, onNavigate }: Props) {
         ...(key ? { aiApiKey: key } : {}),
       });
       setToast(
-        `AI OK · ${result.provider} · ${result.model}${
-          result.reply ? ` · “${result.reply.slice(0, 80)}”` : ""
-        }`,
+        t("platformUi.settingsAiTestOk", {
+          provider: result.provider,
+          model: result.model,
+          reply: result.reply ? ` · “${result.reply.slice(0, 80)}”` : "",
+        }),
       );
     } catch (err) {
-      fail(err, "AI connection test failed");
+      fail(err, t("platformUi.settingsAiTestFail"));
     } finally {
       setTestingAi(false);
     }
@@ -352,9 +372,11 @@ export function PlatformSettings({ user, onOpenProfile, onNavigate }: Props) {
       <div className="plat-subjects-v2 plat-settings-v2">
         <AppToast message={error} tone="error" onDismiss={() => setError("")} />
         <div className="plat-subjects-v2__empty" style={{ padding: "2rem 1.25rem", textAlign: "center" }}>
-          <p style={{ margin: 0, fontWeight: 700, color: "#0f172a" }}>Couldn’t load platform settings</p>
+          <p style={{ margin: 0, fontWeight: 700, color: "#0f172a" }}>
+            {t("platformUi.settingsLoadFailTitle")}
+          </p>
           <p style={{ margin: "0.5rem 0 1rem", color: "#64748b", fontSize: "0.9rem" }}>
-            {error || "The settings API failed. Check that the database is up to date, then retry."}
+            {error || t("platformUi.settingsLoadFailSub")}
           </p>
           <button
             type="button"
@@ -363,11 +385,11 @@ export function PlatformSettings({ user, onOpenProfile, onNavigate }: Props) {
               setLoading(true);
               setError("");
               void load()
-                .catch((err) => fail(err, "Failed to load settings"))
+                .catch((err) => fail(err, t("platformUi.errLoadSettings")))
                 .finally(() => setLoading(false));
             }}
           >
-            Retry
+            {t("common.retry")}
           </button>
         </div>
       </div>
@@ -385,25 +407,23 @@ export function PlatformSettings({ user, onOpenProfile, onNavigate }: Props) {
             <DashIcon name="settings" className="dash-icon--md" />
           </span>
           <div>
-            <p className="plat-subjects-v2__eyebrow">Configuration</p>
-            <h2 className="plat-subjects-v2__title">Platform settings</h2>
-            <p className="plat-subjects-v2__sub">
-              Global defaults for onboarding, billing, AI, communications, and operations.
-            </p>
+            <p className="plat-subjects-v2__eyebrow">{t("platformUi.settingsEyebrow")}</p>
+            <h2 className="plat-subjects-v2__title">{t("platformUi.settingsTitle")}</h2>
+            <p className="plat-subjects-v2__sub">{t("platformUi.settingsSub")}</p>
           </div>
         </div>
         <div className="plat-subjects-v2__hero-stats">
           <div className="plat-subjects-v2__stat">
             <strong>{draft.platformName}</strong>
-            <span>Brand</span>
+            <span>{t("platformUi.settingsStatBrand")}</span>
           </div>
           <div className="plat-subjects-v2__stat">
             <strong>{heroStats.reg}</strong>
-            <span>Registration</span>
+            <span>{t("platformUi.settingsStatRegistration")}</span>
           </div>
           <div className="plat-subjects-v2__stat">
             <strong>{heroStats.maint}</strong>
-            <span>Maintenance</span>
+            <span>{t("platformUi.settingsStatMaintenance")}</span>
           </div>
         </div>
       </header>
@@ -413,33 +433,31 @@ export function PlatformSettings({ user, onOpenProfile, onNavigate }: Props) {
           <DashIcon name="calendar" className="dash-icon--sm" />
           <div>
             <strong>{heroStats.trial}</strong>
-            <span>Default trial</span>
+            <span>{t("platformUi.settingsKpiTrial")}</span>
           </div>
         </article>
         <article className="plat-subjects-v2__kpi">
           <DashIcon name="fees" className="dash-icon--sm" />
           <div>
             <strong>{draft.invoicePrefix}</strong>
-            <span>Invoice prefix</span>
+            <span>{t("platformUi.settingsKpiPrefix")}</span>
           </div>
         </article>
         <article className="plat-subjects-v2__kpi">
           <DashIcon name="finance" className="dash-icon--sm" />
           <div>
             <strong>{draft.defaultBillingCurrency}</strong>
-            <span>Default currency</span>
+            <span>{t("platformUi.settingsKpiCurrency")}</span>
           </div>
         </article>
       </div>
 
       {!isOwner ? (
-        <p className="plat-settings-v2__readonly">
-          You can view settings. Only <strong>OWNER</strong> operators can save changes.
-        </p>
+        <p className="plat-settings-v2__readonly">{t("platformUi.settingsReadonly")}</p>
       ) : null}
 
       <div className="set-v2__toolbar">
-        <nav className="set-v2__tabs" aria-label="Settings sections">
+        <nav className="set-v2__tabs" aria-label={t("platformUi.settingsSectionsAria")}>
           {TABS.map((item) => (
             <button
               key={item.id}
@@ -462,15 +480,13 @@ export function PlatformSettings({ user, onOpenProfile, onNavigate }: Props) {
                 <DashIcon name="settings" className="dash-icon--sm" />
               </span>
               <div>
-                <h2 className="set-v2__panel-title">General</h2>
-                <p className="set-v2__panel-sub">
-                  Platform identity and support contact shown across the console and emails.
-                </p>
+                <h2 className="set-v2__panel-title">{t("platformUi.settingsGeneralTitle")}</h2>
+                <p className="set-v2__panel-sub">{t("platformUi.settingsGeneralSub")}</p>
               </div>
             </div>
             <div className="cfg-form">
               <div className="cfg-field">
-                <label htmlFor="ps-name">Platform name</label>
+                <label htmlFor="ps-name">{t("platformUi.settingsPlatformName")}</label>
                 <input
                   id="ps-name"
                   value={draft.platformName}
@@ -492,7 +508,7 @@ export function PlatformSettings({ user, onOpenProfile, onNavigate }: Props) {
                 onUploaded={(updated) => {
                   setSettings(updated);
                   setDraft(applySettings(updated));
-                  setToast("Demo video uploaded.");
+                  setToast(t("platformUi.settingsDemoVideoSaved"));
                 }}
                 disabled={!isOwner}
               />
@@ -506,14 +522,14 @@ export function PlatformSettings({ user, onOpenProfile, onNavigate }: Props) {
                 onUploaded={(updated) => {
                   setSettings(updated);
                   setDraft(applySettings(updated));
-                  setToast("Product documentation uploaded.");
+                  setToast(t("platformUi.settingsDocsSaved"));
                 }}
                 disabled={!isOwner}
               />
               <div className="cfg-field">
-                <label>Social media links</label>
+                <label>{t("platformUi.settingsSocialLinks")}</label>
                 <p className="set-v2__panel-sub" style={{ margin: "0 0 0.75rem" }}>
-                  Shown in the public site footer. Leave a field empty to hide that icon.
+                  {t("platformUi.settingsSocialSub")}
                 </p>
                 <div className="plat-settings-social">
                   {SOCIAL_LINK_DEFS.map((item) => (
@@ -534,7 +550,7 @@ export function PlatformSettings({ user, onOpenProfile, onNavigate }: Props) {
               </div>
               <div className="cfg-form-row">
                 <div className="cfg-field">
-                  <label htmlFor="ps-email">Support email</label>
+                  <label htmlFor="ps-email">{t("platformUi.settingsSupportEmail")}</label>
                   <input
                     id="ps-email"
                     type="email"
@@ -545,7 +561,7 @@ export function PlatformSettings({ user, onOpenProfile, onNavigate }: Props) {
                   />
                 </div>
                 <div className="cfg-field">
-                  <label htmlFor="ps-phone">Support phone</label>
+                  <label htmlFor="ps-phone">{t("platformUi.settingsSupportPhone")}</label>
                   <input
                     id="ps-phone"
                     value={draft.supportPhone}
@@ -557,7 +573,7 @@ export function PlatformSettings({ user, onOpenProfile, onNavigate }: Props) {
               </div>
               <div className="cfg-form-row">
                 <div className="cfg-field">
-                  <label htmlFor="ps-country">Default country</label>
+                  <label htmlFor="ps-country">{t("platformUi.settingsDefaultCountry")}</label>
                   <input
                     id="ps-country"
                     value={draft.defaultCountry}
@@ -566,7 +582,7 @@ export function PlatformSettings({ user, onOpenProfile, onNavigate }: Props) {
                   />
                 </div>
                 <div className="cfg-field">
-                  <label htmlFor="ps-tz">Default timezone</label>
+                  <label htmlFor="ps-tz">{t("platformUi.settingsDefaultTz")}</label>
                   <select
                     id="ps-tz"
                     value={draft.defaultTimezone}
@@ -592,11 +608,8 @@ export function PlatformSettings({ user, onOpenProfile, onNavigate }: Props) {
                 <DashIcon name="plus" className="dash-icon--sm" />
               </span>
               <div>
-                <h2 className="set-v2__panel-title">School onboarding</h2>
-                <p className="set-v2__panel-sub">
-                  Controls self-service registration at <Link href="/register">/register</Link> and
-                  default trial length for new tenants.
-                </p>
+                <h2 className="set-v2__panel-title">{t("platformUi.settingsOnboardTitle")}</h2>
+                <p className="set-v2__panel-sub">{t("platformUi.settingsOnboardSub")}</p>
               </div>
             </div>
             <div className="plat-settings-v2__toggles">
@@ -608,8 +621,8 @@ export function PlatformSettings({ user, onOpenProfile, onNavigate }: Props) {
                   disabled={!isOwner}
                 />
                 <span>
-                  <strong>Allow self-registration</strong>
-                  <small>Schools can sign up without platform operator approval</small>
+                  <strong>{t("platformUi.settingsAllowSelfReg")}</strong>
+                  <small>{t("platformUi.settingsAllowSelfRegHint")}</small>
                 </span>
               </label>
               <label className="plat-settings-v2__toggle">
@@ -620,14 +633,14 @@ export function PlatformSettings({ user, onOpenProfile, onNavigate }: Props) {
                   disabled={!isOwner}
                 />
                 <span>
-                  <strong>Require admin approval</strong>
-                  <small>New tenants stay pending until a platform operator activates them</small>
+                  <strong>{t("platformUi.settingsRequireApproval")}</strong>
+                  <small>{t("platformUi.settingsRequireApprovalHint")}</small>
                 </span>
               </label>
             </div>
             <div className="cfg-form" style={{ marginTop: "1rem" }}>
               <div className="cfg-field">
-                <label htmlFor="ps-trial">Default trial length (days)</label>
+                <label htmlFor="ps-trial">{t("platformUi.settingsTrialDays")}</label>
                 <input
                   id="ps-trial"
                   type="number"
@@ -637,17 +650,17 @@ export function PlatformSettings({ user, onOpenProfile, onNavigate }: Props) {
                   onChange={(e) => patch("defaultTrialDays", e.target.value)}
                   disabled={!isOwner}
                 />
-                <p className="cfg-hint">Also updates the Trial plan in the plan catalog.</p>
+                <p className="cfg-hint">{t("platformUi.settingsTrialHint")}</p>
               </div>
               <div className="cfg-field">
-                <label htmlFor="ps-welcome">Welcome message</label>
+                <label htmlFor="ps-welcome">{t("platformUi.settingsWelcome")}</label>
                 <textarea
                   id="ps-welcome"
                   rows={4}
                   value={draft.welcomeMessage}
                   onChange={(e) => patch("welcomeMessage", e.target.value)}
                   disabled={!isOwner}
-                  placeholder="Shown on the registration page…"
+                  placeholder={t("platformUi.settingsWelcomePh")}
                 />
               </div>
             </div>
@@ -661,16 +674,14 @@ export function PlatformSettings({ user, onOpenProfile, onNavigate }: Props) {
                 <DashIcon name="finance" className="dash-icon--sm" />
               </span>
               <div>
-                <h2 className="set-v2__panel-title">Billing defaults</h2>
-                <p className="set-v2__panel-sub">
-                  Invoice numbering, currency, and overdue handling for platform billing.
-                </p>
+                <h2 className="set-v2__panel-title">{t("platformUi.settingsBillingTitle")}</h2>
+                <p className="set-v2__panel-sub">{t("platformUi.settingsBillingSub")}</p>
               </div>
             </div>
             <div className="cfg-form">
               <div className="cfg-form-row">
                 <div className="cfg-field">
-                  <label htmlFor="ps-currency">Default invoice currency</label>
+                  <label htmlFor="ps-currency">{t("platformUi.settingsDefaultCurrency")}</label>
                   <select
                     id="ps-currency"
                     value={draft.defaultBillingCurrency}
@@ -684,7 +695,7 @@ export function PlatformSettings({ user, onOpenProfile, onNavigate }: Props) {
                   </select>
                 </div>
                 <div className="cfg-field">
-                  <label htmlFor="ps-prefix">Invoice prefix</label>
+                  <label htmlFor="ps-prefix">{t("platformUi.settingsInvoicePrefix")}</label>
                   <input
                     id="ps-prefix"
                     value={draft.invoicePrefix}
@@ -693,11 +704,13 @@ export function PlatformSettings({ user, onOpenProfile, onNavigate }: Props) {
                     maxLength={12}
                     placeholder="INV"
                   />
-                  <p className="cfg-hint">e.g. {draft.invoicePrefix}-2026-00001</p>
+                  <p className="cfg-hint">
+                    {t("platformUi.settingsInvoicePrefixHint", { prefix: draft.invoicePrefix })}
+                  </p>
                 </div>
               </div>
               <div className="cfg-field">
-                <label htmlFor="ps-grace">Invoice grace period (days)</label>
+                <label htmlFor="ps-grace">{t("platformUi.settingsGraceDays")}</label>
                 <input
                   id="ps-grace"
                   type="number"
@@ -716,20 +729,19 @@ export function PlatformSettings({ user, onOpenProfile, onNavigate }: Props) {
                   disabled={!isOwner}
                 />
                 <span>
-                  <strong>Auto-suspend overdue schools</strong>
-                  <small>Suspend tenant access when invoices pass due date (coming soon)</small>
+                  <strong>{t("platformUi.settingsAutoSuspend")}</strong>
+                  <small>{t("platformUi.settingsAutoSuspendHint")}</small>
                 </span>
               </label>
               <h3 className="set-v2__subhead" style={{ marginTop: "1.25rem" }}>
-                Where schools pay you
+                {t("platformUi.settingsPayoutTitle")}
               </h3>
               <p className="set-v2__panel-sub" style={{ marginBottom: "0.85rem" }}>
-                Schools send subscription payments here after they request an invoice. This is
-                your CampusOne account, not the school’s fee account.
+                {t("platformUi.settingsPayoutSub")}
               </p>
               <div className="cfg-form-row">
                 <div className="cfg-field">
-                  <label htmlFor="ps-telebirr">Telebirr number</label>
+                  <label htmlFor="ps-telebirr">{t("platformUi.settingsTelebirr")}</label>
                   <input
                     id="ps-telebirr"
                     value={draft.telebirrNumber}
@@ -739,29 +751,29 @@ export function PlatformSettings({ user, onOpenProfile, onNavigate }: Props) {
                   />
                 </div>
                 <div className="cfg-field">
-                  <label htmlFor="ps-telebirr-name">Telebirr account name</label>
+                  <label htmlFor="ps-telebirr-name">{t("platformUi.settingsTelebirrName")}</label>
                   <input
                     id="ps-telebirr-name"
                     value={draft.telebirrAccountName}
                     onChange={(e) => patch("telebirrAccountName", e.target.value)}
                     disabled={!isOwner}
-                    placeholder="CampusOne / your business name"
+                    placeholder={t("platformUi.settingsTelebirrNamePh")}
                   />
                 </div>
               </div>
               <div className="cfg-field">
-                <label htmlFor="ps-bank">Bank name</label>
+                <label htmlFor="ps-bank">{t("platformUi.settingsBankName")}</label>
                 <input
                   id="ps-bank"
                   value={draft.bankName}
                   onChange={(e) => patch("bankName", e.target.value)}
                   disabled={!isOwner}
-                  placeholder="Commercial Bank of Ethiopia"
+                  placeholder={t("platformUi.settingsBankNamePh")}
                 />
               </div>
               <div className="cfg-form-row">
                 <div className="cfg-field">
-                  <label htmlFor="ps-acc-name">Account holder</label>
+                  <label htmlFor="ps-acc-name">{t("platformUi.settingsAccHolder")}</label>
                   <input
                     id="ps-acc-name"
                     value={draft.bankAccountHolder}
@@ -770,7 +782,7 @@ export function PlatformSettings({ user, onOpenProfile, onNavigate }: Props) {
                   />
                 </div>
                 <div className="cfg-field">
-                  <label htmlFor="ps-acc-num">Account number</label>
+                  <label htmlFor="ps-acc-num">{t("platformUi.settingsAccNumber")}</label>
                   <input
                     id="ps-acc-num"
                     value={draft.bankAccountNumber}
@@ -780,14 +792,14 @@ export function PlatformSettings({ user, onOpenProfile, onNavigate }: Props) {
                 </div>
               </div>
               <div className="cfg-field">
-                <label htmlFor="ps-payout-note">Payment instructions</label>
+                <label htmlFor="ps-payout-note">{t("platformUi.settingsPayoutNote")}</label>
                 <textarea
                   id="ps-payout-note"
                   rows={3}
                   value={draft.payoutInstructions}
                   onChange={(e) => patch("payoutInstructions", e.target.value)}
                   disabled={!isOwner}
-                  placeholder="Include the invoice number in the Telebirr remark or bank reference…"
+                  placeholder={t("platformUi.settingsPayoutNotePh")}
                 />
               </div>
             </div>
@@ -798,7 +810,7 @@ export function PlatformSettings({ user, onOpenProfile, onNavigate }: Props) {
                 style={{ marginTop: "0.75rem" }}
                 onClick={() => onNavigate("plans")}
               >
-                Edit plan prices & limits →
+                {t("platformUi.settingsEditPlans")}
               </button>
             ) : null}
           </section>
@@ -811,15 +823,13 @@ export function PlatformSettings({ user, onOpenProfile, onNavigate }: Props) {
                 <DashIcon name="mail" className="dash-icon--sm" />
               </span>
               <div>
-                <h2 className="set-v2__panel-title">Communications</h2>
-                <p className="set-v2__panel-sub">
-                  Default sender details for platform emails and SMS templates.
-                </p>
+                <h2 className="set-v2__panel-title">{t("platformUi.settingsCommsTitle")}</h2>
+                <p className="set-v2__panel-sub">{t("platformUi.settingsCommsSub")}</p>
               </div>
             </div>
             <div className="cfg-form">
               <div className="cfg-field">
-                <label htmlFor="ps-from">Email from name</label>
+                <label htmlFor="ps-from">{t("platformUi.settingsEmailFrom")}</label>
                 <input
                   id="ps-from"
                   value={draft.emailFromName}
@@ -829,7 +839,7 @@ export function PlatformSettings({ user, onOpenProfile, onNavigate }: Props) {
                 />
               </div>
               <div className="cfg-field">
-                <label htmlFor="ps-reply">Reply-to email</label>
+                <label htmlFor="ps-reply">{t("platformUi.settingsReplyTo")}</label>
                 <input
                   id="ps-reply"
                   type="email"
@@ -840,7 +850,7 @@ export function PlatformSettings({ user, onOpenProfile, onNavigate }: Props) {
                 />
               </div>
               <div className="cfg-field">
-                <label htmlFor="ps-sms">SMS sender name</label>
+                <label htmlFor="ps-sms">{t("platformUi.settingsSmsSender")}</label>
                 <input
                   id="ps-sms"
                   value={draft.smsSenderName}
@@ -858,7 +868,7 @@ export function PlatformSettings({ user, onOpenProfile, onNavigate }: Props) {
                 style={{ marginTop: "0.75rem" }}
                 onClick={() => onNavigate("messages")}
               >
-                Edit message templates →
+                {t("platformUi.settingsEditTemplates")}
               </button>
             ) : null}
           </section>
@@ -872,11 +882,8 @@ export function PlatformSettings({ user, onOpenProfile, onNavigate }: Props) {
                   <DashIcon name="flask" className="dash-icon--sm" />
                 </span>
                 <div>
-                  <h2 className="set-v2__panel-title">AI provider</h2>
-                  <p className="set-v2__panel-sub">
-                    Power study assist, announcement drafts, report comments, and the in-app assistant
-                    for every school. Gemini is recommended.
-                  </p>
+                  <h2 className="set-v2__panel-title">{t("platformUi.settingsAiTitle")}</h2>
+                  <p className="set-v2__panel-sub">{t("platformUi.settingsAiSub")}</p>
                 </div>
               </div>
 
@@ -894,20 +901,22 @@ export function PlatformSettings({ user, onOpenProfile, onNavigate }: Props) {
               >
                 <strong style={{ display: "block", fontSize: "0.85rem", color: "#0f172a" }}>
                   {draft.aiEnabled && draft.aiConfigured
-                    ? "AI is ready"
+                    ? t("platformUi.settingsAiReady")
                     : draft.aiConfigured
-                      ? "Key saved — enable AI to use it"
+                      ? t("platformUi.settingsAiKeySavedEnable")
                       : draft.aiApiKey.trim()
-                        ? "Key entered — click Save settings"
-                        : "Not configured"}
+                        ? t("platformUi.settingsAiKeyEnterSave")
+                        : t("platformUi.settingsAiNotConfigured")}
                 </strong>
                 <span style={{ fontSize: "0.8rem", color: "#64748b" }}>
                   {draft.aiApiKeyMasked
-                    ? `Saved key: ${draft.aiApiKeyMasked}`
+                    ? t("platformUi.settingsAiSavedKey", { mask: draft.aiApiKeyMasked })
                     : draft.aiApiKey.trim()
-                      ? "Save to store the key, then Test connection."
-                      : "Paste your Gemini API key below, then Save."}
-                  {draft.aiModel ? ` · Model: ${draft.aiModel}` : ""}
+                      ? t("platformUi.settingsAiSaveThenTest")
+                      : t("platformUi.settingsAiPasteSave")}
+                  {draft.aiModel
+                    ? t("platformUi.settingsAiModelSuffix", { model: draft.aiModel })
+                    : ""}
                 </span>
               </div>
 
@@ -919,13 +928,13 @@ export function PlatformSettings({ user, onOpenProfile, onNavigate }: Props) {
                   disabled={!isOwner}
                 />
                 <span>
-                  <strong>Enable platform AI</strong>
-                  <small>When on, schools use this key instead of server env vars</small>
+                  <strong>{t("platformUi.settingsAiEnable")}</strong>
+                  <small>{t("platformUi.settingsAiEnableHint")}</small>
                 </span>
               </label>
 
               <div className="cfg-field" style={{ marginTop: "0.85rem" }}>
-                <label htmlFor="ps-ai-provider">Provider</label>
+                <label htmlFor="ps-ai-provider">{t("platformUi.settingsProvider")}</label>
                 <select
                   id="ps-ai-provider"
                   value={draft.aiProvider}
@@ -941,17 +950,25 @@ export function PlatformSettings({ user, onOpenProfile, onNavigate }: Props) {
                 >
                   {AI_PROVIDERS.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.label}
+                      {p.id === "gemini"
+                        ? t("platformUi.settingsAiProviderGemini")
+                        : p.id === "openai"
+                          ? t("platformUi.settingsAiProviderOpenai")
+                          : t("platformUi.settingsAiProviderFreemodel")}
                     </option>
                   ))}
                 </select>
                 <p className="cfg-hint">
-                  {AI_PROVIDERS.find((p) => p.id === draft.aiProvider)?.hint}
+                  {draft.aiProvider === "gemini"
+                    ? t("platformUi.settingsAiHintGemini")
+                    : draft.aiProvider === "openai"
+                      ? t("platformUi.settingsAiHintOpenai")
+                      : t("platformUi.settingsAiHintFreemodel")}
                 </p>
               </div>
 
               <div className="cfg-field">
-                <label htmlFor="ps-ai-key">API key</label>
+                <label htmlFor="ps-ai-key">{t("platformUi.settingsApiKey")}</label>
                 <input
                   id="ps-ai-key"
                   type="password"
@@ -961,37 +978,37 @@ export function PlatformSettings({ user, onOpenProfile, onNavigate }: Props) {
                   disabled={!isOwner}
                   placeholder={
                     draft.aiConfigured
-                      ? "Leave blank to keep the saved key"
+                      ? t("platformUi.settingsApiKeyKeep")
                       : draft.aiProvider === "gemini"
-                        ? "AIza…"
-                        : "sk-…"
+                        ? t("platformUi.settingsApiKeyGeminiPh")
+                        : t("platformUi.settingsApiKeyOpenaiPh")
                   }
                 />
                 <p className="cfg-hint">
                   {draft.aiProvider === "gemini" ? (
                     <>
-                      Create a key in{" "}
+                      {t("platformUi.settingsAiStudioLead")}{" "}
                       <a
                         href="https://aistudio.google.com/apikey"
                         target="_blank"
                         rel="noreferrer"
                       >
-                        Google AI Studio
+                        {t("platformUi.settingsAiStudio")}
                       </a>
-                      . The full key is never shown again after save.
+                      . {t("platformUi.settingsAiKeyNeverShown")}
                     </>
                   ) : (
-                    "The full key is never shown again after save."
+                    t("platformUi.settingsAiKeyNeverShown")
                   )}
                 </p>
               </div>
 
               <div className="cfg-field">
-                <label htmlFor="ps-ai-model">Model</label>
+                <label htmlFor="ps-ai-model">{t("platformUi.settingsModel")}</label>
                 <div
                   className="plat-ai-models"
                   role="group"
-                  aria-label="Quick model switch"
+                  aria-label={t("platformUi.settingsModelGroupAria")}
                   style={{
                     display: "flex",
                     flexWrap: "wrap",
@@ -1040,7 +1057,7 @@ export function PlatformSettings({ user, onOpenProfile, onNavigate }: Props) {
                       {m.note ? ` — ${m.note}` : ""}
                     </option>
                   ))}
-                  <option value="__custom__">Custom model name…</option>
+                  <option value="__custom__">{t("platformUi.settingsCustomModel")}</option>
                 </select>
                 {!(AI_MODELS[draft.aiProvider] ?? []).some((m) => m.id === draft.aiModel) ? (
                   <input
@@ -1050,16 +1067,13 @@ export function PlatformSettings({ user, onOpenProfile, onNavigate }: Props) {
                     onChange={(e) => patch("aiModel", e.target.value)}
                     disabled={!isOwner}
                     placeholder="custom-model-id"
-                    aria-label="Custom model id"
+                    aria-label={t("platformUi.settingsCustomModelAria")}
                   />
                 ) : null}
-                <p className="cfg-hint">
-                  Tap a chip to switch models, then Save → Test. Flash is cheaper/faster; Pro is
-                  stronger.
-                </p>
+                <p className="cfg-hint">{t("platformUi.settingsModelHint")}</p>
               </div>
               <div className="cfg-field">
-                <label htmlFor="ps-ai-base">Base URL (optional)</label>
+                <label htmlFor="ps-ai-base">{t("platformUi.settingsBaseUrl")}</label>
                 <input
                   id="ps-ai-base"
                   type="url"
@@ -1068,14 +1082,14 @@ export function PlatformSettings({ user, onOpenProfile, onNavigate }: Props) {
                   disabled={!isOwner}
                   placeholder={
                     draft.aiProvider === "gemini"
-                      ? "Leave blank (recommended)"
-                      : "Provider default"
+                      ? t("platformUi.settingsBaseUrlGeminiPh")
+                      : t("platformUi.settingsBaseUrlDefaultPh")
                   }
                 />
                 <p className="cfg-hint">
                   {draft.aiProvider === "gemini"
-                    ? "For Gemini, leave this blank. Old …/openai URLs are ignored automatically."
-                    : "Leave blank to use the provider default endpoint."}
+                    ? t("platformUi.settingsBaseUrlGeminiHint")
+                    : t("platformUi.settingsBaseUrlHint")}
                 </p>
               </div>
 
@@ -1095,14 +1109,14 @@ export function PlatformSettings({ user, onOpenProfile, onNavigate }: Props) {
                     disabled={testingAi || saving || (!draft.aiConfigured && !draft.aiApiKey.trim())}
                     onClick={() => void onTestAi()}
                   >
-                    {testingAi ? "Testing…" : "Test connection"}
+                    {testingAi ? t("platformUi.settingsTesting") : t("platformUi.settingsTestConnection")}
                   </button>
                   <button
                     type="submit"
                     className="plat-btn plat-btn--ghost plat-btn--sm"
                     disabled={saving}
                   >
-                    {saving ? "Saving…" : "Save model / settings"}
+                    {saving ? t("common.saving") : t("platformUi.settingsSaveModel")}
                   </button>
                   {draft.aiConfigured ? (
                     <button
@@ -1111,7 +1125,7 @@ export function PlatformSettings({ user, onOpenProfile, onNavigate }: Props) {
                       disabled={saving}
                       onClick={() => void onClearAiKey()}
                     >
-                      Remove saved key
+                      {t("platformUi.settingsRemoveKey")}
                     </button>
                   ) : null}
                 </div>
@@ -1128,10 +1142,8 @@ export function PlatformSettings({ user, onOpenProfile, onNavigate }: Props) {
                   <DashIcon name="alert" className="dash-icon--sm" />
                 </span>
                 <div>
-                  <h2 className="set-v2__panel-title">Maintenance mode</h2>
-                  <p className="set-v2__panel-sub">
-                    Blocks new school registration while keeping existing tenants online.
-                  </p>
+                  <h2 className="set-v2__panel-title">{t("platformUi.settingsMaintTitle")}</h2>
+                  <p className="set-v2__panel-sub">{t("platformUi.settingsMaintSub")}</p>
                 </div>
               </div>
               <label className="plat-settings-v2__toggle plat-settings-v2__toggle--warn">
@@ -1142,19 +1154,19 @@ export function PlatformSettings({ user, onOpenProfile, onNavigate }: Props) {
                   disabled={!isOwner}
                 />
                 <span>
-                  <strong>Maintenance mode enabled</strong>
-                  <small>Registration page shows your message below</small>
+                  <strong>{t("platformUi.settingsMaintEnable")}</strong>
+                  <small>{t("platformUi.settingsMaintEnableHint")}</small>
                 </span>
               </label>
               <div className="cfg-field" style={{ marginTop: "0.85rem" }}>
-                <label htmlFor="ps-maint-msg">Maintenance message</label>
+                <label htmlFor="ps-maint-msg">{t("platformUi.settingsMaintMsg")}</label>
                 <textarea
                   id="ps-maint-msg"
                   rows={3}
                   value={draft.maintenanceMessage}
                   onChange={(e) => patch("maintenanceMessage", e.target.value)}
                   disabled={!isOwner}
-                  placeholder="We are performing scheduled maintenance…"
+                  placeholder={t("platformUi.settingsMaintMsgPh")}
                 />
               </div>
             </section>
@@ -1165,14 +1177,12 @@ export function PlatformSettings({ user, onOpenProfile, onNavigate }: Props) {
                   <DashIcon name="users" className="dash-icon--sm" />
                 </span>
                 <div>
-                  <h2 className="set-v2__panel-title">Security & session</h2>
-                  <p className="set-v2__panel-sub">
-                    Platform JWT session length and operator account shortcuts.
-                  </p>
+                  <h2 className="set-v2__panel-title">{t("platformUi.settingsSecurityTitle")}</h2>
+                  <p className="set-v2__panel-sub">{t("platformUi.settingsSecuritySub")}</p>
                 </div>
               </div>
               <div className="cfg-field">
-                <label htmlFor="ps-session">Session timeout (minutes)</label>
+                <label htmlFor="ps-session">{t("platformUi.settingsSessionTimeout")}</label>
                 <input
                   id="ps-session"
                   type="number"
@@ -1182,14 +1192,14 @@ export function PlatformSettings({ user, onOpenProfile, onNavigate }: Props) {
                   onChange={(e) => patch("sessionTimeoutMinutes", e.target.value)}
                   disabled={!isOwner}
                 />
-                <p className="cfg-hint">
-                  Applies to platform console sessions. School sessions use separate JWT config.
-                </p>
+                <p className="cfg-hint">{t("platformUi.settingsSessionHint")}</p>
               </div>
               <div className="plat-settings-v2__account-row">
                 {user ? (
                   <p>
-                    Signed in as <strong>{user.firstName} {user.lastName}</strong> ·{" "}
+                    {t("platformUi.settingsSignedInAs", {
+                      name: `${user.firstName} ${user.lastName}`,
+                    })}{" "}
                     <span className="plat-role-badge">{user.role}</span>
                   </p>
                 ) : null}
@@ -1199,7 +1209,7 @@ export function PlatformSettings({ user, onOpenProfile, onNavigate }: Props) {
                     className="plat-btn plat-btn--ghost plat-btn--sm"
                     onClick={onOpenProfile}
                   >
-                    Open profile
+                    {t("platformUi.settingsOpenProfile")}
                   </button>
                 ) : null}
               </div>
@@ -1211,23 +1221,23 @@ export function PlatformSettings({ user, onOpenProfile, onNavigate }: Props) {
                   <DashIcon name="settings" className="dash-icon--sm" />
                 </span>
                 <div>
-                  <h2 className="set-v2__panel-title">API environment</h2>
-                  <p className="set-v2__panel-sub">Backend URL used by this web console.</p>
+                  <h2 className="set-v2__panel-title">{t("platformUi.settingsApiEnvTitle")}</h2>
+                  <p className="set-v2__panel-sub">{t("platformUi.settingsApiEnvSub")}</p>
                 </div>
               </div>
               <div className="set-v2__code-box">
                 <code className="set-v2__code">{apiUrl}</code>
                 <button type="button" className="cfg-btn cfg-btn--ghost" onClick={() => void copyApiUrl()}>
-                  {copied ? "Copied!" : "Copy URL"}
+                  {copied ? t("common.copied") : t("platformUi.settingsCopyUrl")}
                 </button>
               </div>
               <p className="cfg-hint" style={{ marginTop: "0.65rem" }}>
-                Set via <code>NEXT_PUBLIC_API_URL</code> in <code>apps/web/.env.local</code>
+                {t("platformUi.settingsApiEnvHint")}
               </p>
             </section>
 
             <section className="set-v2__panel">
-              <h2 className="set-v2__panel-title">Quick links</h2>
+              <h2 className="set-v2__panel-title">{t("platformUi.settingsQuickLinks")}</h2>
               <div className="plat-shortcuts-grid">
                 {SHORTCUTS.map((item) => (
                   <Link key={item.href} href={item.href} className="plat-shortcut-card">
@@ -1247,16 +1257,16 @@ export function PlatformSettings({ user, onOpenProfile, onNavigate }: Props) {
         {isOwner ? (
           <div className="plat-settings-v2__save-bar">
             <p className="plat-settings-v2__save-hint">
-              Last saved{" "}
+              {t("platformUi.settingsLastSaved")}{" "}
               {settings
-                ? new Date(settings.updatedAt).toLocaleString(undefined, {
+                ? new Date(settings.updatedAt).toLocaleString(locale === "am" ? "am-ET" : undefined, {
                     dateStyle: "medium",
                     timeStyle: "short",
                   })
                 : "—"}
             </p>
             <button type="submit" className="plat-v2__btn plat-v2__btn--primary" disabled={saving}>
-              {saving ? "Saving…" : "Save settings"}
+              {saving ? t("common.saving") : t("platformUi.settingsSaveSettings")}
             </button>
           </div>
         ) : null}

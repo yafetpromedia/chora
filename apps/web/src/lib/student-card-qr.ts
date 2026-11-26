@@ -16,7 +16,10 @@ export async function generateCardQrDataUrl(
 
 /** Batch-generate QR images for bulk print (avoids 1000s of per-card effects). */
 export async function buildCardQrMap(
-  cards: Pick<StudentIdCard, "studentProfileId" | "scanPayload">[],
+  cards: Pick<
+    StudentIdCard,
+    "studentProfileId" | "scanPayload" | "publicResultsUrl"
+  >[],
   size = 120,
   onProgress?: (done: number, total: number) => void,
 ): Promise<Map<string, string>> {
@@ -24,9 +27,10 @@ export async function buildCardQrMap(
   const total = cards.length;
   for (let i = 0; i < total; i++) {
     const card = cards[i]!;
+    const payload = card.publicResultsUrl?.trim() || card.scanPayload;
     map.set(
       card.studentProfileId,
-      await generateCardQrDataUrl(card.scanPayload, size),
+      await generateCardQrDataUrl(payload, size),
     );
     if (i % 8 === 0 || i === total - 1) {
       onProgress?.(i + 1, total);

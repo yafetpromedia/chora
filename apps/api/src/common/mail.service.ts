@@ -47,7 +47,13 @@ export class MailService {
     const from =
       this.config.get<string>('EMAIL_FROM')?.trim() ||
       this.config.get<string>('SMTP_USER')?.trim() ||
-      'noreply@localhost';
+      '';
+    if (!from || /noreply@/i.test(from)) {
+      return {
+        sent: false,
+        reason: 'Set a real Awud Digitals mailbox as the From address',
+      };
+    }
 
     try {
       await this.transporter.sendMail({

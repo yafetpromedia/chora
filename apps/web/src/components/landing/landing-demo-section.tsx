@@ -3,15 +3,40 @@
 import Link from "next/link";
 import { DemoVideoPlayer } from "@/components/landing/demo-video-player";
 import { Reveal, Stagger, StaggerItem } from "@/components/motion/reveal";
-import { BOOK_DEMO_HREF, DEMO_STORY_POINTS } from "@/lib/demo-video";
+import { BOOK_DEMO_HREF } from "@/lib/demo-video";
 import { BRAND_NAME } from "@/lib/brand";
+import { useLocale } from "@/components/i18n/locale-provider";
 
 type Props = {
   variant?: "home" | "page";
 };
 
 export function LandingDemoSection({ variant = "home" }: Props) {
+  const { t } = useLocale();
   const isPage = variant === "page";
+
+  const storyPoints = [
+    {
+      n: "01",
+      title: t("demoPageUi.story01Title"),
+      desc: t("demoPageUi.story01Desc"),
+    },
+    {
+      n: "02",
+      title: t("demoPageUi.story02Title"),
+      desc: t("demoPageUi.story02Desc"),
+    },
+    {
+      n: "03",
+      title: t("demoPageUi.story03Title"),
+      desc: t("demoPageUi.story03Desc"),
+    },
+    {
+      n: "04",
+      title: t("demoPageUi.story04Title"),
+      desc: t("demoPageUi.story04Desc"),
+    },
+  ];
 
   return (
     <section
@@ -21,14 +46,12 @@ export function LandingDemoSection({ variant = "home" }: Props) {
       <div className="lp3-container">
         <Reveal>
           <div className="lp3-section__head lp3-section__head--center lp3-section__head--demo">
-            <span className="lp3-eyebrow">Product walkthrough</span>
+            <span className="lp3-eyebrow">{t("demoPageUi.eyebrow")}</span>
             <h2 className="lp3-heading">
-              {isPage ? "See how Chora works" : "See Chora in Action"}
+              {isPage ? t("demoPageUi.titlePage") : t("demoPageUi.titleHome")}
             </h2>
             <p className="lp3-lead lp3-lead--demo">
-              {isPage
-                ? "A closer look at how schools, teachers, students and parents use Chora every day."
-                : "From administration to learning, see how Chora connects your entire school community in one platform."}
+              {isPage ? t("demoPageUi.leadPage") : t("demoPageUi.leadHome")}
             </p>
           </div>
         </Reveal>
@@ -38,13 +61,11 @@ export function LandingDemoSection({ variant = "home" }: Props) {
         </Reveal>
 
         <Reveal>
-          <p className="lp3-demo-story-lead">
-            From school administration to student learning.
-          </p>
+          <p className="lp3-demo-story-lead">{t("demoPageUi.storyLead")}</p>
         </Reveal>
 
         <Stagger className="lp3-demo-story">
-          {DEMO_STORY_POINTS.map((point) => (
+          {storyPoints.map((point) => (
             <StaggerItem key={point.n}>
               <article className="lp3-demo-story__item">
                 <span className="lp3-demo-story__n">{point.n}</span>
@@ -58,26 +79,24 @@ export function LandingDemoSection({ variant = "home" }: Props) {
         <Reveal>
           <div className="lp3-demo-cta">
             <h3 className="lp3-demo-cta__title">
-              Ready to see what {BRAND_NAME} can do for your school?
+              {t("demoPageUi.ctaTitle", { brand: BRAND_NAME })}
             </h3>
-            <p className="lp3-demo-cta__sub">
-              Start your 14-day free trial — no credit card required.
-            </p>
+            <p className="lp3-demo-cta__sub">{t("demoPageUi.ctaSub")}</p>
             <div className="lp3-demo-cta__actions">
               <Link href="/register" className="lp3-btn lp3-btn--primary">
-                Start free trial
+                {t("demoPageUi.startTrial")}
               </Link>
               <a href={BOOK_DEMO_HREF} className="lp3-btn lp3-btn--ghost">
-                Book a demo
+                {t("demoPageUi.bookDemo")}
               </a>
               {!isPage ? (
                 <Link href="/demo" className="lp3-demo-cta__more">
-                  Full walkthrough &amp; chapters
+                  {t("demoPageUi.fullWalkthrough")}
                 </Link>
               ) : null}
             </div>
             <p className="lp3-demo-cta__credit">
-              Built by{" "}
+              {t("demoPageUi.builtBy")}{" "}
               <a
                 href="https://awuddigitals.com"
                 target="_blank"

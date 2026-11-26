@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { DashIcon } from "@/components/dashboard/dash-icons";
 import { AcademicsHero, AcademicsBadge } from "@/components/academics/academics-ui";
 import { DashboardPage } from "@/components/dashboard/dashboard-page";
+import { useLocale } from "@/components/i18n/locale-provider";
 import { EtbAmount } from "@/components/billing/etb-amount";
 import { formatEtbPlain } from "@/lib/currency";
 import { listGrades, listStudents } from "@/lib/school-setup";
@@ -49,6 +50,7 @@ type Tab = "pending" | "billing" | "payments" | "tools";
 
 export default function AdminFinancePage() {
   const router = useRouter();
+  const { t } = useLocale();
   const [tab, setTab] = useState<Tab>("pending");
   const [years, setYears] = useState<AcademicYear[]>([]);
   const [feeTypes, setFeeTypes] = useState<FeeType[]>([]);
@@ -289,11 +291,11 @@ export default function AdminFinancePage() {
     <DashboardPage role="admin" title="Finance">
       <div className="fin-v2">
         <AcademicsHero
-          title="School finance"
+          title={t("adminFinanceUi.heroTitle")}
           subtitle={
             analytics
               ? `${formatEtbPlain(analytics.collectedCents)} collected of ${formatEtbPlain(analytics.expectedRevenueCents)} expected · ${analytics.overdueFeesCount} overdue fees`
-              : "Track collections, bill students, verify payments, and export records."
+              : t("adminFinanceUi.heroSubLoading")
           }
           stats={[
             {
@@ -620,7 +622,7 @@ export default function AdminFinancePage() {
                         {schedules.map((s) => (
                           <option key={s.id} value={s.id}>
                             {s.feeType.name} — {s.grade?.name ?? "All"} —{" "}
-                            <EtbAmount cents={s.amountCents} />
+                            {formatEtb(s.amountCents)}
                           </option>
                         ))}
                       </select>

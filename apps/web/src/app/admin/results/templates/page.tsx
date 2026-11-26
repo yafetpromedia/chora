@@ -26,6 +26,7 @@ import {
   type Subject,
 } from "@/lib/results";
 import { AUTH_ROLE_KEY, AUTH_TOKEN_KEY, isSchoolWorkspaceRole } from "@/lib/auth";
+import { useLocale } from "@/components/i18n/locale-provider";
 
 const DEFAULT_COMPONENTS: TemplateComponentDraft[] = [
   { name: "Worksheet", weightPercent: 15, maxScore: 15 },
@@ -37,22 +38,23 @@ const DEFAULT_COMPONENTS: TemplateComponentDraft[] = [
 
 type AssignTab = "grade" | "class";
 
-function assignmentSummary(template: AssessmentTemplate) {
-  if (template.gradeAssignments.length === 0) return "Not assigned yet";
-  return template.gradeAssignments
-    .map((a) => (a.subjectName ? `${a.gradeName} · ${a.subjectName}` : a.gradeName))
-    .join(", ");
-}
-
 export default function AssessmentTemplatesPage() {
   const router = useRouter();
+  const { t, tp } = useLocale();
+
+  function assignmentSummary(template: AssessmentTemplate) {
+    if (template.gradeAssignments.length === 0) return t("adminTemplatesUi.notAssignedYet");
+    return template.gradeAssignments
+      .map((a) => (a.subjectName ? `${a.gradeName} · ${a.subjectName}` : a.gradeName))
+      .join(", ");
+  }
   const [templates, setTemplates] = useState<AssessmentTemplate[]>([]);
   const [grades, setGrades] = useState<GradeWithSections[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [classSubjects, setClassSubjects] = useState<ClassSubject[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [name, setName] = useState("Custom template");
+  const [name, setName] = useState("");
   const [components, setComponents] = useState(DEFAULT_COMPONENTS);
   const [assignTemplateId, setAssignTemplateId] = useState("");
   const [assignGradeId, setAssignGradeId] = useState("");
@@ -61,6 +63,10 @@ export default function AssessmentTemplatesPage() {
   const [editingTemplateId, setEditingTemplateId] = useState("");
   const [assignTab, setAssignTab] = useState<AssignTab>("grade");
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    setName((prev) => prev || t("adminTemplatesUi.defaultName"));
+  }, [t]);
 
   function fetchAll() {
     return Promise.all([
@@ -99,7 +105,8 @@ export default function AssessmentTemplatesPage() {
         if (!cancelled) applyLoaded(data);
       })
       .catch((err) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : "Load failed");
+        if (!cancelled)
+          setError(err instanceof Error ? err.message : t("adminTemplatesUi.loadFailed"));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -111,14 +118,14 @@ export default function AssessmentTemplatesPage() {
   }, [router]);
 
   const totalComponents = useMemo(
-    () => templates.reduce((sum, t) => sum + t.components.length, 0),
+    () => templates.reduce((sum, tpl) => sum + tpl.components.length, 0),
     [templates],
   );
 
   const linkedGrades = useMemo(() => {
     const names = new Set<string>();
-    for (const t of templates) {
-      for (const a of t.gradeAssignments) names.add(a.gradeName);
+    for (const tpl of templates) {
+      for (const a of tpl.gradeAssignments) names.add(a.gradeName);
     }
     return names.size;
   }, [templates]);
@@ -127,7 +134,7 @@ export default function AssessmentTemplatesPage() {
 
   function resetForm() {
     setEditingTemplateId("");
-    setName("Custom template");
+    setName(t("adminTemplatesUi.defaultName"));
     setComponents(DEFAULT_COMPONENTS);
   }
 
@@ -135,7 +142,7 @@ export default function AssessmentTemplatesPage() {
     e.preventDefault();
     setError("");
     if (weightTotal !== 100) {
-      setError(`Weights must total 100% (currently ${weightTotal}%)`);
+      setError(t("adminTemplatesUi.weightsMust100", { total: weightTotal }));
       return;
     }
     setBusy(true);
@@ -152,7 +159,7 @@ export default function AssessmentTemplatesPage() {
       resetForm();
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Save failed");
+      setError(err instanceof Error ? err.message : t("adminTemplatesUi.saveFailed"));
     } finally {
       setBusy(false);
     }
@@ -169,7 +176,7 @@ export default function AssessmentTemplatesPage() {
       });
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Assign failed");
+      setError(err instanceof Error ? err.message : t("adminTemplatesUi.assignFailed"));
     } finally {
       setBusy(false);
     }
@@ -185,7 +192,7 @@ export default function AssessmentTemplatesPage() {
       });
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Class assignment failed");
+      setError(err instanceof Error ? err.message : t("adminTemplatesUi.classAssignFailed"));
     } finally {
       setBusy(false);
     }
@@ -204,7 +211,7 @@ export default function AssessmentTemplatesPage() {
   }
 
   async function onDeleteTemplate(templateId: string) {
-    if (!window.confirm("Delete this template? Classes using it may lose grading structure.")) {
+    if (!window.confirm(t("adminTemplatesUi.deleteConfirm"))) {
       return;
     }
     setError("");
@@ -214,23 +221,26 @@ export default function AssessmentTemplatesPage() {
       if (editingTemplateId === templateId) resetForm();
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Delete failed");
+      setError(err instanceof Error ? err.message : t("adminTemplatesUi.deleteFailed"));
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <DashboardPage role="admin" title="Assessment templates">
+    <DashboardPage role="admin" title={tp("Assessment templates")}>
       <div className="tpl-v2">
         <AcademicsHero
-          title="Assessment templates"
-          subtitle="Define worksheet, quiz, test, and exam weights — then assign templates to grades, subjects, or individual classes."
+          title={t("adminTemplatesUi.heroTitle")}
+          subtitle={t("adminTemplatesUi.heroSub")}
           stats={[
-            { label: "Templates", value: loading ? "—" : templates.length },
-            { label: "Components", value: loading ? "—" : totalComponents },
+            { label: t("adminTemplatesUi.statTemplates"), value: loading ? "—" : templates.length },
             {
-              label: "Grades linked",
+              label: t("adminTemplatesUi.statComponents"),
+              value: loading ? "—" : totalComponents,
+            },
+            {
+              label: t("adminTemplatesUi.statGradesLinked"),
               value: loading ? "—" : linkedGrades,
               accent: !loading && linkedGrades > 0,
             },
@@ -242,7 +252,7 @@ export default function AssessmentTemplatesPage() {
         {loading ? (
           <div className="tpl-v2__loading">
             <span className="tpl-v2__loading-spinner" aria-hidden />
-            <p>Loading templates…</p>
+            <p>{t("adminTemplatesUi.loading")}</p>
           </div>
         ) : (
           <div className="tpl-v2__layout">
@@ -254,53 +264,51 @@ export default function AssessmentTemplatesPage() {
                       <DashIcon name="templates" className="dash-icon--sm" />
                     </span>
                     <div>
-                      <h3 className="tpl-v2__card-title">Template library</h3>
-                      <p className="tpl-v2__card-sub">
-                        Reusable grading structures for primary, middle, and secondary levels.
-                      </p>
+                      <h3 className="tpl-v2__card-title">{t("adminTemplatesUi.libraryTitle")}</h3>
+                      <p className="tpl-v2__card-sub">{t("adminTemplatesUi.librarySub")}</p>
                     </div>
                   </div>
                   <button type="button" className="tpl-v2__btn tpl-v2__btn--ghost" onClick={resetForm}>
-                    + New template
+                    {t("adminTemplatesUi.newTemplate")}
                   </button>
                 </header>
 
                 {templates.length === 0 ? (
                   <div className="tpl-v2__empty">
-                    <p>No templates yet. Create your first grading structure on the right.</p>
+                    <p>{t("adminTemplatesUi.emptyList")}</p>
                   </div>
                 ) : (
                   <ul className="tpl-v2__list">
-                    {templates.map((t) => (
+                    {templates.map((tpl) => (
                       <li
-                        key={t.id}
-                        className={`tpl-v2__item${editingTemplateId === t.id ? " tpl-v2__item--active" : ""}`}
+                        key={tpl.id}
+                        className={`tpl-v2__item${editingTemplateId === tpl.id ? " tpl-v2__item--active" : ""}`}
                       >
                         <div className="tpl-v2__item-main">
                           <div className="tpl-v2__item-top">
-                            <strong className="tpl-v2__item-name">{t.name}</strong>
+                            <strong className="tpl-v2__item-name">{tpl.name}</strong>
                             <div className="tpl-v2__item-actions">
                               <button
                                 type="button"
                                 className="tpl-v2__btn tpl-v2__btn--ghost tpl-v2__btn--sm"
-                                onClick={() => onEditTemplate(t)}
+                                onClick={() => onEditTemplate(tpl)}
                               >
-                                Edit
+                                {t("common.edit")}
                               </button>
                               <button
                                 type="button"
                                 className="tpl-v2__btn tpl-v2__btn--danger tpl-v2__btn--sm"
-                                onClick={() => void onDeleteTemplate(t.id)}
+                                onClick={() => void onDeleteTemplate(tpl.id)}
                               >
-                                Delete
+                                {t("common.delete")}
                               </button>
                             </div>
                           </div>
-                          {t.description ? (
-                            <p className="tpl-v2__item-desc">{t.description}</p>
+                          {tpl.description ? (
+                            <p className="tpl-v2__item-desc">{tpl.description}</p>
                           ) : null}
                           <div className="tpl-v2__chips">
-                            {t.components.map((c) => (
+                            {tpl.components.map((c) => (
                               <span key={c.id} className="tpl-v2__chip">
                                 <strong>{c.name}</strong>
                                 <span>
@@ -310,7 +318,7 @@ export default function AssessmentTemplatesPage() {
                             ))}
                           </div>
                           <p className="tpl-v2__item-meta">
-                            <span>Assigned</span> {assignmentSummary(t)}
+                            <span>{t("adminTemplatesUi.assigned")}</span> {assignmentSummary(tpl)}
                           </p>
                         </div>
                       </li>
@@ -326,10 +334,8 @@ export default function AssessmentTemplatesPage() {
                       <DashIcon name="teachers" className="dash-icon--sm" />
                     </span>
                     <div>
-                      <h3 className="tpl-v2__card-title">Assign template</h3>
-                      <p className="tpl-v2__card-sub">
-                        Link a template to a whole grade or a specific class-subject slot.
-                      </p>
+                      <h3 className="tpl-v2__card-title">{t("adminTemplatesUi.assignTitle")}</h3>
+                      <p className="tpl-v2__card-sub">{t("adminTemplatesUi.assignSub")}</p>
                     </div>
                   </div>
                 </header>
@@ -340,34 +346,34 @@ export default function AssessmentTemplatesPage() {
                     className={`tpl-v2__subtab${assignTab === "grade" ? " tpl-v2__subtab--active" : ""}`}
                     onClick={() => setAssignTab("grade")}
                   >
-                    By grade
+                    {t("adminTemplatesUi.tabByGrade")}
                   </button>
                   <button
                     type="button"
                     className={`tpl-v2__subtab${assignTab === "class" ? " tpl-v2__subtab--active" : ""}`}
                     onClick={() => setAssignTab("class")}
                   >
-                    By class
+                    {t("adminTemplatesUi.tabByClass")}
                   </button>
                 </div>
 
                 {assignTab === "grade" ? (
                   <div className="tpl-v2__assign">
                     <label className="tpl-v2__field">
-                      <span>Template</span>
+                      <span>{t("adminTemplatesUi.fieldTemplate")}</span>
                       <select
                         value={assignTemplateId}
                         onChange={(e) => setAssignTemplateId(e.target.value)}
                       >
-                        {templates.map((t) => (
-                          <option key={t.id} value={t.id}>
-                            {t.name}
+                        {templates.map((tpl) => (
+                          <option key={tpl.id} value={tpl.id}>
+                            {tpl.name}
                           </option>
                         ))}
                       </select>
                     </label>
                     <label className="tpl-v2__field">
-                      <span>Grade</span>
+                      <span>{t("adminTemplatesUi.fieldGrade")}</span>
                       <select value={assignGradeId} onChange={(e) => setAssignGradeId(e.target.value)}>
                         {grades.map((g) => (
                           <option key={g.id} value={g.id}>
@@ -377,9 +383,9 @@ export default function AssessmentTemplatesPage() {
                       </select>
                     </label>
                     <label className="tpl-v2__field tpl-v2__field--wide">
-                      <span>Subject (optional)</span>
+                      <span>{t("adminTemplatesUi.fieldSubjectOptional")}</span>
                       <select value={assignSubjectId} onChange={(e) => setAssignSubjectId(e.target.value)}>
-                        <option value="">All subjects</option>
+                        <option value="">{t("adminTemplatesUi.allSubjects")}</option>
                         {subjects.map((s) => (
                           <option key={s.id} value={s.id}>
                             {s.name}
@@ -393,26 +399,26 @@ export default function AssessmentTemplatesPage() {
                       disabled={busy || !assignTemplateId || !assignGradeId}
                       onClick={() => void onAssignGrade()}
                     >
-                      Assign to grade
+                      {t("adminTemplatesUi.assignToGrade")}
                     </button>
                   </div>
                 ) : (
                   <div className="tpl-v2__assign">
                     <label className="tpl-v2__field tpl-v2__field--wide">
-                      <span>Template</span>
+                      <span>{t("adminTemplatesUi.fieldTemplate")}</span>
                       <select
                         value={assignTemplateId}
                         onChange={(e) => setAssignTemplateId(e.target.value)}
                       >
-                        {templates.map((t) => (
-                          <option key={t.id} value={t.id}>
-                            {t.name}
+                        {templates.map((tpl) => (
+                          <option key={tpl.id} value={tpl.id}>
+                            {tpl.name}
                           </option>
                         ))}
                       </select>
                     </label>
                     <label className="tpl-v2__field tpl-v2__field--grow">
-                      <span>Class · subject</span>
+                      <span>{t("adminTemplatesUi.fieldClassSubject")}</span>
                       <select
                         value={assignClassSubjectId}
                         onChange={(e) => setAssignClassSubjectId(e.target.value)}
@@ -431,7 +437,7 @@ export default function AssessmentTemplatesPage() {
                       disabled={busy || !assignTemplateId || !assignClassSubjectId}
                       onClick={() => void onAssignClassSubject()}
                     >
-                      Assign to class
+                      {t("adminTemplatesUi.assignToClass")}
                     </button>
                   </div>
                 )}
@@ -445,31 +451,35 @@ export default function AssessmentTemplatesPage() {
                     <DashIcon name="plus" className="dash-icon--sm" />
                   </span>
                   <div>
-                    <h3>{editingTemplateId ? "Edit template" : "New template"}</h3>
+                    <h3>
+                      {editingTemplateId
+                        ? t("adminTemplatesUi.editTemplate")
+                        : t("adminTemplatesUi.newTemplateForm")}
+                    </h3>
                     <p>
                       {editingTemplateId
-                        ? "Update component names, weights, and max scores."
-                        : "Build a grading structure with components that total 100%."}
+                        ? t("adminTemplatesUi.formEditSub")
+                        : t("adminTemplatesUi.formNewSub")}
                     </p>
                   </div>
                 </header>
 
                 <label className="tpl-v2__field tpl-v2__field--stack">
-                  <span>Template name</span>
+                  <span>{t("adminTemplatesUi.fieldTemplateName")}</span>
                   <input
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    placeholder="e.g. Secondary (Grades 9–12)"
+                    placeholder={t("adminTemplatesUi.namePlaceholder")}
                     required
                   />
                 </label>
 
                 <div className="tpl-v2__weight">
-                  <span>Weight total</span>
+                  <span>{t("adminTemplatesUi.weightTotal")}</span>
                   <strong className={weightTotal === 100 ? "tpl-v2__weight--ok" : "tpl-v2__weight--warn"}>
                     {weightTotal}%
                   </strong>
-                  {weightTotal !== 100 ? <em>Must equal 100%</em> : null}
+                  {weightTotal !== 100 ? <em>{t("adminTemplatesUi.mustEqual100")}</em> : null}
                 </div>
 
                 <TemplateComponentsEditor components={components} onChange={setComponents} />
@@ -477,7 +487,7 @@ export default function AssessmentTemplatesPage() {
                 <footer className="tpl-v2__form-foot">
                   {editingTemplateId ? (
                     <button type="button" className="tpl-v2__btn tpl-v2__btn--ghost" onClick={resetForm}>
-                      Cancel
+                      {t("common.cancel")}
                     </button>
                   ) : null}
                   <button
@@ -485,7 +495,11 @@ export default function AssessmentTemplatesPage() {
                     className="tpl-v2__btn tpl-v2__btn--primary"
                     disabled={busy || weightTotal !== 100}
                   >
-                    {busy ? "Saving…" : editingTemplateId ? "Save changes" : "Create template"}
+                    {busy
+                      ? t("common.saving")
+                      : editingTemplateId
+                        ? t("adminTemplatesUi.saveChanges")
+                        : t("adminTemplatesUi.createTemplate")}
                   </button>
                 </footer>
               </form>

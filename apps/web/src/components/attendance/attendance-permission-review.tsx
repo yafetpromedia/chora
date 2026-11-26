@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { GradeWithSections } from "@/lib/api";
 import {
   listAttendancePermissionRequests,
@@ -10,34 +10,30 @@ import {
   type AttendancePermissionType,
 } from "@/lib/attendance";
 import { getMyTeacherProfile } from "@/lib/teachers";
+import { useLocale } from "@/components/i18n/locale-provider";
+import type { AppLocale, MessageKey } from "@/lib/i18n";
 
-const TYPE_LABEL: Record<AttendancePermissionType, string> = {
-  ABSENCE: "Absence",
-  LATE: "Late arrival",
-  EARLY_LEAVE: "Early leave",
-  OTHER: "Other",
-};
-
-const REASON_LABEL: Record<string, string> = {
-  sick: "Sick",
-  family_emergency: "Family emergency",
-  unexcused: "Unexcused",
-  other: "Other",
-};
-
-function formatDate(iso: string) {
-  try {
-    return new Date(iso + "T12:00:00").toLocaleDateString(undefined, {
-      weekday: "short",
-      month: "short",
-      day: "numeric",
-    });
-  } catch {
-    return iso;
-  }
+function dateLocaleTag(locale: AppLocale) {
+  return locale === "am" ? "am-ET" : undefined;
 }
 
+const TYPE_KEYS: Record<AttendancePermissionType, MessageKey> = {
+  ABSENCE: "attendancePermissionReviewUi.typeAbsence",
+  LATE: "attendancePermissionReviewUi.typeLate",
+  EARLY_LEAVE: "attendancePermissionReviewUi.typeEarlyLeave",
+  OTHER: "attendancePermissionReviewUi.typeOther",
+};
+
+const REASON_KEYS: Record<string, MessageKey> = {
+  sick: "parentAttendance.sick",
+  family_emergency: "parentAttendance.familyEmergency",
+  unexcused: "parentAttendance.unexcused",
+  other: "parentAttendance.other",
+};
+
 export function AttendancePermissionReview() {
+  const { t, locale } = useLocale();
+  const dateLocale = dateLocaleTag(locale);
   const [grades, setGrades] = useState<GradeWithSections[]>([]);
   const [gradeId, setGradeId] = useState("");
   const [sectionId, setSectionId] = useState("");
@@ -48,6 +44,40 @@ export function AttendancePermissionReview() {
   const [filter, setFilter] = useState<"PENDING" | "ALL">("PENDING");
 
   const selectedGrade = grades.find((g) => g.id === gradeId);
+
+  const formatDate = useCallback(
+    (iso: string) => {
+      try {
+        return new Date(iso + "T12:00:00").toLocaleDateString(dateLocale, {
+          weekday: "short",
+          month: "short",
+          day: "numeric",
+        });
+      } catch {
+        return iso;
+      }
+    },
+    [dateLocale],
+  );
+
+  const typeLabel = useCallback(
+    (permType: AttendancePermissionType) => t(TYPE_KEYS[permType]),
+    [t],
+  );
+
+  const reasonLabel = useCallback(
+    (reason: string) => t(REASON_KEYS[reason] ?? "parentAttendance.other"),
+    [t],
+  );
+
+  const statusLabel = useCallback(
+    (status: AttendancePermissionRequest["status"]) => {
+      if (status === "PENDING") return t("attendancePermissionReviewUi.statusPending");
+      if (status === "APPROVED") return t("attendancePermissionReviewUi.statusApproved");
+      return t("attendancePermissionReviewUi.statusRejected");
+    },
+    [t],
+  );
 
   const load = useCallback(async () => {
     if (!gradeId) return;
@@ -61,12 +91,14 @@ export function AttendancePermissionReview() {
       });
       setRequests(rows);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load requests");
+      setError(
+        err instanceof Error ? err.message : t("attendancePermissionReviewUi.loadFailed"),
+      );
       setRequests([]);
     } finally {
       setLoading(false);
     }
-  }, [gradeId, sectionId, filter]);
+  }, [gradeId, sectionId, filter, t]);
 
   useEffect(() => {
     void Promise.all([listGradesForAttendance(), getMyTeacherProfile().catch(() => null)])
@@ -107,7 +139,9 @@ export function AttendancePermissionReview() {
         setRequests(rows);
       } catch (err) {
         if (cancelled) return;
-        setError(err instanceof Error ? err.message : "Could not load requests");
+        setError(
+          err instanceof Error ? err.message : t("attendancePermissionReviewUi.loadFailed"),
+        );
         setRequests([]);
       } finally {
         if (!cancelled) setLoading(false);
@@ -116,7 +150,7 @@ export function AttendancePermissionReview() {
     return () => {
       cancelled = true;
     };
-  }, [gradeId, sectionId, filter]);
+  }, [gradeId, sectionId, filter, t]);
 
   async function onReview(id: string, status: "APPROVED" | "REJECTED") {
     setBusyId(id);
@@ -125,19 +159,24 @@ export function AttendancePermissionReview() {
       await reviewAttendancePermissionRequest(id, { status });
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Review failed");
+      setError(
+        err instanceof Error ? err.message : t("attendancePermissionReviewUi.reviewFailed"),
+      );
     } finally {
       setBusyId(null);
     }
   }
 
-  const pendingCount = requests.filter((r) => r.status === "PENDING").length;
+  const pendingCount = useMemo(
+    () => requests.filter((r) => r.status === "PENDING").length,
+    [requests],
+  );
 
   return (
     <div className="att-perm-review">
       <section className="att-v4__filters">
         <div className="att-v4__field">
-          <span>Grade</span>
+          <span>{t("attendancePermissionReviewUi.grade")}</span>
           <select
             value={gradeId}
             onChange={(e) => {
@@ -153,9 +192,9 @@ export function AttendancePermissionReview() {
           </select>
         </div>
         <div className="att-v4__field">
-          <span>Section</span>
+          <span>{t("attendancePermissionReviewUi.section")}</span>
           <select value={sectionId} onChange={(e) => setSectionId(e.target.value)}>
-            <option value="">All sections</option>
+            <option value="">{t("attendancePermissionReviewUi.allSections")}</option>
             {selectedGrade?.sections.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}
@@ -169,7 +208,7 @@ export function AttendancePermissionReview() {
             className={`att-manual__view-tab${filter === "PENDING" ? " att-manual__view-tab--on" : ""}`}
             onClick={() => setFilter("PENDING")}
           >
-            Pending
+            {t("attendancePermissionReviewUi.tabPending")}
             <span className="att-manual__view-count">{pendingCount}</span>
           </button>
           <button
@@ -177,7 +216,7 @@ export function AttendancePermissionReview() {
             className={`att-manual__view-tab${filter === "ALL" ? " att-manual__view-tab--on" : ""}`}
             onClick={() => setFilter("ALL")}
           >
-            All
+            {t("attendancePermissionReviewUi.tabAll")}
           </button>
         </div>
       </section>
@@ -186,24 +225,24 @@ export function AttendancePermissionReview() {
 
       <section className="att-perm-review__list-card">
         <header className="att-perm-review__list-head">
-          <h2 className="att-perm-review__list-title">Permission requests</h2>
-          <p className="att-perm-review__list-sub">
-            Students and parents can seek absence, late, or early-leave permission here.
-          </p>
+          <h2 className="att-perm-review__list-title">
+            {t("attendancePermissionReviewUi.listTitle")}
+          </h2>
+          <p className="att-perm-review__list-sub">{t("attendancePermissionReviewUi.listSub")}</p>
         </header>
 
         {loading ? (
           <div className="att-manual__empty">
             <span className="att-manual__empty-spinner" aria-hidden />
-            <p>Loading requests…</p>
+            <p>{t("attendancePermissionReviewUi.loadingRequests")}</p>
           </div>
         ) : requests.length === 0 ? (
           <div className="att-manual__empty">
-            <p className="att-manual__empty-title">No requests</p>
+            <p className="att-manual__empty-title">{t("attendancePermissionReviewUi.emptyTitle")}</p>
             <span>
               {filter === "PENDING"
-                ? "No pending permission requests for this class."
-                : "No permission requests found for this class."}
+                ? t("attendancePermissionReviewUi.emptyPending")
+                : t("attendancePermissionReviewUi.emptyAll")}
             </span>
           </div>
         ) : (
@@ -217,29 +256,32 @@ export function AttendancePermissionReview() {
                   <div className="att-perm-review__item-top">
                     <p className="att-perm-review__student">{r.studentName}</p>
                     <span className={`att-perm__status att-perm__status--${r.status.toLowerCase()}`}>
-                      {r.status === "PENDING"
-                        ? "Pending"
-                        : r.status === "APPROVED"
-                          ? "Approved"
-                          : "Rejected"}
+                      {statusLabel(r.status)}
                     </span>
                   </div>
                   <p className="att-perm-review__meta">
-                    {TYPE_LABEL[r.type]} · {formatDate(r.date)}
+                    {typeLabel(r.type)} · {formatDate(r.date)}
                     {r.sectionName ? ` · ${r.sectionName}` : ""}
                   </p>
                   {r.reason ? (
                     <p className="att-perm-review__reason">
-                      Reason: {REASON_LABEL[r.reason] ?? r.reason}
+                      {t("attendancePermissionReviewUi.reasonPrefix")} {reasonLabel(r.reason)}
                     </p>
                   ) : null}
                   {r.note ? <p className="att-perm-review__note">{r.note}</p> : null}
                   <p className="att-perm-review__by">
-                    Requested by {r.requestedBy}
-                    {r.requestedByRole === "parent" ? " (parent)" : ""}
+                    {t("attendancePermissionReviewUi.requestedBy", {
+                      name: r.requestedBy,
+                      parent:
+                        r.requestedByRole === "parent"
+                          ? t("attendancePermissionReviewUi.requestedByParent")
+                          : "",
+                    })}
                   </p>
                   {r.reviewNote ? (
-                    <p className="att-perm-review__review-note">Your note: {r.reviewNote}</p>
+                    <p className="att-perm-review__review-note">
+                      {t("attendancePermissionReviewUi.yourNotePrefix")} {r.reviewNote}
+                    </p>
                   ) : null}
                 </div>
                 {r.status === "PENDING" ? (
@@ -250,7 +292,7 @@ export function AttendancePermissionReview() {
                       disabled={busyId === r.id}
                       onClick={() => void onReview(r.id, "APPROVED")}
                     >
-                      {busyId === r.id ? "…" : "Approve"}
+                      {busyId === r.id ? "…" : t("attendancePermissionReviewUi.approve")}
                     </button>
                     <button
                       type="button"
@@ -258,7 +300,7 @@ export function AttendancePermissionReview() {
                       disabled={busyId === r.id}
                       onClick={() => void onReview(r.id, "REJECTED")}
                     >
-                      Reject
+                      {t("attendancePermissionReviewUi.reject")}
                     </button>
                   </div>
                 ) : null}

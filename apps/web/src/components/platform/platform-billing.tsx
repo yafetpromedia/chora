@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DashIcon } from "@/components/dashboard/dash-icons";
+import { useLocale } from "@/components/i18n/locale-provider";
 import { AppToast } from "@/components/ui/app-toast";
 import { handlePlatformAuthFailure } from "@/lib/platform-auth";
 import { getBillingSummary, type BillingSummary } from "@/lib/platform-billing";
@@ -16,10 +17,10 @@ type Props = {
 
 type PlanFilter = "ALL" | "TRIAL" | "STARTER" | "PROFESSIONAL" | "ENTERPRISE" | "INACTIVE";
 
-function formatDate(iso: string | null | undefined) {
+function formatDate(iso: string | null | undefined, locale: string) {
   if (!iso) return "—";
   try {
-    return new Date(iso).toLocaleDateString(undefined, {
+    return new Date(iso).toLocaleDateString(locale === "am" ? "am-ET" : undefined, {
       month: "short",
       day: "numeric",
       year: "numeric",
@@ -35,7 +36,25 @@ function daysUntil(iso: string | null | undefined) {
   return Math.ceil((end - Date.now()) / (1000 * 60 * 60 * 24));
 }
 
+function planFilterLabel(id: PlanFilter, t: (key: string) => string) {
+  if (id === "ALL") return t("platformUi.filterAll");
+  if (id === "TRIAL") return t("platformUi.planTrial");
+  if (id === "STARTER") return t("platformUi.planStarter");
+  if (id === "PROFESSIONAL") return t("platformUi.planPro");
+  if (id === "ENTERPRISE") return t("platformUi.planEnterprise");
+  if (id === "INACTIVE") return t("platformUi.billingInactive");
+  return id;
+}
+
+function tenantStatusLabel(status: string, t: (key: string) => string) {
+  if (status === "ACTIVE") return t("platformUi.statusActive");
+  if (status === "TRIAL") return t("platformUi.statusTrial");
+  if (status === "SUSPENDED") return t("platformUi.statusSuspended");
+  return status;
+}
+
 export function PlatformBilling({ dashboard, schools, onNavigate }: Props) {
+  const { t, locale } = useLocale();
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [planFilter, setPlanFilter] = useState<PlanFilter>("ALL");
@@ -59,7 +78,7 @@ export function PlatformBilling({ dashboard, schools, onNavigate }: Props) {
     queueMicrotask(() => {
       setLoading(true);
       void loadSummary()
-        .catch((err) => fail(err, "Failed to load billing summary"))
+        .catch((err) => fail(err, t("platformUi.errLoadBilling")))
         .finally(() => setLoading(false));
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -109,13 +128,13 @@ export function PlatformBilling({ dashboard, schools, onNavigate }: Props) {
     });
   }, [schools, query, planFilter]);
 
-  const planFilters: { id: PlanFilter; label: string; count?: number }[] = [
-    { id: "ALL", label: "All", count: schools.length },
-    { id: "TRIAL", label: "Trial", count: planCounts.TRIAL },
-    { id: "STARTER", label: "Starter", count: planCounts.STARTER },
-    { id: "PROFESSIONAL", label: "Pro", count: planCounts.PROFESSIONAL },
-    { id: "ENTERPRISE", label: "Enterprise", count: planCounts.ENTERPRISE },
-    { id: "INACTIVE", label: "Inactive", count: inactiveBilling.length },
+  const planFilters: { id: PlanFilter; count?: number }[] = [
+    { id: "ALL", count: schools.length },
+    { id: "TRIAL", count: planCounts.TRIAL },
+    { id: "STARTER", count: planCounts.STARTER },
+    { id: "PROFESSIONAL", count: planCounts.PROFESSIONAL },
+    { id: "ENTERPRISE", count: planCounts.ENTERPRISE },
+    { id: "INACTIVE", count: inactiveBilling.length },
   ];
 
   if (loading) {
@@ -137,25 +156,23 @@ export function PlatformBilling({ dashboard, schools, onNavigate }: Props) {
             <DashIcon name="finance" className="dash-icon--md" />
           </span>
           <div>
-            <p className="plat-subjects-v2__eyebrow">Revenue & subscriptions</p>
-            <h2 className="plat-subjects-v2__title">Billing</h2>
-            <p className="plat-subjects-v2__sub">
-              MRR estimates, subscription health, and trial conversion risk.
-            </p>
+            <p className="plat-subjects-v2__eyebrow">{t("platformUi.billingEyebrow")}</p>
+            <h2 className="plat-subjects-v2__title">{t("platformUi.billingTitle")}</h2>
+            <p className="plat-subjects-v2__sub">{t("platformUi.billingSub")}</p>
           </div>
         </div>
         <div className="plat-subjects-v2__hero-stats">
           <div className="plat-subjects-v2__stat">
             <strong>${(summary?.mrrUsd ?? 0).toLocaleString()}</strong>
-            <span>Est. MRR</span>
+            <span>{t("platformUi.billingEstMrr")}</span>
           </div>
           <div className="plat-subjects-v2__stat">
             <strong>{summary?.paidSchools ?? dashboard.schools.paid}</strong>
-            <span>Paid</span>
+            <span>{t("platformUi.statPaid")}</span>
           </div>
           <div className="plat-subjects-v2__stat">
             <strong>{summary?.trialSchools ?? dashboard.schools.trial}</strong>
-            <span>On trial</span>
+            <span>{t("platformUi.overviewOnTrial")}</span>
           </div>
         </div>
       </header>
@@ -174,7 +191,7 @@ export function PlatformBilling({ dashboard, schools, onNavigate }: Props) {
                 ? `$${summary.invoices.outstandingUsd.toLocaleString()}`
                 : "—"}
             </strong>
-            <span>Outstanding</span>
+            <span>{t("platformUi.billingOutstanding")}</span>
           </div>
         </button>
         <button
@@ -186,7 +203,7 @@ export function PlatformBilling({ dashboard, schools, onNavigate }: Props) {
           <DashIcon name="students" className="dash-icon--sm" />
           <div>
             <strong>{schools.length}</strong>
-            <span>Usage & limits</span>
+            <span>{t("platformUi.billingUsageLimits")}</span>
           </div>
         </button>
         <button
@@ -198,7 +215,7 @@ export function PlatformBilling({ dashboard, schools, onNavigate }: Props) {
           <DashIcon name="settings" className="dash-icon--sm" />
           <div>
             <strong>4</strong>
-            <span>Plan tiers</span>
+            <span>{t("platformUi.billingPlanTiers")}</span>
           </div>
         </button>
       </div>
@@ -212,11 +229,13 @@ export function PlatformBilling({ dashboard, schools, onNavigate }: Props) {
           >
             <DashIcon name="fees" className="dash-icon--sm" />
             <div>
-              <strong>Invoices</strong>
+              <strong>{t("platformUi.billingNavInvoices")}</strong>
               <span>
                 {summary
-                  ? `${summary.invoices.sent + summary.invoices.overdue} open`
-                  : "Accounts receivable"}
+                  ? t("platformUi.billingNavInvoicesSubOpen", {
+                      count: summary.invoices.sent + summary.invoices.overdue,
+                    })
+                  : t("platformUi.billingNavInvoicesSubDefault")}
               </span>
             </div>
           </button>
@@ -227,8 +246,8 @@ export function PlatformBilling({ dashboard, schools, onNavigate }: Props) {
           >
             <DashIcon name="students" className="dash-icon--sm" />
             <div>
-              <strong>Usage & limits</strong>
-              <span>Seat utilization per school</span>
+              <strong>{t("platformUi.billingUsageLimits")}</strong>
+              <span>{t("platformUi.billingNavUsageSub")}</span>
             </div>
           </button>
           <button
@@ -238,8 +257,8 @@ export function PlatformBilling({ dashboard, schools, onNavigate }: Props) {
           >
             <DashIcon name="settings" className="dash-icon--sm" />
             <div>
-              <strong>Plan catalog</strong>
-              <span>Prices, limits, and features</span>
+              <strong>{t("platformUi.billingNavPlans")}</strong>
+              <span>{t("platformUi.billingNavPlansSub")}</span>
             </div>
           </button>
         </div>
@@ -250,21 +269,21 @@ export function PlatformBilling({ dashboard, schools, onNavigate }: Props) {
           <DashIcon name="finance" className="dash-icon--sm" />
           <div>
             <strong>{summary?.paidSchools ?? dashboard.schools.paid}</strong>
-            <span>Paid subscriptions</span>
+            <span>{t("platformUi.billingPaidSubscriptions")}</span>
           </div>
         </article>
         <article className="plat-billing-v2__mini-kpi">
           <DashIcon name="calendar" className="dash-icon--sm" />
           <div>
             <strong>{trialEndingSoon.length}</strong>
-            <span>Trials ending in 14d</span>
+            <span>{t("platformUi.billingTrialsEnding14")}</span>
           </div>
         </article>
         <article className="plat-billing-v2__mini-kpi">
           <DashIcon name="alert" className="dash-icon--sm" />
           <div>
             <strong>{inactiveBilling.length}</strong>
-            <span>Billing inactive</span>
+            <span>{t("platformUi.billingBillingInactive")}</span>
           </div>
         </article>
         <article className="plat-billing-v2__mini-kpi">
@@ -275,17 +294,17 @@ export function PlatformBilling({ dashboard, schools, onNavigate }: Props) {
                 ? summary.invoices.sent + summary.invoices.overdue
                 : "—"}
             </strong>
-            <span>Open invoices</span>
+            <span>{t("platformUi.billingOpenInvoices")}</span>
           </div>
         </article>
       </div>
 
       <section className="plat-billing-v2__panel">
-        <h3 className="plat-billing-v2__panel-title">Plan distribution</h3>
+        <h3 className="plat-billing-v2__panel-title">{t("platformUi.billingPlanDistribution")}</h3>
         <div className="plat-plan-bars">
           {(["TRIAL", "STARTER", "PROFESSIONAL", "ENTERPRISE"] as const).map((plan) => (
             <div key={plan} className="plat-plan-bar-row">
-              <span className="plat-plan-bar-row__label">{plan}</span>
+              <span className="plat-plan-bar-row__label">{planFilterLabel(plan, t)}</span>
               <div className="plat-plan-bar-row__track">
                 <div
                   className={`plat-plan-bar-row__fill plat-plan-bar-row__fill--${plan.toLowerCase()}`}
@@ -303,15 +322,23 @@ export function PlatformBilling({ dashboard, schools, onNavigate }: Props) {
           <DashIcon name="alert" className="dash-icon--sm" />
           <div className="plat-billing-v2__alert-body">
             <strong>
-              {trialEndingSoon.length} trial{trialEndingSoon.length > 1 ? "s" : ""} ending soon
+              {t("platformUi.billingTrialsEndingSoon", {
+                count: trialEndingSoon.length,
+                trials:
+                  trialEndingSoon.length > 1
+                    ? t("platformUi.trialsPlural")
+                    : t("platformUi.trialOne"),
+              })}
             </strong>
-            <p>Reach out before access expires — convert to Starter or extend trial.</p>
+            <p>{t("platformUi.billingTrialReachOut")}</p>
           </div>
           <ul className="plat-billing-v2__alert-list">
             {trialEndingSoon.slice(0, 4).map((s) => (
               <li key={s.id}>
                 <strong>{s.name}</strong>
-                <span>{daysUntil(s.subscription?.trialEndsAt)}d left</span>
+                <span>
+                  {t("platformUi.daysLeft", { days: daysUntil(s.subscription?.trialEndsAt) ?? 0 })}
+                </span>
               </li>
             ))}
           </ul>
@@ -319,20 +346,18 @@ export function PlatformBilling({ dashboard, schools, onNavigate }: Props) {
       ) : null}
 
       <section className="plat-billing-v2__panel">
-        <h3 className="plat-billing-v2__panel-title">Subscription ledger</h3>
-        <p className="plat-billing-v2__panel-hint">
-          Per-school plan and billing status. Assign plans from Schools → Billing tab.
-        </p>
+        <h3 className="plat-billing-v2__panel-title">{t("platformUi.billingLedgerTitle")}</h3>
+        <p className="plat-billing-v2__panel-hint">{t("platformUi.billingLedgerHint")}</p>
 
         <div className="plat-subjects-v2__toolbar">
           <div className="plat-tenants-v2__search plat-subjects-v2__search">
             <DashIcon name="finance" className="dash-icon--sm" />
             <input
               type="search"
-              placeholder="Search school or plan…"
+              placeholder={t("platformUi.billingSearchPh")}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              aria-label="Search subscriptions"
+              aria-label={t("platformUi.billingSearchAria")}
             />
           </div>
         </div>
@@ -349,7 +374,7 @@ export function PlatformBilling({ dashboard, schools, onNavigate }: Props) {
               }`}
               onClick={() => setPlanFilter(f.id)}
             >
-              {f.label}
+              {planFilterLabel(f.id, t)}
               <span className="plat-filter-count">{f.count ?? 0}</span>
             </button>
           ))}
@@ -359,18 +384,18 @@ export function PlatformBilling({ dashboard, schools, onNavigate }: Props) {
           <table className="plat-subjects-v2__table">
             <thead>
               <tr>
-                <th>School</th>
-                <th>Plan</th>
-                <th>Billing</th>
-                <th>Renewal / trial</th>
-                <th>Status</th>
+                <th>{t("platformUi.billingColSchool")}</th>
+                <th>{t("platformUi.billingColPlan")}</th>
+                <th>{t("platformUi.billingColBilling")}</th>
+                <th>{t("platformUi.billingColRenewal")}</th>
+                <th>{t("platformUi.billingColStatus")}</th>
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="plat-subjects-v2__empty">
-                    No subscriptions match your filters.
+                    {t("platformUi.billingNoMatch")}
                   </td>
                 </tr>
               ) : (
@@ -392,7 +417,7 @@ export function PlatformBilling({ dashboard, schools, onNavigate }: Props) {
                         <span
                           className={`plat-plan-badge plat-plan-badge--${(sub?.plan ?? "none").toLowerCase()}`}
                         >
-                          {sub?.plan ?? "—"}
+                          {sub?.plan ? planFilterLabel(sub.plan as PlanFilter, t) : "—"}
                         </span>
                       </td>
                       <td>
@@ -400,7 +425,7 @@ export function PlatformBilling({ dashboard, schools, onNavigate }: Props) {
                           <span
                             className={`plat-billing-pill plat-billing-pill--${sub.isActive ? "on" : "off"}`}
                           >
-                            {sub.isActive ? "Active" : "Inactive"}
+                            {sub.isActive ? t("platformUi.billingActive") : t("platformUi.billingInactive")}
                           </span>
                         ) : (
                           "—"
@@ -409,26 +434,26 @@ export function PlatformBilling({ dashboard, schools, onNavigate }: Props) {
                       <td>
                         {sub?.plan === "TRIAL" && sub.trialEndsAt ? (
                           <>
-                            {formatDate(sub.trialEndsAt)}
+                            {formatDate(sub.trialEndsAt, locale)}
                             {days !== null && days >= 0 ? (
                               <span
                                 className={`plat-renewal-tag${
                                   urgent ? " plat-renewal-tag--urgent" : ""
                                 }`}
                               >
-                                {days}d left
+                                {t("platformUi.daysLeft", { days })}
                               </span>
                             ) : null}
                           </>
                         ) : sub?.plan && sub.plan !== "TRIAL" ? (
-                          <span className="plat-billing-v2__muted">Monthly billing</span>
+                          <span className="plat-billing-v2__muted">{t("platformUi.monthBilling")}</span>
                         ) : (
                           "—"
                         )}
                       </td>
                       <td>
                         <span className={`plat-status plat-status--${s.status.toLowerCase()}`}>
-                          {s.status}
+                          {tenantStatusLabel(s.status, t)}
                         </span>
                       </td>
                     </tr>

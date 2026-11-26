@@ -165,13 +165,15 @@ export function StudentIdCardView({
       normalizeHex(card.schoolAccentDeep) ??
       normalizeHex(card.schoolPrimaryColor) ??
       DEFAULT_SCHOOL_THEME.accentDeep;
-    void QRCode.toDataURL(card.scanPayload, {
+    const qrValue = card.publicResultsUrl?.trim() || card.scanPayload;
+    void QRCode.toDataURL(qrValue, {
       width: backQrSize,
       margin: 1,
       errorCorrectionLevel: "M",
       color: { dark, light: "#ffffff" },
     }).then(setQrGenerated);
   }, [
+    card.publicResultsUrl,
     card.scanPayload,
     card.schoolAccentDeep,
     card.schoolPrimaryColor,
@@ -231,7 +233,11 @@ export function StudentIdCardView({
                 </div>
               )}
             </div>
-            <StudentCardBarcode code={card.cardCode} variant={variant} />
+            <StudentCardBarcode
+              code={card.scanPayload}
+              displayValue={card.cardCode}
+              variant={variant}
+            />
           </div>
         </div>
 
@@ -338,12 +344,14 @@ export function StudentIdCardView({
               <div className="sid__qr sid__qr--loading" aria-hidden />
             )}
             <span className="sid__scan-hint">
-              <span className="sid__scan-hint-en">Scan for attendance</span>
+              <span className="sid__scan-hint-en">
+                Scan for results · any phone
+              </span>
               <span className="sid__scan-hint-sep" aria-hidden>
                 ·
               </span>
               <span className="sid__scan-hint-am" lang="am">
-                ለክትትል ይቃኙ
+                ውጤት ለማየት ይቃኙ
               </span>
             </span>
           </div>

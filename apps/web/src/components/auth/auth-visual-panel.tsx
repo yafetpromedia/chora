@@ -1,23 +1,26 @@
 "use client";
 
 import { ProductPreview } from "@/components/product-preview";
-
-const BULLETS = [
-  "Each school gets its own secure workspace",
-  "Admins invite teachers, students & parents",
-  "Everyone joins with a school code — not open signup",
-];
+import { useLocale } from "@/components/i18n/locale-provider";
 
 export function AuthVisualPanel() {
+  const { t } = useLocale();
+  const bullets = [
+    t("authVisualPanelUi.bullet1"),
+    t("authVisualPanelUi.bullet2"),
+    t("authVisualPanelUi.bullet3"),
+  ];
+
   return (
     <div className="auth-visual">
-      <p className="auth-visual-label">Multi-school platform</p>
+      <p className="auth-visual-label">{t("authVisualPanelUi.label")}</p>
       <h2 className="auth-visual-heading">
-        One platform — <span>many schools, fully separated</span>
+        {t("authVisualPanelUi.heading")}
+        <span>{t("authVisualPanelUi.headingAccent")}</span>
       </h2>
 
       <ul className="auth-visual-list">
-        {BULLETS.map((item) => (
+        {bullets.map((item) => (
           <li key={item}>{item}</li>
         ))}
       </ul>

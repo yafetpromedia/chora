@@ -16,7 +16,8 @@ export type PlatformSection =
   | "coupons"
   | "permissions"
   | "profile"
-  | "settings";
+  | "settings"
+  | "email";
 
 export type PlatformDashboard = {
   schools: {
@@ -155,5 +156,9 @@ export const SECTION_META: Record<
   settings: {
     title: "Settings",
     subtitle: "Your account and platform links",
+  },
+  email: {
+    title: "Email",
+    subtitle: "Awud Digitals SMTP delivery, templates, and logs",
   },
 };

@@ -7,6 +7,7 @@ import { DashIcon } from "@/components/dashboard/dash-icons";
 import { StaffAttendanceScanner } from "@/components/staff-attendance/staff-attendance-scanner";
 import { AppToast } from "@/components/ui/app-toast";
 import { hasPermission, Permission } from "@/lib/permissions";
+import { useLocale } from "@/components/i18n/locale-provider";
 import {
   STAFF_ATTENDANCE_STATUS_LABELS,
   STAFF_DEPARTMENT_LABELS,
@@ -44,6 +45,30 @@ function todayIso() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function staffStatusLabel(
+  t: (key: string, vars?: Record<string, string | number>) => string,
+  status: StaffAttendanceStatus | null,
+  unmarked = false,
+) {
+  if (unmarked || !status) return t("staffAttendanceUi.unmarked");
+  if (status === "present") return t("common.present");
+  if (status === "late") return t("common.late");
+  if (status === "absent") return t("common.absent");
+  if (status === "excused") return t("common.excused");
+  if (status === "half_day") return t("staffAttendanceUi.status_half_day");
+  if (status === "on_leave") return t("staffAttendanceUi.status_on_leave");
+  return STAFF_ATTENDANCE_STATUS_LABELS[status];
+}
+
+function staffDeptLabel(
+  t: (key: string) => string,
+  dept: StaffDepartment,
+) {
+  const key = `staffAttendanceUi.dept_${dept}`;
+  const out = t(key);
+  return out === key ? STAFF_DEPARTMENT_LABELS[dept] : out;
+}
+
 function monthStartIso() {
   const d = new Date();
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1))
@@ -52,6 +77,7 @@ function monthStartIso() {
 }
 
 export function StaffAttendanceWorkspace() {
+  const { t } = useLocale();
   const searchParams = useSearchParams();
   const canManage = hasPermission(Permission.STAFF_ATTENDANCE_MANAGE);
   const canExport = hasPermission(Permission.STAFF_ATTENDANCE_ANALYTICS);
@@ -101,7 +127,7 @@ export function StaffAttendanceWorkspace() {
       setSettingsGrace(res.settings.graceMinutes);
       setSettingsOt(res.settings.overtimeEnabled !== false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load");
+      setError(err instanceof Error ? err.message : t("staffAttendanceUi.loadFailed"));
     } finally {
       setLoading(false);
     }
@@ -120,12 +146,12 @@ export function StaffAttendanceWorkspace() {
     if (!userId) return;
     /* Deep-link: open history modal from query params */
     // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot deep link
-    setHistoryName(name?.trim() || "Employee");
+    setHistoryName(name?.trim() || t("staffAttendanceUi.employeeFallback"));
     setModal({
       type: "history",
       row: {
         userId,
-        employeeName: name?.trim() || "Employee",
+        employeeName: name?.trim() || t("staffAttendanceUi.employeeFallback"),
         email: "",
         portalRole: "",
         roleName: "",
@@ -151,7 +177,9 @@ export function StaffAttendanceWorkspace() {
     void getStaffAttendanceHistory(userId)
       .then(setHistory)
       .catch((err) =>
-        setError(err instanceof Error ? err.message : "Could not load history"),
+        setError(
+          err instanceof Error ? err.message : t("staffAttendanceUi.historyLoadFailed"),
+        ),
       );
   }, [searchParams]);
 
@@ -166,10 +194,10 @@ export function StaffAttendanceWorkspace() {
     setError("");
     try {
       await staffCheckIn({ userId: row.userId, date });
-      setToast(`Checked in ${row.employeeName}`);
+      setToast(t("staffAttendanceUi.checkedIn", { name: row.employeeName }));
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Check-in failed");
+      setError(err instanceof Error ? err.message : t("staffAttendanceUi.checkInFailed"));
     } finally {
       setBusyId(null);
     }
@@ -181,10 +209,10 @@ export function StaffAttendanceWorkspace() {
     setError("");
     try {
       await staffCheckOut({ userId: row.userId, date });
-      setToast(`Checked out ${row.employeeName}`);
+      setToast(t("staffAttendanceUi.checkedOut", { name: row.employeeName }));
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Check-out failed");
+      setError(err instanceof Error ? err.message : t("staffAttendanceUi.checkOutFailed"));
     } finally {
       setBusyId(null);
     }
@@ -225,18 +253,27 @@ export function StaffAttendanceWorkspace() {
       setHistory(hist);
       setQrInfo(qr);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load history");
+      setError(
+        err instanceof Error ? err.message : t("staffAttendanceUi.historyLoadFailed"),
+      );
     }
   }
 
   async function onBulkMarkAbsent(unmarked: number) {
     if (!canManage) return;
     if (unmarked <= 0) {
-      setToast("Everyone in this view is already marked");
+      setToast(t("staffAttendanceUi.allMarked"));
       return;
     }
     const ok = window.confirm(
-      `Mark ${unmarked} unmarked ${unmarked === 1 ? "person" : "people"} as absent for ${date}?`,
+      t("staffAttendanceUi.bulkConfirm", {
+        count: unmarked,
+        people:
+          unmarked === 1
+            ? t("staffAttendanceUi.personOne")
+            : t("staffAttendanceUi.peopleMany"),
+        date,
+      }),
     );
     if (!ok) return;
     setBulkBusy(true);
@@ -251,12 +288,12 @@ export function StaffAttendanceWorkspace() {
       });
       setToast(
         res.marked > 0
-          ? `Marked ${res.marked} as absent`
-          : "No unmarked staff to update",
+          ? t("staffAttendanceUi.markedAbsent", { count: res.marked })
+          : t("staffAttendanceUi.noUnmarkedUpdate"),
       );
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Bulk mark failed");
+      setError(err instanceof Error ? err.message : t("staffAttendanceUi.bulkMarkFailed"));
     } finally {
       setBulkBusy(false);
     }
@@ -275,11 +312,11 @@ export function StaffAttendanceWorkspace() {
         reason: formReason || undefined,
         notes: formNotes || undefined,
       });
-      setToast("Attendance saved");
+      setToast(t("staffAttendanceUi.attendanceSaved"));
       setModal(null);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Save failed");
+      setError(err instanceof Error ? err.message : t("staffAttendanceUi.saveFailed"));
     } finally {
       setBusyId(null);
     }
@@ -288,7 +325,7 @@ export function StaffAttendanceWorkspace() {
   async function saveCorrect() {
     if (!modal || modal.type !== "correct" || !modal.row.recordId) return;
     if (!formReason.trim()) {
-      setError("Correction reason is required");
+      setError(t("staffAttendanceUi.correctionReasonRequired"));
       return;
     }
     setBusyId(modal.row.userId);
@@ -300,11 +337,11 @@ export function StaffAttendanceWorkspace() {
         reason: formReason.trim(),
         notes: formNotes || undefined,
       });
-      setToast("Attendance corrected");
+      setToast(t("staffAttendanceUi.attendanceCorrected"));
       setModal(null);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Correction failed");
+      setError(err instanceof Error ? err.message : t("staffAttendanceUi.correctionFailed"));
     } finally {
       setBusyId(null);
     }
@@ -318,11 +355,11 @@ export function StaffAttendanceWorkspace() {
         graceMinutes: settingsGrace,
         overtimeEnabled: settingsOt,
       });
-      setToast("Working hours updated");
+      setToast(t("staffAttendanceUi.workingHoursUpdated"));
       setModal(null);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Settings update failed");
+      setError(err instanceof Error ? err.message : t("staffAttendanceUi.settingsUpdateFailed"));
     }
   }
 
@@ -338,9 +375,9 @@ export function StaffAttendanceWorkspace() {
               ? "staff"
               : undefined,
       });
-      setToast("Export downloaded");
+      setToast(t("staffAttendanceUi.exportDownloaded"));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Export failed");
+      setError(err instanceof Error ? err.message : t("staffAttendanceUi.exportFailed"));
     }
   }
 
@@ -356,20 +393,19 @@ export function StaffAttendanceWorkspace() {
         <div className="tch-v2__hero-glow" aria-hidden />
         <div className="tch-v2__hero-inner">
           <div className="tch-v2__hero-main">
-            <span className="tch-v2__chip">Attendance</span>
-            <h2 className="tch-v2__hero-title">Staff Attendance</h2>
+            <span className="tch-v2__chip">{t("staffAttendanceUi.chip")}</span>
+            <h2 className="tch-v2__hero-title">{t("staffAttendanceUi.title")}</h2>
             <p className="tch-v2__hero-sub">
-              Manage teacher and staff attendance, check-ins, absences and
-              working hours.
+              {t("staffAttendanceUi.heroSub")}
               {canExport ? (
                 <>
                   {" "}
-                  Open{" "}
+                  {t("staffAttendanceUi.heroSubAnalyticsPrefix")}{" "}
                   <Link
                     href="/admin/staff-attendance/analytics"
                     className="tch-v2__hero-link"
                   >
-                    Analytics
+                    {t("staffAttendanceUi.analytics")}
                   </Link>
                   .
                 </>
@@ -381,25 +417,25 @@ export function StaffAttendanceWorkspace() {
               <strong>
                 {loading || summary == null ? "—" : summary.present}
               </strong>
-              <span>Present</span>
+              <span>{t("common.present")}</span>
             </div>
             <div className="tch-v2__stat">
               <strong>
                 {loading || summary == null ? "—" : summary.late}
               </strong>
-              <span>Late</span>
+              <span>{t("common.late")}</span>
             </div>
             <div className="tch-v2__stat">
               <strong>
                 {loading || summary == null ? "—" : summary.absent}
               </strong>
-              <span>Absent</span>
+              <span>{t("common.absent")}</span>
             </div>
             <div className="tch-v2__stat tch-v2__stat--accent">
               <strong>
                 {loading || summary == null ? "—" : unmarkedCount}
               </strong>
-              <span>Unmarked</span>
+              <span>{t("staffAttendanceUi.statUnmarked")}</span>
             </div>
           </div>
         </div>
@@ -413,7 +449,7 @@ export function StaffAttendanceWorkspace() {
             onClick={() => setModal({ type: "settings" })}
           >
             <DashIcon name="settings" className="dash-icon--sm" />
-            Hours
+            {t("staffAttendanceUi.hours")}
           </button>
         ) : null}
         {canManage ? (
@@ -423,7 +459,7 @@ export function StaffAttendanceWorkspace() {
             disabled={bulkBusy || loading || unmarkedCount <= 0}
             onClick={() => void onBulkMarkAbsent(unmarkedCount)}
           >
-            Mark rest absent
+            {t("staffAttendanceUi.markRestAbsent")}
             {unmarkedCount > 0 ? ` (${unmarkedCount})` : ""}
           </button>
         ) : null}
@@ -433,7 +469,7 @@ export function StaffAttendanceWorkspace() {
             className="sa-btn sa-btn--ghost"
           >
             <DashIcon name="chart" className="dash-icon--sm" />
-            Analytics
+            {t("staffAttendanceUi.analytics")}
           </Link>
         ) : null}
         {canExport ? (
@@ -443,7 +479,7 @@ export function StaffAttendanceWorkspace() {
             onClick={() => void onExport()}
           >
             <DashIcon name="chart" className="dash-icon--sm" />
-            Export CSV
+            {t("staffAttendanceUi.exportCsv")}
           </button>
         ) : null}
       </div>
@@ -451,15 +487,15 @@ export function StaffAttendanceWorkspace() {
       <div className="sa-stats">
         {(
           [
-            ["Present", summary?.present, "present"],
-            ["Late", summary?.late, "late"],
-            ["Absent", summary?.absent, "absent"],
-            ["On leave", summary?.on_leave, "leave"],
-            ["Half day", summary?.half_day, "half"],
-            ["Excused", summary?.excused, "excused"],
+            [t("common.present"), summary?.present, "present"],
+            [t("common.late"), summary?.late, "late"],
+            [t("common.absent"), summary?.absent, "absent"],
+            [t("staffAttendanceUi.statOnLeave"), summary?.on_leave, "leave"],
+            [t("staffAttendanceUi.statHalfDay"), summary?.half_day, "half"],
+            [t("common.excused"), summary?.excused, "excused"],
           ] as const
         ).map(([label, value, tone]) => (
-          <div key={label} className={`sa-stat sa-stat--${tone}`}>
+          <div key={tone} className={`sa-stat sa-stat--${tone}`}>
             <span className="sa-stat__label">{label}</span>
             <strong className="sa-stat__value">
               {loading || value == null ? "—" : value}
@@ -468,13 +504,13 @@ export function StaffAttendanceWorkspace() {
         ))}
       </div>
 
-      <nav className="sa-tabs" aria-label="Staff attendance views">
+      <nav className="sa-tabs" aria-label={t("staffAttendanceUi.tabsAria")}>
         <button
           type="button"
           className={`sa-tab${tab === "roll" ? " sa-tab--active" : ""}`}
           onClick={() => setTab("roll")}
         >
-          Daily roll
+          {t("staffAttendanceUi.tabRoll")}
         </button>
         {canManage ? (
           <button
@@ -482,7 +518,7 @@ export function StaffAttendanceWorkspace() {
             className={`sa-tab${tab === "scan" ? " sa-tab--active" : ""}`}
             onClick={() => setTab("scan")}
           >
-            Scan QR
+            {t("staffAttendanceUi.tabScan")}
           </button>
         ) : null}
       </nav>
@@ -499,7 +535,7 @@ export function StaffAttendanceWorkspace() {
       <>
       <div className="sa-toolbar">
         <label className="sa-field">
-          <span>Date</span>
+          <span>{t("staffAttendanceUi.date")}</span>
           <input
             type="date"
             value={date}
@@ -507,51 +543,55 @@ export function StaffAttendanceWorkspace() {
           />
         </label>
         <label className="sa-field">
-          <span>Department</span>
+          <span>{t("staffAttendanceUi.department")}</span>
           <select
             value={department}
             onChange={(e) =>
               setDepartment(e.target.value as StaffDepartment | "")
             }
           >
-            <option value="">All departments</option>
-            {Object.entries(STAFF_DEPARTMENT_LABELS).map(([k, v]) => (
-              <option key={k} value={k}>
-                {v}
-              </option>
-            ))}
+            <option value="">{t("staffAttendanceUi.allDepartments")}</option>
+            {(Object.keys(STAFF_DEPARTMENT_LABELS) as StaffDepartment[]).map(
+              (k) => (
+                <option key={k} value={k}>
+                  {staffDeptLabel(t, k)}
+                </option>
+              ),
+            )}
           </select>
         </label>
         <label className="sa-field">
-          <span>Status</span>
+          <span>{t("staffAttendanceUi.status")}</span>
           <select value={status} onChange={(e) => setStatus(e.target.value)}>
-            <option value="">All statuses</option>
-            <option value="unmarked">Unmarked</option>
-            {Object.entries(STAFF_ATTENDANCE_STATUS_LABELS).map(([k, v]) => (
-              <option key={k} value={k}>
-                {v}
-              </option>
-            ))}
+            <option value="">{t("staffAttendanceUi.allStatuses")}</option>
+            <option value="unmarked">{t("staffAttendanceUi.unmarked")}</option>
+            {(Object.keys(STAFF_ATTENDANCE_STATUS_LABELS) as StaffAttendanceStatus[]).map(
+              (k) => (
+                <option key={k} value={k}>
+                  {staffStatusLabel(t, k)}
+                </option>
+              ),
+            )}
           </select>
         </label>
         <form className="sa-search" onSubmit={onSearchSubmit}>
           <label className="sa-field sa-field--grow">
-            <span>Search</span>
+            <span>{t("common.search")}</span>
             <input
               type="search"
-              placeholder="Name or email"
+              placeholder={t("staffAttendanceUi.searchPlaceholder")}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </label>
           <button type="submit" className="sa-btn sa-btn--ghost">
-            Search
+            {t("common.search")}
           </button>
         </form>
         {canExport ? (
           <div className="sa-export-range">
             <label className="sa-field">
-              <span>From</span>
+              <span>{t("staffAttendanceUi.from")}</span>
               <input
                 type="date"
                 value={exportFrom}
@@ -559,7 +599,7 @@ export function StaffAttendanceWorkspace() {
               />
             </label>
             <label className="sa-field">
-              <span>To</span>
+              <span>{t("staffAttendanceUi.to")}</span>
               <input
                 type="date"
                 value={exportTo}
@@ -574,28 +614,28 @@ export function StaffAttendanceWorkspace() {
         <table className="sa-table">
           <thead>
             <tr>
-              <th>Employee</th>
-              <th>Department</th>
-              <th>Role</th>
-              <th>Status</th>
-              <th>Check-in</th>
-              <th>Check-out</th>
-              <th>Late</th>
-              <th>Worked</th>
-              <th>Actions</th>
+              <th>{t("staffAttendanceUi.colEmployee")}</th>
+              <th>{t("staffAttendanceUi.colDepartment")}</th>
+              <th>{t("staffAttendanceUi.colRole")}</th>
+              <th>{t("staffAttendanceUi.colStatus")}</th>
+              <th>{t("staffAttendanceUi.colCheckIn")}</th>
+              <th>{t("staffAttendanceUi.colCheckOut")}</th>
+              <th>{t("staffAttendanceUi.colLate")}</th>
+              <th>{t("staffAttendanceUi.colWorked")}</th>
+              <th>{t("staffAttendanceUi.colActions")}</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
                 <td colSpan={9} className="sa-empty">
-                  Loading…
+                  {t("common.loading")}
                 </td>
               </tr>
             ) : !data?.rows.length ? (
               <tr>
                 <td colSpan={9} className="sa-empty">
-                  No staff match these filters.
+                  {t("staffAttendanceUi.noStaffMatch")}
                 </td>
               </tr>
             ) : (
@@ -612,11 +652,11 @@ export function StaffAttendanceWorkspace() {
                   <td>
                     {row.status ? (
                       <span className={`sa-badge sa-badge--${row.status}`}>
-                        {STAFF_ATTENDANCE_STATUS_LABELS[row.status]}
+                        {staffStatusLabel(t, row.status)}
                       </span>
                     ) : (
                       <span className="sa-badge sa-badge--unmarked">
-                        Unmarked
+                        {t("staffAttendanceUi.unmarked")}
                       </span>
                     )}
                   </td>
@@ -631,7 +671,7 @@ export function StaffAttendanceWorkspace() {
                         className="sa-link"
                         onClick={() => void openHistory(row)}
                       >
-                        View
+                        {t("staffAttendanceUi.view")}
                       </button>
                       {canManage && !row.checkInAt && !row.status ? (
                         <button
@@ -640,7 +680,7 @@ export function StaffAttendanceWorkspace() {
                           disabled={busyId === row.userId}
                           onClick={() => void onCheckIn(row)}
                         >
-                          Check-in
+                          {t("staffAttendanceUi.checkIn")}
                         </button>
                       ) : null}
                       {canManage && row.checkInAt && !row.checkOutAt ? (
@@ -650,7 +690,7 @@ export function StaffAttendanceWorkspace() {
                           disabled={busyId === row.userId}
                           onClick={() => void onCheckOut(row)}
                         >
-                          Check-out
+                          {t("staffAttendanceUi.checkOut")}
                         </button>
                       ) : null}
                       {canManage ? (
@@ -661,7 +701,9 @@ export function StaffAttendanceWorkspace() {
                             row.recordId ? openCorrect(row) : openManual(row)
                           }
                         >
-                          {row.recordId ? "Edit" : "Mark"}
+                          {row.recordId
+                            ? t("staffAttendanceUi.edit")
+                            : t("staffAttendanceUi.mark")}
                         </button>
                       ) : null}
                     </div>
@@ -675,31 +717,41 @@ export function StaffAttendanceWorkspace() {
 
       {data?.settings ? (
         <p className="sa-hours-note">
-          Expected hours {data.settings.checkInTime}–{data.settings.checkOutTime}
-          , grace {data.settings.graceMinutes} min · {summary?.unmarked ?? 0}{" "}
-          unmarked of {summary?.totalStaff ?? 0}
+          {t("staffAttendanceUi.hoursNote", {
+            checkIn: data.settings.checkInTime,
+            checkOut: data.settings.checkOutTime,
+            grace: data.settings.graceMinutes,
+            unmarked: summary?.unmarked ?? 0,
+            total: summary?.totalStaff ?? 0,
+          })}
         </p>
       ) : null}
       </>
       ) : null}
 
       {modal ? (
-        <div className="sa-modal-backdrop" role="presentation">
+        <div
+          className="sa-modal-backdrop"
+          role="presentation"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setModal(null);
+          }}
+        >
           <div
-            className="sa-modal"
+            className={`sa-modal${modal.type === "history" ? " sa-modal--history" : ""}`}
             role="dialog"
             aria-modal="true"
             aria-labelledby="sa-modal-title"
           >
             {modal.type === "settings" ? (
               <>
-                <h3 id="sa-modal-title">Working hours</h3>
+                <h3 id="sa-modal-title">{t("staffAttendanceUi.modalWorkingHours")}</h3>
                 <p className="sa-modal__sub">
-                  School-level expected check-in, check-out, and grace period.
+                  {t("staffAttendanceUi.modalWorkingHoursSub")}
                 </p>
                 <div className="sa-form-grid">
                   <label className="sa-field">
-                    <span>Check-in</span>
+                    <span>{t("staffAttendanceUi.checkIn")}</span>
                     <input
                       type="time"
                       value={settingsCheckIn}
@@ -707,7 +759,7 @@ export function StaffAttendanceWorkspace() {
                     />
                   </label>
                   <label className="sa-field">
-                    <span>Check-out</span>
+                    <span>{t("staffAttendanceUi.checkOut")}</span>
                     <input
                       type="time"
                       value={settingsCheckOut}
@@ -715,7 +767,7 @@ export function StaffAttendanceWorkspace() {
                     />
                   </label>
                   <label className="sa-field">
-                    <span>Grace (minutes)</span>
+                    <span>{t("staffAttendanceUi.graceMinutes")}</span>
                     <input
                       type="number"
                       min={0}
@@ -727,14 +779,14 @@ export function StaffAttendanceWorkspace() {
                     />
                   </label>
                   <label className="sa-field sa-field--full">
-                    <span>Overtime</span>
+                    <span>{t("staffAttendanceUi.overtime")}</span>
                     <label className="sa-check">
                       <input
                         type="checkbox"
                         checked={settingsOt}
                         onChange={(e) => setSettingsOt(e.target.checked)}
                       />
-                      Count minutes after expected check-out as overtime
+                      {t("staffAttendanceUi.overtimeHint")}
                     </label>
                   </label>
                 </div>
@@ -744,14 +796,14 @@ export function StaffAttendanceWorkspace() {
                     className="sa-btn sa-btn--ghost"
                     onClick={() => setModal(null)}
                   >
-                    Cancel
+                    {t("common.cancel")}
                   </button>
                   <button
                     type="button"
                     className="sa-btn sa-btn--primary"
                     onClick={() => void saveSettings()}
                   >
-                    Save
+                    {t("common.save")}
                   </button>
                 </div>
               </>
@@ -760,31 +812,35 @@ export function StaffAttendanceWorkspace() {
             {modal.type === "manual" || modal.type === "correct" ? (
               <>
                 <h3 id="sa-modal-title">
-                  {modal.type === "correct" ? "Correct attendance" : "Mark attendance"}
+                  {modal.type === "correct"
+                    ? t("staffAttendanceUi.modalCorrect")
+                    : t("staffAttendanceUi.modalMark")}
                 </h3>
                 <p className="sa-modal__sub">
                   {modal.row.employeeName} · {date}
                 </p>
                 <div className="sa-form-grid">
                   <label className="sa-field">
-                    <span>Status</span>
+                    <span>{t("staffAttendanceUi.status")}</span>
                     <select
                       value={formStatus}
                       onChange={(e) =>
                         setFormStatus(e.target.value as StaffAttendanceStatus)
                       }
                     >
-                      {Object.entries(STAFF_ATTENDANCE_STATUS_LABELS).map(
-                        ([k, v]) => (
-                          <option key={k} value={k}>
-                            {v}
-                          </option>
-                        ),
-                      )}
+                      {(
+                        Object.keys(
+                          STAFF_ATTENDANCE_STATUS_LABELS,
+                        ) as StaffAttendanceStatus[]
+                      ).map((k) => (
+                        <option key={k} value={k}>
+                          {staffStatusLabel(t, k)}
+                        </option>
+                      ))}
                     </select>
                   </label>
                   <label className="sa-field">
-                    <span>Check-in</span>
+                    <span>{t("staffAttendanceUi.checkIn")}</span>
                     <input
                       type="time"
                       value={formCheckIn}
@@ -792,7 +848,7 @@ export function StaffAttendanceWorkspace() {
                     />
                   </label>
                   <label className="sa-field">
-                    <span>Check-out</span>
+                    <span>{t("staffAttendanceUi.checkOut")}</span>
                     <input
                       type="time"
                       value={formCheckOut}
@@ -801,20 +857,22 @@ export function StaffAttendanceWorkspace() {
                   </label>
                   <label className="sa-field sa-field--full">
                     <span>
-                      {modal.type === "correct" ? "Correction reason" : "Reason"}
+                      {modal.type === "correct"
+                        ? t("staffAttendanceUi.correctionReason")
+                        : t("staffAttendanceUi.reason")}
                     </span>
                     <input
                       value={formReason}
                       onChange={(e) => setFormReason(e.target.value)}
                       placeholder={
                         modal.type === "correct"
-                          ? "Why is this being changed?"
-                          : "Optional"
+                          ? t("staffAttendanceUi.reasonWhyChanged")
+                          : t("staffAttendanceUi.optional")
                       }
                     />
                   </label>
                   <label className="sa-field sa-field--full">
-                    <span>Notes</span>
+                    <span>{t("staffAttendanceUi.notes")}</span>
                     <textarea
                       rows={2}
                       value={formNotes}
@@ -828,7 +886,7 @@ export function StaffAttendanceWorkspace() {
                     className="sa-btn sa-btn--ghost"
                     onClick={() => setModal(null)}
                   >
-                    Cancel
+                    {t("common.cancel")}
                   </button>
                   <button
                     type="button"
@@ -840,7 +898,7 @@ export function StaffAttendanceWorkspace() {
                         : saveManual())
                     }
                   >
-                    Save
+                    {t("common.save")}
                   </button>
                 </div>
               </>
@@ -848,110 +906,222 @@ export function StaffAttendanceWorkspace() {
 
             {modal.type === "history" ? (
               <>
-                <h3 id="sa-modal-title">Attendance history</h3>
-                <p className="sa-modal__sub">
-                  {historyName || modal.row.employeeName}
-                </p>
-                {canQr ? (
-                  <div className="sa-qr-admin">
-                    <p className="sa-modal__sub">
-                      Staff gate QR{" "}
-                      {qrInfo
-                        ? qrInfo.active
-                          ? "(active)"
-                          : "(deactivated)"
-                        : "(not issued)"}
+                <header className="sa-hist-hero">
+                  <div className="sa-hist-hero__avatar" aria-hidden>
+                    {(historyName || modal.row.employeeName)
+                      .split(/\s+/)
+                      .filter(Boolean)
+                      .map((p) => p[0])
+                      .join("")
+                      .slice(0, 2)
+                      .toUpperCase()}
+                  </div>
+                  <div className="sa-hist-hero__main">
+                    <p className="sa-hist-hero__eyebrow">
+                      {t("staffAttendanceUi.historyEyebrow")}
                     </p>
+                    <h3 id="sa-modal-title" className="sa-hist-hero__title">
+                      {historyName || modal.row.employeeName}
+                    </h3>
+                    <p className="sa-hist-hero__meta">
+                      {[
+                        modal.row.roleName,
+                        modal.row.department
+                          ? staffDeptLabel(
+                              t,
+                              modal.row.department as StaffDepartment,
+                            )
+                          : modal.row.department,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className="sa-hist-hero__close"
+                    aria-label={t("common.close")}
+                    onClick={() => setModal(null)}
+                  >
+                    ×
+                  </button>
+                </header>
+
+                {canQr ? (
+                  <section className="sa-qr-card">
+                    <div className="sa-qr-card__head">
+                      <span className="sa-qr-card__icon" aria-hidden>
+                        <DashIcon name="id-card" className="dash-icon--sm" />
+                      </span>
+                      <div>
+                        <h4 className="sa-qr-card__title">
+                          {t("staffAttendanceUi.staffGateQr")}
+                        </h4>
+                        <p className="sa-qr-card__sub">
+                          {t("staffAttendanceUi.staffGateQrSub")}
+                        </p>
+                      </div>
+                      <span
+                        className={`sa-qr-card__status sa-qr-card__status--${
+                          qrInfo
+                            ? qrInfo.active
+                              ? "active"
+                              : "off"
+                            : "none"
+                        }`}
+                      >
+                        {qrInfo
+                          ? qrInfo.active
+                            ? t("staffAttendanceUi.qrActive")
+                            : t("staffAttendanceUi.qrDeactivated")
+                          : t("staffAttendanceUi.qrNotIssued")}
+                      </span>
+                    </div>
                     {qrInfo ? (
-                      <p className="sa-scan__hint">
+                      <p className="sa-qr-card__payload">
                         <code>{qrInfo.payload}</code>
                       </p>
-                    ) : null}
-                    <div className="sa-modal__actions" style={{ justifyContent: "flex-start" }}>
+                    ) : (
+                      <p className="sa-qr-card__hint">
+                        {t("staffAttendanceUi.qrIssueHint")}
+                      </p>
+                    )}
+                    <div className="sa-qr-card__actions">
                       <button
                         type="button"
-                        className="sa-btn sa-btn--ghost"
+                        className={`sa-btn ${qrInfo ? "sa-btn--ghost" : "sa-btn--primary"}`}
                         onClick={() =>
-                          void (qrInfo ? rotateStaffQr : issueStaffQr)(modal.row.userId)
+                          void (qrInfo ? rotateStaffQr : issueStaffQr)(
+                            modal.row.userId,
+                          )
                             .then((r) => {
                               setQrInfo(r);
-                              setToast(qrInfo ? "QR rotated" : "QR issued");
+                              setToast(
+                                qrInfo
+                                  ? t("staffAttendanceUi.qrRotated")
+                                  : t("staffAttendanceUi.qrIssued"),
+                              );
                             })
                             .catch((err) =>
                               setError(
-                                err instanceof Error ? err.message : "QR failed",
+                                err instanceof Error
+                                  ? err.message
+                                  : t("staffAttendanceUi.qrFailed"),
                               ),
                             )
                         }
                       >
-                        {qrInfo ? "Regenerate" : "Issue QR"}
+                        {qrInfo
+                          ? t("staffAttendanceUi.regenerate")
+                          : t("staffAttendanceUi.issueQr")}
                       </button>
                       {qrInfo ? (
                         <button
                           type="button"
                           className="sa-btn sa-btn--ghost"
                           onClick={() =>
-                            void setStaffQrActive(modal.row.userId, !qrInfo.active)
+                            void setStaffQrActive(
+                              modal.row.userId,
+                              !qrInfo.active,
+                            )
                               .then((r) => {
                                 setQrInfo(r);
                                 setToast(
-                                  r.active ? "QR reactivated" : "QR deactivated",
+                                  r.active
+                                    ? t("staffAttendanceUi.qrReactivated")
+                                    : t("staffAttendanceUi.qrDeactivatedToast"),
                                 );
                               })
                               .catch((err) =>
                                 setError(
-                                  err instanceof Error ? err.message : "QR failed",
+                                  err instanceof Error
+                                    ? err.message
+                                    : "QR failed",
                                 ),
                               )
                           }
                         >
-                          {qrInfo.active ? "Deactivate" : "Reactivate"}
+                          {qrInfo.active
+                            ? t("staffAttendanceUi.deactivate")
+                            : t("staffAttendanceUi.reactivate")}
                         </button>
                       ) : null}
                     </div>
-                  </div>
+                  </section>
                 ) : null}
-                <div className="sa-history">
+
+                <section className="sa-history">
+                  <div className="sa-history__head">
+                    <h4 className="sa-history__title">
+                      {t("staffAttendanceUi.recentRecords")}
+                    </h4>
+                    <span className="sa-history__count">
+                      {history.length === 1
+                        ? t("staffAttendanceUi.dayOne")
+                        : t("staffAttendanceUi.daysMany", {
+                            count: history.length,
+                          })}
+                    </span>
+                  </div>
                   {!history.length ? (
-                    <p className="sa-empty">No records yet.</p>
+                    <div className="sa-history__empty">
+                      <span className="sa-history__empty-icon" aria-hidden>
+                        <DashIcon name="attendance" className="dash-icon--sm" />
+                      </span>
+                      <p className="sa-history__empty-title">
+                        {t("staffAttendanceUi.noRecordsTitle")}
+                      </p>
+                      <p className="sa-history__empty-sub">
+                        {t("staffAttendanceUi.noRecordsSub")}
+                      </p>
+                    </div>
                   ) : (
-                    <table className="sa-table sa-table--compact">
-                      <thead>
-                        <tr>
-                          <th>Date</th>
-                          <th>Status</th>
-                          <th>In</th>
-                          <th>Out</th>
-                          <th>Late</th>
-                          <th>Worked</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {history.map((r) => (
-                          <tr key={r.id}>
-                            <td>{r.date}</td>
-                            <td>
-                              <span className={`sa-badge sa-badge--${r.status}`}>
-                                {STAFF_ATTENDANCE_STATUS_LABELS[r.status]}
-                              </span>
-                            </td>
-                            <td>{r.checkInLabel || "—"}</td>
-                            <td>{r.checkOutLabel || "—"}</td>
-                            <td>{formatLateLabel(r.lateMinutes)}</td>
-                            <td>{formatWorkedHours(r.workedMinutes)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                    <ul className="sa-history__list">
+                      {history.map((r) => (
+                        <li key={r.id} className="sa-history__row">
+                          <div className="sa-history__date">
+                            <strong>
+                              {new Date(r.date + "T12:00:00").toLocaleDateString(
+                                undefined,
+                                {
+                                  weekday: "short",
+                                  month: "short",
+                                  day: "numeric",
+                                },
+                              )}
+                            </strong>
+                            <span>{r.date}</span>
+                          </div>
+                          <span className={`sa-badge sa-badge--${r.status}`}>
+                            {staffStatusLabel(t, r.status)}
+                          </span>
+                          <div className="sa-history__times">
+                            <span>
+                              {t("staffAttendanceUi.historyIn")}{" "}
+                              <strong>{r.checkInLabel || "—"}</strong>
+                            </span>
+                            <span>
+                              {t("staffAttendanceUi.historyOut")}{" "}
+                              <strong>{r.checkOutLabel || "—"}</strong>
+                            </span>
+                          </div>
+                          <div className="sa-history__metrics">
+                            <span>{formatLateLabel(r.lateMinutes)}</span>
+                            <span>{formatWorkedHours(r.workedMinutes)}</span>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
                   )}
-                </div>
-                <div className="sa-modal__actions">
+                </section>
+
+                <div className="sa-modal__actions sa-modal__actions--history">
                   <button
                     type="button"
-                    className="sa-btn sa-btn--ghost"
+                    className="sa-btn sa-btn--primary"
                     onClick={() => setModal(null)}
                   >
-                    Close
+                    {t("common.close")}
                   </button>
                 </div>
               </>

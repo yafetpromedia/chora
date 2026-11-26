@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DashIcon } from "@/components/dashboard/dash-icons";
 import { AppToast } from "@/components/ui/app-toast";
+import { useLocale } from "@/components/i18n/locale-provider";
 import { LIBRARY_RESOURCE_TYPES } from "@/lib/library";
 import {
   handlePlatformAuthFailure,
@@ -39,12 +40,12 @@ type ResourceRow = {
 
 type EditorMode = "create" | "edit" | null;
 
-const GRADE_OPTIONS = [
-  "Nursery",
-  "KG 1",
-  "KG 2",
-  ...Array.from({ length: 12 }, (_, i) => `Grade ${i + 1}`),
-  "All grades",
+const GRADE_OPTION_KEYS = [
+  "nursery",
+  "kg1",
+  "kg2",
+  ...Array.from({ length: 12 }, (_, i) => `grade:${i + 1}`),
+  "all",
 ] as const;
 
 function resourceLabel(type: string) {
@@ -66,6 +67,7 @@ function fileNameFromUrl(url: string | null | undefined) {
 }
 
 export function PlatformLibraryRepo() {
+  const { t, locale } = useLocale();
   const router = useRouter();
   const [resources, setResources] = useState<ResourceRow[]>([]);
   const [categories, setCategories] = useState<CategoryOption[]>([]);
@@ -109,7 +111,7 @@ export function PlatformLibraryRepo() {
       setCategories(cats);
       setSubjects(subjectRows);
     } catch (err) {
-      fail(err, "Load failed");
+      fail(err, t("platformUi.loadFailed"));
     } finally {
       setLoading(false);
     }
@@ -157,10 +159,17 @@ export function PlatformLibraryRepo() {
   }, [subjects, formSubject]);
 
   const gradeOptions = useMemo(() => {
-    const opts = [...GRADE_OPTIONS] as string[];
+    const opts = GRADE_OPTION_KEYS.map((key) => {
+      if (key === "nursery") return t("platformUi.libNursery");
+      if (key === "kg1") return t("platformUi.libKg1");
+      if (key === "kg2") return t("platformUi.libKg2");
+      if (key === "all") return t("platformUi.libAllGrades");
+      const n = key.split(":")[1];
+      return `${t("platformUi.grade")} ${n}`;
+    });
     if (formGrade && !opts.includes(formGrade)) opts.push(formGrade);
     return opts;
-  }, [formGrade]);
+  }, [formGrade, t]);
 
   function resetEditor() {
     setEditorMode(null);
@@ -251,7 +260,7 @@ export function PlatformLibraryRepo() {
       resetEditor();
       await load();
     } catch (err) {
-      fail(err, editorMode === "edit" ? "Save failed" : "Create failed");
+      fail(err, editorMode === "edit" ? t("platformUi.saveFailed") : t("platformUi.createFailed"));
     } finally {
       setBusy(false);
     }
@@ -268,7 +277,7 @@ export function PlatformLibraryRepo() {
       if (editingId === id) resetEditor();
       await load();
     } catch (err) {
-      fail(err, "Delete failed");
+      fail(err, t("platformUi.deleteFailed"));
     } finally {
       setBusy(false);
     }
@@ -301,8 +310,8 @@ export function PlatformLibraryRepo() {
             <DashIcon name="library" className="dash-icon--md" />
           </span>
           <div>
-            <p className="plat-subjects-v2__eyebrow">Content & Curriculum Engine</p>
-            <h2 className="plat-subjects-v2__title">eLibrary repository</h2>
+            <p className="plat-subjects-v2__eyebrow">{t("platformUi.contentEngineEyebrow")}</p>
+            <h2 className="plat-subjects-v2__title">{t("platformUi.libTitle")}</h2>
             <p className="plat-subjects-v2__sub">
               Master learning resources inherited by schools when a curriculum
               package is provisioned.
@@ -312,15 +321,15 @@ export function PlatformLibraryRepo() {
         <div className="plat-subjects-v2__hero-stats">
           <div className="plat-subjects-v2__stat">
             <strong>{stats.total}</strong>
-            <span>Resources</span>
+            <span>{t("platformUi.libStatResources")}</span>
           </div>
           <div className="plat-subjects-v2__stat">
             <strong>{stats.inPackages}</strong>
-            <span>In packages</span>
+            <span>{t("platformUi.libStatInPackages")}</span>
           </div>
           <div className="plat-subjects-v2__stat">
             <strong>{stats.inSchools}</strong>
-            <span>In schools</span>
+            <span>{t("platformUi.libStatInSchools")}</span>
           </div>
         </div>
       </header>
@@ -329,19 +338,19 @@ export function PlatformLibraryRepo() {
         <article className="plat-subjects-v2__kpi">
           <div>
             <strong>{stats.categories}</strong>
-            <span>Categories</span>
+            <span>{t("platformUi.libStatCategories")}</span>
           </div>
         </article>
         <article className="plat-subjects-v2__kpi">
           <div>
             <strong>{withFile}</strong>
-            <span>With file / link</span>
+            <span>{t("platformUi.libStatWithFile")}</span>
           </div>
         </article>
         <article className="plat-subjects-v2__kpi">
           <div>
             <strong>{stats.inSchools}</strong>
-            <span>School copies</span>
+            <span>{t("platformUi.libStatSchoolCopies")}</span>
           </div>
         </article>
       </div>
@@ -350,10 +359,10 @@ export function PlatformLibraryRepo() {
         <div className="plat-tenants-v2__search plat-subjects-v2__search">
           <input
             type="search"
-            placeholder="Search resources…"
+            placeholder={t("platformUi.libSearchPh")}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            aria-label="Search resources"
+            aria-label={t("platformUi.libSearchAria")}
           />
         </div>
         <div className="plat-filter-tabs plat-subjects-v2__filters" role="tablist">
@@ -366,7 +375,7 @@ export function PlatformLibraryRepo() {
             }`}
             onClick={() => setCategoryFilter("ALL")}
           >
-            All categories
+            {t("platformUi.libAllCategories")}
           </button>
           {categoryFilters.map(([slug, name]) => (
             <button
@@ -389,7 +398,7 @@ export function PlatformLibraryRepo() {
           onClick={() => openCreate()}
         >
           <DashIcon name="plus" className="dash-icon--sm" />
-          New resource
+          {t("platformUi.newResource")}
         </button>
       </div>
 
@@ -397,22 +406,22 @@ export function PlatformLibraryRepo() {
         <table className="plat-subjects-v2__table">
           <thead>
             <tr>
-              <th>Title</th>
-              <th>Category</th>
-              <th>Type</th>
-              <th>Subject</th>
-              <th>Grade</th>
-              <th>File</th>
-              <th>Packages</th>
-              <th>Schools</th>
-              <th aria-label="Actions" />
+              <th>{t("platformUi.libColTitle")}</th>
+              <th>{t("platformUi.libColCategory")}</th>
+              <th>{t("platformUi.libColType")}</th>
+              <th>{t("platformUi.libColSubject")}</th>
+              <th>{t("platformUi.libColGrade")}</th>
+              <th>{t("platformUi.libColFile")}</th>
+              <th>{t("platformUi.libColPackages")}</th>
+              <th>{t("platformUi.libColSchools")}</th>
+              <th aria-label={t("platformUi.actions")} />
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
               <tr>
                 <td colSpan={9} className="plat-subjects-v2__empty">
-                  No resources match your filters.
+                  {t("platformUi.libNoMatch")}
                 </td>
               </tr>
             ) : (
@@ -458,7 +467,7 @@ export function PlatformLibraryRepo() {
                         disabled={busy}
                         onClick={() => openEdit(r)}
                       >
-                        Edit
+                        {t("common.edit")}
                       </button>
                       <button
                         type="button"
@@ -466,7 +475,7 @@ export function PlatformLibraryRepo() {
                         disabled={busy}
                         onClick={() => void deleteResource(r.id, r.title)}
                       >
-                        Delete
+                        {t("common.delete")}
                       </button>
                     </div>
                   </td>
@@ -482,7 +491,7 @@ export function PlatformLibraryRepo() {
           <button
             type="button"
             className="stu-drawer-backdrop"
-            aria-label="Close"
+            aria-label={t("common.close")}
             onClick={() => resetEditor()}
           />
           <aside
@@ -494,12 +503,12 @@ export function PlatformLibraryRepo() {
             <header className="stu-drawer__head">
               <div>
                 <h2 id="plat-lib-editor-title" className="stu-drawer__title">
-                  {isEditing ? "Edit resource" : "New resource"}
+                  {isEditing ? t("platformUi.libEditResource") : t("platformUi.newResource")}
                 </h2>
                 <p className="stu-drawer__sub">
                   {isEditing
-                    ? "Update details or replace the attached file."
-                    : "Add a master file schools can inherit on provision."}
+                    ? t("platformUi.libEditLead")
+                    : t("platformUi.libCreateLead")}
                 </p>
               </div>
               <button
@@ -515,33 +524,33 @@ export function PlatformLibraryRepo() {
               <AppToast message={error} tone="error" onDismiss={() => setError("")} />
 
               <label className="plat-field">
-                <span>Title</span>
+                <span>{t("platformUi.libColTitle")}</span>
                 <input
                   value={formTitle}
                   onChange={(e) => setFormTitle(e.target.value)}
-                  placeholder="Resource title"
+                  placeholder={t("platformUi.libResourceTitle")}
                   autoFocus
                 />
               </label>
 
               <label className="plat-field">
-                <span>Description</span>
+                <span>{t("platformUi.description")}</span>
                 <textarea
                   value={formDescription}
                   onChange={(e) => setFormDescription(e.target.value)}
-                  placeholder="Short summary for schools (optional)"
+                  placeholder={t("platformUi.libDescPh")}
                   rows={3}
                 />
               </label>
 
               <div className="plat-field-row">
                 <label className="plat-field">
-                  <span>Category</span>
+                  <span>{t("platformUi.category")}</span>
                   <select
                     value={formCategoryId}
                     onChange={(e) => setFormCategoryId(e.target.value)}
                   >
-                    <option value="">Select category</option>
+                    <option value="">{t("platformUi.libSelectCategory")}</option>
                     {categories.map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.name}
@@ -550,7 +559,7 @@ export function PlatformLibraryRepo() {
                   </select>
                 </label>
                 <label className="plat-field">
-                  <span>Type</span>
+                  <span>{t("platformUi.type")}</span>
                   <select
                     value={formType}
                     onChange={(e) => setFormType(e.target.value)}
@@ -566,12 +575,12 @@ export function PlatformLibraryRepo() {
 
               <div className="plat-field-row">
                 <label className="plat-field">
-                  <span>Subject</span>
+                  <span>{t("platformUi.currSubjectCol")}</span>
                   <select
                     value={formSubject}
                     onChange={(e) => setFormSubject(e.target.value)}
                   >
-                    <option value="">Any subject</option>
+                    <option value="">{t("platformUi.libAnySubject")}</option>
                     {subjectOptions.map((name) => (
                       <option key={name} value={name}>
                         {name}
@@ -580,12 +589,12 @@ export function PlatformLibraryRepo() {
                   </select>
                 </label>
                 <label className="plat-field">
-                  <span>Grade</span>
+                  <span>{t("platformUi.grade")}</span>
                   <select
                     value={formGrade}
                     onChange={(e) => setFormGrade(e.target.value)}
                   >
-                    <option value="">Any grade</option>
+                    <option value="">{t("platformUi.libAnyGrade")}</option>
                     {gradeOptions.map((g) => (
                       <option key={g} value={g}>
                         {g}
@@ -596,13 +605,15 @@ export function PlatformLibraryRepo() {
               </div>
 
               <div className="plat-field">
-                <span>File</span>
+                <span>{t("platformUi.file")}</span>
                 <div className="plat-lib-v2__file">
                   <div className="plat-lib-v2__file-copy">
                     <strong>
-                      {isEditing ? "Replace main file" : "Attach main file"}
+                      {isEditing
+                        ? t("platformUi.libReplaceMain")
+                        : t("platformUi.libAttachMain")}
                     </strong>
-                    <p>Optional if you use an external link.</p>
+                    <p>{t("platformUi.libFileOptional")}</p>
                     {currentFileLabel || formFile ? (
                       <em className="plat-lib-v2__file-picked">
                         {formFile
@@ -612,7 +623,7 @@ export function PlatformLibraryRepo() {
                     ) : null}
                   </div>
                   <label className="plat-lib-v2__file-btn">
-                    Choose file
+                    {t("platformUi.libChooseFile")}
                     <input
                       type="file"
                       accept=".pdf,.epub,.doc,.docx,.ppt,.pptx,.mp4,.mp3"
@@ -625,11 +636,11 @@ export function PlatformLibraryRepo() {
               </div>
 
               <label className="plat-field">
-                <span>External link</span>
+                <span>{t("platformUi.libExternalLink")}</span>
                 <input
                   value={formExternalUrl}
                   onChange={(e) => setFormExternalUrl(e.target.value)}
-                  placeholder="https://…"
+                  placeholder={t("platformUi.libExternalPh")}
                 />
               </label>
             </div>
@@ -644,7 +655,7 @@ export function PlatformLibraryRepo() {
                     void deleteResource(editingId, formTitle || "resource")
                   }
                 >
-                  Delete
+                  {t("common.delete")}
                 </button>
               ) : (
                 <span />
@@ -656,7 +667,7 @@ export function PlatformLibraryRepo() {
                   disabled={busy}
                   onClick={() => resetEditor()}
                 >
-                  Cancel
+                  {t("common.cancel")}
                 </button>
                 <button
                   type="button"
@@ -667,8 +678,8 @@ export function PlatformLibraryRepo() {
                   {busy
                     ? "Saving…"
                     : isEditing
-                      ? "Save changes"
-                      : "Save resource"}
+                      ? t("platformUi.saveChanges")
+                      : t("platformUi.saveResource")}
                 </button>
               </div>
             </footer>

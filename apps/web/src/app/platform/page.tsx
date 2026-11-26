@@ -20,6 +20,7 @@ import { PlatformPermissions } from "@/components/platform/platform-permissions"
 import { PlatformSchools } from "@/components/platform/platform-schools";
 import { PlatformProfilePanel } from "@/components/profile/platform-profile-panel";
 import { PlatformSettings } from "@/components/platform/platform-settings";
+import { PlatformEmail } from "@/components/platform/platform-email";
 import { PlatformShell } from "@/components/platform/platform-shell";
 import type {
   PlatformDashboard,
@@ -213,6 +214,7 @@ export default function PlatformDashboardPage() {
           {section === "profile" ? (
             <PlatformProfilePanel onUserUpdated={setUser} />
           ) : null}
+          {section === "email" && user?.role === "OWNER" ? <PlatformEmail /> : null}
           {section === "settings" && user?.role === "OWNER" ? (
             <PlatformSettings
               user={user}

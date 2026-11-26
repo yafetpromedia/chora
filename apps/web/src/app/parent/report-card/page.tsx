@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DashboardPage } from "@/components/dashboard/dashboard-page";
+import { useLocale } from "@/components/i18n/locale-provider";
 import { ParentChildBar } from "@/components/parent/parent-child-bar";
 import { StudentReportCardPanel } from "@/components/results/student-report-card-panel";
 import { useParentChild } from "@/hooks/use-parent-child";
@@ -12,6 +13,7 @@ import type { ParentDayOverview } from "@/lib/dashboard-day";
 
 export default function ParentReportCardPage() {
   const router = useRouter();
+  const { t } = useLocale();
   const { children, selectedId, selectChild, loading, error } = useParentChild();
   const [blocked, setBlocked] = useState(false);
   const [privacyLoading, setPrivacyLoading] = useState(true);
@@ -55,8 +57,8 @@ export default function ParentReportCardPage() {
   return (
     <DashboardPage
       role="parent"
-      title="Report card"
-      subtitle="Official term or year-end academic summary"
+      title={t("pages.parentReportCard.title")}
+      subtitle={t("pages.parentReportCard.subtitle")}
     >
       <div className="par-portal-stack">
         <ParentChildBar

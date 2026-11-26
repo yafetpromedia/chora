@@ -30,16 +30,8 @@ import {
   type AdmissionStatus,
   type PlacementRule,
 } from "@/lib/admissions";
-
-const STATUS_LABELS: Record<AdmissionStatus, string> = {
-  APPLIED: "Applied",
-  SCORED: "Scored",
-  PLACED: "Placed",
-  ACCEPTED: "Accepted",
-  REJECTED: "Rejected",
-  ENROLLED: "Enrolled",
-  WITHDRAWN: "Withdrawn",
-};
+import { useLocale } from "@/components/i18n/locale-provider";
+import type { MessageKey } from "@/lib/i18n";
 
 const STATUS_FILTERS: Array<AdmissionStatus | "ALL"> = [
   "ALL",
@@ -59,18 +51,37 @@ function gradeHasStreamSections(grade: GradeWithSections) {
   return grade.sections.some((s) => /^(natural|social)/i.test(s.name.trim()));
 }
 
-function quickSetupLabel(grade: GradeWithSections) {
+function quickSetupLabel(
+  grade: GradeWithSections,
+  t: (key: MessageKey | string, vars?: Record<string, string | number>) => string,
+) {
   return gradeHasStreamSections(grade)
-    ? `Quick setup: ${grade.name} Natural/Social`
-    : `Quick setup: ${grade.name}`;
+    ? t("admissionsUi.quickSetupStream", { grade: grade.name })
+    : t("admissionsUi.quickSetupGrade", { grade: grade.name });
 }
 
-function placementLabel(a: AdmissionApplication) {
-  if (!a.placedGrade) return "—";
+function placementLabel(
+  a: AdmissionApplication,
+  t: (key: MessageKey | string) => string,
+) {
+  if (!a.placedGrade) return t("admissionsUi.emptyDash");
   return `${a.placedGrade.name}${a.placedSection ? ` · ${a.placedSection.name}` : ""}`;
 }
 
 export function AdmissionsWorkspace() {
+  const { t, tp } = useLocale();
+  const statusLabels = useMemo(
+    (): Record<AdmissionStatus, string> => ({
+      APPLIED: t("admissionsUi.applied"),
+      SCORED: t("admissionsUi.statusScored"),
+      PLACED: t("admissionsUi.statusPlaced"),
+      ACCEPTED: t("admissionsUi.accepted"),
+      REJECTED: t("admissionsUi.rejected"),
+      ENROLLED: t("admissionsUi.statusEnrolled"),
+      WITHDRAWN: t("admissionsUi.withdrawn"),
+    }),
+    [t],
+  );
   const canManage = useClientSnapshot(
     () => hasPermission(Permission.ADMISSIONS_MANAGE),
     false,
@@ -138,12 +149,14 @@ export function AdmissionsWorkspace() {
           setRules(ruleList);
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Could not load admissions");
+        setError(
+          err instanceof Error ? err.message : t("admissionsUi.loadFailed"),
+        );
       } finally {
         setLoading(false);
       }
     },
-    [fetchData],
+    [fetchData, t],
   );
 
   useEffect(() => {
@@ -163,7 +176,9 @@ export function AdmissionsWorkspace() {
         }
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Could not load admissions");
+          setError(
+            err instanceof Error ? err.message : t("admissionsUi.loadFailed"),
+          );
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -172,7 +187,7 @@ export function AdmissionsWorkspace() {
     return () => {
       cancelled = true;
     };
-  }, [fetchData]);
+  }, [fetchData, t]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -215,18 +230,20 @@ export function AdmissionsWorkspace() {
       setToast(
         key === "autoPlaceOnScore"
           ? value
-            ? "Auto-placement on — scores will place applicants instantly"
-            : "Auto-placement off — use Run placement manually"
+            ? t("admissionsUi.autoPlaceOn")
+            : t("admissionsUi.autoPlaceOff")
           : key === "autoAcceptOnPlace"
             ? value
-              ? "Auto-accept on — placed applicants skip manual Accept"
-              : "Auto-accept off"
+              ? t("admissionsUi.autoAcceptOn")
+              : t("admissionsUi.autoAcceptOff")
             : value
-              ? "Auto-enroll on — complete records enroll automatically"
-              : "Auto-enroll off",
+              ? t("admissionsUi.autoEnrollOn")
+              : t("admissionsUi.autoEnrollOff"),
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not update settings");
+      setError(
+        err instanceof Error ? err.message : t("admissionsUi.updateSettingsFailed"),
+      );
     } finally {
       setBusy(false);
     }
@@ -239,9 +256,14 @@ export function AdmissionsWorkspace() {
     try {
       const res = await runAdmissionPlacement(cycleId, { includePlaced: true });
       await refreshApps();
-      setToast(`Placement complete — ${res.placed} placed, ${res.unmatched} unmatched`);
+      setToast(
+        t("admissionsUi.placementComplete", {
+          placed: res.placed,
+          unmatched: res.unmatched,
+        }),
+      );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Placement failed");
+      setError(err instanceof Error ? err.message : t("admissionsUi.placementFailed"));
     } finally {
       setBusy(false);
     }
@@ -249,14 +271,19 @@ export function AdmissionsWorkspace() {
 
   async function handleBulkEnroll() {
     if (!cycleId || !canManage) return;
-    if (!confirm("Enroll all placed/accepted applicants with complete records?")) return;
+    if (!confirm(t("admissionsUi.confirmBulkEnroll"))) return;
     setBusy(true);
     try {
       const res = await bulkEnrollAdmissionCycle(cycleId);
       await refreshApps();
-      setToast(`Enrolled ${res.enrolled} · ${res.failed} failed`);
+      setToast(
+        t("admissionsUi.bulkEnrollResult", {
+          enrolled: res.enrolled,
+          failed: res.failed,
+        }),
+      );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Bulk enroll failed");
+      setError(err instanceof Error ? err.message : t("admissionsUi.bulkEnrollFailed"));
     } finally {
       setBusy(false);
     }
@@ -269,24 +296,27 @@ export function AdmissionsWorkspace() {
       const res = await enrollAdmissionApplication(id);
       await refreshApps();
       setToast(
-        `Enrolled ${res.student.student.name} — temp password ${res.student.credentials.studentTempPassword}`,
+        t("admissionsUi.enrollOneResult", {
+          name: res.student.student.name,
+          password: res.student.credentials.studentTempPassword,
+        }),
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Enrollment failed");
+      setError(err instanceof Error ? err.message : t("admissionsUi.enrollmentFailed"));
     } finally {
       setBusy(false);
     }
   }
 
   async function handleDelete(id: string) {
-    if (!canManage || !confirm("Remove this applicant?")) return;
+    if (!canManage || !confirm(t("admissionsUi.confirmRemoveApplicant"))) return;
     setBusy(true);
     try {
       await deleteAdmissionApplication(id);
       await refreshApps();
-      setToast("Applicant removed");
+      setToast(t("admissionsUi.applicantRemoved"));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Delete failed");
+      setError(err instanceof Error ? err.message : t("admissionsUi.deleteFailed"));
     } finally {
       setBusy(false);
     }
@@ -299,7 +329,7 @@ export function AdmissionsWorkspace() {
       await updateAdmissionApplication(id, { status: "ACCEPTED" });
       await refreshApps();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Update failed");
+      setError(err instanceof Error ? err.message : t("admissionsUi.updateFailed"));
     } finally {
       setBusy(false);
     }
@@ -340,14 +370,14 @@ export function AdmissionsWorkspace() {
       };
       if (editingRuleId) {
         await updatePlacementRule(cycleId, editingRuleId, payload);
-        setToast("Placement rule updated");
+        setToast(t("admissionsUi.placementRuleUpdated"));
       } else {
         await createPlacementRule(cycleId, {
           ...payload,
           targetSectionId: ruleSectionId || undefined,
           streamMatch: ruleStream.trim() || undefined,
         });
-        setToast("Placement rule added");
+        setToast(t("admissionsUi.placementRuleAdded"));
       }
       setRules(await listPlacementRules(cycleId));
       resetRuleForm();
@@ -356,8 +386,8 @@ export function AdmissionsWorkspace() {
         err instanceof Error
           ? err.message
           : editingRuleId
-            ? "Could not update rule"
-            : "Could not add rule",
+            ? t("admissionsUi.couldNotUpdateRule")
+            : t("admissionsUi.couldNotAddRule"),
       );
     } finally {
       setBusy(false);
@@ -371,14 +401,14 @@ export function AdmissionsWorkspace() {
     try {
       if (grade && gradeHasStreamSections(grade)) {
         await seedStreamPlacementRules(cycleId, gradeId);
-        setToast("Natural / Social stream rules created (70+ → Natural, below → Social)");
+        setToast(t("admissionsUi.streamRulesCreated"));
       } else {
         await seedGradePlacementRules(cycleId, gradeId);
-        setToast("Placement rule created — scores place into this grade with balanced sections");
+        setToast(t("admissionsUi.gradeRuleCreated"));
       }
       setRules(await listPlacementRules(cycleId));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not seed rules");
+      setError(err instanceof Error ? err.message : t("admissionsUi.couldNotSeedRules"));
     } finally {
       setBusy(false);
     }
@@ -392,7 +422,7 @@ export function AdmissionsWorkspace() {
       setRules(await listPlacementRules(cycleId));
       if (editingRuleId === ruleId) resetRuleForm();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Delete failed");
+      setError(err instanceof Error ? err.message : t("admissionsUi.deleteFailed"));
     } finally {
       setBusy(false);
     }
@@ -407,28 +437,26 @@ export function AdmissionsWorkspace() {
         <div className="adm-v2__hero-glow" aria-hidden />
         <div className="adm-v2__hero-inner">
           <div className="adm-v2__hero-main">
-            <span className="adm-v2__chip">Admissions</span>
-            <h2 className="adm-v2__hero-title">Entrance & placement</h2>
-            <p className="adm-v2__hero-sub">
-              Register applicants for any grade — scores place them into the right class and section. Enroll when ready.
-            </p>
+            <span className="adm-v2__chip">{tp("Admissions")}</span>
+            <h2 className="adm-v2__hero-title">{t("admissionsUi.hero")}</h2>
+            <p className="adm-v2__hero-sub">{t("admissionsUi.heroSub")}</p>
           </div>
           <div className="adm-v2__hero-stats">
             <div className="adm-v2__stat">
               <strong>{stats.total}</strong>
-              <span>Applicants</span>
+              <span>{t("admissionsUi.applicants")}</span>
             </div>
             <div className="adm-v2__stat">
               <strong>{stats.scored}</strong>
-              <span>Scored</span>
+              <span>{t("admissionsUi.scored")}</span>
             </div>
             <div className="adm-v2__stat">
               <strong>{stats.placed}</strong>
-              <span>Placed</span>
+              <span>{t("admissionsUi.placed")}</span>
             </div>
             <div className="adm-v2__stat adm-v2__stat--accent">
               <strong>{stats.enrolled}</strong>
-              <span>Enrolled</span>
+              <span>{t("admissionsUi.enrolled")}</span>
             </div>
           </div>
         </div>
@@ -437,13 +465,13 @@ export function AdmissionsWorkspace() {
       {activeCycle && canManage ? (
         <div className="adm-auto">
           <div className="adm-auto__head">
-            <strong>Automation</strong>
+            <strong>{t("admissionsUi.automation")}</strong>
             <span>
               {activeCycle.autoPlaceOnScore
-                ? "Score in → placed instantly"
-                : "Manual placement"}
-              {activeCycle.autoAcceptOnPlace ? " · auto-accept" : ""}
-              {activeCycle.autoEnrollOnPlace ? " · auto-enroll" : ""}
+                ? t("admissionsUi.scoreInPlaced")
+                : t("admissionsUi.manualPlacement")}
+              {activeCycle.autoAcceptOnPlace ? t("admissionsUi.suffixAutoAccept") : ""}
+              {activeCycle.autoEnrollOnPlace ? t("admissionsUi.suffixAutoEnroll") : ""}
             </span>
           </div>
           <div className="adm-auto__toggles">
@@ -457,8 +485,8 @@ export function AdmissionsWorkspace() {
                 }
               />
               <span>
-                <strong>Auto-place on score</strong>
-                <small>Grade and section as soon as exam score is saved</small>
+                <strong>{t("admissionsUi.autoPlaceOnScore")}</strong>
+                <small>{t("admissionsUi.autoPlaceOnScoreHint")}</small>
               </span>
             </label>
             <label className="adm-auto__toggle">
@@ -471,8 +499,8 @@ export function AdmissionsWorkspace() {
                 }
               />
               <span>
-                <strong>Auto-accept</strong>
-                <small>Skip manual Accept after placement</small>
+                <strong>{t("admissionsUi.autoAcceptLabel")}</strong>
+                <small>{t("admissionsUi.autoAcceptHint")}</small>
               </span>
             </label>
             <label className="adm-auto__toggle">
@@ -485,8 +513,8 @@ export function AdmissionsWorkspace() {
                 }
               />
               <span>
-                <strong>Auto-enroll</strong>
-                <small>Create student record when ID, gender & DOB are complete</small>
+                <strong>{t("admissionsUi.autoEnrollLabel")}</strong>
+                <small>{t("admissionsUi.autoEnrollHint")}</small>
               </span>
             </label>
           </div>
@@ -498,7 +526,7 @@ export function AdmissionsWorkspace() {
           <DashIcon name="students" className="adm-v2__search-icon" />
           <input
             type="search"
-            placeholder="Search name, ID, phone…"
+            placeholder={t("admissionsUi.searchPlaceholder")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -521,7 +549,7 @@ export function AdmissionsWorkspace() {
         >
           {STATUS_FILTERS.map((s) => (
             <option key={s} value={s}>
-              {s === "ALL" ? "All statuses" : STATUS_LABELS[s]}
+              {s === "ALL" ? t("admissionsUi.allStatuses") : statusLabels[s]}
             </option>
           ))}
         </select>
@@ -531,14 +559,14 @@ export function AdmissionsWorkspace() {
             className={panel === "applicants" ? "adm-v2__tab adm-v2__tab--active" : "adm-v2__tab"}
             onClick={() => setPanel("applicants")}
           >
-            Applicants
+            {t("admissionsUi.applicants")}
           </button>
           <button
             type="button"
             className={panel === "rules" ? "adm-v2__tab adm-v2__tab--active" : "adm-v2__tab"}
             onClick={() => setPanel("rules")}
           >
-            Placement rules
+            {t("admissionsUi.tabPlacementRules")}
           </button>
         </div>
         {canManage ? (
@@ -550,9 +578,9 @@ export function AdmissionsWorkspace() {
                   className="adm-btn adm-btn--ghost"
                   disabled={busy || !cycleId}
                   onClick={() => void handleRunPlacement()}
-                  title="Re-run placement for all scored applicants"
+                  title={t("admissionsUi.rerunAllTitle")}
                 >
-                  Re-run all
+                  {t("admissionsUi.rerunAll")}
                 </button>
                 <button
                   type="button"
@@ -560,7 +588,7 @@ export function AdmissionsWorkspace() {
                   disabled={busy || !cycleId}
                   onClick={() => void handleBulkEnroll()}
                 >
-                  Enroll all placed
+                  {t("admissionsUi.enrollAllPlaced")}
                 </button>
                 <button
                   type="button"
@@ -568,7 +596,7 @@ export function AdmissionsWorkspace() {
                   disabled={!activeCycle?.isOpen}
                   onClick={() => setShowRegister(true)}
                 >
-                  + Register applicant
+                  + {t("admissionsUi.registerApplicant")}
                 </button>
               </>
             ) : null}
@@ -579,23 +607,20 @@ export function AdmissionsWorkspace() {
       {loading ? (
         <div className="adm-v2__loading">
           <span className="adm-v2__spinner" aria-hidden />
-          Loading admissions…
+          {t("admissionsUi.loadingAdmissions")}
         </div>
       ) : panel === "applicants" ? (
         filtered.length === 0 ? (
           <div className="adm-v2__empty">
-            <h3>No applicants yet</h3>
-            <p>
-              Register with an entrance exam score — placement happens automatically when rules exist.
-              Use <strong>Re-run all</strong> only to refresh everyone after rule changes.
-            </p>
+            <h3>{t("admissionsUi.noApplicants")}</h3>
+            <p>{t("admissionsUi.noApplicantsHint")}</p>
             {canManage && activeCycle?.isOpen ? (
               <button
                 type="button"
                 className="adm-btn adm-btn--primary"
                 onClick={() => setShowRegister(true)}
               >
-                Register first applicant
+                {t("admissionsUi.registerFirstApplicant")}
               </button>
             ) : null}
           </div>
@@ -604,11 +629,11 @@ export function AdmissionsWorkspace() {
             <table className="adm-v2__table">
               <thead>
                 <tr>
-                  <th>Applicant</th>
-                  <th>Score</th>
-                  <th>Placement</th>
-                  <th>Status</th>
-                  {canManage ? <th>Actions</th> : null}
+                  <th>{t("admissionsUi.colApplicant")}</th>
+                  <th>{t("admissionsUi.colScore")}</th>
+                  <th>{t("admissionsUi.colPlacement")}</th>
+                  <th>{t("admissionsUi.colStatus")}</th>
+                  {canManage ? <th>{t("common.actions")}</th> : null}
                 </tr>
               </thead>
               <tbody>
@@ -617,21 +642,27 @@ export function AdmissionsWorkspace() {
                     <td>
                       <div className="adm-v2__name">{applicantName(a)}</div>
                       <div className="adm-v2__meta">
-                        {a.targetGrade?.name ? `Applying: ${a.targetGrade.name}` : "Grade TBD"}
-                        {a.idNumber ? ` · ID ${a.idNumber}` : ""}
+                        {a.targetGrade?.name
+                          ? t("admissionsUi.applyingGrade", { grade: a.targetGrade.name })
+                          : t("admissionsUi.gradeTbd")}
+                        {a.idNumber
+                          ? ` · ${t("admissionsUi.idNumberPrefix", { id: a.idNumber })}`
+                          : ""}
                       </div>
                     </td>
                     <td>
-                      <strong>{a.totalScore ?? "—"}</strong>
+                      <strong>{a.totalScore ?? t("admissionsUi.emptyDash")}</strong>
                       {a.entranceScore != null ? (
                         <div className="adm-v2__meta">
-                          Exam {a.entranceScore}
-                          {a.interviewScore != null ? ` · Int ${a.interviewScore}` : ""}
+                          {t("admissionsUi.examShort", { score: a.entranceScore })}
+                          {a.interviewScore != null
+                            ? ` · ${t("admissionsUi.interviewShort", { score: a.interviewScore })}`
+                            : ""}
                         </div>
                       ) : null}
                     </td>
                     <td>
-                      <div>{placementLabel(a)}</div>
+                      <div>{placementLabel(a, t)}</div>
                       {a.placementNote ? (
                         <div className="adm-v2__meta">{a.placementNote}</div>
                       ) : null}
@@ -640,13 +671,13 @@ export function AdmissionsWorkspace() {
                           href={`/admin/students`}
                           className="adm-v2__link"
                         >
-                          → {a.enrolledProfile.user.externalRef ?? "Student"}
+                          → {a.enrolledProfile.user.externalRef ?? t("studentsUi.student")}
                         </Link>
                       ) : null}
                     </td>
                     <td>
                       <span className={`adm-badge adm-badge--${a.status.toLowerCase()}`}>
-                        {STATUS_LABELS[a.status]}
+                        {statusLabels[a.status]}
                       </span>
                     </td>
                     {canManage ? (
@@ -659,7 +690,7 @@ export function AdmissionsWorkspace() {
                               disabled={busy}
                               onClick={() => void handleAccept(a.id)}
                             >
-                              Accept
+                              {t("admissionsUi.accept")}
                             </button>
                           ) : null}
                           {["PLACED", "ACCEPTED"].includes(a.status) ? (
@@ -669,7 +700,7 @@ export function AdmissionsWorkspace() {
                               disabled={busy}
                               onClick={() => void handleEnrollOne(a.id)}
                             >
-                              Enroll
+                              {t("admissionsUi.enroll")}
                             </button>
                           ) : null}
                           {a.status !== "ENROLLED" ? (
@@ -679,7 +710,7 @@ export function AdmissionsWorkspace() {
                               disabled={busy}
                               onClick={() => void handleDelete(a.id)}
                             >
-                              Remove
+                              {t("admissionsUi.remove")}
                             </button>
                           ) : null}
                         </div>
@@ -694,11 +725,8 @@ export function AdmissionsWorkspace() {
       ) : (
         <div className="adm-rules">
           <div className="adm-rules__intro">
-            <h3>Score-based placement rules</h3>
-            <p>
-              Rules match total score (entrance + interview) to a grade and section. Add one rule per grade you admit into.
-              For upper grades with Natural / Social streams, use <strong>stream match</strong> to auto-balance sections.
-            </p>
+            <h3>{t("admissionsUi.rulesTitle")}</h3>
+            <p>{t("admissionsUi.rulesIntro")}</p>
             {canManage && grades.length > 0 ? (
               <div className="adm-rules__presets">
                 {grades.map((g) => (
@@ -709,7 +737,7 @@ export function AdmissionsWorkspace() {
                       disabled={busy}
                       onClick={() => void handleSeedGradeRules(g.id)}
                     >
-                      {quickSetupLabel(g)}
+                      {quickSetupLabel(g, t)}
                     </button>
                   ))}
               </div>
@@ -719,24 +747,26 @@ export function AdmissionsWorkspace() {
           {canManage ? (
             <form className="adm-rules__form" onSubmit={(e) => void handleSaveRule(e)}>
               {editingRuleId ? (
-                <p className="adm-rules__editing">
-                  Editing rule — change fields below, then save or cancel.
-                </p>
+                <p className="adm-rules__editing">{t("admissionsUi.editingRuleHint")}</p>
               ) : null}
               <label>
-                Label
-                <input value={ruleLabel} onChange={(e) => setRuleLabel(e.target.value)} placeholder="Grade 5 (80+)" />
+                {t("admissionsUi.fieldLabel")}
+                <input
+                  value={ruleLabel}
+                  onChange={(e) => setRuleLabel(e.target.value)}
+                  placeholder={t("admissionsUi.ruleLabelPlaceholder")}
+                />
               </label>
               <label>
-                Min
+                {t("admissionsUi.fieldMin")}
                 <input type="number" value={ruleMin} onChange={(e) => setRuleMin(e.target.value)} />
               </label>
               <label>
-                Max
+                {t("admissionsUi.fieldMax")}
                 <input type="number" value={ruleMax} onChange={(e) => setRuleMax(e.target.value)} />
               </label>
               <label>
-                Grade
+                {t("admissionsUi.fieldGrade")}
                 <select
                   value={ruleGradeId}
                   onChange={(e) => {
@@ -744,7 +774,7 @@ export function AdmissionsWorkspace() {
                     setRuleSectionId("");
                   }}
                 >
-                  <option value="">Select grade</option>
+                  <option value="">{t("admissionsUi.selectGrade")}</option>
                   {grades.map((g) => (
                     <option key={g.id} value={g.id}>
                       {g.name}
@@ -753,9 +783,9 @@ export function AdmissionsWorkspace() {
                 </select>
               </label>
               <label>
-                Section (fixed)
+                {t("admissionsUi.fieldSectionFixed")}
                 <select value={ruleSectionId} onChange={(e) => setRuleSectionId(e.target.value)}>
-                  <option value="">Auto / stream</option>
+                  <option value="">{t("admissionsUi.autoStream")}</option>
                   {ruleGrade?.sections.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.name}
@@ -764,16 +794,16 @@ export function AdmissionsWorkspace() {
                 </select>
               </label>
               <label>
-                Stream match
+                {t("admissionsUi.fieldStreamMatch")}
                 <input
                   value={ruleStream}
                   onChange={(e) => setRuleStream(e.target.value)}
-                  placeholder="Natural or Social (optional)"
+                  placeholder={t("admissionsUi.streamMatchPlaceholder")}
                 />
               </label>
               <div className="adm-rules__form-actions">
                 <button type="submit" className="adm-btn adm-btn--primary" disabled={busy || !ruleGradeId}>
-                  {editingRuleId ? "Save changes" : "Add rule"}
+                  {editingRuleId ? t("admissionsUi.saveChanges") : t("admissionsUi.addRule")}
                 </button>
                 {editingRuleId ? (
                   <button
@@ -782,7 +812,7 @@ export function AdmissionsWorkspace() {
                     disabled={busy}
                     onClick={resetRuleForm}
                   >
-                    Cancel
+                    {t("common.cancel")}
                   </button>
                 ) : null}
               </div>
@@ -790,16 +820,16 @@ export function AdmissionsWorkspace() {
           ) : null}
 
           {rules.length === 0 ? (
-            <p className="adm-rules__empty">No rules yet — add rules manually or use quick setup for each grade.</p>
+            <p className="adm-rules__empty">{t("admissionsUi.rulesEmpty")}</p>
           ) : (
             <div className="adm-v2__table-wrap">
               <table className="adm-v2__table">
                 <thead>
                   <tr>
-                    <th>Rule</th>
-                    <th>Score range</th>
-                    <th>Target</th>
-                    <th>Stream</th>
+                    <th>{t("admissionsUi.colRule")}</th>
+                    <th>{t("admissionsUi.colScoreRange")}</th>
+                    <th>{t("admissionsUi.colTarget")}</th>
+                    <th>{t("admissionsUi.colStream")}</th>
                     {canManage ? <th /> : null}
                   </tr>
                 </thead>
@@ -814,7 +844,7 @@ export function AdmissionsWorkspace() {
                         {r.targetGrade.name}
                         {r.targetSection ? ` · ${r.targetSection.name}` : ""}
                       </td>
-                      <td>{r.streamMatch ?? "—"}</td>
+                      <td>{r.streamMatch ?? t("admissionsUi.emptyDash")}</td>
                       {canManage ? (
                         <td>
                           <div className="adm-v2__actions">
@@ -824,7 +854,7 @@ export function AdmissionsWorkspace() {
                               disabled={busy}
                               onClick={() => startEditRule(r)}
                             >
-                              Edit
+                              {t("admissionsUi.edit")}
                             </button>
                             <button
                               type="button"
@@ -832,7 +862,7 @@ export function AdmissionsWorkspace() {
                               disabled={busy}
                               onClick={() => void handleDeleteRule(r.id)}
                             >
-                              Remove
+                              {t("admissionsUi.remove")}
                             </button>
                           </div>
                         </td>
@@ -854,7 +884,7 @@ export function AdmissionsWorkspace() {
           onSuccess={(app) => {
             setShowRegister(false);
             setApplications((prev) => [app, ...prev]);
-            setToast(`Registered ${applicantName(app)}`);
+            setToast(t("admissionsUi.registeredApplicant", { name: applicantName(app) }));
           }}
         />
       ) : null}

@@ -16,9 +16,11 @@ import {
   listExamSchedules,
   type ExamScheduleListItem,
 } from "@/lib/exam-schedule";
+import { useLocale } from "@/components/i18n/locale-provider";
 
 export default function AdminExamSchedulesPage() {
   const router = useRouter();
+  const { t, tp } = useLocale();
   const canEdit = useClientSnapshot(
     () => hasPermission(Permission.TIMETABLE_MANAGE),
     false,
@@ -57,7 +59,7 @@ export default function AdminExamSchedulesPage() {
         setTerms(t);
         setRows(schedules);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Could not load exam schedules");
+        setError(err instanceof Error ? err.message : t("adminExamsUi.loadFailed"));
       } finally {
         setLoading(false);
       }
@@ -82,7 +84,7 @@ export default function AdminExamSchedulesPage() {
       setTermId("");
       router.push(`/admin/exams/${created.id}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not create schedule");
+      setError(err instanceof Error ? err.message : t("adminExamsUi.createFailed"));
     } finally {
       setBusy(false);
     }
@@ -96,26 +98,26 @@ export default function AdminExamSchedulesPage() {
       await deleteExamSchedule(deleteId);
       setRows((prev) => prev.filter((r) => r.id !== deleteId));
       setDeleteId(null);
-      setSaved("Exam schedule deleted.");
+      setSaved(t("adminExamsUi.deleted"));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not delete");
+      setError(err instanceof Error ? err.message : t("adminExamsUi.deleteFailed"));
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <DashboardPage role="admin" title="Exam schedules">
+    <DashboardPage role="admin" title={tp("Exam schedules")}>
       <div className="ex-page">
         <AppToast message={error} tone="error" onDismiss={() => setError("")} />
         <AppToast message={saved} tone="success" onDismiss={() => setSaved("")} />
         <AppConfirmDialog
           open={Boolean(deleteId)}
           tone="danger"
-          title="Delete exam schedule?"
-          message="This removes all days and subjects on this schedule."
-          confirmLabel="Delete"
-          cancelLabel="Keep"
+          title={t("adminExamsUi.deleteTitle")}
+          message={t("adminExamsUi.deleteMessage")}
+          confirmLabel={t("common.delete")}
+          cancelLabel={t("adminExamsUi.keep")}
           busy={busy}
           onCancel={() => !busy && setDeleteId(null)}
           onConfirm={() => void confirmDelete()}
@@ -125,12 +127,9 @@ export default function AdminExamSchedulesPage() {
           <div className="ex-hero__glow" aria-hidden />
           <div className="ex-hero__inner">
             <div>
-              <p className="ex-hero__eyebrow">{yearName || "Academic year"}</p>
-              <h2 className="ex-hero__title">Exam schedules</h2>
-              <p className="ex-hero__sub">
-                Mid and final exam calendars by date and grade — like the board posters, built for
-                screen and print.
-              </p>
+              <p className="ex-hero__eyebrow">{yearName || t("adminExamsUi.academicYear")}</p>
+              <h2 className="ex-hero__title">{t("adminExamsUi.heroTitle")}</h2>
+              <p className="ex-hero__sub">{t("adminExamsUi.heroSub")}</p>
             </div>
             {canEdit ? (
               <button
@@ -138,25 +137,25 @@ export default function AdminExamSchedulesPage() {
                 className="ex-btn ex-btn--primary"
                 onClick={() => setCreateOpen(true)}
               >
-                + New schedule
+                {t("adminExamsUi.newSchedule")}
               </button>
             ) : null}
           </div>
         </header>
 
         {loading ? (
-          <div className="ex-loading">Loading schedules…</div>
+          <div className="ex-loading">{t("adminExamsUi.loading")}</div>
         ) : rows.length === 0 ? (
           <div className="ex-empty">
-            <h3>No exam schedules yet</h3>
-            <p>Create one for a mid exam, final, or make-up week.</p>
+            <h3>{t("adminExamsUi.emptyTitle")}</h3>
+            <p>{t("adminExamsUi.emptyBody")}</p>
             {canEdit ? (
               <button
                 type="button"
                 className="ex-btn ex-btn--primary"
                 onClick={() => setCreateOpen(true)}
               >
-                Create schedule
+                {t("adminExamsUi.createSchedule")}
               </button>
             ) : null}
           </div>
@@ -171,7 +170,11 @@ export default function AdminExamSchedulesPage() {
                       {[
                         row.shiftLabel,
                         row.academicTerm?.name,
-                        `${row._count.days} day${row._count.days === 1 ? "" : "s"}`,
+                        `${row._count.days} ${
+                          row._count.days === 1
+                            ? t("adminExamsUi.dayOne")
+                            : t("adminExamsUi.dayMany")
+                        }`,
                       ]
                         .filter(Boolean)
                         .join(" · ")}
@@ -180,12 +183,14 @@ export default function AdminExamSchedulesPage() {
                   <span
                     className={`ex-pill ${row.status === "PUBLISHED" ? "ex-pill--live" : ""}`}
                   >
-                    {row.status === "PUBLISHED" ? "Published" : "Draft"}
+                    {row.status === "PUBLISHED"
+                      ? t("adminExamsUi.statusPublished")
+                      : t("adminExamsUi.statusDraft")}
                   </span>
                 </div>
                 <div className="ex-card__actions">
                   <Link href={`/admin/exams/${row.id}`} className="ex-btn ex-btn--primary">
-                    Open
+                    {t("adminExamsUi.open")}
                   </Link>
                   {canEdit ? (
                     <button
@@ -193,7 +198,7 @@ export default function AdminExamSchedulesPage() {
                       className="ex-btn ex-btn--ghost"
                       onClick={() => setDeleteId(row.id)}
                     >
-                      Delete
+                      {t("common.delete")}
                     </button>
                   ) : null}
                 </div>
@@ -207,32 +212,32 @@ export default function AdminExamSchedulesPage() {
             <button
               type="button"
               className="ex-modal__backdrop"
-              aria-label="Close"
+              aria-label={t("common.close")}
               onClick={() => setCreateOpen(false)}
             />
             <form className="ex-modal__panel" onSubmit={(e) => void onCreate(e)}>
-              <h3 className="ex-modal__title">New exam schedule</h3>
+              <h3 className="ex-modal__title">{t("adminExamsUi.modalTitle")}</h3>
               <label className="ex-field">
-                Title
+                {t("adminExamsUi.fieldTitle")}
                 <input
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder="e.g. 1st Term Mid Exam"
+                  placeholder={t("adminExamsUi.titlePlaceholder")}
                   required
                 />
               </label>
               <label className="ex-field">
-                Shift (optional)
+                {t("adminExamsUi.fieldShift")}
                 <input
                   value={shiftLabel}
                   onChange={(e) => setShiftLabel(e.target.value)}
-                  placeholder="e.g. Shift One"
+                  placeholder={t("adminExamsUi.shiftPlaceholder")}
                 />
               </label>
               <label className="ex-field">
-                Term (optional)
+                {t("adminExamsUi.fieldTerm")}
                 <select value={termId} onChange={(e) => setTermId(e.target.value)}>
-                  <option value="">No term</option>
+                  <option value="">{t("adminExamsUi.noTerm")}</option>
                   {terms.map((t) => (
                     <option key={t.id} value={t.id}>
                       {t.name}
@@ -246,10 +251,10 @@ export default function AdminExamSchedulesPage() {
                   className="ex-btn ex-btn--ghost"
                   onClick={() => setCreateOpen(false)}
                 >
-                  Cancel
+                  {t("common.cancel")}
                 </button>
                 <button type="submit" className="ex-btn ex-btn--primary" disabled={busy}>
-                  {busy ? "Creating…" : "Create & edit"}
+                  {busy ? t("adminExamsUi.creating") : t("adminExamsUi.createEdit")}
                 </button>
               </div>
             </form>

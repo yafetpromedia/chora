@@ -13,8 +13,10 @@ import { countStudentIdCards, listStudentIdCards } from "@/lib/student-cards";
 import type { StudentIdCard } from "@/lib/student-cards";
 import { AUTH_ROLE_KEY, AUTH_TOKEN_KEY, isSchoolWorkspaceRole } from "@/lib/auth";
 import { AppToast } from "@/components/ui/app-toast";
+import { useLocale } from "@/components/i18n/locale-provider";
 
 export default function StudentCardsPage() {
+  const { t, tp, tn } = useLocale();
   const router = useRouter();
   const [grades, setGrades] = useState<GradeWithSections[]>([]);
   const [gradeId, setGradeId] = useState("");
@@ -49,7 +51,7 @@ export default function StudentCardsPage() {
       setTotal(count);
       setCards(page);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load cards");
+      setError(err instanceof Error ? err.message : t("adminStudentCardsPageUi.loadFailed"));
     } finally {
       setLoading(false);
     }
@@ -86,7 +88,7 @@ export default function StudentCardsPage() {
         setCards(page);
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Could not load cards");
+          setError(err instanceof Error ? err.message : t("adminStudentCardsPageUi.loadFailed"));
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -99,7 +101,7 @@ export default function StudentCardsPage() {
   }, [gradeId, sectionId]);
 
   return (
-    <DashboardPage role="admin" title="Student ID cards">
+    <DashboardPage role="admin" title={tp("Student ID cards")}>
       <div className="idcards-page">
         <AppToast message={error} tone="error" onDismiss={() => setError("")} />
 
@@ -107,38 +109,36 @@ export default function StudentCardsPage() {
           <div className="idcards-head__main">
             <Link href="/admin/students" className="idcards-back">
               <DashIcon name="chevron" className="dash-icon--xs" />
-              Students
+              {tn("Students")}
             </Link>
-            <h2 className="idcards-title">Student ID cards</h2>
-            <p className="idcards-subtitle">
-              Preview campus cards, filter by class, then print the set you need.
-            </p>
+            <h2 className="idcards-title">{t("adminStudentCardsPageUi.title")}</h2>
+            <p className="idcards-subtitle">{t("adminStudentCardsPageUi.subtitle")}</p>
           </div>
           <div className="idcards-head__aside">
             <p className="idcards-summary">
               <span>
                 <strong>{loading ? "—" : cards.length.toLocaleString()}</strong>{" "}
-                shown
+                {t("adminStudentCardsPageUi.shown")}
               </span>
               {gradeId ? (
                 <span>
                   <strong>
-                    {selectedGrade?.name ?? "Grade"}
+                    {selectedGrade?.name ?? t("adminStudentCardsPageUi.gradeFallback")}
                     {sectionId
                       ? ` · ${selectedGrade?.sections.find((s) => s.id === sectionId)?.name ?? ""}`
                       : ""}
                   </strong>{" "}
-                  filter
+                  {t("adminStudentCardsPageUi.filter")}
                 </span>
               ) : (
                 <span>
-                  <strong>All grades</strong>
+                  <strong>{t("adminStudentCardsPageUi.allGrades")}</strong>
                 </span>
               )}
             </p>
             <div className="idcards-head__actions">
               <Link href="/admin/attendance" className="idcards-btn idcards-btn--ghost">
-                Scan attendance
+                {t("adminStudentCardsPageUi.scanAttendance")}
               </Link>
               <button
                 type="button"
@@ -146,7 +146,7 @@ export default function StudentCardsPage() {
                 disabled={loading || total === 0}
                 onClick={() => setPrintOpen(true)}
               >
-                Print…
+                {t("adminStudentCardsPageUi.print")}
               </button>
             </div>
           </div>
@@ -154,7 +154,7 @@ export default function StudentCardsPage() {
 
         <div className="idcards-bar no-print">
           <label className="idcards-control">
-            <span>Grade</span>
+            <span>{t("adminStudentCardsPageUi.grade")}</span>
             <select
               value={gradeId}
               onChange={(e) => {
@@ -162,7 +162,7 @@ export default function StudentCardsPage() {
                 setSectionId("");
               }}
             >
-              <option value="">All grades</option>
+              <option value="">{t("adminStudentCardsPageUi.allGrades")}</option>
               {grades.map((g) => (
                 <option key={g.id} value={g.id}>
                   {g.name}
@@ -172,12 +172,12 @@ export default function StudentCardsPage() {
           </label>
           {selectedGrade && selectedGrade.sections.length > 0 ? (
             <label className="idcards-control">
-              <span>Section</span>
+              <span>{t("adminStudentCardsPageUi.section")}</span>
               <select
                 value={sectionId}
                 onChange={(e) => setSectionId(e.target.value)}
               >
-                <option value="">All sections</option>
+                <option value="">{t("adminStudentCardsPageUi.allSections")}</option>
                 {selectedGrade.sections.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.name}
@@ -192,7 +192,7 @@ export default function StudentCardsPage() {
               checked={previewBack}
               onChange={(e) => setPreviewBack(e.target.checked)}
             />
-            <span>Show card back</span>
+            <span>{t("adminStudentCardsPageUi.showCardBack")}</span>
           </label>
           <button
             type="button"
@@ -200,17 +200,17 @@ export default function StudentCardsPage() {
             onClick={() => void load()}
             disabled={loading}
           >
-            Refresh
+            {t("adminStudentCardsPageUi.refresh")}
           </button>
         </div>
 
         {loading ? (
-          <p className="idcards-status">Loading cards…</p>
+          <p className="idcards-status">{t("adminStudentCardsPageUi.loadingCards")}</p>
         ) : error ? null : total === 0 ? (
           <p className="idcards-status">
             {gradeId
-              ? "No students in this class. Try “All grades” or enroll students first."
-              : "No students yet. Register students from the Students page."}
+              ? t("adminStudentCardsPageUi.emptyClass")
+              : t("adminStudentCardsPageUi.emptySchool")}
           </p>
         ) : (
           <div className="idcards-preview-grid">

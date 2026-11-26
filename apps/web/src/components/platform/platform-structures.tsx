@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DashIcon } from "@/components/dashboard/dash-icons";
 import { AppToast } from "@/components/ui/app-toast";
+import { useLocale } from "@/components/i18n/locale-provider";
 import {
   handlePlatformAuthFailure,
   platformFetch,
@@ -21,33 +22,23 @@ type StructureRow = {
 
 type EditorMode = "create" | "edit" | null;
 
-const GRADE_PRESETS = [
+const GRADE_PRESET_META = [
   {
     value: "KG_12",
-    label: "Nursery – Grade 12",
-    hint: "Nursery, KG 1, KG 2, then Grade 1–12",
+    labelKey: "platformUi.structPresetKg12",
+    hintKey: "platformUi.structPresetKg12Hint",
   },
   {
     value: "GRADES_1_8",
-    label: "Grades 1–8",
-    hint: "Primary school (8 grades)",
+    labelKey: "platformUi.structPresetG18",
+    hintKey: "platformUi.structPresetPrimary",
   },
   {
     value: "GRADES_9_12",
-    label: "Grades 9–12",
-    hint: "Secondary / preparatory (4 grades)",
+    labelKey: "platformUi.structPresetG912",
+    hintKey: "platformUi.structPresetSecondary",
   },
 ] as const;
-
-function formatPreset(value: string) {
-  return (
-    GRADE_PRESETS.find((p) => p.value === value)?.label ??
-    value
-      .replace(/_/g, " ")
-      .toLowerCase()
-      .replace(/\b\w/g, (c) => c.toUpperCase())
-  );
-}
 
 function slugKey(label: string) {
   return label
@@ -59,6 +50,7 @@ function slugKey(label: string) {
 }
 
 export function PlatformStructures() {
+  const { t, locale } = useLocale();
   const router = useRouter();
   const [structures, setStructures] = useState<StructureRow[]>([]);
   const [query, setQuery] = useState("");
@@ -74,6 +66,15 @@ export function PlatformStructures() {
   const [formDescription, setFormDescription] = useState("");
   const [formPreset, setFormPreset] = useState<string>("KG_12");
   const [keyTouched, setKeyTouched] = useState(false);
+
+  function formatPreset(value: string) {
+    const meta = GRADE_PRESET_META.find((p) => p.value === value);
+    if (meta) return t(meta.labelKey);
+    return value
+      .replace(/_/g, " ")
+      .toLowerCase()
+      .replace(/\b\w/g, (c) => c.toUpperCase());
+  }
 
   function fail(err: unknown, fallback: string) {
     if (handlePlatformAuthFailure(err, () => router.replace("/platform/login"))) {
@@ -95,7 +96,7 @@ export function PlatformStructures() {
     try {
       await loadStructures();
     } catch (err) {
-      fail(err, "Load failed");
+      fail(err, t("platformUi.loadFailed"));
     } finally {
       setLoading(false);
     }
@@ -195,7 +196,7 @@ export function PlatformStructures() {
       resetEditor();
       await loadStructures();
     } catch (err) {
-      fail(err, isEditing ? "Save failed" : "Create failed");
+      fail(err, isEditing ? t("platformUi.saveFailed") : t("platformUi.createFailed"));
     } finally {
       setBusy(false);
     }
@@ -222,7 +223,7 @@ export function PlatformStructures() {
       if (editingId === row.id) resetEditor();
       await loadStructures();
     } catch (err) {
-      fail(err, next ? "Archive failed" : "Restore failed");
+      fail(err, next ? t("platformUi.archiveFailed") : t("platformUi.restoreFailed"));
     } finally {
       setBusy(false);
     }
@@ -245,7 +246,7 @@ export function PlatformStructures() {
       if (editingId === row.id) resetEditor();
       await loadStructures();
     } catch (err) {
-      fail(err, "Delete failed");
+      fail(err, t("platformUi.deleteFailed"));
     } finally {
       setBusy(false);
     }
@@ -274,25 +275,25 @@ export function PlatformStructures() {
             <DashIcon name="building" className="dash-icon--md" />
           </span>
           <div>
-            <p className="plat-subjects-v2__eyebrow">Content & Curriculum Engine</p>
-            <h2 className="plat-subjects-v2__title">Academic structures</h2>
+            <p className="plat-subjects-v2__eyebrow">{t("platformUi.contentEngineEyebrow")}</p>
+            <h2 className="plat-subjects-v2__title">{t("platformUi.structTitle")}</h2>
             <p className="plat-subjects-v2__sub">
-              Grade presets packages can use when onboarding schools.
+              {t("platformUi.structSub")}
             </p>
           </div>
         </div>
         <div className="plat-subjects-v2__hero-stats">
           <div className="plat-subjects-v2__stat">
             <strong>{stats.active}</strong>
-            <span>Active</span>
+            <span>{t("platformUi.structStatActive")}</span>
           </div>
           <div className="plat-subjects-v2__stat">
             <strong>{stats.linked}</strong>
-            <span>Package links</span>
+            <span>{t("platformUi.structStatLinks")}</span>
           </div>
           <div className="plat-subjects-v2__stat">
             <strong>{stats.archived}</strong>
-            <span>Archived</span>
+            <span>{t("platformUi.structStatArchived")}</span>
           </div>
         </div>
       </header>
@@ -301,19 +302,19 @@ export function PlatformStructures() {
         <article className="plat-subjects-v2__kpi">
           <div>
             <strong>{stats.active}</strong>
-            <span>Active presets</span>
+            <span>{t("platformUi.structStatPresets")}</span>
           </div>
         </article>
         <article className="plat-subjects-v2__kpi">
           <div>
             <strong>{stats.linked}</strong>
-            <span>Linked packages</span>
+            <span>{t("platformUi.structStatLinked")}</span>
           </div>
         </article>
         <article className="plat-subjects-v2__kpi">
           <div>
             <strong>{stats.presets}</strong>
-            <span>Grade bands</span>
+            <span>{t("platformUi.structStatBands")}</span>
           </div>
         </article>
       </div>
@@ -322,10 +323,10 @@ export function PlatformStructures() {
         <div className="plat-tenants-v2__search plat-subjects-v2__search">
           <input
             type="search"
-            placeholder="Search structures…"
+            placeholder={t("platformUi.structSearchPh")}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            aria-label="Search structures"
+            aria-label={t("platformUi.structSearchAria")}
           />
         </div>
         <label className="plat-subjects-v2__check">
@@ -334,7 +335,7 @@ export function PlatformStructures() {
             checked={showArchived}
             onChange={(e) => setShowArchived(e.target.checked)}
           />
-          Show archived
+          {t("platformUi.showArchived")}
         </label>
         <button
           type="button"
@@ -342,7 +343,7 @@ export function PlatformStructures() {
           onClick={() => openCreate()}
         >
           <DashIcon name="plus" className="dash-icon--sm" />
-          New structure
+          {t("platformUi.newStructure")}
         </button>
       </div>
 
@@ -350,19 +351,19 @@ export function PlatformStructures() {
         <table className="plat-subjects-v2__table">
           <thead>
             <tr>
-              <th>Structure</th>
-              <th>Key</th>
-              <th>Grade preset</th>
-              <th>Packages</th>
-              <th>Status</th>
-              <th aria-label="Actions" />
+              <th>{t("platformUi.structColStructure")}</th>
+              <th>{t("platformUi.structColKey")}</th>
+              <th>{t("platformUi.structColPreset")}</th>
+              <th>{t("platformUi.structColPackages")}</th>
+              <th>{t("platformUi.structColStatus")}</th>
+              <th aria-label={t("platformUi.actions")} />
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
               <tr>
                 <td colSpan={6} className="plat-subjects-v2__empty">
-                  No structures match your filters.
+                  {t("platformUi.structNoMatch")}
                 </td>
               </tr>
             ) : (
@@ -401,7 +402,7 @@ export function PlatformStructures() {
                         Archived
                       </span>
                     ) : (
-                      <span className="plat-subjects-v2__pill">Active</span>
+                      <span className="plat-subjects-v2__pill">{t("platformUi.structStatActive")}</span>
                     )}
                   </td>
                   <td>
@@ -412,7 +413,7 @@ export function PlatformStructures() {
                         disabled={busy}
                         onClick={() => openEdit(s)}
                       >
-                        Edit
+                        {t("common.edit")}
                       </button>
                       <button
                         type="button"
@@ -420,7 +421,7 @@ export function PlatformStructures() {
                         disabled={busy}
                         onClick={() => void archiveStructure(s)}
                       >
-                        {s.isArchived ? "Restore" : "Archive"}
+                        {s.isArchived ? t("platformUi.structRestore") : t("platformUi.structArchive")}
                       </button>
                       <button
                         type="button"
@@ -428,12 +429,12 @@ export function PlatformStructures() {
                         disabled={busy || s._count.packages > 0}
                         title={
                           s._count.packages > 0
-                            ? "Unlink from packages first"
-                            : "Delete permanently"
+                            ? t("platformUi.structUnlinkFirst")
+                            : t("platformUi.structDeletePerm")
                         }
                         onClick={() => void deleteStructure(s)}
                       >
-                        Delete
+                        {t("common.delete")}
                       </button>
                     </div>
                   </td>
@@ -464,12 +465,12 @@ export function PlatformStructures() {
                   id="plat-structure-editor-title"
                   className="stu-drawer__title"
                 >
-                  {isEditing ? "Edit structure" : "New structure"}
+                  {isEditing ? t("platformUi.structEditTitle") : t("platformUi.newStructure")}
                 </h2>
                 <p className="stu-drawer__sub">
                   {isEditing
-                    ? "Update the label, description, or grade band."
-                    : "Define a grade preset packages can link to."}
+                    ? t("platformUi.structEditLead")
+                    : t("platformUi.structCreateLead")}
                 </p>
               </div>
               <button
@@ -485,7 +486,7 @@ export function PlatformStructures() {
               <AppToast message={error} tone="error" onDismiss={() => setError("")} />
 
               <label className="plat-field">
-                <span>Label</span>
+                <span>{t("platformUi.structLabel")}</span>
                 <input
                   value={formLabel}
                   onChange={(e) => {
@@ -495,13 +496,13 @@ export function PlatformStructures() {
                       setFormKey(slugKey(next));
                     }
                   }}
-                  placeholder="e.g. Primary (Grades 1–8)"
+                  placeholder={t("platformUi.structLabelPh")}
                   autoFocus
                 />
               </label>
 
               <label className="plat-field">
-                <span>Key</span>
+                <span>{t("platformUi.key")}</span>
                 <input
                   value={formKey}
                   onChange={(e) => {
@@ -516,28 +517,31 @@ export function PlatformStructures() {
               </label>
 
               <label className="plat-field">
-                <span>Grade preset</span>
+                <span>{t("platformUi.structColPreset")}</span>
                 <select
                   value={formPreset}
                   onChange={(e) => setFormPreset(e.target.value)}
                 >
-                  {GRADE_PRESETS.map((p) => (
+                  {GRADE_PRESET_META.map((p) => (
                     <option key={p.value} value={p.value}>
-                      {p.label}
+                      {t(p.labelKey)}
                     </option>
                   ))}
                 </select>
                 <em className="plat-subjects-v2__muted">
-                  {GRADE_PRESETS.find((p) => p.value === formPreset)?.hint}
+                  {t(
+                    GRADE_PRESET_META.find((p) => p.value === formPreset)
+                      ?.hintKey ?? "platformUi.structPresetKg12Hint",
+                  )}
                 </em>
               </label>
 
               <label className="plat-field">
-                <span>Description</span>
+                <span>{t("platformUi.description")}</span>
                 <textarea
                   value={formDescription}
                   onChange={(e) => setFormDescription(e.target.value)}
-                  placeholder="Short note for operators (optional)"
+                  placeholder={t("platformUi.structDescPh")}
                   rows={3}
                 />
               </label>
@@ -554,7 +558,7 @@ export function PlatformStructures() {
                     if (row) void deleteStructure(row);
                   }}
                 >
-                  Delete
+                  {t("common.delete")}
                 </button>
               ) : (
                 <span />
@@ -566,7 +570,7 @@ export function PlatformStructures() {
                   disabled={busy}
                   onClick={() => resetEditor()}
                 >
-                  Cancel
+                  {t("common.cancel")}
                 </button>
                 <button
                   type="button"
@@ -582,8 +586,8 @@ export function PlatformStructures() {
                   {busy
                     ? "Saving…"
                     : isEditing
-                      ? "Save changes"
-                      : "Save structure"}
+                      ? t("platformUi.saveChanges")
+                      : t("platformUi.saveStructure")}
                 </button>
               </div>
             </footer>

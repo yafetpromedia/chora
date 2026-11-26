@@ -10,53 +10,14 @@ import {
   type AttendanceReason,
 } from "@/lib/attendance";
 import { AppToast } from "@/components/ui/app-toast";
+import { useLocale } from "@/components/i18n/locale-provider";
+import type { AppLocale, MessageKey } from "@/lib/i18n";
 
-const TYPES: {
-  value: AttendancePermissionType;
-  label: string;
-  hint: string;
-  icon: "absence" | "late" | "leave" | "other";
-}[] = [
-  { value: "ABSENCE", label: "Absence", hint: "I will not be in class", icon: "absence" },
-  { value: "LATE", label: "Late arrival", hint: "Arriving after roll call", icon: "late" },
-  { value: "EARLY_LEAVE", label: "Early leave", hint: "Leaving before end of day", icon: "leave" },
-  { value: "OTHER", label: "Other", hint: "Another attendance request", icon: "other" },
-];
-
-const REASONS: { value: AttendanceReason; label: string }[] = [
-  { value: "sick", label: "Sick" },
-  { value: "family_emergency", label: "Family emergency" },
-  { value: "other", label: "Other" },
-];
-
-const TYPE_LABEL: Record<AttendancePermissionType, string> = {
-  ABSENCE: "Absence",
-  LATE: "Late arrival",
-  EARLY_LEAVE: "Early leave",
-  OTHER: "Other",
-};
-
-const REASON_LABEL: Record<AttendanceReason, string> = {
-  sick: "Sick",
-  family_emergency: "Family emergency",
-  unexcused: "Unexcused",
-  other: "Other",
-};
-
-function formatDate(iso: string) {
-  try {
-    return new Date(iso + "T12:00:00").toLocaleDateString(undefined, {
-      weekday: "short",
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-  } catch {
-    return iso;
-  }
+function dateLocaleTag(locale: AppLocale) {
+  return locale === "am" ? "am-ET" : undefined;
 }
 
-function TypeIcon({ kind }: { kind: (typeof TYPES)[number]["icon"] }) {
+function TypeIcon({ kind }: { kind: "absence" | "late" | "leave" | "other" }) {
   const p = {
     viewBox: "0 0 24 24",
     fill: "none",
@@ -105,7 +66,42 @@ function TypeIcon({ kind }: { kind: (typeof TYPES)[number]["icon"] }) {
   }
 }
 
+const TYPE_KEYS: Record<
+  AttendancePermissionType,
+  { label: MessageKey; hint: MessageKey; icon: "absence" | "late" | "leave" | "other" }
+> = {
+  ABSENCE: {
+    label: "attendancePermissionFormUi.typeAbsence",
+    hint: "attendancePermissionFormUi.typeAbsenceHint",
+    icon: "absence",
+  },
+  LATE: {
+    label: "attendancePermissionFormUi.typeLate",
+    hint: "attendancePermissionFormUi.typeLateHint",
+    icon: "late",
+  },
+  EARLY_LEAVE: {
+    label: "attendancePermissionFormUi.typeEarlyLeave",
+    hint: "attendancePermissionFormUi.typeEarlyLeaveHint",
+    icon: "leave",
+  },
+  OTHER: {
+    label: "attendancePermissionFormUi.typeOther",
+    hint: "attendancePermissionFormUi.typeOtherHint",
+    icon: "other",
+  },
+};
+
+const REASON_KEYS: Record<AttendanceReason, MessageKey> = {
+  sick: "parentAttendance.sick",
+  family_emergency: "parentAttendance.familyEmergency",
+  unexcused: "parentAttendance.unexcused",
+  other: "parentAttendance.other",
+};
+
 export function AttendancePermissionForm() {
+  const { t, locale } = useLocale();
+  const dateLocale = dateLocaleTag(locale);
   const today = new Date().toISOString().slice(0, 10);
   const [type, setType] = useState<AttendancePermissionType>("ABSENCE");
   const [date, setDate] = useState(today);
@@ -116,6 +112,56 @@ export function AttendancePermissionForm() {
   const [saved, setSaved] = useState("");
   const [requests, setRequests] = useState<AttendancePermissionRequest[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const types = useMemo(
+    () =>
+      (Object.keys(TYPE_KEYS) as AttendancePermissionType[]).map((value) => {
+        const meta = TYPE_KEYS[value];
+        return {
+          value,
+          label: t(meta.label),
+          hint: t(meta.hint),
+          icon: meta.icon,
+        };
+      }),
+    [t],
+  );
+
+  const reasons = useMemo(
+    () =>
+      (["sick", "family_emergency", "other"] as AttendanceReason[]).map((value) => ({
+        value,
+        label: t(REASON_KEYS[value]),
+      })),
+    [t],
+  );
+
+  function formatDate(iso: string) {
+    try {
+      return new Date(iso + "T12:00:00").toLocaleDateString(dateLocale, {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      });
+    } catch {
+      return iso;
+    }
+  }
+
+  function typeLabel(permType: AttendancePermissionType) {
+    return t(TYPE_KEYS[permType].label);
+  }
+
+  function reasonLabel(reasonKey: AttendanceReason) {
+    return t(REASON_KEYS[reasonKey] ?? "parentAttendance.other");
+  }
+
+  function statusLabel(status: AttendancePermissionRequest["status"]) {
+    if (status === "PENDING") return t("attendancePermissionFormUi.statusPending");
+    if (status === "APPROVED") return t("attendancePermissionFormUi.statusApproved");
+    return t("attendancePermissionFormUi.statusRejected");
+  }
 
   const load = () => {
     void listMyAttendancePermissionRequests()
@@ -146,17 +192,19 @@ export function AttendancePermissionForm() {
         reason,
         note: note.trim() || undefined,
       });
-      setSaved("Request sent to your homeroom teacher.");
+      setSaved(t("attendancePermissionFormUi.requestSent"));
       setNote("");
       load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not submit request");
+      setError(
+        err instanceof Error ? err.message : t("attendancePermissionFormUi.submitFailed"),
+      );
     } finally {
       setBusy(false);
     }
   }
 
-  const selectedType = TYPES.find((t) => t.value === type);
+  const selectedType = types.find((item) => item.value === type);
 
   return (
     <div className="att-perm-v2">
@@ -164,24 +212,22 @@ export function AttendancePermissionForm() {
         <div className="att-perm-v2__hero-glow" aria-hidden />
         <div className="att-perm-v2__hero-inner">
           <div className="att-perm-v2__hero-main">
-            <span className="att-perm-v2__chip">Homeroom request</span>
-            <h2 className="att-perm-v2__hero-title">Attendance permission</h2>
-            <p className="att-perm-v2__hero-sub">
-              Tell your homeroom teacher before you miss class, arrive late, or leave early.
-            </p>
+            <span className="att-perm-v2__chip">{t("attendancePermissionFormUi.chip")}</span>
+            <h2 className="att-perm-v2__hero-title">{t("attendancePermissionFormUi.title")}</h2>
+            <p className="att-perm-v2__hero-sub">{t("attendancePermissionFormUi.heroSub")}</p>
           </div>
           <div className="att-perm-v2__stats">
             <div className="att-perm-v2__stat">
               <strong>{stats.pending}</strong>
-              <span>Pending</span>
+              <span>{t("attendancePermissionFormUi.statPending")}</span>
             </div>
             <div className="att-perm-v2__stat">
               <strong>{stats.approved}</strong>
-              <span>Approved</span>
+              <span>{t("attendancePermissionFormUi.statApproved")}</span>
             </div>
             <div className="att-perm-v2__stat att-perm-v2__stat--accent">
               <strong>{stats.total}</strong>
-              <span>Total</span>
+              <span>{t("attendancePermissionFormUi.statTotal")}</span>
             </div>
           </div>
         </div>
@@ -194,8 +240,8 @@ export function AttendancePermissionForm() {
               <DashIcon name="attendance" className="dash-icon--sm" />
             </span>
             <div>
-              <h3 className="att-perm-v2__card-title">New request</h3>
-              <p className="att-perm-v2__card-sub">Choose a type and send it to your homeroom teacher</p>
+              <h3 className="att-perm-v2__card-title">{t("attendancePermissionFormUi.newRequest")}</h3>
+              <p className="att-perm-v2__card-sub">{t("attendancePermissionFormUi.newRequestSub")}</p>
             </div>
           </div>
 
@@ -204,21 +250,21 @@ export function AttendancePermissionForm() {
 
           <form className="att-perm-v2__form" onSubmit={(e) => void onSubmit(e)}>
             <fieldset className="att-perm-v2__types">
-              <legend className="att-perm-v2__legend">Request type</legend>
+              <legend className="att-perm-v2__legend">{t("attendancePermissionFormUi.requestType")}</legend>
               <div className="att-perm-v2__type-grid">
-                {TYPES.map((t) => (
+                {types.map((item) => (
                   <button
-                    key={t.value}
+                    key={item.value}
                     type="button"
-                    className={`att-perm-v2__type${type === t.value ? " att-perm-v2__type--on" : ""}`}
-                    onClick={() => setType(t.value)}
-                    aria-pressed={type === t.value}
+                    className={`att-perm-v2__type${type === item.value ? " att-perm-v2__type--on" : ""}`}
+                    onClick={() => setType(item.value)}
+                    aria-pressed={type === item.value}
                   >
                     <span className="att-perm-v2__type-icon">
-                      <TypeIcon kind={t.icon} />
+                      <TypeIcon kind={item.icon} />
                     </span>
-                    <span className="att-perm-v2__type-label">{t.label}</span>
-                    <span className="att-perm-v2__type-hint">{t.hint}</span>
+                    <span className="att-perm-v2__type-label">{item.label}</span>
+                    <span className="att-perm-v2__type-hint">{item.hint}</span>
                   </button>
                 ))}
               </div>
@@ -226,13 +272,14 @@ export function AttendancePermissionForm() {
 
             {selectedType ? (
               <p className="att-perm-v2__type-active">
-                Selected: <strong>{selectedType.label}</strong> — {selectedType.hint}
+                {t("attendancePermissionFormUi.selectedPrefix")}{" "}
+                <strong>{selectedType.label}</strong> — {selectedType.hint}
               </p>
             ) : null}
 
             <div className="att-perm-v2__fields">
               <label className="att-perm-v2__field">
-                <span>Date</span>
+                <span>{t("parentAttendance.date")}</span>
                 <input
                   type="date"
                   value={date}
@@ -241,12 +288,12 @@ export function AttendancePermissionForm() {
                 />
               </label>
               <label className="att-perm-v2__field">
-                <span>Reason</span>
+                <span>{t("parentAttendance.reason")}</span>
                 <select
                   value={reason}
                   onChange={(e) => setReason(e.target.value as AttendanceReason)}
                 >
-                  {REASONS.map((r) => (
+                  {reasons.map((r) => (
                     <option key={r.value} value={r.value}>
                       {r.label}
                     </option>
@@ -256,17 +303,20 @@ export function AttendancePermissionForm() {
             </div>
 
             <label className="att-perm-v2__field att-perm-v2__field--full">
-              <span>Message to teacher <em>(optional)</em></span>
+              <span>
+                {t("attendancePermissionFormUi.messageTeacher")}{" "}
+                <em>{t("attendancePermissionFormUi.optional")}</em>
+              </span>
               <textarea
                 rows={3}
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
-                placeholder="Explain why you need permission…"
+                placeholder={t("attendancePermissionFormUi.messagePlaceholder")}
               />
             </label>
 
             <button type="submit" className="att-perm-v2__submit" disabled={busy}>
-              {busy ? "Sending…" : "Submit request"}
+              {busy ? t("attendancePermissionFormUi.sending") : t("attendancePermissionFormUi.submitRequest")}
             </button>
           </form>
         </section>
@@ -277,23 +327,23 @@ export function AttendancePermissionForm() {
               <DashIcon name="calendar" className="dash-icon--sm" />
             </span>
             <div>
-              <h3 className="att-perm-v2__card-title">Your requests</h3>
-              <p className="att-perm-v2__card-sub">Track what your homeroom teacher has decided</p>
+              <h3 className="att-perm-v2__card-title">{t("attendancePermissionFormUi.yourRequests")}</h3>
+              <p className="att-perm-v2__card-sub">{t("attendancePermissionFormUi.yourRequestsSub")}</p>
             </div>
           </div>
 
           {loading ? (
             <div className="att-perm-v2__loading">
               <span className="att-perm-v2__spinner" aria-hidden />
-              <p>Loading requests…</p>
+              <p>{t("attendancePermissionFormUi.loadingRequests")}</p>
             </div>
           ) : requests.length === 0 ? (
             <div className="att-perm-v2__empty">
               <span className="att-perm-v2__empty-icon" aria-hidden>
                 <DashIcon name="attendance" className="dash-icon--lg" />
               </span>
-              <h4>No requests yet</h4>
-              <p>Submit your first permission request using the form. Your teacher will approve or reject it.</p>
+              <h4>{t("attendancePermissionFormUi.emptyTitle")}</h4>
+              <p>{t("attendancePermissionFormUi.emptySub")}</p>
             </div>
           ) : (
             <ul className="att-perm-v2__list">
@@ -306,28 +356,26 @@ export function AttendancePermissionForm() {
                   <div className="att-perm-v2__item-body">
                     <div className="att-perm-v2__item-top">
                       <div>
-                        <p className="att-perm-v2__item-type">{TYPE_LABEL[r.type]}</p>
+                        <p className="att-perm-v2__item-type">{typeLabel(r.type)}</p>
                         <p className="att-perm-v2__item-date">{formatDate(r.date)}</p>
                       </div>
                       <span
                         className={`att-perm-v2__badge att-perm-v2__badge--${r.status.toLowerCase()}`}
                       >
-                        {r.status === "PENDING"
-                          ? "Pending"
-                          : r.status === "APPROVED"
-                            ? "Approved"
-                            : "Rejected"}
+                        {statusLabel(r.status)}
                       </span>
                     </div>
                     {r.reason ? (
                       <p className="att-perm-v2__item-meta">
-                        Reason: {REASON_LABEL[r.reason] ?? r.reason}
+                        {t("attendancePermissionFormUi.reasonPrefix")}{" "}
+                        {reasonLabel(r.reason as AttendanceReason)}
                       </p>
                     ) : null}
                     {r.note ? <p className="att-perm-v2__item-note">{r.note}</p> : null}
                     {r.reviewNote ? (
                       <p className="att-perm-v2__item-review">
-                        <strong>Teacher:</strong> {r.reviewNote}
+                        <strong>{t("attendancePermissionFormUi.teacherNotePrefix")}</strong>{" "}
+                        {r.reviewNote}
                       </p>
                     ) : null}
                   </div>

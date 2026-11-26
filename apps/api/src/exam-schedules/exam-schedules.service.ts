@@ -2,12 +2,14 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Optional,
 } from '@nestjs/common';
 import {
   ExamScheduleStatus,
   Prisma,
   StudentRecordStatus,
 } from '@prisma/client';
+import { EmailService } from '../email/email.service';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   CreateExamScheduleDto,
@@ -42,7 +44,10 @@ const scheduleInclude = {
 
 @Injectable()
 export class ExamSchedulesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly email?: EmailService,
+  ) {}
 
   async list(schoolId: string, academicYearId?: string) {
     return this.prisma.examSchedule.findMany({
@@ -158,7 +163,7 @@ export class ExamSchedulesService {
   }
 
   async update(schoolId: string, id: string, dto: UpdateExamScheduleDto) {
-    await this.get(schoolId, id);
+    const existing = await this.get(schoolId, id);
 
     if (dto.academicTermId) {
       const schedule = await this.prisma.examSchedule.findFirst({
@@ -174,7 +179,7 @@ export class ExamSchedulesService {
       if (!term) throw new NotFoundException('Academic term not found');
     }
 
-    return this.prisma.examSchedule.update({
+    const updated = await this.prisma.examSchedule.update({
       where: { id },
       data: {
         ...(dto.title !== undefined ? { title: dto.title.trim() } : {}),
@@ -191,6 +196,36 @@ export class ExamSchedulesService {
       },
       include: scheduleInclude,
     });
+
+    if (
+      existing.status !== ExamScheduleStatus.PUBLISHED &&
+      updated.status === ExamScheduleStatus.PUBLISHED
+    ) {
+      const dates = [...updated.days]
+        .map((day) => day.examDate)
+        .sort((a, b) => a.getTime() - b.getTime());
+      const formatDay = (day: Date) =>
+        day.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      const dateRange =
+        dates.length === 0
+          ? ''
+          : dates.length === 1
+            ? formatDay(dates[0])
+            : `${formatDay(dates[0])} – ${formatDay(dates[dates.length - 1])}`;
+      try {
+        await this.email?.notifySchoolParents({
+          schoolId,
+          preference: 'examinationEnabled',
+          category: 'examination',
+          templateId: 'examination',
+          idempotencyPrefix: `exam-published:${updated.id}`,
+          vars: { title: updated.title, dateRange },
+        });
+      } catch {
+        // The timetable is already published.
+      }
+    }
+    return updated;
   }
 
   async remove(schoolId: string, id: string) {

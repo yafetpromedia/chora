@@ -10,6 +10,7 @@ import {
   type StudentIdCard,
 } from "@/lib/student-cards";
 import type { StudentIdCardVariant } from "@/components/students/student-id-card";
+import { useLocale } from "@/components/i18n/locale-provider";
 
 export type StudentIdCardSource = "profile" | "me" | "child" | "static";
 
@@ -29,9 +30,11 @@ export function StudentIdCardPanel({
   card: staticCard,
   variant = "compact",
   className = "",
-  title = "Student ID card",
+  title,
   subtitle,
 }: Props) {
+  const { t } = useLocale();
+  const displayTitle = title ?? t("idCardPortal.panelTitle");
   const [fetchedCard, setCard] = useState<StudentIdCard | null>(null);
   const [loadingState, setLoading] = useState(source !== "static");
   const [errorState, setError] = useState("");
@@ -41,8 +44,8 @@ export function StudentIdCardPanel({
   const loading = source !== "static" && !missingProfile && loadingState;
   const error = missingProfile
     ? source === "child"
-      ? "Missing child profile."
-      : "Missing student profile."
+      ? t("idCardPortal.missingChildProfile")
+      : t("idCardPortal.missingStudentProfile")
     : errorState;
   const [modalOpen, setModalOpen] = useState(false);
 
@@ -68,7 +71,9 @@ export function StudentIdCardPanel({
 
     void fetcher
       .then(setCard)
-      .catch((err) => setError(err instanceof Error ? err.message : "Could not load ID card"))
+      .catch((err) =>
+        setError(err instanceof Error ? err.message : t("idCardPortal.loadFailed")),
+      )
       .finally(() => setLoading(false));
   }, [source, profileId, missingProfile]);
 
@@ -76,7 +81,7 @@ export function StudentIdCardPanel({
     <section className={`sid-my-panel dash-panel dash-panel--flat ${className}`.trim()}>
       <div className="sid-my-panel__head">
         <div>
-          <h2 className="sid-my-panel__title">{title}</h2>
+          <h2 className="sid-my-panel__title">{displayTitle}</h2>
           {subtitle ? <p className="sid-my-panel__sub">{subtitle}</p> : null}
         </div>
         {card ? (
@@ -85,13 +90,13 @@ export function StudentIdCardPanel({
             className="att-btn att-btn--primary no-print"
             onClick={() => setModalOpen(true)}
           >
-            Full view · Print
+            {t("idCardPortal.fullViewPrint")}
           </button>
         ) : null}
       </div>
 
       {loading ? (
-        <p className="setup-hint">Loading ID card…</p>
+        <p className="setup-hint">{t("idCardPortal.loadingIdCard")}</p>
       ) : error ? (
         <p className="att-toast att-toast--error">{error}</p>
       ) : card ? (
@@ -102,7 +107,7 @@ export function StudentIdCardPanel({
 
       {card ? (
         <p className="sid-my-panel__hint no-print">
-          Open full view to see both sides of the card or save a PDF via Print.
+          {t("idCardPortal.hintFullView")}
         </p>
       ) : null}
 

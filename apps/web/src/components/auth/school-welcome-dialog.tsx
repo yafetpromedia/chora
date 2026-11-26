@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, useReducedMotion } from "framer-motion";
 import { BRAND_NAME } from "@/lib/brand";
@@ -10,6 +10,7 @@ import {
   getLoginUrl,
   SCHOOL_TRIAL_DAYS,
 } from "@/lib/school-welcome";
+import { useLocale } from "@/components/i18n/locale-provider";
 
 type Props = {
   open: boolean;
@@ -20,21 +21,6 @@ type Props = {
   onContinue: () => void;
 };
 
-const USAGE_STEPS = [
-  {
-    title: "Sign-in page",
-    body: "Teachers, parents, and students open the login page and enter your school code first.",
-  },
-  {
-    title: "Share with staff & families",
-    body: "Share this code when people join, or use invitation links in Admin → Settings → Access.",
-  },
-  {
-    title: "Mobile app",
-    body: `The ${BRAND_NAME} app uses the same school code and login — no separate signup.`,
-  },
-] as const;
-
 type CopiedKind = "code" | "url" | "handout";
 
 export function SchoolWelcomeDialog({
@@ -43,6 +29,7 @@ export function SchoolWelcomeDialog({
   joinCode,
   onContinue,
 }: Props) {
+  const { t } = useLocale();
   const titleId = useId();
   const descId = useId();
   const continueRef = useRef<HTMLButtonElement>(null);
@@ -50,6 +37,19 @@ export function SchoolWelcomeDialog({
   const [copied, setCopied] = useState<CopiedKind | null>(null);
   const [savedAck, setSavedAck] = useState(false);
   const reduce = useReducedMotion();
+
+  const usageSteps = useMemo(
+    () =>
+      [
+        { title: t("schoolWelcomeUi.step1Title"), body: t("schoolWelcomeUi.step1Body") },
+        { title: t("schoolWelcomeUi.step2Title"), body: t("schoolWelcomeUi.step2Body") },
+        {
+          title: t("schoolWelcomeUi.step3Title"),
+          body: t("schoolWelcomeUi.step3Body", { brand: BRAND_NAME }),
+        },
+      ] as const,
+    [t],
+  );
 
   const loginUrl = getLoginUrl();
 
@@ -106,22 +106,25 @@ export function SchoolWelcomeDialog({
         </div>
 
         <header className="school-welcome__head">
-          <p className="school-welcome__eyebrow">Welcome to {BRAND_NAME}</p>
+          <p className="school-welcome__eyebrow">
+            {t("schoolWelcomeUi.welcomeEyebrow", { brand: BRAND_NAME })}
+          </p>
           <h2 id={titleId} className="school-welcome__title">
-            {schoolName} is ready
+            {t("schoolWelcomeUi.titleReady", { schoolName })}
           </h2>
           <p id={descId} className="school-welcome__lead">
-            Save your school code — everyone uses it to sign in. You can always find it under{" "}
-            <strong>Admin → Settings → Access</strong>.
+            {t("schoolWelcomeUi.lead")}
+            <strong>{t("schoolWelcomeUi.leadSettings")}</strong>
+            {t("schoolWelcomeUi.leadEnd")}
           </p>
         </header>
 
         <p className="school-welcome__trial" role="status">
-          Your {SCHOOL_TRIAL_DAYS}-day free trial starts today — explore every core module.
+          {t("schoolWelcomeUi.trial", { days: SCHOOL_TRIAL_DAYS })}
         </p>
 
         <div className="school-welcome__code-block">
-          <span className="school-welcome__code-label">Your school code</span>
+          <span className="school-welcome__code-label">{t("schoolWelcomeUi.codeLabel")}</span>
           <div className="school-welcome__code-row">
             <code className="school-welcome__code">{joinCode}</code>
             <button
@@ -129,11 +132,11 @@ export function SchoolWelcomeDialog({
               className="school-welcome__copy"
               onClick={() => void copyText("code", joinCode)}
             >
-              {copied === "code" ? "Copied!" : "Copy code"}
+              {copied === "code" ? t("schoolWelcomeUi.copied") : t("schoolWelcomeUi.copyCode")}
             </button>
           </div>
           <p className="school-welcome__login-hint">
-            Login page:{" "}
+            {t("schoolWelcomeUi.loginPage")}{" "}
             <a href={loginUrl} target="_blank" rel="noopener noreferrer">
               {loginUrl.replace(/^https?:\/\//, "")}
             </a>
@@ -144,20 +147,20 @@ export function SchoolWelcomeDialog({
               className="school-welcome__copy-secondary"
               onClick={() => void copyText("url", loginUrl)}
             >
-              {copied === "url" ? "Copied!" : "Copy login URL"}
+              {copied === "url" ? t("schoolWelcomeUi.copied") : t("schoolWelcomeUi.copyLoginUrl")}
             </button>
             <button
               type="button"
               className="school-welcome__copy-secondary school-welcome__copy-secondary--primary"
               onClick={() => void copyText("handout", handoutText)}
             >
-              {copied === "handout" ? "Copied!" : "Copy share handout"}
+              {copied === "handout" ? t("schoolWelcomeUi.copied") : t("schoolWelcomeUi.copyHandout")}
             </button>
           </div>
         </div>
 
         <ol className="school-welcome__steps">
-          {USAGE_STEPS.map((step, index) => (
+          {usageSteps.map((step, index) => (
             <li key={step.title} className="school-welcome__step">
               <span className="school-welcome__step-num" aria-hidden>
                 {index + 1}
@@ -176,7 +179,7 @@ export function SchoolWelcomeDialog({
             checked={savedAck}
             onChange={(e) => setSavedAck(e.target.checked)}
           />
-          <span>I&apos;ve saved my school code</span>
+          <span>{t("schoolWelcomeUi.ack")}</span>
         </label>
 
         <footer className="school-welcome__actions">
@@ -187,7 +190,7 @@ export function SchoolWelcomeDialog({
             disabled={!savedAck}
             onClick={onContinue}
           >
-            Continue to your workspace →
+            {t("schoolWelcomeUi.continue")}
           </button>
         </footer>
       </motion.div>

@@ -1,5 +1,7 @@
 "use client";
 
+import { useLocale } from "@/components/i18n/locale-provider";
+
 export type TemplateComponentDraft = {
   name: string;
   weightPercent: number;
@@ -12,6 +14,8 @@ type Props = {
 };
 
 export function TemplateComponentsEditor({ components, onChange }: Props) {
+  const { t } = useLocale();
+
   function updateRow(index: number, patch: Partial<TemplateComponentDraft>) {
     const next = [...components];
     next[index] = { ...next[index], ...patch };
@@ -21,7 +25,7 @@ export function TemplateComponentsEditor({ components, onChange }: Props) {
   function addRow() {
     onChange([
       ...components,
-      { name: "New component", weightPercent: 0, maxScore: 10 },
+      { name: t("templateComponentsEditorUi.newComponentDefault"), weightPercent: 0, maxScore: 10 },
     ]);
   }
 
@@ -41,30 +45,30 @@ export function TemplateComponentsEditor({ components, onChange }: Props) {
 
   return (
     <div className="res-components-editor">
-      <p className="res-components-editor__title">Assessment components</p>
+      <p className="res-components-editor__title">{t("templateComponentsEditorUi.title")}</p>
 
-      <div className="res-components-editor__grid" role="table" aria-label="Template components">
+      <div className="res-components-editor__grid" role="table" aria-label={t("templateComponentsEditorUi.tableAria")}>
         <div className="res-components-editor__grid-head" role="row">
-          <span role="columnheader">Component</span>
-          <span role="columnheader">Wt %</span>
-          <span role="columnheader">Max</span>
+          <span role="columnheader">{t("templateComponentsEditorUi.colComponent")}</span>
+          <span role="columnheader">{t("templateComponentsEditorUi.colWeight")}</span>
+          <span role="columnheader">{t("templateComponentsEditorUi.colMax")}</span>
           <span className="res-components-editor__grid-actions-label" role="columnheader">
-            Order
+            {t("templateComponentsEditorUi.colOrder")}
           </span>
         </div>
 
         {components.map((c, i) => (
           <div key={i} className="res-components-editor__grid-row" role="row">
             <label className="res-components-editor__cell res-components-editor__cell--name">
-              <span className="res-components-editor__sr-only">Component</span>
+              <span className="res-components-editor__sr-only">{t("templateComponentsEditorUi.srComponent")}</span>
               <input
                 value={c.name}
                 onChange={(e) => updateRow(i, { name: e.target.value })}
-                placeholder="e.g. Quiz"
+                placeholder={t("templateComponentsEditorUi.placeholderName")}
               />
             </label>
             <label className="res-components-editor__cell res-components-editor__cell--num">
-              <span className="res-components-editor__sr-only">Weight percent</span>
+              <span className="res-components-editor__sr-only">{t("templateComponentsEditorUi.srWeight")}</span>
               <input
                 type="number"
                 min={0}
@@ -76,7 +80,7 @@ export function TemplateComponentsEditor({ components, onChange }: Props) {
               />
             </label>
             <label className="res-components-editor__cell res-components-editor__cell--num">
-              <span className="res-components-editor__sr-only">Max score</span>
+              <span className="res-components-editor__sr-only">{t("templateComponentsEditorUi.srMax")}</span>
               <input
                 type="number"
                 min={1}
@@ -90,8 +94,8 @@ export function TemplateComponentsEditor({ components, onChange }: Props) {
                 className="res-components-editor__icon-btn"
                 disabled={i === 0}
                 onClick={() => moveRow(i, -1)}
-                title="Move up"
-                aria-label="Move up"
+                title={t("templateComponentsEditorUi.moveUp")}
+                aria-label={t("templateComponentsEditorUi.moveUp")}
               >
                 ↑
               </button>
@@ -100,8 +104,8 @@ export function TemplateComponentsEditor({ components, onChange }: Props) {
                 className="res-components-editor__icon-btn"
                 disabled={i === components.length - 1}
                 onClick={() => moveRow(i, 1)}
-                title="Move down"
-                aria-label="Move down"
+                title={t("templateComponentsEditorUi.moveDown")}
+                aria-label={t("templateComponentsEditorUi.moveDown")}
               >
                 ↓
               </button>
@@ -111,7 +115,7 @@ export function TemplateComponentsEditor({ components, onChange }: Props) {
                 disabled={components.length <= 1}
                 onClick={() => removeRow(i)}
               >
-                Remove
+                {t("common.remove")}
               </button>
             </div>
           </div>
@@ -119,7 +123,7 @@ export function TemplateComponentsEditor({ components, onChange }: Props) {
       </div>
 
       <button type="button" className="res-components-editor__add" onClick={addRow}>
-        + Add component
+        {t("templateComponentsEditorUi.addComponent")}
       </button>
     </div>
   );

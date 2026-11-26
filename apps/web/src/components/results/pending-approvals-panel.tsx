@@ -11,6 +11,7 @@ import {
   type PendingWorkflowItem,
 } from "@/lib/results";
 import { AppToast } from "@/components/ui/app-toast";
+import { useLocale } from "@/components/i18n/locale-provider";
 
 const PAGE_SIZE = 40;
 
@@ -32,6 +33,7 @@ export function PendingApprovalsPanel({
   onError,
   onCountChange,
 }: Props) {
+  const { t } = useLocale();
   const [termIdState, setTermId] = useState(defaultTermId ?? "");
   const termId = termIdState || defaultTermId || "";
   const [pending, setPending] = useState<PendingWorkflowItem[]>([]);
@@ -41,7 +43,8 @@ export function PendingApprovalsPanel({
   const [page, setPage] = useState(0);
   const [flash, setFlash] = useState("");
 
-  const termName = terms.find((t) => t.id === termId)?.name ?? "All terms";
+  const termName =
+    terms.find((term) => term.id === termId)?.name ?? t("resultsUi.allTermsFallback");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -54,7 +57,9 @@ export function PendingApprovalsPanel({
       setSelected(new Set());
       setPage(0);
     } catch (err) {
-      onError?.(err instanceof Error ? err.message : "Could not load approvals");
+      onError?.(
+        err instanceof Error ? err.message : t("resultsUi.loadApprovalsFailed"),
+      );
     } finally {
       setLoading(false);
     }
@@ -80,7 +85,9 @@ export function PendingApprovalsPanel({
         setPage(0);
       } catch (err) {
         if (cancelled) return;
-        onError?.(err instanceof Error ? err.message : "Could not load approvals");
+        onError?.(
+        err instanceof Error ? err.message : t("resultsUi.loadApprovalsFailed"),
+      );
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -106,13 +113,19 @@ export function PendingApprovalsPanel({
     const count = scope === "all" ? pending.length : selectedCount;
     if (count === 0) return;
 
-    const verb = action === "approve" ? "Approve" : "Publish";
     const scopeLabel =
       scope === "all"
-        ? `all ${count} submitted sheets${termId ? ` in ${termName}` : ""}`
-        : `${count} selected sheet${count === 1 ? "" : "s"}`;
+        ? t("resultsUi.confirmAllSheets", {
+            count,
+            inTerm: termId ? t("resultsUi.confirmInTerm", { term: termName }) : "",
+          })
+        : count === 1
+          ? t("resultsUi.confirmSelectedSheets", { count })
+          : t("resultsUi.confirmSelectedSheetsMany", { count });
 
-    if (!window.confirm(`${verb} ${scopeLabel}?`)) return;
+    const confirmKey =
+      action === "approve" ? "resultsUi.confirmApproveScope" : "resultsUi.confirmPublishScope";
+    if (!window.confirm(t(confirmKey, { scope: scopeLabel }))) return;
 
     setBusy(true);
     setFlash("");
@@ -124,20 +137,32 @@ export function PendingApprovalsPanel({
 
       if (action === "approve") {
         const { approved } = await approveResultWorkflowBulk(body);
-        setFlash(`Approved ${approved} score sheet${approved === 1 ? "" : "s"}.`);
+        setFlash(
+          approved === 1
+            ? t("resultsUi.flashApproved", { count: approved })
+            : t("resultsUi.flashApprovedMany", { count: approved }),
+        );
       } else {
         const { published, skipped } = await publishResultWorkflowBulk(body);
         const skippedNote =
           skipped && skipped > 0
-            ? ` Skipped ${skipped} empty sheet${skipped === 1 ? "" : "s"}.`
+            ? skipped === 1
+              ? t("resultsUi.flashSkipped", { count: skipped })
+              : t("resultsUi.flashSkippedMany", { count: skipped })
             : "";
-        setFlash(
-          `Published ${published} score sheet${published === 1 ? "" : "s"} to parents.${skippedNote}`,
-        );
+        const publishedMsg =
+          published === 1
+            ? t("resultsUi.flashPublished", { count: published })
+            : t("resultsUi.flashPublishedMany", { count: published });
+        setFlash(`${publishedMsg}${skippedNote}`);
       }
       await load();
     } catch (err) {
-      onError?.(err instanceof Error ? err.message : `${verb} failed`);
+      onError?.(
+        err instanceof Error
+          ? err.message
+          : t(action === "approve" ? "resultsUi.approveFailed" : "resultsUi.publishFailed"),
+      );
     } finally {
       setBusy(false);
     }
@@ -148,10 +173,10 @@ export function PendingApprovalsPanel({
     setFlash("");
     try {
       await approveResultWorkflow(item.termId, item.classSubjectId);
-      setFlash(`Approved ${sheetLabel(item)}.`);
+      setFlash(t("resultsUi.flashApprovedOne", { label: sheetLabel(item) }));
       await load();
     } catch (err) {
-      onError?.(err instanceof Error ? err.message : "Approve failed");
+      onError?.(err instanceof Error ? err.message : t("resultsUi.approveFailed"));
     } finally {
       setBusy(false);
     }
@@ -162,10 +187,10 @@ export function PendingApprovalsPanel({
     setFlash("");
     try {
       await publishResultWorkflow(item.termId, item.classSubjectId);
-      setFlash(`Published ${sheetLabel(item)}.`);
+      setFlash(t("resultsUi.flashPublishedOne", { label: sheetLabel(item) }));
       await load();
     } catch (err) {
-      onError?.(err instanceof Error ? err.message : "Publish failed");
+      onError?.(err instanceof Error ? err.message : t("resultsUi.publishFailed"));
     } finally {
       setBusy(false);
     }
@@ -203,11 +228,13 @@ export function PendingApprovalsPanel({
           ✓
         </div>
         <div className="res-approvals__banner-copy">
-          <h2 className="res-approvals__title">Pending approvals</h2>
+          <h2 className="res-approvals__title">{t("resultsUi.approvalsTitle")}</h2>
           <p className="res-approvals__sub">
             {loading
-              ? "Loading submitted sheets…"
-              : `${pending.length} score sheet${pending.length === 1 ? "" : "s"} waiting for academic office review`}
+              ? t("resultsUi.approvalsLoadingSub")
+              : pending.length === 1
+                ? t("resultsUi.approvalsWaitingSub", { count: pending.length })
+                : t("resultsUi.approvalsWaitingSubMany", { count: pending.length })}
           </p>
         </div>
         <span className="res-approvals__count">{loading ? "…" : pending.length}</span>
@@ -217,13 +244,13 @@ export function PendingApprovalsPanel({
 
       <div className="res-approvals__toolbar">
         <label className="res-approvals__filter">
-          <span>Term</span>
+          <span>{t("resultsUi.termFilter")}</span>
           <select
             value={termId}
             onChange={(e) => setTermId(e.target.value)}
             disabled={busy}
           >
-            <option value="">All terms</option>
+            <option value="">{t("resultsUi.allTerms")}</option>
             {terms.map((t) => (
               <option key={t.id} value={t.id}>
                 {t.name} ({t.academicYear.name})
@@ -239,7 +266,7 @@ export function PendingApprovalsPanel({
             disabled={busy || pending.length === 0}
             onClick={() => void runBulk("approve", "all")}
           >
-            Approve all ({pending.length})
+            {t("resultsUi.approveAll", { count: pending.length })}
           </button>
           <button
             type="button"
@@ -247,7 +274,7 @@ export function PendingApprovalsPanel({
             disabled={busy || pending.length === 0}
             onClick={() => void runBulk("publish", "all")}
           >
-            Publish all ({pending.length})
+            {t("resultsUi.publishAll", { count: pending.length })}
           </button>
           {selectedCount > 0 ? (
             <>
@@ -257,7 +284,7 @@ export function PendingApprovalsPanel({
                 disabled={busy}
                 onClick={() => void runBulk("approve", "selected")}
               >
-                Approve selected ({selectedCount})
+                {t("resultsUi.approveSelected", { count: selectedCount })}
               </button>
               <button
                 type="button"
@@ -265,7 +292,7 @@ export function PendingApprovalsPanel({
                 disabled={busy}
                 onClick={() => void runBulk("publish", "selected")}
               >
-                Publish selected ({selectedCount})
+                {t("resultsUi.publishSelected", { count: selectedCount })}
               </button>
             </>
           ) : null}
@@ -282,26 +309,26 @@ export function PendingApprovalsPanel({
                   checked={allOnPageSelected}
                   onChange={toggleAllOnPage}
                   disabled={busy || pageItems.length === 0}
-                  aria-label="Select all on this page"
+                  aria-label={t("resultsUi.selectAllOnPage")}
                 />
               </th>
-              <th>Class</th>
-              <th>Term</th>
-              <th>Submitted by</th>
-              <th className="res-approvals__actions-col">Actions</th>
+              <th>{t("resultsUi.classCol")}</th>
+              <th>{t("resultsUi.termCol")}</th>
+              <th>{t("resultsUi.submittedBy")}</th>
+              <th className="res-approvals__actions-col">{t("resultsUi.actions")}</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
                 <td colSpan={5} className="res-approvals__empty">
-                  Loading pending sheets…
+                  {t("resultsUi.loadingPending")}
                 </td>
               </tr>
             ) : pageItems.length === 0 ? (
               <tr>
                 <td colSpan={5} className="res-approvals__empty">
-                  No submitted sheets for this term.
+                  {t("resultsUi.noPendingForTerm")}
                 </td>
               </tr>
             ) : (
@@ -313,7 +340,7 @@ export function PendingApprovalsPanel({
                       checked={selected.has(p.id)}
                       onChange={() => toggleOne(p.id)}
                       disabled={busy}
-                      aria-label={`Select ${sheetLabel(p)}`}
+                      aria-label={t("resultsUi.selectSheetAria", { label: sheetLabel(p) })}
                     />
                   </td>
                   <td>
@@ -332,7 +359,7 @@ export function PendingApprovalsPanel({
                       disabled={busy}
                       onClick={() => void onApproveOne(p)}
                     >
-                      Approve
+                      {t("resultsUi.approve")}
                     </button>
                     <button
                       type="button"
@@ -340,7 +367,7 @@ export function PendingApprovalsPanel({
                       disabled={busy}
                       onClick={() => void onPublishOne(p)}
                     >
-                      Publish
+                      {t("resultsUi.publish")}
                     </button>
                   </td>
                 </tr>
@@ -358,18 +385,16 @@ export function PendingApprovalsPanel({
             disabled={busy || page === 0}
             onClick={() => setPage((p) => Math.max(0, p - 1))}
           >
-            Previous
+            {t("resultsUi.previous")}
           </button>
-          <span>
-            Page {page + 1} of {pageCount}
-          </span>
+          <span>{t("resultsUi.pageOf", { page: page + 1, total: pageCount })}</span>
           <button
             type="button"
             className="res-approvals__btn res-approvals__btn--sm"
             disabled={busy || page >= pageCount - 1}
             onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
           >
-            Next
+            {t("resultsUi.next")}
           </button>
         </div>
       ) : null}

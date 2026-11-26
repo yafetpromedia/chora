@@ -322,7 +322,7 @@ export class AcademicsService {
   async updateSubject(
     schoolId: string,
     subjectId: string,
-    dto: { name?: string },
+    dto: { name?: string; code?: string },
   ) {
     const existing = await this.prisma.subject.findFirst({
       where: { id: subjectId, schoolId },
@@ -332,8 +332,10 @@ export class AcademicsService {
     }
 
     const name = dto.name?.trim();
+    const code = dto.code?.trim().toUpperCase();
     const data: {
       name?: string;
+      code?: string;
       isCustomized?: boolean;
     } = {};
 
@@ -344,10 +346,53 @@ export class AcademicsService {
       }
     }
 
+    if (code && code !== existing.code) {
+      const clash = await this.prisma.subject.findFirst({
+        where: {
+          schoolId,
+          code,
+          NOT: { id: subjectId },
+        },
+        select: { id: true },
+      });
+      if (clash) {
+        throw new BadRequestException(
+          `Subject code ${code} is already used in this school`,
+        );
+      }
+      data.code = code;
+      data.isCustomized = true;
+    }
+
+    if (!data.name && !data.code) {
+      return existing;
+    }
+
     return this.prisma.subject.update({
       where: { id: subjectId },
       data,
     });
+  }
+
+  async deleteSubject(schoolId: string, subjectId: string) {
+    const existing = await this.prisma.subject.findFirst({
+      where: { id: subjectId, schoolId },
+      include: {
+        _count: { select: { classSubjects: true } },
+      },
+    });
+    if (!existing) {
+      throw new NotFoundException('Subject not found');
+    }
+
+    if (existing._count.classSubjects > 0) {
+      throw new BadRequestException(
+        'Remove this subject from all classes first, then delete it from the catalog',
+      );
+    }
+
+    await this.prisma.subject.delete({ where: { id: subjectId } });
+    return { deleted: true, id: subjectId };
   }
 
   async listClassSubjects(

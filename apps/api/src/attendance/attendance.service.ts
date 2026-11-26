@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import {
   AttendanceMode,
@@ -18,6 +19,7 @@ import { CreateAttendancePermissionDto } from './dto/create-attendance-permissio
 import { ReviewAttendancePermissionDto } from './dto/review-attendance-permission.dto';
 import { ScanAttendanceDto } from './dto/scan-attendance.dto';
 import { parseCardScanPayload } from '../students/student-card.util';
+import { EmailService } from '../email/email.service';
 import { TeacherScopeService } from '../teachers/teacher-scope.service';
 
 function parseDateOnly(date: string): Date {
@@ -40,6 +42,7 @@ export class AttendanceService {
     private readonly prisma: PrismaService,
     private readonly subscriptionsService: SubscriptionsService,
     private readonly teacherScope: TeacherScopeService,
+    @Optional() private readonly email?: EmailService,
   ) {}
 
   private async assertClassAccess(
@@ -267,6 +270,27 @@ export class AttendanceService {
           body,
         })),
       });
+
+      const late = entry.status === AttendanceStatus.late;
+      try {
+        await this.email?.notifyParents({
+          schoolId,
+          preference: late ? 'lateEnabled' : 'absenceEnabled',
+          category: late ? 'student_late' : 'student_absence',
+          templateId: late ? 'student_late' : 'student_absence',
+          messages: parentIds.map((parentId) => ({
+            parentId,
+            idempotencyKey: `attendance:${schoolId}:${student.id}:${dto.date}:${periodNumber}:${entry.status}:${parentId}`,
+            vars: {
+              childName: student.user.firstName,
+              dateLabel,
+              gradeSection,
+            },
+          })),
+        });
+      } catch {
+        // In-app attendance notice is already stored.
+      }
     }
 
     return { saved: dto.records.length, date: dto.date, periodNumber };
@@ -448,7 +472,7 @@ export class AttendanceService {
       rate,
       counts,
       total,
-      recent: records.slice(0, 30).map((r) => ({
+      recent: records.slice(0, 120).map((r) => ({
         id: r.id,
         date: r.date,
         status: r.status,

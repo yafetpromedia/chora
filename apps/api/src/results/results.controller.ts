@@ -39,6 +39,7 @@ import { SaveStudentSubjectMatrixDto } from './dto/save-student-subject-matrix.d
 import { CreateAssessmentDto } from './dto/create-assessment.dto';
 import { CreateClassSubjectDto } from './dto/create-class-subject.dto';
 import { CreateSubjectDto } from './dto/create-subject.dto';
+import { UpdateSubjectDto } from './dto/update-subject.dto';
 import { CreateTermDto } from './dto/create-term.dto';
 import { UpdateTermDto } from './dto/update-term.dto';
 import { UpdateClassSubjectDto } from './dto/update-class-subject.dto';
@@ -524,9 +525,15 @@ export class ResultsController {
   updateSubject(
     @CurrentUser() user: AuthUser,
     @Param('id') id: string,
-    @Body() dto: { name?: string },
+    @Body() dto: UpdateSubjectDto,
   ) {
     return this.academicsService.updateSubject(user.schoolId, id, dto);
+  }
+
+  @Delete('subjects/:id')
+  @Roles('admin')
+  deleteSubject(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.academicsService.deleteSubject(user.schoolId, id);
   }
 
   @Get('class-subjects')

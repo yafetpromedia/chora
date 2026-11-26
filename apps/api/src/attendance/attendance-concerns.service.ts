@@ -747,25 +747,32 @@ export class AttendanceConcernsService {
       },
       orderBy: { user: { firstName: 'asc' } },
     });
-    const records = await this.prisma.attendanceRecord.findMany({
-      where: {
-        schoolId,
-        date: day,
-        periodNumber: 0,
-        studentProfileId: { in: students.map((s) => s.id) },
-      },
-      select: { studentProfileId: true, status: true },
-    });
+    if (students.length === 0) {
+      return [];
+    }
+
+    const studentIds = students.map((s) => s.id);
+    const [records, leaveRows] = await Promise.all([
+      this.prisma.attendanceRecord.findMany({
+        where: {
+          schoolId,
+          date: day,
+          periodNumber: 0,
+          studentProfileId: { in: studentIds },
+        },
+        select: { studentProfileId: true, status: true },
+      }),
+      this.prisma.attendancePermissionRequest.findMany({
+        where: {
+          schoolId,
+          date: day,
+          studentProfileId: { in: studentIds },
+          status: AttendancePermissionStatus.APPROVED,
+        },
+        select: { studentProfileId: true, type: true },
+      }),
+    ]);
     const byId = new Map(records.map((r) => [r.studentProfileId, r.status]));
-    const leaveRows = await this.prisma.attendancePermissionRequest.findMany({
-      where: {
-        schoolId,
-        date: day,
-        studentProfileId: { in: students.map((s) => s.id) },
-        status: AttendancePermissionStatus.APPROVED,
-      },
-      select: { studentProfileId: true, type: true },
-    });
     const leaveByStudent = new Map<string, string[]>();
     for (const row of leaveRows) {
       const list = leaveByStudent.get(row.studentProfileId) ?? [];

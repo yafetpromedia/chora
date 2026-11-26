@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useLocale } from "@/components/i18n/locale-provider";
 import {
   listMyScoreUpdates,
   listTerms,
@@ -29,6 +30,7 @@ function ScoreIcon({ className }: { className?: string }) {
 }
 
 export function StudentResultsPanel() {
+  const { t } = useLocale();
   const [loading, setLoading] = useState(true);
   const [terms, setTerms] = useState<AcademicTerm[]>([]);
   const [termId, setTermId] = useState("");
@@ -40,12 +42,14 @@ export function StudentResultsPanel() {
     void listTerms()
       .then((available) => {
         setTerms(available);
-        const current = available.find((t) => t.isCurrent) ?? available[0];
+        const current = available.find((tex) => tex.isCurrent) ?? available[0];
         if (current) setTermId(current.id);
       })
-      .catch((err) => setScoresError(err instanceof Error ? err.message : "Load failed"))
+      .catch((err) =>
+        setScoresError(err instanceof Error ? err.message : t("resultsUi.loadFailed")),
+      )
       .finally(() => setLoading(false));
-  }, []);
+  }, [t]);
 
   const scoresKey = !loading && termId ? termId : "";
   const [prevScoresKey, setPrevScoresKey] = useState("");
@@ -63,12 +67,12 @@ export function StudentResultsPanel() {
       try {
         setScores(await listMyScoreUpdates(termId));
       } catch (err) {
-        setScoresError(err instanceof Error ? err.message : "Failed to load scores");
+        setScoresError(err instanceof Error ? err.message : t("resultsUi.loadScoresFailed"));
       } finally {
         setScoresLoading(false);
       }
     })();
-  }, [loading, termId]);
+  }, [loading, termId, t]);
 
   const groupedScores = useMemo(() => {
     const map = new Map<string, StudentScoreUpdate[]>();
@@ -84,38 +88,33 @@ export function StudentResultsPanel() {
   const scoreStats = useMemo(() => {
     if (scores.length === 0) return null;
     const avg =
-      Math.round(
-        (scores.reduce((sum, s) => sum + s.percentage, 0) / scores.length) * 10,
-      ) / 10;
+      Math.round((scores.reduce((sum, s) => sum + s.percentage, 0) / scores.length) * 10) / 10;
     const subjects = new Set(scores.map((s) => s.subject)).size;
     return { count: scores.length, avg, subjects };
   }, [scores]);
 
   return (
     <div className="stu-res">
-      <section className="stu-res__panel stu-res__panel--scores" aria-label="Score updates">
+      <section className="stu-res__panel stu-res__panel--scores" aria-label={t("resultsUi.scoresAria")}>
         <header className="stu-res__hero stu-res__hero--scores">
           <div>
-            <p className="stu-res__eyebrow">Live updates</p>
-            <h2 className="stu-res__hero-title">Your latest scores</h2>
-            <p className="stu-res__hero-sub">
-              Teachers release marks after each quiz, test, or assignment — often weekly or
-              monthly. Check back as new results are posted.
-            </p>
+            <p className="stu-res__eyebrow">{t("resultsUi.liveUpdates")}</p>
+            <h2 className="stu-res__hero-title">{t("resultsUi.latestScores")}</h2>
+            <p className="stu-res__hero-sub">{t("resultsUi.latestScoresSub")}</p>
           </div>
           {scoreStats ? (
             <div className="stu-res__hero-stats">
               <div className="stu-res__hero-stat">
                 <strong>{scoreStats.count}</strong>
-                <span>Released</span>
+                <span>{t("resultsUi.released")}</span>
               </div>
               <div className="stu-res__hero-stat">
                 <strong>{scoreStats.subjects}</strong>
-                <span>Subjects</span>
+                <span>{t("resultsUi.subjects")}</span>
               </div>
               <div className="stu-res__hero-stat">
                 <strong>{scoreStats.avg}%</strong>
-                <span>Average</span>
+                <span>{t("resultsUi.average")}</span>
               </div>
             </div>
           ) : null}
@@ -123,7 +122,7 @@ export function StudentResultsPanel() {
 
         <div className="stu-res__filter">
           <label className="stu-res__field">
-            <span>Term</span>
+            <span>{t("resultsUi.term")}</span>
             <select
               className="stu-res__select"
               value={termId}
@@ -131,7 +130,7 @@ export function StudentResultsPanel() {
               disabled={loading || terms.length === 0}
             >
               {terms.length === 0 ? (
-                <option value="">No terms</option>
+                <option value="">{t("resultsUi.noTerms")}</option>
               ) : (
                 terms.map((term) => (
                   <option key={term.id} value={term.id}>
@@ -148,16 +147,13 @@ export function StudentResultsPanel() {
         {scoresLoading || loading ? (
           <div className="stu-res__loading">
             <span className="stu-res__spinner" aria-hidden />
-            <p>Loading score updates…</p>
+            <p>{t("resultsUi.loadingScores")}</p>
           </div>
         ) : scores.length === 0 ? (
           <div className="stu-res__empty stu-res__empty--scores">
             <ScoreIcon className="stu-res__empty-icon" />
-            <h3>No score updates yet</h3>
-            <p>
-              When your teacher finishes marking and releases a test or assignment, it will
-              appear here — usually within days or weeks, not at term end.
-            </p>
+            <h3>{t("resultsUi.noScoreUpdates")}</h3>
+            <p>{t("resultsUi.noScoreUpdatesHint")}</p>
           </div>
         ) : (
           <div className="stu-res__score-groups">
@@ -165,7 +161,11 @@ export function StudentResultsPanel() {
               <article key={subject} className="stu-res__subject">
                 <header className="stu-res__subject-head">
                   <h3>{subject}</h3>
-                  <span>{rows.length} update{rows.length === 1 ? "" : "s"}</span>
+                  <span>
+                    {rows.length === 1
+                      ? t("resultsUi.updateOne")
+                      : t("resultsUi.updateMany", { count: rows.length })}
+                  </span>
                 </header>
                 <ul className="stu-res__timeline">
                   {rows.map((row) => (
@@ -182,8 +182,12 @@ export function StudentResultsPanel() {
                         <p className="stu-res__timeline-meta">
                           {row.classLabel} · {row.termName} ·{" "}
                           {row.published
-                            ? `Published ${formatReleasedDate(row.publishedAt ?? row.releasedAt)}`
-                            : `Updated ${formatReleasedDate(row.releasedAt)} · awaiting official publish`}
+                            ? t("resultsUi.publishedOn", {
+                                date: formatReleasedDate(row.publishedAt ?? row.releasedAt),
+                              })
+                            : t("resultsUi.updatedAwaiting", {
+                                date: formatReleasedDate(row.releasedAt),
+                              })}
                         </p>
                       </div>
                     </li>

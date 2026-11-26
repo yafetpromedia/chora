@@ -4,8 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AUTH_TOKEN_KEY } from "@/lib/auth";
 import { reportCardPrintUrl, type ReportCardPrintMode } from "@/lib/results";
+import { useLocale } from "@/components/i18n/locale-provider";
 
 export function ReportCardPrintInner() {
+  const { t } = useLocale();
   const searchParams = useSearchParams();
   const router = useRouter();
   const frameRef = useRef<HTMLIFrameElement>(null);
@@ -34,9 +36,7 @@ export function ReportCardPrintInner() {
         if (!cancelled) setHtml(text);
       } catch {
         if (!cancelled) {
-          setError(
-            "Report card is not available. Publish results for all class subjects first.",
-          );
+          setError(t("reportCardPrintUi.loadFailed"));
         }
       }
     })();
@@ -64,7 +64,7 @@ export function ReportCardPrintInner() {
           className="rc-print-btn"
           onClick={() => router.replace("/admin/report-cards")}
         >
-          Back to report cards
+          {t("reportCardPrintUi.backToCards")}
         </button>
       </div>
     );
@@ -73,7 +73,7 @@ export function ReportCardPrintInner() {
   if (!html) {
     return (
       <div className="rc-print-shell">
-        <p className="rc-print-loading">Preparing report card…</p>
+        <p className="rc-print-loading">{t("reportCardPrintUi.preparing")}</p>
       </div>
     );
   }
@@ -82,11 +82,11 @@ export function ReportCardPrintInner() {
     <div className="rc-print-wrap">
       <div className="rc-print-toolbar no-print">
         <p>
-          <strong>Student report card</strong>
+          <strong>{t("reportCardPrintUi.toolbarTitle")}</strong>
           {mode === "annual"
-            ? " — A4 landscape duplex (2 pages). Front: grading | cover. Back: student info & QR | results. Use short-edge flip for duplex."
-            : " — A4 landscape term card (front only). Each report is half a page so two term reports fit on one sheet."}{" "}
-          Print → Save as PDF.
+            ? t("reportCardPrintUi.modeAnnual")
+            : t("reportCardPrintUi.modeTerm")}{" "}
+          {t("reportCardPrintUi.printHint")}
         </p>
         <div className="rc-print-toolbar__actions">
           <button
@@ -94,20 +94,20 @@ export function ReportCardPrintInner() {
             className="rc-print-btn rc-print-btn--primary"
             onClick={onPrint}
           >
-            Print / Save PDF
+            {t("reportCardPrintUi.printSave")}
           </button>
           <button
             type="button"
             className="rc-print-btn"
             onClick={() => router.replace("/admin/report-cards")}
           >
-            Close
+            {t("common.close")}
           </button>
         </div>
       </div>
       <iframe
         ref={frameRef}
-        title="Report card"
+        title={t("reportCardPrintUi.frameTitle")}
         className="rc-print-frame"
         srcDoc={html}
       />

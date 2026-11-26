@@ -1,6 +1,7 @@
 import {
   ConflictException,
   Injectable,
+  Optional,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
@@ -8,6 +9,7 @@ import { ConfigService } from '@nestjs/config';
 import { hashSync, compare } from 'bcrypt';
 import { PlatformAuthUser } from '../common/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
+import { EmailService } from '../email/email.service';
 import { PlatformAccessService } from './platform-access.service';
 
 @Injectable()
@@ -17,6 +19,7 @@ export class PlatformAuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly platformAccess: PlatformAccessService,
+    @Optional() private readonly email?: EmailService,
   ) {}
 
   /**
@@ -158,6 +161,16 @@ export class PlatformAuthService {
       await this.prisma.platformUser.update({
         where: { id: row.id },
         data,
+      });
+    }
+
+    if (dto.newPassword) {
+      await this.email?.enqueueSafe({
+        to: row.email,
+        category: 'password_change',
+        templateId: 'password_change',
+        idempotencyKey: `platform-password:${row.id}:${Date.now()}`,
+        vars: { firstName: data.firstName ?? row.firstName },
       });
     }
 

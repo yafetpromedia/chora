@@ -1,33 +1,26 @@
 "use client";
 
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { useState } from "react";
-import { BRAND_NAME } from "@/lib/brand";
+import { useMemo, useState } from "react";
+import { useLocale } from "@/components/i18n/locale-provider";
 
-const FAQS = [
-  {
-    q: "How long does setup take?",
-    a: "Most schools create their tenant in one session, set grades and sections, then import students via CSV. Teachers and parents can be invited the same week.",
-  },
-  {
-    q: "Can we pay in Ethiopian birr?",
-    a: `Yes. Plans are listed in USD and ETB. When you are on a paid plan, ${BRAND_NAME} can invoice your school in the currency you choose.`,
-  },
-  {
-    q: "Do parents need to download an app?",
-    a: `They can use the ${BRAND_NAME} app on Google Play or the App Store, or sign in through the mobile-friendly web portal. Same school code and login either way.`,
-  },
-  {
-    q: "What happens when the trial ends?",
-    a: "You choose a school size, then keep the modules you need — including attendance, results, yearly report cards, and HR & payroll. Until then, every module stays available for 14 days, up to 50 students.",
-  },
-  {
-    q: "Is our data isolated from other schools?",
-    a: "Every school is a separate tenant in the database. Staff only see their school; platform operators use a separate admin console.",
-  },
-];
+const FAQ_KEYS = [
+  { q: "faq.q1", a: "faq.a1" },
+  { q: "faq.q2", a: "faq.a2" },
+  { q: "faq.q3", a: "faq.a3" },
+  { q: "faq.q4", a: "faq.a4" },
+  { q: "faq.q5", a: "faq.a5" },
+  { q: "faq.q6", a: "faq.a6" },
+  { q: "faq.q7", a: "faq.a7" },
+  { q: "faq.q8", a: "faq.a8" },
+] as const;
 
 export function Faq() {
+  const { t } = useLocale();
+  const faqs = useMemo(
+    () => FAQ_KEYS.map((item) => ({ q: t(item.q), a: t(item.a) })),
+    [t],
+  );
   const [open, setOpen] = useState<number | null>(0);
   const reduce = useReducedMotion();
 
@@ -35,14 +28,14 @@ export function Faq() {
     <section id="faq" className="lp3-section lp3-faq">
       <div className="lp3-faq__panel">
         <div className="lp3-section__head lp3-section__head--center">
-          <span className="lp3-eyebrow">FAQ</span>
-          <h2 className="lp3-heading">Questions school leaders ask</h2>
+          <span className="lp3-eyebrow">{t("faq.eyebrow")}</span>
+          <h2 className="lp3-heading">{t("faq.title")}</h2>
         </div>
         <div className="lp3-faq__list">
-        {FAQS.map((item, i) => {
+        {faqs.map((item, i) => {
           const isOpen = open === i;
           return (
-            <div key={item.q} className="lp3-faq__item">
+            <div key={FAQ_KEYS[i].q} className="lp3-faq__item">
               <button
                 type="button"
                 className="lp3-faq__trigger"

@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useLocale } from "@/components/i18n/locale-provider";
 import { EtbAmount } from "@/components/billing/etb-amount";
+import type { AppLocale } from "@/lib/i18n";
 import { AppConfirmDialog } from "@/components/ui/app-confirm-dialog";
 import { AppToast } from "@/components/ui/app-toast";
 import { hasPermission, Permission } from "@/lib/permissions";
@@ -22,27 +24,49 @@ import {
 
 type ConfirmKind = "calculate" | "approve" | "close" | "force-close" | null;
 
-function currentMonthDefaults() {
+function currentMonthDefaults(
+  locale: AppLocale,
+  monthLabel: (monthYear: string) => string,
+) {
   const now = new Date();
   const y = now.getUTCFullYear();
   const m = now.getUTCMonth();
   const start = new Date(Date.UTC(y, m, 1));
   const end = new Date(Date.UTC(y, m + 1, 0));
   const pay = new Date(Date.UTC(y, m + 1, 5));
-  const label = start.toLocaleString(undefined, {
+  const monthYear = start.toLocaleString(locale === "am" ? "am-ET" : "en-US", {
     month: "long",
     year: "numeric",
     timeZone: "UTC",
   });
   return {
-    label: `${label} Payroll`,
+    label: monthLabel(monthYear),
     startDate: start.toISOString().slice(0, 10),
     endDate: end.toISOString().slice(0, 10),
     payDate: pay.toISOString().slice(0, 10),
   };
 }
 
+const LIFECYCLE_STEPS = [
+  "Draft",
+  "Calculate",
+  "Approve",
+  "Pay",
+  "Close",
+] as const;
+
+const ADJ_TYPES = [
+  "BONUS",
+  "ALLOWANCE",
+  "PENALTY",
+  "ADVANCE_DEDUCTION",
+  "REIMBURSEMENT",
+  "CORRECTION",
+  "OTHER",
+] as const;
+
 export function PayrollWorkspace() {
+  const { t, tn, locale } = useLocale();
   const canCalc = hasPermission(Permission.PAYROLL_CALCULATE);
   const canApprove = hasPermission(Permission.PAYROLL_APPROVE);
   const canPay = hasPermission(Permission.PAYROLL_PAY);
@@ -50,7 +74,13 @@ export function PayrollWorkspace() {
   const canExport = hasPermission(Permission.PAYROLL_EXPORT);
   const canAdjust = hasPermission(Permission.PAYROLL_ADJUST);
 
-  const defaults = currentMonthDefaults();
+  const defaults = useMemo(
+    () =>
+      currentMonthDefaults(locale, (monthYear) =>
+        t("payrollUi.defaultPeriodLabel", { monthYear }),
+      ),
+    [locale, t],
+  );
   const [dashboard, setDashboard] = useState<Awaited<
     ReturnType<typeof getPayrollDashboard>
   > | null>(null);
@@ -85,7 +115,7 @@ export function PayrollWorkspace() {
       const runId = d.current?.runId ?? p[0]?.runs[0]?.id;
       if (runId) setRun(await getPayrollRun(runId));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load payroll");
+      setError(err instanceof Error ? err.message : t("payrollUi.loadFailed"));
     }
   }
 
@@ -105,11 +135,11 @@ export function PayrollWorkspace() {
         payDate,
       });
       const created = await createPayrollRun((period as { id: string }).id);
-      setToast("Payroll period & run created");
+      setToast(t("payrollUi.periodRunCreated"));
       setRun(await getPayrollRun(created.id));
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Create failed");
+      setError(err instanceof Error ? err.message : t("payrollUi.createFailed"));
     }
   }
 
@@ -119,26 +149,26 @@ export function PayrollWorkspace() {
     try {
       if (confirm === "calculate") {
         await calculatePayrollRun(run.id);
-        setToast("Payroll calculated");
+        setToast(t("payrollUi.calculated"));
       } else if (confirm === "approve") {
         await approvePayrollRun(run.id);
-        setToast("Payroll approved — editing locked");
+        setToast(t("payrollUi.approvedLocked"));
       } else if (confirm === "close") {
         await closePayrollRun(run.id);
-        setToast("Payroll closed");
+        setToast(t("payrollUi.closed"));
       } else if (confirm === "force-close") {
         await closePayrollRun(run.id, {
           force: true,
           reason: forceReason.trim(),
         });
-        setToast("Payroll force-closed");
+        setToast(t("payrollUi.forceClosed"));
       }
       setRun(await getPayrollRun(run.id));
       await load();
       setConfirm(null);
       setForceReason("");
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Action failed";
+      const msg = err instanceof Error ? err.message : t("payrollUi.actionFailed");
       if (confirm === "close" && /unpaid/i.test(msg)) {
         setConfirm("force-close");
         setError(msg);
@@ -158,51 +188,71 @@ export function PayrollWorkspace() {
       await recordPayrollPayment(paySnapId, {
         method: payMethod,
         reference: payRef.trim() || undefined,
-        notes: "Payment recorded in Chora (not a verified bank transfer)",
+        notes: t("payrollUi.paymentRecordedToast"),
       });
-      setToast(
-        "Payment recorded in Chora — this does not confirm an external bank transfer",
-      );
+      setToast(t("payrollUi.paymentRecordedToast"));
       setPaySnapId(null);
       setPayRef("");
       setRun(await getPayrollRun(run.id));
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Payment failed");
+      setError(err instanceof Error ? err.message : t("payrollUi.paymentFailed"));
     } finally {
       setBusy(false);
     }
   }
 
-  const confirmCopy: Record<
-    Exclude<ConfirmKind, null>,
-    { title: string; message: string; tone: "default" | "warning" | "danger" }
-  > = {
-    calculate: {
-      title: "Calculate payroll?",
-      message:
-        "This will generate or replace employee snapshots, lines, and payslips for the open run. Recalculation is allowed until the run is approved.",
-      tone: "default",
-    },
-    approve: {
-      title: "Approve payroll?",
-      message:
-        "Approval locks this run from normal recalculation and adjustments. Payments can then be recorded.",
-      tone: "warning",
-    },
-    close: {
-      title: "Close payroll?",
-      message:
-        "Closing locks the run permanently. All required employee payments should already be recorded as paid.",
-      tone: "danger",
-    },
-    "force-close": {
-      title: "Force-close with unpaid employees?",
-      message:
-        "Some payments are still unpaid. Force-close requires a reason and is audited. Prefer recording payments first.",
-      tone: "danger",
-    },
-  };
+  const confirmCopy = useMemo(
+    (): Record<
+      Exclude<ConfirmKind, null>,
+      { title: string; message: string; tone: "default" | "warning" | "danger" }
+    > => ({
+      calculate: {
+        title: t("payrollUi.confirmCalculateTitle"),
+        message: t("payrollUi.confirmCalculateMessage"),
+        tone: "default",
+      },
+      approve: {
+        title: t("payrollUi.confirmApproveTitle"),
+        message: t("payrollUi.confirmApproveMessage"),
+        tone: "warning",
+      },
+      close: {
+        title: t("payrollUi.confirmCloseTitle"),
+        message: t("payrollUi.confirmCloseMessage"),
+        tone: "danger",
+      },
+      "force-close": {
+        title: t("payrollUi.confirmForceCloseTitle"),
+        message: t("payrollUi.confirmForceCloseMessage"),
+        tone: "danger",
+      },
+    }),
+    [t],
+  );
+
+  function runStatusLabel(status: string) {
+    const key = `payrollUi.runStatus_${status.toUpperCase()}`;
+    const translated = t(key);
+    return translated === key ? status : translated;
+  }
+
+  function paymentStatusLabel(status: string) {
+    const key = `payrollUi.payment_${status.toUpperCase()}`;
+    const translated = t(key);
+    return translated === key ? status : translated;
+  }
+
+  function lifecycleStepLabel(step: (typeof LIFECYCLE_STEPS)[number]) {
+    const map = {
+      Draft: "payrollUi.stepDraft",
+      Calculate: "payrollUi.stepCalculate",
+      Approve: "payrollUi.stepApprove",
+      Pay: "payrollUi.stepPay",
+      Close: "payrollUi.stepClose",
+    } as const;
+    return t(map[step]);
+  }
 
   return (
     <div className="hr-page">
@@ -219,7 +269,7 @@ export function PayrollWorkspace() {
           confirm && confirm !== "force-close" ? confirmCopy[confirm].tone : "default"
         }
         busy={busy}
-        confirmLabel="Continue"
+        confirmLabel={t("payrollUi.continue")}
         onCancel={() => setConfirm(null)}
         onConfirm={() => void runConfirmedAction()}
       />
@@ -236,7 +286,7 @@ export function PayrollWorkspace() {
             <h3>{confirmCopy["force-close"].title}</h3>
             <p>{confirmCopy["force-close"].message}</p>
             <label className="sa-field sa-field--full">
-              <span>Reason (required)</span>
+              <span>{t("payrollUi.reasonRequired")}</span>
               <textarea
                 value={forceReason}
                 onChange={(e) => setForceReason(e.target.value)}
@@ -253,14 +303,14 @@ export function PayrollWorkspace() {
                   setForceReason("");
                 }}
               >
-                Cancel
+                {t("common.cancel")}
               </button>
               <button
                 type="submit"
                 className="sa-btn sa-btn--primary"
                 disabled={busy || !forceReason.trim()}
               >
-                Force close
+                {t("payrollUi.forceClose")}
               </button>
             </div>
           </form>
@@ -270,28 +320,27 @@ export function PayrollWorkspace() {
       {paySnapId ? (
         <div className="hr-modal" role="dialog" aria-modal="true">
           <form className="hr-modal__panel" onSubmit={(e) => void submitPayment(e)}>
-            <h3>Record payment in Chora</h3>
-            <p className="sa-hours-note">
-              This records payment status in Chora. It does not confirm that money
-              was transferred by a bank or payment provider.
-            </p>
+            <h3>{t("payrollUi.recordPaymentTitle")}</h3>
+            <p className="sa-hours-note">{t("payrollUi.recordPaymentNote")}</p>
             <label className="sa-field">
-              <span>Method</span>
+              <span>{t("payrollUi.method")}</span>
               <select
                 value={payMethod}
                 onChange={(e) => setPayMethod(e.target.value)}
               >
-                <option value="BANK_TRANSFER">Bank transfer</option>
-                <option value="CASH">Cash</option>
-                <option value="OTHER">Other</option>
+                <option value="BANK_TRANSFER">
+                  {t("payrollUi.method_BANK_TRANSFER")}
+                </option>
+                <option value="CASH">{t("payrollUi.method_CASH")}</option>
+                <option value="OTHER">{t("payrollUi.method_OTHER")}</option>
               </select>
             </label>
             <label className="sa-field sa-field--full">
-              <span>Reference (optional)</span>
+              <span>{t("payrollUi.referenceOptional")}</span>
               <input
                 value={payRef}
                 onChange={(e) => setPayRef(e.target.value)}
-                placeholder="Cheque / transfer ref"
+                placeholder={t("payrollUi.referencePlaceholder")}
               />
             </label>
             <div className="hr-modal__actions">
@@ -300,10 +349,10 @@ export function PayrollWorkspace() {
                 className="sa-btn sa-btn--ghost"
                 onClick={() => setPaySnapId(null)}
               >
-                Cancel
+                {t("common.cancel")}
               </button>
               <button type="submit" className="sa-btn sa-btn--primary" disabled={busy}>
-                Record payment
+                {t("payrollUi.recordPayment")}
               </button>
             </div>
           </form>
@@ -314,13 +363,12 @@ export function PayrollWorkspace() {
         <div className="tch-v2__hero-glow" aria-hidden />
         <div className="tch-v2__hero-inner">
           <div className="tch-v2__hero-main">
-            <span className="tch-v2__chip">Compensation &amp; payroll</span>
-            <h2 className="tch-v2__hero-title">Payroll runs</h2>
+            <span className="tch-v2__chip">{t("payrollUi.chip")}</span>
+            <h2 className="tch-v2__hero-title">{t("payrollUi.title")}</h2>
             <p className="tch-v2__hero-sub">
-              Create a period, calculate snapshots, approve, record payments,
-              then close. Open{" "}
+              {t("payrollUi.heroSubPrefix")}{" "}
               <Link href="/admin/hr/employees" className="tch-v2__hero-link">
-                Employees
+                {tn("Employees")}
               </Link>
               {hasPermission(Permission.PAYROLL_SETTINGS) ? (
                 <>
@@ -329,7 +377,7 @@ export function PayrollWorkspace() {
                     href="/admin/payroll/settings"
                     className="tch-v2__hero-link"
                   >
-                    Settings
+                    {tn("Settings")}
                   </Link>
                 </>
               ) : null}
@@ -339,15 +387,17 @@ export function PayrollWorkspace() {
           <div className="tch-v2__hero-stats">
             <div className="tch-v2__stat">
               <strong>{dashboard?.totals.employees ?? 0}</strong>
-              <span>Employees</span>
+              <span>{t("payrollUi.statEmployees")}</span>
             </div>
             <div className="tch-v2__stat">
               <strong>{periods.length}</strong>
-              <span>Periods</span>
+              <span>{t("payrollUi.statPeriods")}</span>
             </div>
             <div className="tch-v2__stat">
-              <strong>{run?.status ?? "—"}</strong>
-              <span>Run status</span>
+              <strong>
+                {run?.status ? runStatusLabel(run.status) : "—"}
+              </strong>
+              <span>{t("payrollUi.statRunStatus")}</span>
             </div>
             <div className="tch-v2__stat tch-v2__stat--accent">
               <strong>
@@ -357,7 +407,7 @@ export function PayrollWorkspace() {
                   "—"
                 )}
               </strong>
-              <span>Net</span>
+              <span>{t("payrollUi.statNet")}</span>
             </div>
           </div>
         </div>
@@ -365,21 +415,12 @@ export function PayrollWorkspace() {
 
       <div className="hr-banner">
         <p>
-          <strong>Payment recorded in Chora</strong> updates status here — it does
-          not confirm a bank transfer unless a payment integration is connected.
+          <strong>{t("payrollUi.bannerStrong")}</strong> {t("payrollUi.bannerBody")}
         </p>
       </div>
 
-      <ul className="hr-steps" aria-label="Payroll lifecycle">
-        {(
-          [
-            "Draft",
-            "Calculate",
-            "Approve",
-            "Pay",
-            "Close",
-          ] as const
-        ).map((step) => {
+      <ul className="hr-steps" aria-label={t("payrollUi.lifecycleAria")}>
+        {LIFECYCLE_STEPS.map((step) => {
           const status = (run?.status ?? "").toUpperCase();
           const on =
             (step === "Draft" && (!run || status === "DRAFT")) ||
@@ -390,7 +431,7 @@ export function PayrollWorkspace() {
             (step === "Close" && status === "CLOSED");
           return (
             <li key={step} className={`hr-step${on ? " hr-step--on" : ""}`}>
-              {step}
+              {lifecycleStepLabel(step)}
             </li>
           );
         })}
@@ -399,22 +440,18 @@ export function PayrollWorkspace() {
       <div className="sa-stats">
         {(
           [
-            ["Employees", dashboard?.totals.employees ?? 0, "present"],
-            ["Gross", dashboard?.totals.grossCents ?? 0, "present"],
-            ["Deductions", dashboard?.totals.deductionCents ?? 0, "absent"],
-            ["Net", dashboard?.totals.netCents ?? 0, "present"],
-            ["Paid", dashboard?.totals.paidCents ?? 0, "leave"],
-            ["Unpaid", dashboard?.totals.unpaidCents ?? 0, "late"],
+            [t("payrollUi.statEmployees"), dashboard?.totals.employees ?? 0, "present", true],
+            [t("payrollUi.statGross"), dashboard?.totals.grossCents ?? 0, "present", false],
+            [t("payrollUi.statDeductions"), dashboard?.totals.deductionCents ?? 0, "absent", false],
+            [t("payrollUi.statNet"), dashboard?.totals.netCents ?? 0, "present", false],
+            [t("payrollUi.statPaid"), dashboard?.totals.paidCents ?? 0, "leave", false],
+            [t("payrollUi.statUnpaid"), dashboard?.totals.unpaidCents ?? 0, "late", false],
           ] as const
-        ).map(([labelText, value, tone]) => (
+        ).map(([labelText, value, tone, isCount]) => (
           <div key={labelText} className={`sa-stat sa-stat--${tone}`}>
             <span className="sa-stat__label">{labelText}</span>
             <strong className="sa-stat__value">
-              {labelText === "Employees" ? (
-                value
-              ) : (
-                <EtbAmount cents={Number(value)} />
-              )}
+              {isCount ? value : <EtbAmount cents={Number(value)} />}
             </strong>
           </div>
         ))}
@@ -424,19 +461,17 @@ export function PayrollWorkspace() {
         <section className="hr-panel">
           <div className="hr-panel__head">
             <div>
-              <h3 className="hr-panel__title">New payroll period</h3>
-              <p className="hr-panel__hint">
-                Defines the attendance window and pay date for the next run.
-              </p>
+              <h3 className="hr-panel__title">{t("payrollUi.newPeriodTitle")}</h3>
+              <p className="hr-panel__hint">{t("payrollUi.newPeriodHint")}</p>
             </div>
           </div>
           <form className="hr-form" onSubmit={(e) => void onCreatePeriod(e)}>
             <label className="sa-field sa-field--full">
-              <span>Label</span>
+              <span>{t("payrollUi.label")}</span>
               <input value={label} onChange={(e) => setLabel(e.target.value)} />
             </label>
             <label className="sa-field">
-              <span>Start</span>
+              <span>{t("payrollUi.start")}</span>
               <input
                 type="date"
                 value={startDate}
@@ -444,7 +479,7 @@ export function PayrollWorkspace() {
               />
             </label>
             <label className="sa-field">
-              <span>End</span>
+              <span>{t("payrollUi.end")}</span>
               <input
                 type="date"
                 value={endDate}
@@ -452,7 +487,7 @@ export function PayrollWorkspace() {
               />
             </label>
             <label className="sa-field">
-              <span>Pay date</span>
+              <span>{t("payrollUi.payDate")}</span>
               <input
                 type="date"
                 value={payDate}
@@ -461,7 +496,7 @@ export function PayrollWorkspace() {
             </label>
             <div className="hr-form__actions">
               <button type="submit" className="sa-btn sa-btn--primary">
-                Create period + run
+                {t("payrollUi.createPeriodRun")}
               </button>
             </div>
           </form>
@@ -471,22 +506,20 @@ export function PayrollWorkspace() {
       <section className="hr-panel">
         <div className="hr-panel__head">
           <div>
-            <h3 className="hr-panel__title">Open run</h3>
-            <p className="hr-panel__hint">
-              Select a run, then calculate, approve, pay, or export.
-            </p>
+            <h3 className="hr-panel__title">{t("payrollUi.openRunTitle")}</h3>
+            <p className="hr-panel__hint">{t("payrollUi.openRunHint")}</p>
           </div>
           {run ? (
             <span
               className={`hr-status hr-status--${run.status.toLowerCase()}`}
             >
-              {run.status}
+              {runStatusLabel(run.status)}
             </span>
           ) : null}
         </div>
         <div className="hr-toolbar">
           <label className="sa-field">
-            <span>Payroll run</span>
+            <span>{t("payrollUi.payrollRun")}</span>
             <select
               value={run?.id ?? ""}
               onChange={(e) => {
@@ -495,11 +528,11 @@ export function PayrollWorkspace() {
                 void getPayrollRun(id).then(setRun);
               }}
             >
-              <option value="">Select a run…</option>
+              <option value="">{t("payrollUi.selectRun")}</option>
               {periods.flatMap((p) =>
                 p.runs.map((r) => (
                   <option key={r.id} value={r.id}>
-                    {p.label} · {r.status}
+                    {p.label} · {runStatusLabel(r.status)}
                   </option>
                 )),
               )}
@@ -511,7 +544,7 @@ export function PayrollWorkspace() {
               className="sa-btn sa-btn--primary"
               onClick={() => setConfirm("calculate")}
             >
-              Calculate
+              {t("payrollUi.calculate")}
             </button>
           ) : null}
           {run && canApprove ? (
@@ -520,7 +553,7 @@ export function PayrollWorkspace() {
               className="sa-btn sa-btn--ghost"
               onClick={() => setConfirm("approve")}
             >
-              Approve
+              {t("payrollUi.approve")}
             </button>
           ) : null}
           {run && canClose ? (
@@ -529,7 +562,7 @@ export function PayrollWorkspace() {
               className="sa-btn sa-btn--ghost"
               onClick={() => setConfirm("close")}
             >
-              Close
+              {t("payrollUi.close")}
             </button>
           ) : null}
           {run && canExport ? (
@@ -538,15 +571,15 @@ export function PayrollWorkspace() {
               className="sa-btn sa-btn--ghost"
               onClick={() =>
                 void downloadPayrollExport(run.id)
-                  .then(() => setToast("Exported"))
+                  .then(() => setToast(t("payrollUi.exported")))
                   .catch((err) =>
                     setError(
-                      err instanceof Error ? err.message : "Export failed",
+                      err instanceof Error ? err.message : t("payrollUi.exportFailed"),
                     ),
                   )
               }
             >
-              Export CSV
+              {t("payrollUi.exportCsv")}
             </button>
           ) : null}
         </div>
@@ -556,10 +589,8 @@ export function PayrollWorkspace() {
         <section className="hr-panel">
           <div className="hr-panel__head">
             <div>
-              <h3 className="hr-panel__title">Manual adjustment</h3>
-              <p className="hr-panel__hint">
-                Reason required. Recalculate the run to apply the line on payslips.
-              </p>
+              <h3 className="hr-panel__title">{t("payrollUi.adjustmentTitle")}</h3>
+              <p className="hr-panel__hint">{t("payrollUi.adjustmentHint")}</p>
             </div>
           </div>
           <form
@@ -573,23 +604,23 @@ export function PayrollWorkspace() {
                 reason: adjReason,
               })
                 .then(async () => {
-                  setToast("Adjustment saved — recalculate to apply");
+                  setToast(t("payrollUi.adjustmentSaved"));
                   setAdjReason("");
                   setAdjAmount("");
                 })
                 .catch((err) =>
-                  setError(err instanceof Error ? err.message : "Adjust failed"),
+                  setError(err instanceof Error ? err.message : t("payrollUi.adjustFailed")),
                 );
             }}
           >
             <label className="sa-field">
-              <span>Employee</span>
+              <span>{t("payrollUi.employee")}</span>
               <select
                 value={adjUserId}
                 onChange={(e) => setAdjUserId(e.target.value)}
                 required
               >
-                <option value="">Select employee…</option>
+                <option value="">{t("payrollUi.selectEmployee")}</option>
                 {run.snapshots.map((s) => (
                   <option key={s.id} value={s.userId}>
                     {s.employeeName} ({s.employeeCode})
@@ -598,19 +629,17 @@ export function PayrollWorkspace() {
               </select>
             </label>
             <label className="sa-field">
-              <span>Type</span>
+              <span>{t("payrollUi.type")}</span>
               <select value={adjType} onChange={(e) => setAdjType(e.target.value)}>
-                <option value="BONUS">Bonus</option>
-                <option value="ALLOWANCE">Allowance</option>
-                <option value="PENALTY">Penalty</option>
-                <option value="ADVANCE_DEDUCTION">Advance deduction</option>
-                <option value="REIMBURSEMENT">Reimbursement</option>
-                <option value="CORRECTION">Correction</option>
-                <option value="OTHER">Other</option>
+                {ADJ_TYPES.map((typeCode) => (
+                  <option key={typeCode} value={typeCode}>
+                    {t(`payrollUi.adj_${typeCode}`)}
+                  </option>
+                ))}
               </select>
             </label>
             <label className="sa-field">
-              <span>Amount (ETB)</span>
+              <span>{t("payrollUi.amountEtb")}</span>
               <input
                 value={adjAmount}
                 onChange={(e) => setAdjAmount(e.target.value)}
@@ -619,7 +648,7 @@ export function PayrollWorkspace() {
               />
             </label>
             <label className="sa-field sa-field--full">
-              <span>Reason</span>
+              <span>{t("payrollUi.reason")}</span>
               <input
                 value={adjReason}
                 onChange={(e) => setAdjReason(e.target.value)}
@@ -628,7 +657,7 @@ export function PayrollWorkspace() {
             </label>
             <div className="hr-form__actions">
               <button type="submit" className="sa-btn sa-btn--primary">
-                Add adjustment
+                {t("payrollUi.addAdjustment")}
               </button>
             </div>
           </form>
@@ -640,9 +669,7 @@ export function PayrollWorkspace() {
           <div className="hr-panel__head">
             <div>
               <h3 className="hr-panel__title">{run.period.label}</h3>
-              <p className="hr-panel__hint">
-                Statutory tax inactive · review amounts before approving
-              </p>
+              <p className="hr-panel__hint">{t("payrollUi.periodReviewHint")}</p>
             </div>
           </div>
           {run.snapshots.length ? (
@@ -650,12 +677,12 @@ export function PayrollWorkspace() {
               <table className="sa-table">
                 <thead>
                   <tr>
-                    <th>Employee</th>
-                    <th>Dept</th>
-                    <th>Gross</th>
-                    <th>Deductions</th>
-                    <th>Net</th>
-                    <th>Payment</th>
+                    <th>{t("payrollUi.employee")}</th>
+                    <th>{t("payrollUi.colDept")}</th>
+                    <th>{t("payrollUi.colGross")}</th>
+                    <th>{t("payrollUi.colDeductions")}</th>
+                    <th>{t("payrollUi.colNet")}</th>
+                    <th>{t("payrollUi.colPayment")}</th>
                     <th />
                   </tr>
                 </thead>
@@ -682,7 +709,7 @@ export function PayrollWorkspace() {
                         <span
                           className={`hr-status hr-status--${(s.payment?.status ?? "UNPAID").toLowerCase()}`}
                         >
-                          {s.payment?.status ?? "UNPAID"}
+                          {paymentStatusLabel(s.payment?.status ?? "UNPAID")}
                         </span>
                       </td>
                       <td className="sa-actions">
@@ -691,7 +718,7 @@ export function PayrollWorkspace() {
                             className="sa-link"
                             href={`/admin/payroll/payslips/${s.payslip.id}`}
                           >
-                            Payslip
+                            {t("payrollUi.payslip")}
                           </Link>
                         ) : null}
                         {canPay && s.payment?.status !== "PAID" ? (
@@ -700,7 +727,7 @@ export function PayrollWorkspace() {
                             className="sa-link"
                             onClick={() => setPaySnapId(s.id)}
                           >
-                            Record payment
+                            {t("payrollUi.recordPayment")}
                           </button>
                         ) : null}
                       </td>
@@ -711,21 +738,15 @@ export function PayrollWorkspace() {
             </div>
           ) : (
             <div className="hr-empty">
-              <p className="hr-empty__title">No employee snapshots yet</p>
-              <p className="hr-empty__sub">
-                Assign compensation packages on employee profiles, then run
-                Calculate to build this period’s payroll.
-              </p>
+              <p className="hr-empty__title">{t("payrollUi.noSnapshotsTitle")}</p>
+              <p className="hr-empty__sub">{t("payrollUi.noSnapshotsSub")}</p>
             </div>
           )}
         </section>
       ) : (
         <div className="hr-empty">
-          <p className="hr-empty__title">Create a payroll period to begin</p>
-          <p className="hr-empty__sub">
-            Start with a labeled period and pay date. You’ll calculate, review,
-            approve, and record payments from this workspace.
-          </p>
+          <p className="hr-empty__title">{t("payrollUi.emptyTitle")}</p>
+          <p className="hr-empty__sub">{t("payrollUi.emptySub")}</p>
         </div>
       )}
     </div>

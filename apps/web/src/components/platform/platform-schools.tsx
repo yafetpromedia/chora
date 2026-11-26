@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { DashIcon } from "@/components/dashboard/dash-icons";
+import { useLocale } from "@/components/i18n/locale-provider";
 import type { PlatformUser } from "@/lib/platform-auth";
 import { hasPlatformPermission } from "@/lib/platform-access";
 import { CreateSchoolDrawer } from "./create-school-drawer";
@@ -37,9 +38,20 @@ function canDeleteTenant(user: PlatformUser | null) {
   return hasPlatformPermission(user, "platform.schools.delete");
 }
 
-function planLabel(plan: string | undefined) {
+function planDisplay(plan: string | undefined, t: (key: string) => string) {
   if (!plan) return "—";
-  return plan.charAt(0) + plan.slice(1).toLowerCase();
+  if (plan === "TRIAL") return t("platformUi.planTrial");
+  if (plan === "STARTER") return t("platformUi.planStarter");
+  if (plan === "PROFESSIONAL") return t("platformUi.planProfessional");
+  if (plan === "ENTERPRISE") return t("platformUi.planEnterprise");
+  return plan;
+}
+
+function tenantStatusLabel(status: string, t: (key: string) => string) {
+  if (status === "ACTIVE") return t("platformUi.statusActive");
+  if (status === "TRIAL") return t("platformUi.statusTrial");
+  if (status === "SUSPENDED") return t("platformUi.statusSuspended");
+  return status;
 }
 
 export function PlatformSchools({
@@ -49,6 +61,7 @@ export function PlatformSchools({
   onStatusChange,
   onDelete,
 }: Props) {
+  const { t } = useLocale();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<StatusFilter>("ALL");
   const [selectedRow, setSelected] = useState<PlatformSchoolRow | null>(null);
@@ -81,10 +94,10 @@ export function PlatformSchools({
   );
 
   const filters: { id: StatusFilter; label: string; count: number }[] = [
-    { id: "ALL", label: "All", count: counts.all },
-    { id: "ACTIVE", label: "Active", count: counts.active },
-    { id: "TRIAL", label: "Trial", count: counts.trial },
-    { id: "SUSPENDED", label: "Suspended", count: counts.suspended },
+    { id: "ALL", label: t("platformUi.filterAll"), count: counts.all },
+    { id: "ACTIVE", label: t("platformUi.statusActive"), count: counts.active },
+    { id: "TRIAL", label: t("platformUi.statusTrial"), count: counts.trial },
+    { id: "SUSPENDED", label: t("platformUi.statusSuspended"), count: counts.suspended },
   ];
 
   return (
@@ -95,26 +108,23 @@ export function PlatformSchools({
             <DashIcon name="students" className="dash-icon--md" />
           </span>
           <div>
-            <p className="plat-subjects-v2__eyebrow">Tenant operations</p>
-            <h2 className="plat-subjects-v2__title">Tenant directory</h2>
-            <p className="plat-subjects-v2__sub">
-              Create workspaces, inspect usage, suspend access, or permanently
-              remove tenants.
-            </p>
+            <p className="plat-subjects-v2__eyebrow">{t("platformUi.schoolsEyebrow")}</p>
+            <h2 className="plat-subjects-v2__title">{t("platformUi.schoolsTitle")}</h2>
+            <p className="plat-subjects-v2__sub">{t("platformUi.schoolsSub")}</p>
           </div>
         </div>
         <div className="plat-subjects-v2__hero-stats">
           <div className="plat-subjects-v2__stat">
             <strong>{counts.all}</strong>
-            <span>Tenants</span>
+            <span>{t("platformUi.statTenants")}</span>
           </div>
           <div className="plat-subjects-v2__stat">
             <strong>{counts.active}</strong>
-            <span>Active</span>
+            <span>{t("platformUi.statActive")}</span>
           </div>
           <div className="plat-subjects-v2__stat">
             <strong>{counts.trial}</strong>
-            <span>Trial</span>
+            <span>{t("platformUi.statTrial")}</span>
           </div>
         </div>
       </header>
@@ -124,10 +134,10 @@ export function PlatformSchools({
           <DashIcon name="students" className="dash-icon--sm" />
           <input
             type="search"
-            placeholder="Search by name, code, or plan…"
+            placeholder={t("platformUi.schoolsSearchPh")}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            aria-label="Search tenants"
+            aria-label={t("platformUi.schoolsSearchAria")}
           />
         </div>
         {canCreateTenant(user) ? (
@@ -137,12 +147,12 @@ export function PlatformSchools({
             onClick={() => setCreateOpen(true)}
           >
             <DashIcon name="plus" className="dash-icon--sm" />
-            New tenant
+            {t("platformUi.schoolsNewTenant")}
           </button>
         ) : null}
       </div>
 
-      <div className="plat-tenants-v2__filters" role="tablist" aria-label="Filter by status">
+      <div className="plat-tenants-v2__filters" role="tablist" aria-label={t("platformUi.schoolsFilterAria")}>
         {filters.map((f) => (
           <button
             key={f.id}
@@ -160,14 +170,14 @@ export function PlatformSchools({
 
       {filtered.length === 0 ? (
         <div className="plat-tenants-v2__empty">
-          <p>No tenants match your filters.</p>
+          <p>{t("platformUi.schoolsEmpty")}</p>
           {canCreateTenant(user) ? (
             <button
               type="button"
               className="plat-btn plat-btn--primary plat-btn--sm"
               onClick={() => setCreateOpen(true)}
             >
-              Create tenant
+              {t("platformUi.schoolsCreateTenant")}
             </button>
           ) : null}
         </div>
@@ -186,33 +196,33 @@ export function PlatformSchools({
                 <div className="plat-tenants-v2__meta">
                   <span>
                     <DashIcon name="students" className="dash-icon--xs" />
-                    {tenant.usage.students} students
+                    {t("platformUi.studentsCount", { count: tenant.usage.students })}
                   </span>
                   <span>
                     <DashIcon name="teachers" className="dash-icon--xs" />
-                    {tenant.usage.teachers} teachers
+                    {t("platformUi.teachersCount", { count: tenant.usage.teachers })}
                   </span>
                   <span>
                     <DashIcon name="users" className="dash-icon--xs" />
-                    {tenant.usage.parents} parents
+                    {t("platformUi.parentsCount", { count: tenant.usage.parents })}
                   </span>
                 </div>
               </div>
               <div className="plat-tenants-v2__aside">
                 <span className="plat-tenants-v2__plan">
-                  {planLabel(tenant.subscription?.plan)}
+                  {planDisplay(tenant.subscription?.plan, t)}
                 </span>
                 <span
                   className={`plat-tenants-v2__status plat-tenants-v2__status--${tenant.status.toLowerCase()}`}
                 >
-                  {tenant.status}
+                  {tenantStatusLabel(tenant.status, t)}
                 </span>
                 <button
                   type="button"
                   className="plat-tenants-v2__manage"
                   onClick={() => setSelected(tenant)}
                 >
-                  Manage
+                  {t("platformUi.schoolsManage")}
                   <DashIcon name="chevron" className="dash-icon--xs" />
                 </button>
               </div>

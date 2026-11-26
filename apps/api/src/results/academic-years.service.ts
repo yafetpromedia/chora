@@ -41,6 +41,7 @@ export class AcademicYearsService {
         name: dto.name.trim(),
         startDate: new Date(dto.startDate),
         endDate: new Date(dto.endDate),
+        calendarSystem: dto.calendarSystem ?? 'ETHIOPIAN',
         isCurrent: dto.isCurrent ?? false,
       },
     });

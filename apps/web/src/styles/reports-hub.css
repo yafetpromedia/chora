@@ -1,0 +1,420 @@
+/* Reports hub — modern export workspace */
+
+.rpt-hub {
+  display: flex;
+  flex-direction: column;
+  gap: 1.15rem;
+}
+
+.rpt-hub__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.85rem 1.1rem;
+  padding: 1rem 1.15rem;
+  border-radius: 1.15rem;
+  border: 1px solid var(--brand-border, #c5e4e4);
+  background:
+    linear-gradient(180deg, rgba(240, 250, 249, 0.9), #fff 62%),
+    #fff;
+  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.03);
+  animation: rpt-hub-rise 0.45s ease both;
+}
+
+.rpt-hub__toolbar-copy {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+.rpt-hub__toolbar-kicker {
+  margin: 0;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--brand-teal-dark, #0f766e);
+}
+
+.rpt-hub__toolbar-title {
+  margin: 0.2rem 0 0;
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--lite-black, #0f172a);
+}
+
+.rpt-hub__toolbar-hint {
+  margin: 0.2rem 0 0;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: var(--brand-muted, #5f8f8f);
+}
+
+.rpt-hub__toolbar-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(8.5rem, 11rem));
+  gap: 0.65rem;
+}
+
+.rpt-hub__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+.rpt-hub__field span {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--brand-muted, #64748b);
+}
+
+.rpt-hub__field input,
+.rpt-hub__field select {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  min-height: 2.4rem;
+  padding: 0.45rem 0.7rem;
+  border: 1px solid var(--brand-border, #c5e4e4);
+  border-radius: 0.75rem;
+  background: #fff;
+  font: inherit;
+  font-size: 0.88rem;
+  color: var(--lite-black, #0f172a);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.rpt-hub__field input:focus,
+.rpt-hub__field select:focus {
+  outline: none;
+  border-color: rgba(15, 118, 110, 0.45);
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.12);
+}
+
+.rpt-hub__presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  width: 100%;
+}
+
+.rpt-hub__preset {
+  appearance: none;
+  border: 1px solid var(--brand-border, #c5e4e4);
+  background: var(--brand-surface, #edf8f8);
+  color: var(--brand-ink, #1e4a4a);
+  border-radius: 999px;
+  padding: 0.35rem 0.75rem;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.rpt-hub__preset:hover {
+  border-color: rgba(15, 118, 110, 0.35);
+  background: #dff3f1;
+}
+
+.rpt-hub__preset.is-active {
+  background: #0f766e;
+  border-color: #0f766e;
+  color: #fff;
+}
+
+.rpt-hub__section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  animation: rpt-hub-rise 0.5s ease both;
+}
+
+.rpt-hub__section:nth-of-type(2) {
+  animation-delay: 0.05s;
+}
+
+.rpt-hub__section:nth-of-type(3) {
+  animation-delay: 0.1s;
+}
+
+.rpt-hub__section:nth-of-type(4) {
+  animation-delay: 0.15s;
+}
+
+.rpt-hub__section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.35rem 1rem;
+  padding: 0 0.15rem;
+}
+
+.rpt-hub__section-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--lite-black, #0f172a);
+}
+
+.rpt-hub__section-sub {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--brand-muted, #5f8f8f);
+}
+
+.rpt-hub__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 19rem), 1fr));
+  gap: 0.9rem;
+  align-items: stretch;
+}
+
+.rpt-hub__card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.95rem;
+  min-width: 0;
+  padding: 1.15rem 1.2rem;
+  border: 1px solid var(--brand-border, #c5e4e4);
+  border-radius: 1.15rem;
+  background: #fff;
+  overflow: hidden;
+  transition:
+    transform 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.rpt-hub__card::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: linear-gradient(180deg, #14b8a6, #0f766e);
+  opacity: 0.55;
+}
+
+.rpt-hub__card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(15, 118, 110, 0.28);
+  box-shadow: 0 10px 28px rgba(15, 118, 110, 0.08);
+}
+
+.rpt-hub__card--link::before {
+  background: linear-gradient(180deg, #334155, #0f172a);
+}
+
+.rpt-hub__card-head {
+  display: flex;
+  gap: 0.8rem;
+  align-items: flex-start;
+}
+
+.rpt-hub__card-icon {
+  display: grid;
+  place-items: center;
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 0.8rem;
+  background: rgba(15, 118, 110, 0.1);
+  color: #0f766e;
+  flex-shrink: 0;
+}
+
+.rpt-hub__card--link .rpt-hub__card-icon {
+  background: rgba(15, 23, 42, 0.08);
+  color: #0f172a;
+}
+
+.rpt-hub__card-title {
+  margin: 0;
+  font-size: 1.02rem;
+  font-weight: 800;
+  color: var(--lite-black, #0f172a);
+}
+
+.rpt-hub__card-sub {
+  margin: 0.28rem 0 0;
+  font-size: 0.84rem;
+  line-height: 1.45;
+  color: var(--brand-muted, #5f8f8f);
+}
+
+.rpt-hub__card-meta {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #0f766e;
+}
+
+.rpt-hub__filters {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+.rpt-hub__filters--stack {
+  grid-template-columns: 1fr;
+}
+
+.rpt-hub__roster-actions,
+.rpt-hub__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: auto;
+}
+
+.rpt-hub__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 2.45rem;
+  padding: 0.48rem 1rem;
+  border-radius: 0.8rem;
+  border: 1px solid transparent;
+  background: linear-gradient(135deg, #115e59, #0f766e);
+  color: #fff;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: none;
+  width: fit-content;
+  transition: filter 0.15s ease, transform 0.15s ease;
+}
+
+.rpt-hub__btn:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+
+.rpt-hub__btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.rpt-hub__btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.rpt-hub__btn--ghost {
+  background: #fff;
+  border-color: var(--brand-border, #c5e4e4);
+  color: var(--lite-black, #0f172a);
+}
+
+.rpt-hub__btn--ghost:hover:not(:disabled) {
+  border-color: rgba(15, 118, 110, 0.35);
+  background: #f0faf9;
+  filter: none;
+}
+
+.rpt-hub__btn--link {
+  background: #0f172a;
+}
+
+.rpt-hub__links {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  gap: 0.75rem;
+}
+
+.rpt-hub__link {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.95rem 1rem;
+  border-radius: 1rem;
+  border: 1px solid var(--brand-border, #c5e4e4);
+  background: #fff;
+  text-decoration: none;
+  color: inherit;
+  transition:
+    transform 0.18s ease,
+    border-color 0.18s ease,
+    background 0.18s ease;
+}
+
+.rpt-hub__link:hover {
+  transform: translateY(-1px);
+  border-color: rgba(15, 118, 110, 0.3);
+  background: #f7fcfb;
+}
+
+.rpt-hub__link-icon {
+  display: grid;
+  place-items: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  border-radius: 0.7rem;
+  background: rgba(15, 118, 110, 0.1);
+  color: #0f766e;
+  flex-shrink: 0;
+}
+
+.rpt-hub__link strong {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: var(--lite-black, #0f172a);
+}
+
+.rpt-hub__link span {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: var(--brand-muted, #5f8f8f);
+}
+
+.rpt-hub__link-arrow {
+  margin-left: auto;
+  color: var(--brand-muted, #5f8f8f);
+  transform: rotate(-90deg);
+}
+
+@keyframes rpt-hub-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 720px) {
+  .rpt-hub__toolbar-fields {
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+  }
+
+  .rpt-hub__filters {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rpt-hub__toolbar,
+  .rpt-hub__section,
+  .rpt-hub__card,
+  .rpt-hub__link,
+  .rpt-hub__btn {
+    animation: none;
+    transition: none;
+  }
+
+  .rpt-hub__card:hover,
+  .rpt-hub__link:hover {
+    transform: none;
+  }
+}

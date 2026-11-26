@@ -15,12 +15,48 @@ export function buildCardScanPayload(cardCode: string): string {
   return `CAMPUS1:${cardCode}`;
 }
 
+/** Public URL encoded in the student ID QR — opens on any phone camera. */
+export function buildStudentCardPublicResultsUrl(
+  joinCode: string,
+  cardCode: string,
+): string {
+  const webAppUrl =
+    process.env.WEB_APP_URL?.replace(/\/$/, '') ?? 'http://localhost:3000';
+  const s = encodeURIComponent(joinCode.trim());
+  const c = encodeURIComponent(cardCode.trim().toUpperCase());
+  return `${webAppUrl}/results/card?s=${s}&c=${c}`;
+}
+
 export function parseCardScanPayload(raw: string): string | null {
-  const trimmed = raw.trim().toUpperCase();
-  if (trimmed.startsWith('CAMPUS1:')) {
-    return trimmed.slice('CAMPUS1:'.length).replace(/[^A-Z0-9]/g, '');
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+
+  // Native-camera QR: https://…/results/card?s=JOIN&c=CARDCODE
+  try {
+    if (/^https?:\/\//i.test(trimmed) || trimmed.includes('/results/card')) {
+      const url = new URL(
+        trimmed.startsWith('http')
+          ? trimmed
+          : `https://local.invalid${trimmed.startsWith('/') ? '' : '/'}${trimmed}`,
+      );
+      const fromQuery = url.searchParams.get('c')?.trim();
+      if (fromQuery) {
+        return fromQuery.toUpperCase().replace(/[^A-Z0-9]/g, '') || null;
+      }
+    }
+  } catch {
+    /* fall through */
   }
-  return trimmed.replace(/[^A-Z0-9]/g, '') || null;
+
+  const upper = trimmed.toUpperCase();
+  if (upper.startsWith('CAMPUS1:')) {
+    return upper.slice('CAMPUS1:'.length).replace(/[^A-Z0-9]/g, '') || null;
+  }
+  // Reject teacher / staff prefixes so student parsers stay role-safe.
+  if (upper.startsWith('CAMPUS1-T:') || upper.startsWith('CAMPUS1-S:')) {
+    return null;
+  }
+  return upper.replace(/[^A-Z0-9]/g, '') || null;
 }
 
 const STUDENT_ID_PREFIX = 'STU-';

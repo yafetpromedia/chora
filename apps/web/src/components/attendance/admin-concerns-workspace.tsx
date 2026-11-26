@@ -2,11 +2,10 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { useLocale } from "@/components/i18n/locale-provider";
 import { AppToast } from "@/components/ui/app-toast";
 import { listGradesForAttendance } from "@/lib/attendance";
 import {
-  CONCERN_TYPE_LABELS,
-  STATUS_LABELS,
   getAttendanceConcernsSummary,
   listAttendanceConcerns,
   type AttendanceConcern,
@@ -22,12 +21,12 @@ type GradeOpt = {
 
 type StatusFilter = AttendanceConcernStatus | "";
 
-const STATUS_CHIPS: { id: StatusFilter; label: string }[] = [
-  { id: "", label: "All" },
-  { id: "OPEN", label: "Open" },
-  { id: "UNDER_REVIEW", label: "In review" },
-  { id: "RESOLVED", label: "Resolved" },
-  { id: "DISMISSED", label: "Dismissed" },
+const STATUS_CHIP_IDS: { id: StatusFilter; key: string }[] = [
+  { id: "", key: "chipAll" },
+  { id: "OPEN", key: "chipOpen" },
+  { id: "UNDER_REVIEW", key: "chipInReview" },
+  { id: "RESOLVED", key: "chipResolved" },
+  { id: "DISMISSED", key: "chipDismissed" },
 ];
 
 function classLabel(c: AttendanceConcern) {
@@ -48,6 +47,7 @@ function formatWhen(iso: string) {
 }
 
 export function AdminConcernsWorkspace() {
+  const { t } = useLocale();
   const [items, setItems] = useState<AttendanceConcern[]>([]);
   const [total, setTotal] = useState(0);
   const [summary, setSummary] = useState<{
@@ -67,6 +67,11 @@ export function AdminConcernsWorkspace() {
   const [grades, setGrades] = useState<GradeOpt[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+
+  const concernTypeLabel = (ty: AttendanceConcernType) =>
+    t(`attendanceConcernsUi.type_${ty}`);
+  const statusLabel = (st: AttendanceConcernStatus) =>
+    t(`attendanceConcernsUi.status_${st}`);
 
   useEffect(() => {
     void listGradesForAttendance()
@@ -126,7 +131,7 @@ export function AdminConcernsWorkspace() {
         c.subject?.name,
         c.reportedBy.name,
         c.student?.name,
-        CONCERN_TYPE_LABELS[c.concernType],
+        concernTypeLabel(c.concernType),
         c.description,
       ]
         .filter(Boolean)
@@ -134,7 +139,7 @@ export function AdminConcernsWorkspace() {
         .toLowerCase();
       return hay.includes(q);
     });
-  }, [items, query]);
+  }, [items, query, t]);
 
   function clearFilters() {
     setDate("");
@@ -149,6 +154,21 @@ export function AdminConcernsWorkspace() {
     date || status || concernType || gradeId || sectionId || query.trim(),
   );
 
+  const kpiRows = [
+    { key: "statOpen" as const, value: summary?.open, tone: "late" as const, action: () => setStatus("OPEN") },
+    { key: "statInReview" as const, value: summary?.underReview, tone: "half" as const, action: () => setStatus("UNDER_REVIEW") },
+    { key: "statResolved" as const, value: summary?.resolved, tone: "present" as const, action: () => setStatus("RESOLVED") },
+    {
+      key: "statToday" as const,
+      value: summary?.today,
+      tone: "leave" as const,
+      action: () => {
+        setDate(new Date().toISOString().slice(0, 10));
+        setStatus("");
+      },
+    },
+  ];
+
   return (
     <div className="att-concern att-concern--wide">
       <AppToast message={error} tone="error" onDismiss={() => setError("")} />
@@ -157,59 +177,40 @@ export function AdminConcernsWorkspace() {
         <div className="tch-v2__hero-glow" aria-hidden />
         <div className="tch-v2__hero-inner">
           <div className="tch-v2__hero-main">
-            <span className="tch-v2__chip">Attendance</span>
-            <h2 className="tch-v2__hero-title">Attendance concerns</h2>
-            <p className="tch-v2__hero-sub">
-              School-wide observations from subject teachers. Homeroom and
-              admins review without changing the official roll unless resolved
-              with a correction.
-            </p>
+            <span className="tch-v2__chip">{t("attendanceConcernsUi.chip")}</span>
+            <h2 className="tch-v2__hero-title">{t("attendanceConcernsUi.title")}</h2>
+            <p className="tch-v2__hero-sub">{t("attendanceConcernsUi.heroSub")}</p>
           </div>
           <div className="tch-v2__hero-stats">
             <div className="tch-v2__stat">
               <strong>{summary?.open ?? "—"}</strong>
-              <span>Open</span>
+              <span>{t("attendanceConcernsUi.statOpen")}</span>
             </div>
             <div className="tch-v2__stat">
               <strong>{summary?.today ?? "—"}</strong>
-              <span>Today</span>
+              <span>{t("attendanceConcernsUi.statToday")}</span>
             </div>
             <div className="tch-v2__stat">
               <strong>{summary?.resolved ?? "—"}</strong>
-              <span>Closed</span>
+              <span>{t("attendanceConcernsUi.statClosed")}</span>
             </div>
             <div className="tch-v2__stat tch-v2__stat--accent">
               <strong>{loading ? "—" : total}</strong>
-              <span>Showing</span>
+              <span>{t("attendanceConcernsUi.statShowing")}</span>
             </div>
           </div>
         </div>
       </header>
 
       <div className="sa-stats att-concern__kpis">
-        {(
-          [
-            ["Open", summary?.open, "late"],
-            ["In review", summary?.underReview, "half"],
-            ["Resolved", summary?.resolved, "present"],
-            ["Today", summary?.today, "leave"],
-          ] as const
-        ).map(([label, value, tone]) => (
+        {kpiRows.map(({ key, value, tone, action }) => (
           <button
-            key={label}
+            key={key}
             type="button"
             className={`sa-stat sa-stat--${tone} att-concern__kpi-btn`}
-            onClick={() => {
-              if (label === "Open") setStatus("OPEN");
-              else if (label === "In review") setStatus("UNDER_REVIEW");
-              else if (label === "Resolved") setStatus("RESOLVED");
-              else if (label === "Today") {
-                setDate(new Date().toISOString().slice(0, 10));
-                setStatus("");
-              }
-            }}
+            onClick={action}
           >
-            <span className="sa-stat__label">{label}</span>
+            <span className="sa-stat__label">{t(`attendanceConcernsUi.${key}`)}</span>
             <strong className="sa-stat__value">
               {value == null ? "—" : value}
             </strong>
@@ -217,8 +218,8 @@ export function AdminConcernsWorkspace() {
         ))}
       </div>
 
-      <div className="att-concern__chips" role="tablist" aria-label="Status">
-        {STATUS_CHIPS.map((chip) => (
+      <div className="att-concern__chips" role="tablist" aria-label={t("employeesUi.status")}>
+        {STATUS_CHIP_IDS.map((chip) => (
           <button
             key={chip.id || "all"}
             type="button"
@@ -229,14 +230,14 @@ export function AdminConcernsWorkspace() {
             }`}
             onClick={() => setStatus(chip.id)}
           >
-            {chip.label}
+            {t(`attendanceConcernsUi.${chip.key}`)}
           </button>
         ))}
       </div>
 
       <div className="sa-toolbar att-concern__toolbar">
         <label className="sa-field">
-          <span>Date</span>
+          <span>{t("staffAttendanceUi.date")}</span>
           <input
             type="date"
             value={date}
@@ -244,25 +245,31 @@ export function AdminConcernsWorkspace() {
           />
         </label>
         <label className="sa-field">
-          <span>Concern type</span>
+          <span>{t("attendanceConcernsUi.concernType")}</span>
           <select
             value={concernType}
             onChange={(e) =>
               setConcernType(e.target.value as AttendanceConcernType | "")
             }
           >
-            <option value="">All types</option>
-            {(Object.keys(CONCERN_TYPE_LABELS) as AttendanceConcernType[]).map(
-              (t) => (
-                <option key={t} value={t}>
-                  {CONCERN_TYPE_LABELS[t]}
-                </option>
-              ),
-            )}
+            <option value="">{t("attendanceConcernsUi.allTypes")}</option>
+            {(
+              [
+                "STUDENT_APPEARS_ABSENT",
+                "STUDENT_APPEARS_PRESENT",
+                "COUNT_MISMATCH",
+                "STUDENT_LEFT_CLASS",
+                "OTHER",
+              ] as AttendanceConcernType[]
+            ).map((ty) => (
+              <option key={ty} value={ty}>
+                {concernTypeLabel(ty)}
+              </option>
+            ))}
           </select>
         </label>
         <label className="sa-field">
-          <span>Grade</span>
+          <span>{t("attendanceConcernsUi.grade")}</span>
           <select
             value={gradeId}
             onChange={(e) => {
@@ -270,7 +277,7 @@ export function AdminConcernsWorkspace() {
               setSectionId("");
             }}
           >
-            <option value="">All grades</option>
+            <option value="">{t("attendanceConcernsUi.allGrades")}</option>
             {grades.map((g) => (
               <option key={g.id} value={g.id}>
                 {g.name}
@@ -279,13 +286,13 @@ export function AdminConcernsWorkspace() {
           </select>
         </label>
         <label className="sa-field">
-          <span>Section</span>
+          <span>{t("attendanceConcernsUi.section")}</span>
           <select
             value={sectionId}
             onChange={(e) => setSectionId(e.target.value)}
             disabled={!gradeId}
           >
-            <option value="">All sections</option>
+            <option value="">{t("attendanceConcernsUi.allSections")}</option>
             {sections.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}
@@ -294,12 +301,12 @@ export function AdminConcernsWorkspace() {
           </select>
         </label>
         <label className="sa-field sa-field--grow">
-          <span>Search</span>
+          <span>{t("common.search")}</span>
           <input
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Class, teacher, student, type…"
+            placeholder={t("attendanceConcernsUi.searchPlaceholder")}
           />
         </label>
         {hasFilters ? (
@@ -308,7 +315,7 @@ export function AdminConcernsWorkspace() {
             className="sa-btn sa-btn--ghost"
             onClick={clearFilters}
           >
-            Clear
+            {t("common.clear")}
           </button>
         ) : null}
       </div>
@@ -317,27 +324,28 @@ export function AdminConcernsWorkspace() {
         <div className="att-concern__results-head">
           <h3>
             {loading
-              ? "Loading concerns…"
-              : `${filtered.length} concern${filtered.length === 1 ? "" : "s"}`}
+              ? t("attendanceConcernsUi.loadingConcerns")
+              : filtered.length === 1
+                ? t("attendanceConcernsUi.concernOne")
+                : t("attendanceConcernsUi.concernsMany", {
+                    count: filtered.length,
+                  })}
           </h3>
-          <p>
-            Official attendance stays unchanged until a reviewer resolves with a
-            correction.
-          </p>
+          <p>{t("attendanceConcernsUi.resultsSub")}</p>
         </div>
 
         {loading ? (
           <div className="att-concern__loading">
             <span className="dash-loading-spinner" aria-hidden />
-            <p>Fetching concerns…</p>
+            <p>{t("attendanceConcernsUi.fetching")}</p>
           </div>
         ) : filtered.length === 0 ? (
           <div className="att-concern__empty-card">
-            <strong>No concerns match</strong>
+            <strong>{t("attendanceConcernsUi.noMatchTitle")}</strong>
             <p>
               {hasFilters
-                ? "Try clearing filters, or check another date."
-                : "When subject teachers report a mismatch, it will show up here for review."}
+                ? t("attendanceConcernsUi.noMatchFiltered")
+                : t("attendanceConcernsUi.noMatchEmpty")}
             </p>
             {hasFilters ? (
               <button
@@ -345,7 +353,7 @@ export function AdminConcernsWorkspace() {
                 className="sa-btn sa-btn--primary"
                 onClick={clearFilters}
               >
-                Clear filters
+                {t("common.clearFilters")}
               </button>
             ) : null}
           </div>
@@ -354,13 +362,13 @@ export function AdminConcernsWorkspace() {
             <table className="sa-table">
               <thead>
                 <tr>
-                  <th>Class / subject</th>
-                  <th>Type</th>
-                  <th>Reported by</th>
-                  <th>Date</th>
-                  <th>Counts</th>
-                  <th>Status</th>
-                  <th>Actions</th>
+                  <th>{t("attendanceConcernsUi.colClassSubject")}</th>
+                  <th>{t("attendanceConcernsUi.colType")}</th>
+                  <th>{t("attendanceConcernsUi.colReportedBy")}</th>
+                  <th>{t("attendanceConcernsUi.colDate")}</th>
+                  <th>{t("attendanceConcernsUi.colCounts")}</th>
+                  <th>{t("attendanceConcernsUi.colStatus")}</th>
+                  <th>{t("attendanceConcernsUi.colActions")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -374,11 +382,14 @@ export function AdminConcernsWorkspace() {
                           {c.periodLabel ? ` · ${c.periodLabel}` : ""}
                         </span>
                         {c.student ? (
-                          <span>Student: {c.student.name}</span>
+                          <span>
+                            {t("attendanceConcernsUi.studentPrefix")}{" "}
+                            {c.student.name}
+                          </span>
                         ) : null}
                       </div>
                     </td>
-                    <td>{CONCERN_TYPE_LABELS[c.concernType]}</td>
+                    <td>{concernTypeLabel(c.concernType)}</td>
                     <td>
                       <strong>{c.reportedBy.name}</strong>
                       <div className="sa-emp">
@@ -389,12 +400,12 @@ export function AdminConcernsWorkspace() {
                     <td>
                       <div className="att-concern__counts">
                         <span>
-                          Off{" "}
+                          {t("attendanceConcernsUi.offCount")}{" "}
                           {c.officialPresentCount ?? "—"}/
                           {c.officialAbsentCount ?? "—"}
                         </span>
                         <span>
-                          Obs{" "}
+                          {t("attendanceConcernsUi.obsCount")}{" "}
                           {c.observedPresentCount ?? "—"}/
                           {c.observedAbsentCount ?? "—"}
                         </span>
@@ -416,7 +427,7 @@ export function AdminConcernsWorkspace() {
                       <span
                         className={`att-concern__badge att-concern__badge--${c.status.toLowerCase()}`}
                       >
-                        {STATUS_LABELS[c.status]}
+                        {statusLabel(c.status)}
                       </span>
                     </td>
                     <td>
@@ -425,8 +436,8 @@ export function AdminConcernsWorkspace() {
                         href={`/admin/attendance/concerns/${c.id}`}
                       >
                         {c.status === "OPEN" || c.status === "UNDER_REVIEW"
-                          ? "Review"
-                          : "View"}
+                          ? t("attendanceConcernsUi.review")
+                          : t("attendanceConcernsUi.view")}
                       </Link>
                     </td>
                   </tr>

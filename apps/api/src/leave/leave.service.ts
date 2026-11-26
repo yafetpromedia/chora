@@ -9,7 +9,13 @@ import {
   Prisma,
   StaffAttendanceStatus,
   UserRole,
+  Weekday,
 } from '@prisma/client';
+import {
+  countSchoolDays,
+  DEFAULT_WEEKEND_DAYS,
+  isWeekendDay,
+} from '../common/school-calendar.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { permissionMatches } from '../common/permissions/permission-catalog';
 import {
@@ -50,25 +56,27 @@ function dateKey(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
-/** Count weekdays (Mon–Fri) inclusive between two UTC dates. */
-export function countWeekdays(start: Date, end: Date): number {
-  if (end < start) return 0;
-  let count = 0;
-  const cur = new Date(start);
-  while (cur <= end) {
-    const day = cur.getUTCDay();
-    if (day !== 0 && day !== 6) count += 1;
-    cur.setUTCDate(cur.getUTCDate() + 1);
-  }
-  return count;
+/** Count school days (weekends excluded) inclusive between two UTC dates. */
+export function countWeekdays(
+  start: Date,
+  end: Date,
+  weekendDays: Weekday[] = DEFAULT_WEEKEND_DAYS,
+): number {
+  return countSchoolDays(start, end, weekendDays);
 }
 
-function eachWeekday(start: Date, end: Date): Date[] {
+function eachWeekday(
+  start: Date,
+  end: Date,
+  weekendDays: Weekday[] = DEFAULT_WEEKEND_DAYS,
+): Date[] {
   const out: Date[] = [];
   const cur = new Date(start);
-  while (cur <= end) {
-    const day = cur.getUTCDay();
-    if (day !== 0 && day !== 6) out.push(new Date(cur));
+  cur.setUTCHours(0, 0, 0, 0);
+  const last = new Date(end);
+  last.setUTCHours(0, 0, 0, 0);
+  while (cur <= last) {
+    if (!isWeekendDay(cur, weekendDays, true)) out.push(new Date(cur));
     cur.setUTCDate(cur.getUTCDate() + 1);
   }
   return out;
@@ -186,10 +194,15 @@ export class LeaveService {
     if (end < start) {
       throw new BadRequestException('End date must be on or after start date');
     }
-    const days = countWeekdays(start, end);
+    const school = await this.prisma.school.findUnique({
+      where: { id: schoolId },
+      select: { weekendDays: true },
+    });
+    const weekendDays = school?.weekendDays ?? DEFAULT_WEEKEND_DAYS;
+    const days = countWeekdays(start, end, weekendDays);
     if (days < 1) {
       throw new BadRequestException(
-        'Leave must include at least one weekday (weekends are excluded)',
+        'Leave must include at least one school day (weekends are excluded)',
       );
     }
 
@@ -508,9 +521,11 @@ export class LeaveService {
       select: {
         staffCheckInTime: true,
         staffCheckOutTime: true,
+        weekendDays: true,
       },
     });
-    for (const day of eachWeekday(start, end)) {
+    const weekendDays = school?.weekendDays ?? DEFAULT_WEEKEND_DAYS;
+    for (const day of eachWeekday(start, end, weekendDays)) {
       const existing = await tx.staffAttendanceRecord.findUnique({
         where: {
           schoolId_userId_date: { schoolId, userId, date: day },
@@ -581,7 +596,12 @@ export class LeaveService {
     end: Date,
     actorId: string,
   ) {
-    for (const day of eachWeekday(start, end)) {
+    const school = await tx.school.findUnique({
+      where: { id: schoolId },
+      select: { weekendDays: true },
+    });
+    const weekendDays = school?.weekendDays ?? DEFAULT_WEEKEND_DAYS;
+    for (const day of eachWeekday(start, end, weekendDays)) {
       const existing = await tx.staffAttendanceRecord.findUnique({
         where: {
           schoolId_userId_date: { schoolId, userId, date: day },

@@ -16,13 +16,26 @@ import {
   createAcademicYear,
   listAcademicYears,
   setCurrentAcademicYear,
+  type AcademicCalendarSystem,
   type AcademicYear,
 } from "@/lib/results";
 import { AUTH_ROLE_KEY, AUTH_TOKEN_KEY, isSchoolWorkspaceRole } from "@/lib/auth";
 import { AppToast } from "@/components/ui/app-toast";
+import { useLocale } from "@/components/i18n/locale-provider";
 
 export default function AcademicYearsPage() {
   const router = useRouter();
+  const { t, tp } = useLocale();
+
+  const calendarLabel = (system?: AcademicCalendarSystem) =>
+    system === "GREGORIAN"
+      ? t("adminAcademicYearsUi.gcCode")
+      : t("adminAcademicYearsUi.ecCode");
+
+  const calendarHint = (system: AcademicCalendarSystem) =>
+    system === "ETHIOPIAN"
+      ? t("adminAcademicYearsUi.ethHint")
+      : t("adminAcademicYearsUi.gregHint");
   const [years, setYears] = useState<AcademicYear[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -31,6 +44,8 @@ export default function AcademicYearsPage() {
   const [name, setName] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [calendarSystem, setCalendarSystem] =
+    useState<AcademicCalendarSystem>("ETHIOPIAN");
   const [isCurrent, setIsCurrent] = useState(true);
 
   async function load() {
@@ -51,7 +66,8 @@ export default function AcademicYearsPage() {
         if (!cancelled) setYears(list);
       })
       .catch((err) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : "Load failed");
+        if (!cancelled)
+          setError(err instanceof Error ? err.message : t("adminAcademicYearsUi.loadFailed"));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -67,14 +83,21 @@ export default function AcademicYearsPage() {
     setError("");
     setSuccess("");
     try {
-      await createAcademicYear({ name, startDate, endDate, isCurrent });
+      await createAcademicYear({
+        name,
+        startDate,
+        endDate,
+        calendarSystem,
+        isCurrent,
+      });
       setName("");
       setStartDate("");
       setEndDate("");
-      setSuccess("Academic year created.");
+      setCalendarSystem("ETHIOPIAN");
+      setSuccess(t("adminAcademicYearsUi.created"));
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Create failed");
+      setError(err instanceof Error ? err.message : t("adminAcademicYearsUi.createFailed"));
     } finally {
       setSaving(false);
     }
@@ -85,10 +108,10 @@ export default function AcademicYearsPage() {
     setSuccess("");
     try {
       await setCurrentAcademicYear(id);
-      setSuccess("Current year updated.");
+      setSuccess(t("adminAcademicYearsUi.currentUpdated"));
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Update failed");
+      setError(err instanceof Error ? err.message : t("adminAcademicYearsUi.updateFailed"));
     }
   }
 
@@ -100,23 +123,27 @@ export default function AcademicYearsPage() {
     : 0;
 
   return (
-    <DashboardPage role="admin" title="Academic years">
+    <DashboardPage role="admin" title={tp("Academic years")}>
       <div className="acad-page acad-page--years">
         <AcademicsHero
-          chip="Academics"
+          chip={t("adminAcademicYearsUi.chip")}
           compact
           backHref="/admin/academics"
-          title="Academic years"
-          subtitle="Each year holds terms, class subjects, results, and finance. Mark one year as current."
+          title={t("adminAcademicYearsUi.heroTitle")}
+          subtitle={t("adminAcademicYearsUi.heroSub")}
           badges={
-            current ? <AcademicsBadge variant="live">Current: {current.name}</AcademicsBadge> : null
+            current ? (
+              <AcademicsBadge variant="live">
+                {t("adminAcademicYearsUi.currentBadge", { name: current.name })}
+              </AcademicsBadge>
+            ) : null
           }
           stats={[
-            { label: "Years", value: years.length },
-            { label: "Terms", value: totalTerms },
-            { label: "Class subjects", value: totalSubjects },
+            { label: t("adminAcademicYearsUi.statYears"), value: years.length },
+            { label: t("adminAcademicYearsUi.statTerms"), value: totalTerms },
+            { label: t("adminAcademicYearsUi.statClassSubjects"), value: totalSubjects },
             {
-              label: "Year progress",
+              label: t("adminAcademicYearsUi.statProgress"),
               value: current ? `${currentProgress}%` : "—",
               hint: current?.name,
               accent: true,
@@ -128,26 +155,65 @@ export default function AcademicYearsPage() {
         <AppToast message={success} tone="success" onDismiss={() => setSuccess("")} />
 
         <AcademicsPanel
-          title="School years"
-          subtitle="Open terms for each year after it is created."
+          title={t("adminAcademicYearsUi.panelTitle")}
+          subtitle={t("adminAcademicYearsUi.panelSub")}
           aside={
             <form className="acad-form acad-form-card" onSubmit={(e) => void onCreate(e)}>
               <div className="acad-form-card__head">
-                <h3 className="acad-form-card__title">New academic year</h3>
-                <p className="acad-form-card__sub">e.g. 2026/2027 · Sep 2026 – Jun 2027</p>
+                <h3 className="acad-form-card__title">{t("adminAcademicYearsUi.formTitle")}</h3>
+                <p className="acad-form-card__sub">{calendarHint(calendarSystem)}</p>
               </div>
+              <fieldset className="acad-calendar-pick">
+                <legend>{t("adminAcademicYearsUi.calendarLegend")}</legend>
+                <div
+                  className="acad-calendar-pick__options"
+                  role="radiogroup"
+                  aria-label={t("adminAcademicYearsUi.calendarAria")}
+                >
+                  <label
+                    className={`acad-calendar-pick__option${
+                      calendarSystem === "ETHIOPIAN" ? " acad-calendar-pick__option--active" : ""
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="calendarSystem"
+                      value="ETHIOPIAN"
+                      checked={calendarSystem === "ETHIOPIAN"}
+                      onChange={() => setCalendarSystem("ETHIOPIAN")}
+                    />
+                    <span className="acad-calendar-pick__code">{t("adminAcademicYearsUi.ecCode")}</span>
+                    <span className="acad-calendar-pick__name">{t("adminAcademicYearsUi.ethiopian")}</span>
+                  </label>
+                  <label
+                    className={`acad-calendar-pick__option${
+                      calendarSystem === "GREGORIAN" ? " acad-calendar-pick__option--active" : ""
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="calendarSystem"
+                      value="GREGORIAN"
+                      checked={calendarSystem === "GREGORIAN"}
+                      onChange={() => setCalendarSystem("GREGORIAN")}
+                    />
+                    <span className="acad-calendar-pick__code">{t("adminAcademicYearsUi.gcCode")}</span>
+                    <span className="acad-calendar-pick__name">{t("adminAcademicYearsUi.gregorian")}</span>
+                  </label>
+                </div>
+              </fieldset>
               <label>
-                Year label
+                {t("adminAcademicYearsUi.yearLabel")}
                 <input
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="2026/2027"
+                  placeholder={calendarSystem === "ETHIOPIAN" ? "2018/2019" : "2026/2027"}
                   required
                 />
               </label>
               <div className="acad-form__row">
                 <label>
-                  Starts
+                  {t("adminAcademicYearsUi.starts")}
                   <input
                     type="date"
                     value={startDate}
@@ -156,7 +222,7 @@ export default function AcademicYearsPage() {
                   />
                 </label>
                 <label>
-                  Ends
+                  {t("adminAcademicYearsUi.ends")}
                   <input
                     type="date"
                     value={endDate}
@@ -165,24 +231,29 @@ export default function AcademicYearsPage() {
                   />
                 </label>
               </div>
+              <p className="acad-form__hint">
+                {t("adminAcademicYearsUi.datesHint", {
+                  cal: calendarLabel(calendarSystem),
+                })}
+              </p>
               <label className="acad-form__check">
                 <input
                   type="checkbox"
                   checked={isCurrent}
                   onChange={(e) => setIsCurrent(e.target.checked)}
                 />
-                Set as current school year
+                {t("adminAcademicYearsUi.setCurrent")}
               </label>
               <button type="submit" className="acad-btn acad-btn--primary acad-btn--block" disabled={saving}>
-                {saving ? "Creating…" : "Create year"}
+                {saving ? t("adminAcademicYearsUi.creating") : t("adminAcademicYearsUi.createYear")}
               </button>
             </form>
           }
         >
           {loading ? (
-            <p className="acad-loading">Loading years…</p>
+            <p className="acad-loading">{t("adminAcademicYearsUi.loadingYears")}</p>
           ) : years.length === 0 ? (
-            <AcademicsEmpty message="No academic years yet. Create your first year using the form." />
+            <AcademicsEmpty message={t("adminAcademicYearsUi.emptyYears")} />
           ) : (
             <ul className="acad-year-list acad-year-list--grid">
               {years.map((y) => {
@@ -194,40 +265,56 @@ export default function AcademicYearsPage() {
                   >
                     <div className="acad-year-card__top">
                       <div className="acad-year-card__identity">
-                        <span className="acad-year-card__name">{y.name}</span>
+                        <span className="acad-year-card__name">
+                          {y.name}{" "}
+                          <span className="acad-year-card__cal">
+                            {calendarLabel(y.calendarSystem)}
+                          </span>
+                        </span>
                         <p className="acad-year-card__meta">
                           {formatAcadDate(y.startDate)} – {formatAcadDate(y.endDate)}
                         </p>
                       </div>
-                      {y.isCurrent ? (
-                        <AcademicsBadge variant="live">Current</AcademicsBadge>
-                      ) : (
-                        <button
-                          type="button"
-                          className="acad-btn acad-btn--ghost acad-btn--sm"
-                          onClick={() => void onSetCurrent(y.id)}
-                        >
-                          Set current
-                        </button>
-                      )}
+                      <div className="acad-year-card__actions">
+                        <AcademicsBadge variant="muted">
+                          {y.calendarSystem === "GREGORIAN"
+                            ? t("adminAcademicYearsUi.gregBadge")
+                            : t("adminAcademicYearsUi.ethBadge")}
+                        </AcademicsBadge>
+                        {y.isCurrent ? (
+                          <AcademicsBadge variant="live">{t("adminAcademicYearsUi.current")}</AcademicsBadge>
+                        ) : (
+                          <button
+                            type="button"
+                            className="acad-btn acad-btn--ghost acad-btn--sm"
+                            onClick={() => void onSetCurrent(y.id)}
+                          >
+                            {t("adminAcademicYearsUi.setCurrentBtn")}
+                          </button>
+                        )}
+                      </div>
                     </div>
                     <div className="acad-year-card__stats">
                       <span className="acad-year-card__pill">
-                        <strong>{y._count?.academicTerms ?? 0}</strong> terms
+                        <strong>{y._count?.academicTerms ?? 0}</strong> {t("adminAcademicYearsUi.termsCount")}
                       </span>
                       <span className="acad-year-card__pill">
-                        <strong>{y._count?.classSubjects ?? 0}</strong> class subjects
+                        <strong>{y._count?.classSubjects ?? 0}</strong>{" "}
+                        {t("adminAcademicYearsUi.classSubjectsCount")}
                       </span>
                       <span className="acad-year-card__pill acad-year-card__pill--muted">
-                        <strong>{progress}%</strong> elapsed
+                        <strong>{progress}%</strong> {t("adminAcademicYearsUi.elapsed")}
                       </span>
                     </div>
                     <div className="acad-year-card__foot">
-                      <div className="acad-year-card__bar" title="Year progress">
+                      <div
+                        className="acad-year-card__bar"
+                        title={t("adminAcademicYearsUi.yearProgressTitle")}
+                      >
                         <span style={{ width: `${progress}%` }} />
                       </div>
                       <Link href="/admin/results/terms" className="acad-year-card__cta">
-                        Manage terms →
+                        {t("adminAcademicYearsUi.manageTerms")}
                       </Link>
                     </div>
                   </li>

@@ -15,6 +15,9 @@ import {
   type AiChatMessage,
 } from "@/lib/ai";
 import { BRAND_NAME } from "@/lib/brand";
+import { DashIcon } from "@/components/dashboard/dash-icons";
+import { useLocale } from "@/components/i18n/locale-provider";
+import type { MessageKey } from "@/lib/i18n";
 
 type Props =
   | { variant?: "school"; role: UserRole; pageContext?: string }
@@ -30,39 +33,15 @@ type ChatThread = {
 const MAX_API_MESSAGES = 18;
 const MAX_STORED_THREADS = 25;
 
-const SCHOOL_STARTERS: Record<UserRole, string[]> = {
-  admin: [
-    "How do I publish report cards?",
-    "Where do I set up fee schedules?",
-    "How does student promotion work?",
-  ],
-  staff: [
-    "How do I approve teacher score sheets?",
-    "Where is the finance module?",
-    "How do I print student ID cards?",
-  ],
-  teacher: [
-    "How do I submit grades for approval?",
-    "Where do I mark attendance?",
-    "How do I create classwork?",
-  ],
-  student: [
-    "When will my report card be visible?",
-    "How do I view my timetable?",
-    "Where is the eLibrary AI assistant?",
-  ],
-  parent: [
-    "How do I check my child's fees?",
-    "Where do I see attendance?",
-    "How do I view published results?",
-  ],
-};
+type TranslateFn = (key: MessageKey | string, vars?: Record<string, string | number>) => string;
 
-const PLATFORM_STARTERS = [
-  "How many schools are on trial?",
-  "Where do I suspend a tenant?",
-  "How do I issue an invoice?",
-];
+function schoolStarters(t: TranslateFn, role: UserRole): string[] {
+  return [0, 1, 2].map((i) => t(`aiChatWidgetUi.starter_${role}_${i}`));
+}
+
+function platformStarters(t: TranslateFn): string[] {
+  return [0, 1, 2].map((i) => t(`aiChatWidgetUi.starter_platform_${i}`));
+}
 
 function storageKey(variant: "school" | "platform") {
   return `chora-ai-threads:${variant}`;
@@ -72,11 +51,11 @@ function newThreadId() {
   return `chat_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function threadTitleFromMessages(messages: AiChatMessage[]): string {
+function threadTitleFromMessages(messages: AiChatMessage[], newChatLabel: string): string {
   const firstUser = messages.find((m) => m.role === "user" && m.content.trim());
-  if (!firstUser) return "New chat";
-  const t = firstUser.content.trim().replace(/\s+/g, " ");
-  return t.length > 42 ? `${t.slice(0, 42)}…` : t;
+  if (!firstUser) return newChatLabel;
+  const text = firstUser.content.trim().replace(/\s+/g, " ");
+  return text.length > 42 ? `${text.slice(0, 42)}…` : text;
 }
 
 function persistableMessages(messages: AiChatMessage[]): AiChatMessage[] {
@@ -99,15 +78,21 @@ function persistableMessages(messages: AiChatMessage[]): AiChatMessage[] {
   }));
 }
 
-function formatChatPlainText(messages: AiChatMessage[], brand: string): string {
+function formatChatPlainText(
+  messages: AiChatMessage[],
+  brand: string,
+  t: TranslateFn,
+): string {
   const body = messages
     .map((m) => {
-      const who = m.role === "user" ? "You" : brand;
-      const imgNote = m.images?.length ? `\n[${m.images.length} image(s) attached]` : "";
+      const who = m.role === "user" ? t("aiChatWidgetUi.copyYou") : brand;
+      const imgNote = m.images?.length
+        ? `\n${t("aiChatWidgetUi.imagesAttached", { count: m.images.length })}`
+        : "";
       return `${who}:\n${m.content.trim()}${imgNote}`;
     })
     .join("\n\n");
-  return `${brand} Assistant chat\n\n${body}`.trim();
+  return `${t("aiChatWidgetUi.exportHeader", { brand })}\n\n${body}`.trim();
 }
 
 async function copyText(text: string): Promise<boolean> {
@@ -174,6 +159,7 @@ function imageSrc(img: AiChatImage): string {
 }
 
 export function AiChatWidget(props: Props) {
+  const { t } = useLocale();
   const variant = props.variant ?? "school";
   const role: UserRole =
     variant === "school" ? (props.role ?? "student") : "admin";
@@ -249,7 +235,7 @@ export function AiChatWidget(props: Props) {
     if (!messages.length) return;
     const next: ChatThread = {
       id: threadId,
-      title: threadTitleFromMessages(messages),
+      title: threadTitleFromMessages(messages, t("aiChatWidgetUi.newChatTitle")),
       updatedAt: new Date().toISOString(),
       messages: persistableMessages(messages),
     };
@@ -261,7 +247,7 @@ export function AiChatWidget(props: Props) {
         return merged;
       });
     });
-  }, [messages, threadId, variant]);
+  }, [messages, threadId, variant, t]);
 
   const sortedHistory = useMemo(
     () =>
@@ -292,9 +278,9 @@ export function AiChatWidget(props: Props) {
   }
 
   function deleteThread(id: string) {
-    const target = threads.find((t) => t.id === id);
-    const label = target?.title || "this chat";
-    if (!window.confirm(`Delete “${label}” from history?`)) return;
+    const target = threads.find((th) => th.id === id);
+    const label = target?.title || t("aiChatWidgetUi.confirmDeleteFallback");
+    if (!window.confirm(t("aiChatWidgetUi.confirmDelete", { label }))) return;
     setThreads((prev) => {
       const next = prev.filter((t) => t.id !== id);
       saveThreads(variant, next);
@@ -307,19 +293,15 @@ export function AiChatWidget(props: Props) {
       setError("");
       setInput("");
     }
-    showToast("Chat deleted");
+    showToast(t("aiChatWidgetUi.chatDeleted"));
   }
 
   function clearAllHistory() {
     if (!threads.length) {
-      showToast("No history to clear");
+      showToast(t("aiChatWidgetUi.noHistory"));
       return;
     }
-    if (
-      !window.confirm(
-        `Delete all ${threads.length} saved chat${threads.length === 1 ? "" : "s"}? This cannot be undone.`,
-      )
-    ) {
+    if (!window.confirm(t("aiChatWidgetUi.confirmClearAll", { count: threads.length }))) {
       return;
     }
     saveThreads(variant, []);
@@ -330,34 +312,34 @@ export function AiChatWidget(props: Props) {
     setError("");
     setInput("");
     setHistoryOpen(false);
-    showToast("History cleared");
+    showToast(t("aiChatWidgetUi.historyCleared"));
   }
 
   async function copyMessage(content: string) {
     const ok = await copyText(content.trim());
-    showToast(ok ? "Copied" : "Could not copy");
+    showToast(ok ? t("aiChatWidgetUi.copied") : t("aiChatWidgetUi.copyFailed"));
   }
 
   async function copyChat() {
     if (!messages.length) {
-      showToast("Nothing to copy");
+      showToast(t("aiChatWidgetUi.nothingToCopy"));
       return;
     }
-    const ok = await copyText(formatChatPlainText(messages, BRAND_NAME));
-    showToast(ok ? "Chat copied" : "Could not copy");
+    const ok = await copyText(formatChatPlainText(messages, BRAND_NAME, t));
+    showToast(ok ? t("aiChatWidgetUi.chatCopied") : t("aiChatWidgetUi.copyFailed"));
   }
 
   async function shareChat() {
     if (!messages.length) {
-      showToast("Nothing to share");
+      showToast(t("aiChatWidgetUi.nothingToShare"));
       return;
     }
-    const text = formatChatPlainText(messages, BRAND_NAME);
-    const title = `${BRAND_NAME} Assistant — ${threadTitleFromMessages(messages)}`;
+    const text = formatChatPlainText(messages, BRAND_NAME, t);
+    const title = `${t("aiChatWidgetUi.assistant", { brand: BRAND_NAME })} — ${threadTitleFromMessages(messages, t("aiChatWidgetUi.newChatTitle"))}`;
     try {
       if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
         await navigator.share({ title, text });
-        showToast("Shared");
+        showToast(t("aiChatWidgetUi.shared"));
         return;
       }
     } catch (err) {
@@ -365,7 +347,7 @@ export function AiChatWidget(props: Props) {
       if (err instanceof DOMException && err.name === "AbortError") return;
     }
     const ok = await copyText(text);
-    showToast(ok ? "Chat copied to share" : "Could not share");
+    showToast(ok ? t("aiChatWidgetUi.chatCopiedToShare") : t("aiChatWidgetUi.shareFailed"));
   }
 
   function setReaction(index: number, reaction: "up" | "down") {
@@ -375,9 +357,9 @@ export function AiChatWidget(props: Props) {
         current?.role === "assistant" && current.reaction === reaction
           ? null
           : reaction;
-      if (nextReaction === "up") showToast("Marked as helpful");
-      else if (nextReaction === "down") showToast("Marked as not helpful");
-      else showToast("Reaction removed");
+      if (nextReaction === "up") showToast(t("aiChatWidgetUi.markedAsHelpful"));
+      else if (nextReaction === "down") showToast(t("aiChatWidgetUi.markedAsNotHelpful"));
+      else showToast(t("aiChatWidgetUi.reactionRemoved"));
       return prev.map((m, i) => {
         if (i !== index || m.role !== "assistant") return m;
         return { ...m, reaction: nextReaction };
@@ -396,7 +378,7 @@ export function AiChatWidget(props: Props) {
       }
       setPendingImages(next.slice(0, 3));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not attach image");
+      setError(err instanceof Error ? err.message : t("aiChatWidgetUi.attachFailed"));
     } finally {
       if (fileRef.current) fileRef.current.value = "";
     }
@@ -418,7 +400,7 @@ export function AiChatWidget(props: Props) {
     setHistoryOpen(false);
     const userMsg: AiChatMessage = {
       role: "user",
-      content: content || (images.length ? "What's in this image?" : ""),
+      content: content || (images.length ? t("aiChatWidgetUi.imagePrompt") : ""),
       ...(images.length ? { images } : {}),
     };
     const nextMessages: AiChatMessage[] = [...messages, userMsg];
@@ -434,7 +416,7 @@ export function AiChatWidget(props: Props) {
       });
       setMessages([...nextMessages, { role: "assistant", content: res.content }]);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not reach AI");
+      setError(err instanceof Error ? err.message : t("aiChatWidgetUi.reachAiFailed"));
       setMessages(messages);
       setInput(content);
       setPendingImages(images);
@@ -446,30 +428,31 @@ export function AiChatWidget(props: Props) {
   if (configured === false) return null;
 
   const starters =
-    variant === "platform"
-      ? PLATFORM_STARTERS
-      : SCHOOL_STARTERS[role] ?? SCHOOL_STARTERS.student;
+    variant === "platform" ? platformStarters(t) : schoolStarters(t, role);
   const canSend =
     configured === true && !busy && (Boolean(input.trim()) || pendingImages.length > 0);
 
   return (
     <div className={`ai-chat${open ? " ai-chat--open" : ""}`}>
       {open ? (
-        <section className="ai-chat__panel" aria-label={`${BRAND_NAME} AI assistant`}>
+        <section
+          className="ai-chat__panel"
+          aria-label={t("aiChatWidgetUi.assistantAria", { brand: BRAND_NAME })}
+        >
           <header className="ai-chat__head">
             <div className="ai-chat__brand">
               <BrandMark className="ai-chat__logo" />
             <div>
-              <strong>{BRAND_NAME} Assistant</strong>
-                <span>Ask anything · attach screenshots</span>
+              <strong>{t("aiChatWidgetUi.assistant", { brand: BRAND_NAME })}</strong>
+                <span>{t("aiChatWidgetUi.tagline")}</span>
               </div>
             </div>
             <div className="ai-chat__head-actions">
               <button
                 type="button"
                 className="ai-chat__icon-btn"
-                aria-label="Chat history"
-                title="History"
+                aria-label={t("aiChatWidgetUi.historyAria")}
+                title={t("aiChatWidgetUi.history")}
                 onClick={() => setHistoryOpen((v) => !v)}
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -485,8 +468,8 @@ export function AiChatWidget(props: Props) {
               <button
                 type="button"
                 className="ai-chat__icon-btn"
-                aria-label="New chat"
-                title="New chat"
+                aria-label={t("aiChatWidgetUi.newChatAria")}
+                title={t("aiChatWidgetUi.newChat")}
                 disabled={busy}
                 onClick={startNewChat}
               >
@@ -502,7 +485,7 @@ export function AiChatWidget(props: Props) {
             <button
               type="button"
               className="ai-chat__close"
-              aria-label="Close assistant"
+              aria-label={t("aiChatWidgetUi.closeAssistant")}
                 onClick={() => {
                   setOpen(false);
                   setHistoryOpen(false);
@@ -514,9 +497,9 @@ export function AiChatWidget(props: Props) {
           </header>
 
           {historyOpen ? (
-            <div className="ai-chat__history" aria-label="Chat history">
+            <div className="ai-chat__history" aria-label={t("aiChatWidgetUi.chatHistory")}>
               <div className="ai-chat__history-head">
-                <strong>Chat history</strong>
+                <strong>{t("aiChatWidgetUi.chatHistory")}</strong>
               </div>
               <div className="ai-chat__history-toolbar">
                 <button
@@ -525,7 +508,7 @@ export function AiChatWidget(props: Props) {
                   disabled={!messages.length}
                   onClick={() => void copyChat()}
                 >
-                  Copy
+                  {t("common.copy")}
                 </button>
                 <button
                   type="button"
@@ -533,7 +516,7 @@ export function AiChatWidget(props: Props) {
                   disabled={!messages.length}
                   onClick={() => void shareChat()}
                 >
-                  Share
+                  {t("aiChatWidgetUi.share")}
                 </button>
                 <button
                   type="button"
@@ -541,7 +524,7 @@ export function AiChatWidget(props: Props) {
                   onClick={startNewChat}
                   disabled={busy}
                 >
-                  New chat
+                  {t("aiChatWidgetUi.newChat")}
                 </button>
                 <button
                   type="button"
@@ -549,23 +532,23 @@ export function AiChatWidget(props: Props) {
                   disabled={!sortedHistory.length}
                   onClick={clearAllHistory}
                 >
-                  Clear all
+                  {t("aiChatWidgetUi.clearAll")}
                 </button>
               </div>
               {sortedHistory.length === 0 ? (
-                <p className="ai-chat__history-empty">No saved chats yet.</p>
+                <p className="ai-chat__history-empty">{t("aiChatWidgetUi.historyEmpty")}</p>
               ) : (
                 <ul className="ai-chat__history-list">
-                  {sortedHistory.map((t) => (
-                    <li key={t.id}>
+                  {sortedHistory.map((thread) => (
+                    <li key={thread.id}>
                       <button
                         type="button"
-                        className={`ai-chat__history-item${t.id === threadId ? " ai-chat__history-item--active" : ""}`}
-                        onClick={() => openThread(t)}
+                        className={`ai-chat__history-item${thread.id === threadId ? " ai-chat__history-item--active" : ""}`}
+                        onClick={() => openThread(thread)}
                       >
-                        <span className="ai-chat__history-title">{t.title}</span>
+                        <span className="ai-chat__history-title">{thread.title}</span>
                         <span className="ai-chat__history-meta">
-                          {new Date(t.updatedAt).toLocaleString(undefined, {
+                          {new Date(thread.updatedAt).toLocaleString(undefined, {
                             month: "short",
                             day: "numeric",
                             hour: "2-digit",
@@ -576,11 +559,11 @@ export function AiChatWidget(props: Props) {
                       <button
                         type="button"
                         className="ai-chat__history-delete"
-                        aria-label={`Delete ${t.title}`}
-                        title="Delete"
+                        aria-label={t("aiChatWidgetUi.deleteChatAria", { title: thread.title })}
+                        title={t("aiChatWidgetUi.deleteChat")}
                         onClick={(e) => {
                           e.stopPropagation();
-                          deleteThread(t.id);
+                          deleteThread(thread.id);
                         }}
                       >
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -604,13 +587,15 @@ export function AiChatWidget(props: Props) {
             {messages.length === 0 ? (
               <div className="ai-chat__empty">
                 <div className="ai-chat__empty-hero" aria-hidden>
-                  <span>✦</span>
+                  <span>
+                    <DashIcon name="sparkle" />
+                  </span>
                 </div>
-                <h3>How can I help?</h3>
+                <h3>{t("aiChatWidgetUi.helpTitle")}</h3>
                 <p>
                   {variant === "platform"
-                    ? "Ask about tenants, billing, support, plans, or drop a screenshot and I'll walk you through it."
-                    : "Ask about attendance, results, fees, or drop a screenshot and I'll walk you through it."}
+                    ? t("aiChatWidgetUi.emptyPlatform")
+                    : t("aiChatWidgetUi.emptySchool")}
                 </p>
                 <div className="ai-chat__starters">
                   {starters.map((q) => (
@@ -628,7 +613,7 @@ export function AiChatWidget(props: Props) {
                 >
                   {m.role === "assistant" ? (
                     <span className="ai-chat__msg-avatar" aria-hidden>
-                      ✦
+                      <DashIcon name="sparkle" className="dash-icon--sm" />
                     </span>
                   ) : null}
                   <div className="ai-chat__msg">
@@ -643,7 +628,7 @@ export function AiChatWidget(props: Props) {
                                 key={ji}
                                 type="button"
                                 className="ai-chat__thumb-btn"
-                                aria-label="View attached image"
+                                aria-label={t("aiChatWidgetUi.viewImage")}
                                 onClick={() => setLightboxSrc(src)}
                               >
                                 <img src={src} alt="" className="ai-chat__thumb" />
@@ -658,35 +643,35 @@ export function AiChatWidget(props: Props) {
                       <button
                         type="button"
                         className="ai-chat__msg-action"
-                        title="Copy"
-                        aria-label="Copy message"
+                        title={t("common.copy")}
+                        aria-label={t("aiChatWidgetUi.copyMessage")}
                         onClick={() => void copyMessage(m.content)}
                       >
-                        Copy
+                        {t("common.copy")}
                       </button>
                       {m.role === "assistant" ? (
                         <>
                           <button
                             type="button"
                             className={`ai-chat__msg-action ai-chat__msg-action--react${m.reaction === "up" ? " ai-chat__msg-action--on ai-chat__msg-action--up" : ""}`}
-                            title="Helpful"
-                            aria-label="Mark helpful"
+                            title={t("aiChatWidgetUi.helpful")}
+                            aria-label={t("aiChatWidgetUi.markHelpful")}
                             aria-pressed={m.reaction === "up"}
                             onClick={() => setReaction(i, "up")}
                           >
                             <span aria-hidden>👍</span>
-                            <span className="ai-chat__react-label">Helpful</span>
+                            <span className="ai-chat__react-label">{t("aiChatWidgetUi.helpful")}</span>
                           </button>
                           <button
                             type="button"
                             className={`ai-chat__msg-action ai-chat__msg-action--react${m.reaction === "down" ? " ai-chat__msg-action--on ai-chat__msg-action--down" : ""}`}
-                            title="Not helpful"
-                            aria-label="Mark not helpful"
+                            title={t("aiChatWidgetUi.notHelpful")}
+                            aria-label={t("aiChatWidgetUi.markNotHelpful")}
                             aria-pressed={m.reaction === "down"}
                             onClick={() => setReaction(i, "down")}
                           >
                             <span aria-hidden>👎</span>
-                            <span className="ai-chat__react-label">Not helpful</span>
+                            <span className="ai-chat__react-label">{t("aiChatWidgetUi.notHelpful")}</span>
                           </button>
                         </>
                       ) : null}
@@ -697,8 +682,8 @@ export function AiChatWidget(props: Props) {
                         role="status"
                       >
                         {m.reaction === "up"
-                          ? "You marked this helpful"
-                          : "You marked this not helpful"}
+                          ? t("aiChatWidgetUi.markedHelpful")
+                          : t("aiChatWidgetUi.markedNotHelpful")}
                       </p>
                     ) : null}
                   </div>
@@ -708,7 +693,7 @@ export function AiChatWidget(props: Props) {
             {busy ? (
               <div className="ai-chat__row ai-chat__row--assistant">
                 <span className="ai-chat__msg-avatar" aria-hidden>
-                  ✦
+                  <DashIcon name="sparkle" className="dash-icon--sm" />
                 </span>
                 <div className="ai-chat__typing" aria-live="polite">
                   <span />
@@ -735,15 +720,19 @@ export function AiChatWidget(props: Props) {
                     <button
                       type="button"
                       className="ai-chat__pending-preview"
-                      aria-label="View attached image"
+                      aria-label={t("aiChatWidgetUi.viewImage")}
                       onClick={() => src && setLightboxSrc(src)}
                     >
-                      {src ? <img src={src} alt="" /> : <span className="ai-chat__pending-fallback">Img</span>}
+                      {src ? (
+                        <img src={src} alt="" />
+                      ) : (
+                        <span className="ai-chat__pending-fallback">{t("aiChatWidgetUi.pendingImg")}</span>
+                      )}
                     </button>
                     <button
                       type="button"
                       className="ai-chat__pending-remove"
-                      aria-label="Remove image"
+                      aria-label={t("aiChatWidgetUi.removeImage")}
                       onClick={() => removePending(i)}
                     >
                       ×
@@ -767,8 +756,8 @@ export function AiChatWidget(props: Props) {
               <button
                 type="button"
                 className="ai-chat__attach"
-                aria-label="Attach image"
-                title="Attach image"
+                aria-label={t("aiChatWidgetUi.attachImage")}
+                title={t("aiChatWidgetUi.attachImage")}
                 disabled={busy || configured !== true || pendingImages.length >= 3}
                 onClick={() => fileRef.current?.click()}
               >
@@ -789,14 +778,14 @@ export function AiChatWidget(props: Props) {
               onChange={(e) => setInput(e.target.value)}
                 placeholder={
                   pendingImages.length
-                    ? "Add a caption (optional)…"
-                    : "Ask a question or attach a screenshot…"
+                    ? t("aiChatWidgetUi.placeholderCaption")
+                    : t("aiChatWidgetUi.placeholderAsk")
                 }
               disabled={busy || configured !== true}
             />
             </div>
             <button type="submit" className="ai-chat__send" disabled={!canSend}>
-              Send
+              {t("aiChatWidgetUi.send")}
             </button>
           </form>
         </section>
@@ -807,20 +796,20 @@ export function AiChatWidget(props: Props) {
           className="ai-chat__lightbox"
           role="dialog"
           aria-modal="true"
-          aria-label="Attached image"
+          aria-label={t("aiChatWidgetUi.lightboxAria")}
           onClick={() => setLightboxSrc(null)}
         >
           <button
             type="button"
             className="ai-chat__lightbox-close"
-            aria-label="Close image"
+            aria-label={t("aiChatWidgetUi.closeImage")}
             onClick={() => setLightboxSrc(null)}
           >
             ×
           </button>
           <img
             src={lightboxSrc}
-            alt="Attached"
+            alt={t("aiChatWidgetUi.attachedAlt")}
             className="ai-chat__lightbox-img"
             onClick={(e) => e.stopPropagation()}
           />
@@ -832,12 +821,12 @@ export function AiChatWidget(props: Props) {
         className="ai-chat__fab"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        title={`${BRAND_NAME} AI assistant`}
+        title={t("aiChatWidgetUi.assistantAria", { brand: BRAND_NAME })}
       >
         <span className="ai-chat__fab-icon" aria-hidden>
-          ✦
+          <DashIcon name="sparkle" className="dash-icon--sm" />
         </span>
-        <span className="ai-chat__fab-label">AI</span>
+        <span className="ai-chat__fab-label">{t("aiChatWidgetUi.fabLabel")}</span>
       </button>
     </div>
   );

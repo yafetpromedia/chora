@@ -15,6 +15,11 @@ describe('staff QR payloads', () => {
     expect(classifyStaffScanPayload('CAMPUS1:STU99')).toEqual({
       kind: 'student_card',
     });
+    expect(
+      classifyStaffScanPayload(
+        'https://app.example/results/card?s=EYA&c=K7H3NP2M',
+      ).kind,
+    ).toBe('student_card');
     expect(classifyStaffScanPayload('TCH-1001').kind).toBe('raw');
   });
 

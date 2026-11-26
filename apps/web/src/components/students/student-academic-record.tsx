@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { EtbAmount } from "@/components/billing/etb-amount";
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { useLocale } from "@/components/i18n/locale-provider";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import type { MessageKey } from "@/lib/i18n";
 import {
   executeGraduation,
   getEnrollmentHistory,
@@ -45,14 +47,15 @@ const DOC_TYPES = [
   "OTHER",
 ] as const;
 
-const CERT_TYPES = [
-  { value: "ENROLLMENT", label: "Enrollment" },
-  { value: "COMPLETION", label: "Completion" },
-  { value: "GRADUATION", label: "Graduation" },
-  { value: "CONDUCT", label: "Conduct" },
-] as const;
+const CERT_TYPES = ["ENROLLMENT", "COMPLETION", "GRADUATION", "CONDUCT"] as const;
 
 export function StudentAcademicRecord({ profileId }: { profileId: string }) {
+  const { t, tn } = useLocale();
+  const docLabel = (type: string) =>
+    t(`studentAcademicRecordUi.docType_${type}` as MessageKey);
+  const certLabel = (value: string) =>
+    t(`studentAcademicRecordUi.cert_${value}` as MessageKey);
+
   const [tab, setTab] = useState<Tab>("overview");
   const [summary, setSummary] = useState<StudentRecordSummary | null>(null);
   const [enrollments, setEnrollments] = useState<EnrollmentRow[]>([]);
@@ -87,11 +90,13 @@ export function StudentAcademicRecord({ profileId }: { profileId: string }) {
   );
 
   const applyRecord = useCallback(
-    ([s, enr, tr, t]: Awaited<ReturnType<typeof fetchRecord>>) => {
+    ([s, enr, tr, termList]: Awaited<ReturnType<typeof fetchRecord>>) => {
       setSummary(s);
       setEnrollments(enr);
       setTranscript(tr);
-      setTerms(t.map((x) => ({ id: x.id, name: x.name, isCurrent: x.isCurrent })));
+      setTerms(
+        termList.map((x) => ({ id: x.id, name: x.name, isCurrent: x.isCurrent })),
+      );
       if (s.health) {
         setHealth({
           bloodType: s.health.bloodType ?? "",
@@ -112,7 +117,7 @@ export function StudentAcademicRecord({ profileId }: { profileId: string }) {
     try {
       applyRecord(await fetchRecord());
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Load failed");
+      setError(err instanceof Error ? err.message : t("studentAcademicRecordUi.loadFailed"));
     } finally {
       setLoading(false);
     }
@@ -128,7 +133,9 @@ export function StudentAcademicRecord({ profileId }: { profileId: string }) {
   useEffect(() => {
     void fetchRecord()
       .then(applyRecord)
-      .catch((err) => setError(err instanceof Error ? err.message : "Load failed"))
+      .catch((err) =>
+        setError(err instanceof Error ? err.message : t("studentAcademicRecordUi.loadFailed")),
+      )
       .finally(() => setLoading(false));
   }, [fetchRecord, applyRecord]);
 
@@ -170,7 +177,7 @@ export function StudentAcademicRecord({ profileId }: { profileId: string }) {
       setHealthSaved(true);
       window.setTimeout(() => setHealthSaved(false), 2500);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not save health record");
+      setError(err instanceof Error ? err.message : t("studentAcademicRecordUi.saveHealthFailed"));
     } finally {
       setHealthSaving(false);
     }
@@ -193,28 +200,35 @@ export function StudentAcademicRecord({ profileId }: { profileId: string }) {
   }
 
   async function onGraduate() {
-    if (!confirm("Mark this student as graduated and issue certificate?")) return;
+    if (!confirm(t("studentAcademicRecordUi.graduateConfirm"))) return;
     await executeGraduation(profileId);
     await load();
   }
 
-  const tabs: { id: Tab; label: string }[] = [
-    { id: "overview", label: "Overview" },
-    { id: "attendance", label: "Attendance" },
-    { id: "results", label: "Results" },
-    { id: "fees", label: "Fees" },
-    { id: "documents", label: "Documents" },
-    { id: "transcript", label: "Transcript" },
-    { id: "certificates", label: "Certificates" },
-    { id: "health", label: "Health" },
-  ];
+  const tabs: { id: Tab; label: string }[] = useMemo(
+    () => [
+      { id: "overview", label: t("studentAcademicRecordUi.tabOverview") },
+      { id: "attendance", label: tn("Attendance") },
+      { id: "results", label: tn("Results") },
+      { id: "fees", label: tn("Fees") },
+      { id: "documents", label: t("studentAcademicRecordUi.tabDocuments") },
+      { id: "transcript", label: t("studentAcademicRecordUi.tabTranscript") },
+      { id: "certificates", label: t("studentAcademicRecordUi.tabCertificates") },
+      { id: "health", label: t("studentAcademicRecordUi.tabHealth") },
+    ],
+    [t, tn],
+  );
 
   if (loading && !summary) {
-    return <p className="stu-rec-loading">Loading academic record…</p>;
+    return <p className="stu-rec-loading">{t("studentAcademicRecordUi.loading")}</p>;
   }
 
   if (!summary) {
-    return <p className="auth-alert auth-alert--error">{error || "Student not found"}</p>;
+    return (
+      <p className="auth-alert auth-alert--error">
+        {error || t("studentAcademicRecordUi.notFound")}
+      </p>
+    );
   }
 
   const bloodChip =
@@ -233,7 +247,7 @@ export function StudentAcademicRecord({ profileId }: { profileId: string }) {
       <header className="stu-rec-hero">
         <div className="stu-rec-hero__main">
           <Link href="/admin/students" className="stu-rec-back">
-            ← Students
+            {t("studentAcademicRecordUi.backStudents")}
           </Link>
           <div className="stu-rec-hero__identity">
             {summary.student.photoUrl ? (
@@ -263,7 +277,7 @@ export function StudentAcademicRecord({ profileId }: { profileId: string }) {
                 </span>
                 {bloodChip ? (
                   <span className="stu-rec-chip stu-rec-chip--blood">
-                    Blood {bloodChip}
+                    {t("studentAcademicRecordUi.bloodChip", { type: bloodChip })}
                   </span>
                 ) : null}
               </div>
@@ -276,38 +290,41 @@ export function StudentAcademicRecord({ profileId }: { profileId: string }) {
             className="stu-rec-btn stu-rec-btn--ghost"
             onClick={() => void load()}
           >
-            Refresh
+            {t("studentAcademicRecordUi.refresh")}
           </button>
           <button
             type="button"
             className="stu-rec-btn stu-rec-btn--primary"
             onClick={() => openTranscriptPrint(profileId)}
           >
-            Print transcript
+            {t("studentAcademicRecordUi.printTranscript")}
           </button>
         </div>
       </header>
 
       <div className="stu-rec-kpis">
         <div className="stu-rec-kpi">
-          <span className="stu-rec-kpi__label">Attendance</span>
+          <span className="stu-rec-kpi__label">{t("studentAcademicRecordUi.kpiAttendance")}</span>
           <strong>{summary.attendance.rate ?? "—"}%</strong>
           <span className="stu-rec-kpi__hint">
-            {summary.attendance.present}/{summary.attendance.total} present
+            {t("studentAcademicRecordUi.presentOf", {
+              present: summary.attendance.present,
+              total: summary.attendance.total,
+            })}
           </span>
         </div>
         <div className="stu-rec-kpi">
-          <span className="stu-rec-kpi__label">Enrollment</span>
+          <span className="stu-rec-kpi__label">{t("studentAcademicRecordUi.kpiEnrollment")}</span>
           <strong>{enrollmentYears}</strong>
-          <span className="stu-rec-kpi__hint">Academic years</span>
+          <span className="stu-rec-kpi__hint">{t("studentAcademicRecordUi.academicYears")}</span>
         </div>
         <div className="stu-rec-kpi">
-          <span className="stu-rec-kpi__label">Documents</span>
+          <span className="stu-rec-kpi__label">{t("studentAcademicRecordUi.kpiDocuments")}</span>
           <strong>{summary.counts.documents}</strong>
-          <span className="stu-rec-kpi__hint">On file</span>
+          <span className="stu-rec-kpi__hint">{t("studentAcademicRecordUi.onFile")}</span>
         </div>
         <div className="stu-rec-kpi">
-          <span className="stu-rec-kpi__label">Fees due</span>
+          <span className="stu-rec-kpi__label">{t("studentAcademicRecordUi.kpiFeesDue")}</span>
           <strong>
             {summary.finance ? (
               <EtbAmount cents={summary.finance.outstandingCents} maximumFractionDigits={0} />
@@ -315,7 +332,7 @@ export function StudentAcademicRecord({ profileId }: { profileId: string }) {
               "—"
             )}
           </strong>
-          <span className="stu-rec-kpi__hint">Outstanding</span>
+          <span className="stu-rec-kpi__hint">{t("studentAcademicRecordUi.outstanding")}</span>
         </div>
       </div>
 
@@ -339,18 +356,18 @@ export function StudentAcademicRecord({ profileId }: { profileId: string }) {
             <section className="stu-rec-card">
               <header className="stu-rec-card__head">
                 <div>
-                  <h2 className="stu-rec-card__title">Promotion history</h2>
-                  <p className="stu-rec-card__lead">
-                    Year-by-year grade path for this student.
-                  </p>
+                  <h2 className="stu-rec-card__title">{t("studentAcademicRecordUi.promotionTitle")}</h2>
+                  <p className="stu-rec-card__lead">{t("studentAcademicRecordUi.promotionLead")}</p>
                 </div>
                 <span className="stu-rec-card__count">
                   {enrollments.length}{" "}
-                  {enrollments.length === 1 ? "year" : "years"}
+                  {enrollments.length === 1
+                    ? t("studentAcademicRecordUi.yearOne")
+                    : t("studentAcademicRecordUi.yearMany")}
                 </span>
               </header>
               {enrollments.length === 0 ? (
-                <p className="stu-rec-empty">No enrollment years recorded yet.</p>
+                <p className="stu-rec-empty">{t("studentAcademicRecordUi.noEnrollmentYears")}</p>
               ) : (
                 <ol className="stu-rec-timeline">
                   {enrollments.map((e, index) => (
@@ -372,7 +389,7 @@ export function StudentAcademicRecord({ profileId }: { profileId: string }) {
                           <div className="stu-rec-timeline__tags">
                             {e.isCurrent ? (
                               <span className="stu-rec-pill stu-rec-pill--current">
-                                Current
+                                {t("studentAcademicRecordUi.current")}
                               </span>
                             ) : null}
                             {e.promotionOutcome ? (
@@ -402,10 +419,8 @@ export function StudentAcademicRecord({ profileId }: { profileId: string }) {
               <section className="stu-rec-card stu-rec-card--grad">
                 <header className="stu-rec-card__head">
                   <div>
-                    <h2 className="stu-rec-card__title">Graduation readiness</h2>
-                    <p className="stu-rec-card__lead">
-                      Checklist before marking the student graduated.
-                    </p>
+                    <h2 className="stu-rec-card__title">{t("studentAcademicRecordUi.graduationTitle")}</h2>
+                    <p className="stu-rec-card__lead">{t("studentAcademicRecordUi.graduationLead")}</p>
                   </div>
                   {(() => {
                     const met = gradPreview.requirements.filter((r) => r.met).length;
@@ -415,7 +430,10 @@ export function StudentAcademicRecord({ profileId }: { profileId: string }) {
                       <div
                         className={`stu-rec-progress${gradPreview.ready ? " stu-rec-progress--ready" : ""}`}
                         style={{ ["--stu-rec-pct" as string]: `${pct}%` }}
-                        aria-label={`${met} of ${total} requirements met`}
+                        aria-label={t("studentAcademicRecordUi.requirementsAria", {
+                          met,
+                          total,
+                        })}
                       >
                         <span className="stu-rec-progress__ring" aria-hidden />
                         <span className="stu-rec-progress__val">
@@ -454,7 +472,7 @@ export function StudentAcademicRecord({ profileId }: { profileId: string }) {
                       </span>
                       <span className="stu-rec-check__label">{r.label}</span>
                       <span className="stu-rec-check__state">
-                        {r.met ? "Met" : "Pending"}
+                        {r.met ? t("studentAcademicRecordUi.met") : t("studentAcademicRecordUi.pending")}
                       </span>
                     </li>
                   ))}
@@ -466,13 +484,11 @@ export function StudentAcademicRecord({ profileId }: { profileId: string }) {
                       className="plat-btn plat-btn--primary"
                       onClick={() => void onGraduate()}
                     >
-                      Graduate student
+                      {t("studentAcademicRecordUi.graduateStudent")}
                     </button>
                   </div>
                 ) : (
-                  <p className="stu-rec-grad-note">
-                    Complete the pending items to unlock graduation.
-                  </p>
+                  <p className="stu-rec-grad-note">{t("studentAcademicRecordUi.graduationLocked")}</p>
                 )}
               </section>
             ) : null}
@@ -483,21 +499,21 @@ export function StudentAcademicRecord({ profileId }: { profileId: string }) {
           <section className="stu-rec-section">
             <header className="stu-rec-section__head">
               <div>
-                <h2 className="stu-rec-section__title">Attendance</h2>
-                <p className="stu-rec-section__lead">Daily presence summary for this student.</p>
+                <h2 className="stu-rec-section__title">{t("studentAcademicRecordUi.attendanceTitle")}</h2>
+                <p className="stu-rec-section__lead">{t("studentAcademicRecordUi.attendanceLead")}</p>
               </div>
             </header>
             <div className="stu-rec-stat-grid">
               <div className="stu-rec-stat">
-                <span>Rate</span>
+                <span>{t("studentAcademicRecordUi.rate")}</span>
                 <strong>{summary.attendance.rate ?? 0}%</strong>
               </div>
               <div className="stu-rec-stat">
-                <span>Present</span>
+                <span>{t("studentAcademicRecordUi.present")}</span>
                 <strong>{summary.attendance.present}</strong>
               </div>
               <div className="stu-rec-stat">
-                <span>Records</span>
+                <span>{t("studentAcademicRecordUi.records")}</span>
                 <strong>{summary.attendance.total}</strong>
               </div>
             </div>
@@ -508,27 +524,27 @@ export function StudentAcademicRecord({ profileId }: { profileId: string }) {
           <section className="stu-rec-section">
             <header className="stu-rec-section__head">
               <div>
-                <h2 className="stu-rec-section__title">Report cards</h2>
-                <p className="stu-rec-section__lead">
-                  Open published term report cards for this student.
-                </p>
+                <h2 className="stu-rec-section__title">{t("studentAcademicRecordUi.reportCardsTitle")}</h2>
+                <p className="stu-rec-section__lead">{t("studentAcademicRecordUi.reportCardsLead")}</p>
               </div>
             </header>
             <ul className="stu-rec-rows">
-              {terms.map((t) => (
-                <li key={t.id} className="stu-rec-row">
+              {terms.map((term) => (
+                <li key={term.id} className="stu-rec-row">
                   <div>
-                    <strong>{t.name}</strong>
-                    {t.isCurrent ? (
-                      <span className="stu-rec-pill stu-rec-pill--current">Current</span>
+                    <strong>{term.name}</strong>
+                    {term.isCurrent ? (
+                      <span className="stu-rec-pill stu-rec-pill--current">
+                        {t("studentAcademicRecordUi.current")}
+                      </span>
                     ) : null}
                   </div>
                   <button
                     type="button"
                     className="plat-btn plat-btn--ghost plat-btn--xs"
-                    onClick={() => openReportCardPrint(profileId, t.id)}
+                    onClick={() => openReportCardPrint(profileId, term.id)}
                   >
-                    Report card
+                    {t("studentAcademicRecordUi.reportCard")}
                   </button>
                 </li>
               ))}
@@ -540,36 +556,36 @@ export function StudentAcademicRecord({ profileId }: { profileId: string }) {
           <section className="stu-rec-section">
             <header className="stu-rec-section__head">
               <div>
-                <h2 className="stu-rec-section__title">Fees</h2>
-                <p className="stu-rec-section__lead">Billing snapshot for this student.</p>
+                <h2 className="stu-rec-section__title">{t("studentAcademicRecordUi.feesTitle")}</h2>
+                <p className="stu-rec-section__lead">{t("studentAcademicRecordUi.feesLead")}</p>
               </div>
               <Link href="/admin/finance" className="plat-btn plat-btn--ghost plat-btn--xs">
-                Open finance
+                {t("studentAcademicRecordUi.openFinance")}
               </Link>
             </header>
             {summary.finance ? (
               <div className="stu-rec-stat-grid">
                 <div className="stu-rec-stat">
-                  <span>Total due</span>
+                  <span>{t("studentAcademicRecordUi.totalDue")}</span>
                   <strong>
                     <EtbAmount cents={summary.finance.totalDueCents} maximumFractionDigits={0} />
                   </strong>
                 </div>
                 <div className="stu-rec-stat">
-                  <span>Paid</span>
+                  <span>{t("studentAcademicRecordUi.paid")}</span>
                   <strong>
                     <EtbAmount cents={summary.finance.totalPaidCents} maximumFractionDigits={0} />
                   </strong>
                 </div>
                 <div className="stu-rec-stat">
-                  <span>Outstanding</span>
+                  <span>{t("studentAcademicRecordUi.outstanding")}</span>
                   <strong>
                     <EtbAmount cents={summary.finance.outstandingCents} maximumFractionDigits={0} />
                   </strong>
                 </div>
               </div>
             ) : (
-              <p className="stu-rec-empty">No finance data yet.</p>
+              <p className="stu-rec-empty">{t("studentAcademicRecordUi.noFinance")}</p>
             )}
           </section>
         ) : null}
@@ -578,41 +594,39 @@ export function StudentAcademicRecord({ profileId }: { profileId: string }) {
           <section className="stu-rec-section">
             <header className="stu-rec-section__head">
               <div>
-                <h2 className="stu-rec-section__title">Documents</h2>
-                <p className="stu-rec-section__lead">
-                  Upload and open permanent student files.
-                </p>
+                <h2 className="stu-rec-section__title">{t("studentAcademicRecordUi.documentsTitle")}</h2>
+                <p className="stu-rec-section__lead">{t("studentAcademicRecordUi.documentsLead")}</p>
               </div>
             </header>
             <form className="stu-rec-form stu-rec-form--modern" onSubmit={(e) => void onUploadDoc(e)}>
               <select value={docType} onChange={(e) => setDocType(e.target.value)}>
-                {DOC_TYPES.map((t) => (
-                  <option key={t} value={t}>
-                    {t.replace(/_/g, " ")}
+                {DOC_TYPES.map((docType) => (
+                  <option key={docType} value={docType}>
+                    {docLabel(docType)}
                   </option>
                 ))}
               </select>
               <input type="file" name="file" required />
               <button type="submit" className="plat-btn plat-btn--primary plat-btn--xs">
-                Upload
+                {t("studentAcademicRecordUi.upload")}
               </button>
             </form>
             {documents.length === 0 ? (
-              <p className="stu-rec-empty">No documents uploaded yet.</p>
+              <p className="stu-rec-empty">{t("studentAcademicRecordUi.noDocuments")}</p>
             ) : (
               <ul className="stu-rec-rows">
                 {documents.map((d) => (
                   <li key={d.id} className="stu-rec-row">
                     <div>
-                      <strong>{d.title ?? d.type.replace(/_/g, " ")}</strong>
-                      <span className="stu-rec-row__meta">{d.type.replace(/_/g, " ")}</span>
+                      <strong>{d.title ?? docLabel(d.type)}</strong>
+                      <span className="stu-rec-row__meta">{docLabel(d.type)}</span>
                     </div>
                     <button
                       type="button"
                       className="plat-btn plat-btn--ghost plat-btn--xs"
                       onClick={() => void openStudentDocument(d.fileUrl)}
                     >
-                      Open
+                      {t("studentAcademicRecordUi.open")}
                     </button>
                   </li>
                 ))}
@@ -625,20 +639,21 @@ export function StudentAcademicRecord({ profileId }: { profileId: string }) {
           <section className="stu-rec-section">
             <header className="stu-rec-section__head">
               <div>
-                <h2 className="stu-rec-section__title">Transcript</h2>
-                <p className="stu-rec-section__lead">Cumulative academic performance.</p>
+                <h2 className="stu-rec-section__title">{t("studentAcademicRecordUi.transcriptTitle")}</h2>
+                <p className="stu-rec-section__lead">{t("studentAcademicRecordUi.transcriptLead")}</p>
               </div>
               <div className="stu-rec-transcript-score">
                 <span>
-                  Avg <strong>{transcript.overallAverage ?? "—"}%</strong>
+                  {t("studentAcademicRecordUi.avg")}{" "}
+                  <strong>{transcript.overallAverage ?? "—"}%</strong>
                 </span>
                 <span>
-                  GPA <strong>{transcript.overallGpa ?? "—"}</strong>
+                  {t("studentAcademicRecordUi.gpa")} <strong>{transcript.overallGpa ?? "—"}</strong>
                 </span>
               </div>
             </header>
             {transcript.years.length === 0 ? (
-              <p className="stu-rec-empty">No transcript years yet.</p>
+              <p className="stu-rec-empty">{t("studentAcademicRecordUi.noTranscriptYears")}</p>
             ) : (
               <div className="stu-rec-transcript">
                 {transcript.years.map((y) => (
@@ -647,19 +662,19 @@ export function StudentAcademicRecord({ profileId }: { profileId: string }) {
                       {y.academicYear} — {y.grade}
                       {y.yearAverage != null ? ` (${y.yearAverage}%)` : ""}
                     </h3>
-                    {y.terms.map((t) => (
-                      <div key={t.termId} className="stu-rec-term">
-                        <h4>{t.termName}</h4>
+                    {y.terms.map((termRow) => (
+                      <div key={termRow.termId} className="stu-rec-term">
+                        <h4>{termRow.termName}</h4>
                         <table className="stu-rec-table">
                           <thead>
                             <tr>
-                              <th>Subject</th>
-                              <th>Avg</th>
-                              <th>Grade</th>
+                              <th>{t("studentAcademicRecordUi.colSubject")}</th>
+                              <th>{t("studentAcademicRecordUi.colAvg")}</th>
+                              <th>{t("studentAcademicRecordUi.colGrade")}</th>
                             </tr>
                           </thead>
                           <tbody>
-                            {t.subjects.map((s) => (
+                            {termRow.subjects.map((s) => (
                               <tr key={s.subject}>
                                 <td>{s.subject}</td>
                                 <td>{s.average}%</td>
@@ -681,24 +696,24 @@ export function StudentAcademicRecord({ profileId }: { profileId: string }) {
           <section className="stu-rec-section">
             <header className="stu-rec-section__head">
               <div>
-                <h2 className="stu-rec-section__title">Certificates</h2>
-                <p className="stu-rec-section__lead">Issue and print official certificates.</p>
+                <h2 className="stu-rec-section__title">{t("studentAcademicRecordUi.certificatesTitle")}</h2>
+                <p className="stu-rec-section__lead">{t("studentAcademicRecordUi.certificatesLead")}</p>
               </div>
             </header>
             <div className="stu-rec-cert-actions">
-              {CERT_TYPES.map((c) => (
+              {CERT_TYPES.map((certType) => (
                 <button
-                  key={c.value}
+                  key={certType}
                   type="button"
                   className="plat-btn plat-btn--ghost plat-btn--xs"
-                  onClick={() => void onIssueCert(c.value)}
+                  onClick={() => void onIssueCert(certType)}
                 >
-                  Issue {c.label}
+                  {t("studentAcademicRecordUi.issue", { type: certLabel(certType) })}
                 </button>
               ))}
             </div>
             {certificates.length === 0 ? (
-              <p className="stu-rec-empty">No certificates issued yet.</p>
+              <p className="stu-rec-empty">{t("studentAcademicRecordUi.noCertificates")}</p>
             ) : (
               <ul className="stu-rec-rows">
                 {certificates.map((c) => (
@@ -712,7 +727,7 @@ export function StudentAcademicRecord({ profileId }: { profileId: string }) {
                       className="plat-btn plat-btn--ghost plat-btn--xs"
                       onClick={() => openCertificatePrint(profileId, c.id)}
                     >
-                      Print
+                      {t("studentAcademicRecordUi.print")}
                     </button>
                   </li>
                 ))}
@@ -725,15 +740,13 @@ export function StudentAcademicRecord({ profileId }: { profileId: string }) {
           <form className="stu-rec-health stu-rec-section" onSubmit={(e) => void onSaveHealth(e)}>
             <header className="stu-rec-section__head">
               <div>
-                <h2 className="stu-rec-section__title">Health record</h2>
-                <p className="stu-rec-section__lead">
-                  Blood group and medical notes for ID cards and emergencies.
-                </p>
+                <h2 className="stu-rec-section__title">{t("studentAcademicRecordUi.healthTitle")}</h2>
+                <p className="stu-rec-section__lead">{t("studentAcademicRecordUi.healthLead")}</p>
               </div>
               <div className="stu-rec-health-actions">
                 {healthSaved ? (
                   <span className="stu-rec-health-saved" role="status">
-                    Saved
+                    {t("studentAcademicRecordUi.saved")}
                   </span>
                 ) : null}
                 <button
@@ -741,13 +754,13 @@ export function StudentAcademicRecord({ profileId }: { profileId: string }) {
                   className="stu-rec-btn stu-rec-btn--primary"
                   disabled={healthSaving}
                 >
-                  {healthSaving ? "Saving…" : "Save health record"}
+                  {healthSaving ? t("common.saving") : t("studentAcademicRecordUi.saveHealth")}
                 </button>
               </div>
             </header>
             <div className="stu-rec-health__grid">
               <label>
-                Blood type
+                {t("studentAcademicRecordUi.bloodType")}
                 <select
                   value={health.bloodType ?? ""}
                   onChange={(e) => {
@@ -755,7 +768,7 @@ export function StudentAcademicRecord({ profileId }: { profileId: string }) {
                     setHealth({ ...health, bloodType: e.target.value });
                   }}
                 >
-                  <option value="">Select blood group</option>
+                  <option value="">{t("studentAcademicRecordUi.selectBloodGroup")}</option>
                   {["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"].map((bg) => (
                     <option key={bg} value={bg}>
                       {bg}
@@ -764,7 +777,7 @@ export function StudentAcademicRecord({ profileId }: { profileId: string }) {
                 </select>
               </label>
               <label>
-                Emergency contact
+                {t("studentAcademicRecordUi.emergencyContact")}
                 <input
                   value={health.emergencyContactName ?? ""}
                   onChange={(e) => {
@@ -774,7 +787,7 @@ export function StudentAcademicRecord({ profileId }: { profileId: string }) {
                 />
               </label>
               <label>
-                Emergency phone
+                {t("studentAcademicRecordUi.emergencyPhone")}
                 <input
                   value={health.emergencyContactPhone ?? ""}
                   onChange={(e) => {
@@ -784,7 +797,7 @@ export function StudentAcademicRecord({ profileId }: { profileId: string }) {
                 />
               </label>
               <label>
-                Allergies
+                {t("studentAcademicRecordUi.allergies")}
                 <textarea
                   value={health.allergies ?? ""}
                   onChange={(e) => {
@@ -794,7 +807,7 @@ export function StudentAcademicRecord({ profileId }: { profileId: string }) {
                 />
               </label>
               <label>
-                Medical conditions
+                {t("studentAcademicRecordUi.medicalConditions")}
                 <textarea
                   value={health.medicalConditions ?? ""}
                   onChange={(e) => {
@@ -804,7 +817,7 @@ export function StudentAcademicRecord({ profileId }: { profileId: string }) {
                 />
               </label>
               <label>
-                Medication notes
+                {t("studentAcademicRecordUi.medicationNotes")}
                 <textarea
                   value={health.medicationNotes ?? ""}
                   onChange={(e) => {
@@ -820,11 +833,9 @@ export function StudentAcademicRecord({ profileId }: { profileId: string }) {
                 className="stu-rec-btn stu-rec-btn--primary"
                 disabled={healthSaving}
               >
-                {healthSaving ? "Saving…" : "Save health record"}
+                {healthSaving ? t("common.saving") : t("studentAcademicRecordUi.saveHealth")}
               </button>
-              <p className="stu-rec-section__lead">
-                Choose blood type, then click Save. It appears on the ID card after saving.
-              </p>
+              <p className="stu-rec-section__lead">{t("studentAcademicRecordUi.healthFooter")}</p>
             </div>
           </form>
         ) : null}

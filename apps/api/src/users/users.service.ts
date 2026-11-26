@@ -185,6 +185,7 @@ export class UsersService {
   async createUser(input: {
     username: string;
     email?: string;
+    phone?: string | null;
     password?: string;
     firstName: string;
     lastName: string;
@@ -262,11 +263,14 @@ export class UsersService {
       10,
     );
 
+    const phone = input.phone?.trim() || null;
+
     const user = await this.prisma.user.create({
       data: {
         id: `u_${randomBytes(8).toString('hex')}`,
         username,
         email,
+        phone,
         firstName: input.firstName,
         lastName: input.lastName,
         role: template?.portalRole ?? input.role,

@@ -1,4 +1,12 @@
-import { Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import type { AuthUser } from '../common/auth.types';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -51,5 +59,14 @@ export class NotificationsController {
       return this.notificationsService.markRead(id, user.id);
     }
     return this.notificationsService.markStaffRead(id, user.id);
+  }
+
+  @Delete(':id')
+  @Roles('parent', 'admin', 'teacher', 'staff')
+  remove(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    if (user.role === 'parent') {
+      return this.notificationsService.deleteParentNotification(id, user.id);
+    }
+    return this.notificationsService.deleteStaffNotification(id, user.id);
   }
 }

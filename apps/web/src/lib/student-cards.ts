@@ -5,6 +5,8 @@ export type StudentIdCard = {
   studentProfileId: string;
   cardCode: string;
   scanPayload: string;
+  /** Opens on any phone camera → password → published results. */
+  publicResultsUrl?: string;
   name: string;
   firstName: string;
   lastName: string;

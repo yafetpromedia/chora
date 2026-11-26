@@ -13,6 +13,21 @@ import {
 } from "@/lib/demo-video";
 import { getPublicPlatformConfig } from "@/lib/public-platform-config";
 import { BRAND_DEMO_POSTER_SRC, BRAND_NAME } from "@/lib/brand";
+import { useLocale } from "@/components/i18n/locale-provider";
+
+const DEMO_CHAPTER_KEYS = [
+  "ch0",
+  "ch1",
+  "ch2",
+  "ch3",
+  "ch4",
+  "ch5",
+  "ch6",
+  "ch7",
+  "ch8",
+  "ch9",
+  "ch10",
+] as const;
 
 type Props = {
   size?: "default" | "hero";
@@ -26,6 +41,7 @@ export function DemoVideoPlayer({
   showChapters = true,
   variant = "default",
 }: Props) {
+  const { t } = useLocale();
   const labelId = useId();
   const dialogTitleId = useId();
   const [videoUrl, setVideoUrl] = useState(DEMO_VIDEO_URL_ENV);
@@ -89,7 +105,7 @@ export function DemoVideoPlayer({
     playing && youtubeId ? (
       <iframe
         className="lp3-demo-stage__frame"
-        title={`${BRAND_NAME} product overview`}
+        title={t("demoVideoUi.productOverview", { brand: BRAND_NAME })}
         src={youtubeEmbedSrc(youtubeId, startAt)}
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
         allowFullScreen
@@ -119,7 +135,7 @@ export function DemoVideoPlayer({
           <img
             className="lp3-explore-video__poster"
             src={posterSrc}
-            alt={`${BRAND_NAME} product interface preview`}
+            alt={t("demoVideoUi.posterAlt", { brand: BRAND_NAME })}
           />
           <span className="lp3-explore-video__veil" aria-hidden />
           <span className="lp3-explore-video__cue" aria-hidden>
@@ -129,15 +145,15 @@ export function DemoVideoPlayer({
           </span>
           <span id={labelId} className="sr-only">
             {hasSource
-              ? `Play ${BRAND_NAME} product overview video`
-              : `${BRAND_NAME} product overview video coming soon`}
+              ? t("demoVideoUi.playOverview", { brand: BRAND_NAME })
+              : t("demoVideoUi.overviewSoon", { brand: BRAND_NAME })}
           </span>
         </button>
 
         {!hasSource ? (
           <p className="lp3-explore-video__soon">
-            Overview video coming soon.{" "}
-            <Link href="/demo">Open full walkthrough</Link>
+            {t("demoVideoUi.overviewSoonBody")}{" "}
+            <Link href="/demo">{t("demoVideoUi.openWalkthrough")}</Link>
           </p>
         ) : null}
 
@@ -154,12 +170,14 @@ export function DemoVideoPlayer({
               onClick={(e) => e.stopPropagation()}
             >
               <div className="lp3-explore-modal__bar">
-                <h3 id={dialogTitleId}>{BRAND_NAME} product overview</h3>
+                <h3 id={dialogTitleId}>
+                  {t("demoVideoUi.productOverview", { brand: BRAND_NAME })}
+                </h3>
                 <button
                   type="button"
                   className="lp3-explore-modal__close"
                   onClick={closePlayer}
-                  aria-label="Close video"
+                  aria-label={t("demoVideoUi.closeVideo")}
                 >
                   ×
                 </button>
@@ -199,7 +217,7 @@ export function DemoVideoPlayer({
                   </svg>
                 </span>
                 <span id={labelId} className="lp3-demo-play__label">
-                  Play walkthrough
+                  {t("demoVideoUi.playWalkthrough")}
                 </span>
               </button>
             ) : (
@@ -215,7 +233,7 @@ export function DemoVideoPlayer({
                   </svg>
                 </span>
                 <span id={labelId} className="lp3-demo-play__label">
-                  Open demo
+                  {t("demoVideoUi.openDemo")}
                 </span>
               </Link>
             )}
@@ -225,9 +243,9 @@ export function DemoVideoPlayer({
 
       {showChapters ? (
         <div className="lp3-demo-chapters">
-          <p className="lp3-demo-chapters__label">Chapters</p>
+          <p className="lp3-demo-chapters__label">{t("demoVideoUi.chapters")}</p>
           <ol className="lp3-demo-chapters__list">
-            {DEMO_CHAPTERS.map((ch) => (
+            {DEMO_CHAPTERS.map((ch, index) => (
               <li key={ch.time}>
                 <button
                   type="button"
@@ -236,7 +254,9 @@ export function DemoVideoPlayer({
                   disabled={!hasSource}
                 >
                   <time dateTime={`PT${ch.seconds}S`}>{ch.time}</time>
-                  <span>{ch.title}</span>
+                  <span>
+                    {t(`demoVideoUi.${DEMO_CHAPTER_KEYS[index] ?? "ch0"}`)}
+                  </span>
                 </button>
               </li>
             ))}

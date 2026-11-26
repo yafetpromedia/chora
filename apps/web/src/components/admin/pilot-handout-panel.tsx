@@ -10,6 +10,7 @@ import {
   readSavedHandoutLoginUrl,
   saveHandoutLoginUrl,
 } from "@/lib/school-welcome";
+import { useLocale } from "@/components/i18n/locale-provider";
 
 type Props = {
   schoolName: string;
@@ -18,6 +19,7 @@ type Props = {
 };
 
 export function PilotHandoutPanel({ schoolName, joinCode, loginUrl }: Props) {
+  const { t } = useLocale();
   const detectedUrl = loginUrl ?? getLoginUrl();
   const [urlDraft, setUrlDraft] = useState(detectedUrl);
   const [copied, setCopied] = useState<"parent" | "student" | null>(null);
@@ -67,20 +69,20 @@ export function PilotHandoutPanel({ schoolName, joinCode, loginUrl }: Props) {
 
   return (
     <section className="cfg-section pilot-handout">
-      <h2 className="cfg-section__title">Pilot login handout</h2>
+      <h2 className="cfg-section__title">{t("pilotHandoutUi.title")}</h2>
       <p className="cfg-section__lead">
-        Copy text for parents and students. Set the public login URL before you share — it is saved
-        for this school. Run <Link href="/admin/academics">Academics setup</Link> before the first
-        term of results.
+        {t("pilotHandoutUi.leadBefore")}{" "}
+        <Link href="/admin/academics">{t("pilotHandoutUi.academicsSetup")}</Link>{" "}
+        {t("pilotHandoutUi.leadAfter")}
       </p>
 
       <label className="pilot-handout__url">
-        <span>Public login URL</span>
+        <span>{t("pilotHandoutUi.publicLoginUrl")}</span>
         <div className="pilot-handout__url-row">
           <input
             type="url"
             value={urlDraft}
-            placeholder="https://your-school.chora.app/login"
+            placeholder={t("pilotHandoutUi.urlPlaceholder")}
             onChange={(e) => setUrlDraft(e.target.value)}
             onBlur={(e) => persistUrl(e.target.value)}
           />
@@ -89,43 +91,42 @@ export function PilotHandoutPanel({ schoolName, joinCode, loginUrl }: Props) {
             className="cfg-btn cfg-btn--ghost"
             onClick={() => persistUrl(detectedUrl)}
           >
-            Reset
+            {t("pilotHandoutUi.reset")}
           </button>
         </div>
         <em>
-          {isLocal
-            ? "This looks like a local address. Change it to the URL families should open (for example https://app.chora.app/login)."
-            : "This URL is what parents and students will copy. You can change it anytime."}
+          {isLocal ? t("pilotHandoutUi.urlHintLocal") : t("pilotHandoutUi.urlHintPublic")}
         </em>
       </label>
 
       <div className="pilot-handout__grid">
         <div className="pilot-handout__card">
-          <h3>Parents</h3>
+          <h3>{t("pilotHandoutUi.parents")}</h3>
           <pre className="pilot-handout__pre">{parentText}</pre>
           <button
             type="button"
             className="cfg-btn cfg-btn--ghost"
             onClick={() => void copy("parent", parentText)}
           >
-            {copied === "parent" ? "Copied!" : "Copy parent handout"}
+            {copied === "parent" ? t("pilotHandoutUi.copied") : t("pilotHandoutUi.copyParent")}
           </button>
         </div>
         <div className="pilot-handout__card">
-          <h3>Students</h3>
+          <h3>{t("pilotHandoutUi.students")}</h3>
           <pre className="pilot-handout__pre">{studentText}</pre>
           <button
             type="button"
             className="cfg-btn cfg-btn--ghost"
             onClick={() => void copy("student", studentText)}
           >
-            {copied === "student" ? "Copied!" : "Copy student handout"}
+            {copied === "student" ? t("pilotHandoutUi.copied") : t("pilotHandoutUi.copyStudent")}
           </button>
         </div>
       </div>
       <p className="cfg-hint">
-        Staff and teachers use the same login page with credentials from{" "}
-        <Link href="/admin/teachers">Teachers</Link> or Admin → Settings → Access.
+        {t("pilotHandoutUi.staffHintBefore")}{" "}
+        <Link href="/admin/teachers">{t("pilotHandoutUi.teachersLink")}</Link>{" "}
+        {t("pilotHandoutUi.staffHintAfter")}
       </p>
     </section>
   );

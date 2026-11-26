@@ -1,66 +1,11 @@
 "use client";
 
 import { motion, useReducedMotion } from "framer-motion";
+import { useMemo } from "react";
 import { useLandingHeroImage } from "@/hooks/use-landing-hero-image";
 import { BrandMark } from "@/components/brand-mark";
+import { useLocale } from "@/components/i18n/locale-provider";
 import { BRAND_NAME } from "@/lib/brand";
-
-const FEATURES = [
-  {
-    title: "Attendance",
-    desc: "Roll call & concerns",
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" aria-hidden>
-        <path
-          d="M7.5 12.5l2.75 2.75 6-6.25"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-    ),
-  },
-  {
-    title: "Library",
-    desc: "Books & borrowing",
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" aria-hidden>
-        <path
-          d="M6.25 5.75h5.25a2 2 0 012 2V18H8.25a2 2 0 01-2-2V5.75z"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          strokeLinejoin="round"
-        />
-        <path
-          d="M11.5 7.75H16.75a2 2 0 012 2V18H11.5"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          strokeLinejoin="round"
-        />
-      </svg>
-    ),
-  },
-  {
-    title: "Results",
-    desc: "Term & yearly cards",
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" aria-hidden>
-        <path
-          d="M8 5.75h8a1.75 1.75 0 011.75 1.75v10.5A1.75 1.75 0 0116 19.75H8A1.75 1.75 0 016.25 18V7.5A1.75 1.75 0 018 5.75z"
-          stroke="currentColor"
-          strokeWidth="1.5"
-        />
-        <path
-          d="M10 10h4M10 13.25h4M10 16.5h2.5"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-        />
-      </svg>
-    ),
-  },
-] as const;
 
 function FeatureGraphDivider({ delay = 0 }: { delay?: number }) {
   const gradId = `login-graph-fill-${String(delay).replace(".", "")}`;
@@ -112,8 +57,74 @@ function FeatureGraphDivider({ delay = 0 }: { delay?: number }) {
 }
 
 export function LoginVisualPanel() {
+  const { t } = useLocale();
   const reduce = useReducedMotion();
   const heroSrc = useLandingHeroImage();
+
+  const features = useMemo(
+    () =>
+      ([
+        {
+          titleKey: "auth.visualAttendanceTitle",
+          descKey: "auth.visualAttendanceDesc",
+          icon: (
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path
+                d="M7.5 12.5l2.75 2.75 6-6.25"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          ),
+        },
+        {
+          titleKey: "auth.visualLibraryTitle",
+          descKey: "auth.visualLibraryDesc",
+          icon: (
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path
+                d="M6.25 5.75h5.25a2 2 0 012 2V18H8.25a2 2 0 01-2-2V5.75z"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M11.5 7.75H16.75a2 2 0 012 2V18H11.5"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinejoin="round"
+              />
+            </svg>
+          ),
+        },
+        {
+          titleKey: "auth.visualResultsTitle",
+          descKey: "auth.visualResultsDesc",
+          icon: (
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path
+                d="M8 5.75h8a1.75 1.75 0 011.75 1.75v10.5A1.75 1.75 0 0116 19.75H8A1.75 1.75 0 016.25 18V7.5A1.75 1.75 0 018 5.75z"
+                stroke="currentColor"
+                strokeWidth="1.5"
+              />
+              <path
+                d="M10 10h4M10 13.25h4M10 16.5h2.5"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+              />
+            </svg>
+          ),
+        },
+      ] as const).map((f) => ({
+        ...f,
+        title: t(f.titleKey),
+        desc: t(f.descKey),
+      })),
+    [t],
+  );
 
   return (
     <div className="login-visual">
@@ -141,7 +152,7 @@ export function LoginVisualPanel() {
             </span>
             <div className="login-visual__brand-text">
               <strong>{BRAND_NAME}</strong>
-              <span>School management</span>
+              <span>{t("auth.visualTagline")}</span>
             </div>
           </div>
 
@@ -157,7 +168,7 @@ export function LoginVisualPanel() {
                 />
               </svg>
             </span>
-            Trusted by schools
+            {t("auth.visualTrusted")}
           </div>
         </motion.header>
 
@@ -168,14 +179,11 @@ export function LoginVisualPanel() {
           transition={{ duration: 0.5, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
         >
           <h2 className="login-visual__title">
-            Better schools.
+            {t("auth.visualTitleLine1")}
             <br />
-            <span>Smarter management.</span>
+            <span>{t("auth.visualTitleLine2")}</span>
           </h2>
-          <p className="login-visual__body">
-            Streamline operations, engage stakeholders and improve student
-            outcomes.
-          </p>
+          <p className="login-visual__body">{t("auth.visualBody")}</p>
         </motion.div>
 
         <motion.div
@@ -185,9 +193,9 @@ export function LoginVisualPanel() {
           transition={{ duration: 0.5, delay: 0.14, ease: [0.22, 1, 0.36, 1] }}
         >
           <ul className="login-visual__features">
-            {FEATURES.map((feature, index) => (
+            {features.map((feature, index) => (
               <motion.li
-                key={feature.title}
+                key={feature.titleKey}
                 initial={reduce ? false : { opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 + index * 0.08, duration: 0.4 }}

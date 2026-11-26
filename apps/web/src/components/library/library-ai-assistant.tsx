@@ -7,6 +7,9 @@ import {
   runStudyAssist,
   type StudyAssistAction,
 } from "@/lib/ai";
+import { subjectCompactLabel } from "@/lib/subject-label";
+import { DashIcon } from "@/components/dashboard/dash-icons";
+import { useLocale } from "@/components/i18n/locale-provider";
 
 type Props = {
   resources: LibraryResource[];
@@ -16,32 +19,18 @@ type Props = {
   hideHead?: boolean;
 };
 
-const ACTIONS: { id: StudyAssistAction; label: string; hint: string }[] = [
-  {
-    id: "summarize",
-    label: "Summarize",
-    hint: "Key points and definitions",
-  },
-  {
-    id: "quiz",
-    label: "Quiz me",
-    hint: "5 practice questions + answers",
-  },
-  {
-    id: "translate",
-    label: "Amharic",
-    hint: "Translate lesson text",
-  },
-];
-
-function resourceText(resource: LibraryResource): string {
+function resourceText(
+  resource: LibraryResource,
+  subjectLine: (subject: string) => string,
+): string {
   const parts = [resource.title];
-  if (resource.subject) parts.push(`Subject: ${resource.subject}`);
+  if (resource.subject) parts.push(subjectLine(resource.subject));
   if (resource.description?.trim()) parts.push(resource.description.trim());
   return parts.join("\n\n");
 }
 
 export function LibraryAiAssistant({ resources, focus, hideHead }: Props) {
+  const { t } = useLocale();
   const [configured, setConfigured] = useState<boolean | null>(null);
   const [model, setModel] = useState<string | null>(null);
   const [resourceId, setResourceId] = useState("");
@@ -50,6 +39,28 @@ export function LibraryAiAssistant({ resources, focus, hideHead }: Props) {
   const [result, setResult] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+
+  const actions = useMemo(
+    () =>
+      [
+        {
+          id: "summarize" as const,
+          label: t("libraryAiUi.actionSummarize"),
+          hint: t("libraryAiUi.actionSummarizeHint"),
+        },
+        {
+          id: "quiz" as const,
+          label: t("libraryAiUi.actionQuiz"),
+          hint: t("libraryAiUi.actionQuizHint"),
+        },
+        {
+          id: "translate" as const,
+          label: t("libraryAiUi.actionTranslate"),
+          hint: t("libraryAiUi.actionTranslateHint"),
+        },
+      ],
+    [t],
+  );
 
   const pickable = useMemo(
     () =>
@@ -77,7 +88,13 @@ export function LibraryAiAssistant({ resources, focus, hideHead }: Props) {
   );
   if (selected !== syncedSelected) {
     setSyncedSelected(selected);
-    if (selected) setText(resourceText(selected));
+    if (selected) {
+      setText(
+        resourceText(selected, (subject) =>
+          t("libraryAiUi.subjectPrefix", { subject }),
+        ),
+      );
+    }
   }
 
   async function onSubmit(e: FormEvent) {
@@ -86,7 +103,7 @@ export function LibraryAiAssistant({ resources, focus, hideHead }: Props) {
     setResult("");
     const body = text.trim();
     if (body.length < 10) {
-      setError("Add at least a few sentences of lesson text to analyze.");
+      setError(t("libraryAiUi.errMinText"));
       return;
     }
     setBusy(true);
@@ -99,7 +116,7 @@ export function LibraryAiAssistant({ resources, focus, hideHead }: Props) {
       });
       setResult(res.content);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "AI request failed");
+      setError(err instanceof Error ? err.message : t("libraryAiUi.errRequest"));
     } finally {
       setBusy(false);
     }
@@ -114,45 +131,41 @@ export function LibraryAiAssistant({ resources, focus, hideHead }: Props) {
       <div className="lib-ai-panel__head">
         <div className="lib-ai-panel__intro">
           <span className="lib-ai-panel__icon" aria-hidden>
-            ✦
+            <DashIcon name="sparkle" className="dash-icon--sm" />
           </span>
           <div>
             <h2 id="lib-ai-title" className="lib-ai-panel__title">
-              AI study assistant
+              {t("libraryAiUi.title")}
             </h2>
-            <p className="lib-ai-panel__sub">
-              Summarize chapters, generate quizzes, and translate lessons from your
-              library materials.
-            </p>
+            <p className="lib-ai-panel__sub">{t("libraryAiUi.sub")}</p>
           </div>
         </div>
-        <span className="lib-ai-badge">Powered by AI</span>
+        <span className="lib-ai-badge">{t("libraryAiUi.poweredBy")}</span>
       </div>
       ) : (
         <div className="lib-ai-panel__head lib-ai-panel__head--compact">
-          <span className="lib-ai-badge">Powered by AI</span>
+          <span className="lib-ai-badge">{t("libraryAiUi.poweredBy")}</span>
         </div>
       )}
 
       {configured === false ? (
-        <p className="lib-ai-panel__notice">
-          AI is not configured on this server yet. Ask your school admin to add
-          API keys on the API host.
-        </p>
+        <p className="lib-ai-panel__notice">{t("libraryAiUi.notConfigured")}</p>
       ) : (
         <form className="lib-ai-form" onSubmit={(e) => void onSubmit(e)}>
           {pickable.length > 0 ? (
             <label className="lib-ai-field">
-              <span>From library</span>
+              <span>{t("libraryAiUi.fromLibrary")}</span>
               <select
                 value={resourceId}
                 onChange={(e) => setResourceId(e.target.value)}
               >
-                <option value="">Paste your own text below</option>
+                <option value="">{t("libraryAiUi.pasteOwn")}</option>
                 {pickable.map((r) => (
                   <option key={r.id} value={r.id}>
                     {r.title}
-                    {r.subject ? ` · ${r.subject}` : ""}
+                    {r.subject
+                      ? ` · ${subjectCompactLabel({ name: r.subject })}`
+                      : ""}
                   </option>
                 ))}
               </select>
@@ -160,24 +173,29 @@ export function LibraryAiAssistant({ resources, focus, hideHead }: Props) {
           ) : null}
 
           <label className="lib-ai-field">
-            <span>Lesson text</span>
+            <span>{t("libraryAiUi.lessonText")}</span>
             <textarea
               value={text}
               onChange={(e) => setText(e.target.value)}
               rows={6}
-              placeholder="Paste a chapter, notes, or assignment text here…"
+              placeholder={t("libraryAiUi.lessonPlaceholder")}
               required
             />
           </label>
 
-          <div className="lib-ai-actions" role="group" aria-label="AI actions">
-            {ACTIONS.map((item) => (
+          <div
+            className="lib-ai-actions lib-ai-actions--pick"
+            role="group"
+            aria-label={t("libraryAiUi.ariaActions")}
+          >
+            {actions.map((item) => (
               <button
                 key={item.id}
                 type="button"
                 className={`lib-ai-action${action === item.id ? " lib-ai-action--active" : ""}`}
                 onClick={() => setAction(item.id)}
                 disabled={busy}
+                aria-pressed={action === item.id}
               >
                 <strong>{item.label}</strong>
                 <span>{item.hint}</span>
@@ -191,17 +209,19 @@ export function LibraryAiAssistant({ resources, focus, hideHead }: Props) {
               className="lib-btn lib-btn--primary"
               disabled={busy || configured !== true}
             >
-              {busy ? "Thinking…" : "Run"}
+              {busy ? t("libraryAiUi.thinking") : t("libraryAiUi.run")}
             </button>
             {model ? (
-              <span className="lib-ai-model">Model: {model}</span>
+              <span className="lib-ai-model">
+                {t("libraryAiUi.model", { model })}
+              </span>
             ) : null}
           </div>
 
           {error ? <p className="lib-ai-error">{error}</p> : null}
           {result ? (
             <div className="lib-ai-result">
-              <h3>Result</h3>
+              <h3>{t("libraryAiUi.result")}</h3>
               <div className="lib-ai-result__body">{result}</div>
             </div>
           ) : null}

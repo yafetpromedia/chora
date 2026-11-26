@@ -35,6 +35,11 @@ export function mapStudentRecordToIdCard(
   const year = new Date().getFullYear();
   const cardCode = partial?.cardCode ?? "PENDING";
   const scanPayload = partial?.scanPayload ?? `CAMPUS1:${cardCode}`;
+  const publicResultsUrl =
+    partial?.publicResultsUrl ??
+    (schoolJoinCode
+      ? `${typeof window !== "undefined" ? window.location.origin : ""}/results/card?s=${encodeURIComponent(schoolJoinCode)}&c=${encodeURIComponent(cardCode)}`
+      : undefined);
 
   const father = student.parents[0]?.parent;
   const mother = student.parents[1]?.parent;
@@ -45,6 +50,7 @@ export function mapStudentRecordToIdCard(
     studentProfileId: student.id,
     cardCode,
     scanPayload,
+    publicResultsUrl,
     name,
     firstName: student.user.firstName,
     lastName: student.user.lastName,

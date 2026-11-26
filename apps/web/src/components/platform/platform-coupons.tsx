@@ -13,29 +13,18 @@ import {
 } from "@/lib/platform-coupons";
 import { DashIcon } from "@/components/dashboard/dash-icons";
 import { AppToast } from "@/components/ui/app-toast";
+import { useLocale } from "@/components/i18n/locale-provider";
 
-const KINDS: { value: CouponKind; label: string; hint: string }[] = [
-  {
-    value: "EXTRA_TRIAL_DAYS",
-    label: "Extra trial days",
-    hint: "Extends the school trial. They still pay when the new trial ends.",
-  },
-  {
-    value: "PERCENT_OFF",
-    label: "Percent off invoice",
-    hint: "Discount on the next invoice. The school still has to pay.",
-  },
-  {
-    value: "COMPLIMENTARY",
-    label: "Complimentary plan",
-    hint: "Unlocks a paid plan for a set number of months, no payment required.",
-  },
+const KIND_VALUES: CouponKind[] = [
+  "EXTRA_TRIAL_DAYS",
+  "PERCENT_OFF",
+  "COMPLIMENTARY",
 ];
 
-const PAID_PLANS: { value: Exclude<PlanType, "TRIAL">; label: string }[] = [
-  { value: "STARTER", label: "Starter" },
-  { value: "PROFESSIONAL", label: "Professional" },
-  { value: "ENTERPRISE", label: "Enterprise" },
+const PAID_PLANS: { value: Exclude<PlanType, "TRIAL">; labelKey: string }[] = [
+  { value: "STARTER", labelKey: "platformUi.planStarter" },
+  { value: "PROFESSIONAL", labelKey: "platformUi.planProfessional" },
+  { value: "ENTERPRISE", labelKey: "platformUi.planEnterprise" },
 ];
 
 type StatusFilter = "ALL" | "ACTIVE" | "OFF";
@@ -74,17 +63,23 @@ const EMPTY_CREATE: CreateForm = {
   notes: "",
 };
 
-function kindLabel(kind: CouponKind) {
-  return KINDS.find((k) => k.value === kind)?.label ?? kind;
-}
-
-function effectText(c: PlatformCoupon) {
-  if (c.kind === "EXTRA_TRIAL_DAYS") return `+${c.extraDays} trial days`;
-  if (c.kind === "COMPLIMENTARY") {
-    return `${c.complimentaryMonths} month complimentary ${c.plan ?? "STARTER"}`;
-  }
-  return `${c.percentOff}% off`;
-}
+const KIND_META: Record<
+  CouponKind,
+  { labelKey: string; hintKey: string }
+> = {
+  EXTRA_TRIAL_DAYS: {
+    labelKey: "platformUi.couponKindTrial",
+    hintKey: "platformUi.couponKindTrialHint",
+  },
+  PERCENT_OFF: {
+    labelKey: "platformUi.couponKindPercent",
+    hintKey: "platformUi.couponKindPercentHint",
+  },
+  COMPLIMENTARY: {
+    labelKey: "platformUi.couponKindComp",
+    hintKey: "platformUi.couponKindCompHint",
+  },
+};
 
 function toDateInput(iso: string | null) {
   if (!iso) return "";
@@ -133,6 +128,7 @@ function optionalInt(value: string) {
 }
 
 export function PlatformCoupons() {
+  const { t, locale } = useLocale();
   const router = useRouter();
   const [rows, setRows] = useState<PlatformCoupon[]>([]);
   const [loading, setLoading] = useState(true);
@@ -146,6 +142,23 @@ export function PlatformCoupons() {
   const [busyId, setBusyId] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<EditDraft | null>(null);
+
+  function kindLabel(kind: CouponKind) {
+    return t(KIND_META[kind].labelKey);
+  }
+
+  function effectText(c: PlatformCoupon) {
+    if (c.kind === "EXTRA_TRIAL_DAYS") {
+      return t("platformUi.couponEffectTrial", { days: c.extraDays ?? 0 });
+    }
+    if (c.kind === "COMPLIMENTARY") {
+      return t("platformUi.couponEffectComp", {
+        months: c.complimentaryMonths ?? 0,
+        plan: c.plan ?? "STARTER",
+      });
+    }
+    return t("platformUi.couponEffectPercent", { percent: c.percentOff ?? 0 });
+  }
 
   function fail(err: unknown, fallback: string) {
     if (handlePlatformAuthFailure(err, () => router.replace("/platform/login"))) {
@@ -164,7 +177,7 @@ export function PlatformCoupons() {
     queueMicrotask(() => {
       setLoading(true);
       void load()
-        .catch((err) => fail(err, "Could not load coupons"))
+        .catch((err) => fail(err, t("platformUi.couponErrLoad")))
         .finally(() => setLoading(false));
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -208,7 +221,7 @@ export function PlatformCoupons() {
     e.preventDefault();
     const code = createForm.code.trim();
     if (code.length < 3) {
-      setError("Coupon code must be at least 3 characters");
+      setError(t("platformUi.couponCodeMin"));
       return;
     }
     setSaving(true);
@@ -231,10 +244,10 @@ export function PlatformCoupons() {
       });
       setCreateForm(EMPTY_CREATE);
       setShowCreate(false);
-      setMessage("Coupon created");
+      setMessage(t("platformUi.couponCreated"));
       await load();
     } catch (err) {
-      fail(err, "Could not create coupon");
+      fail(err, t("platformUi.couponErrCreate"));
     } finally {
       setSaving(false);
     }
@@ -258,10 +271,10 @@ export function PlatformCoupons() {
       });
       setEditingId(null);
       setDraft(null);
-      setMessage("Coupon updated");
+      setMessage(t("platformUi.couponUpdated"));
       await load();
     } catch (err) {
-      fail(err, "Could not update coupon");
+      fail(err, t("platformUi.couponErrUpdate"));
     } finally {
       setBusyId("");
     }
@@ -272,10 +285,10 @@ export function PlatformCoupons() {
     setError("");
     try {
       await updatePlatformCoupon(row.id, { isActive: !row.isActive });
-      setMessage(row.isActive ? "Coupon disabled" : "Coupon enabled");
+      setMessage(row.isActive ? t("platformUi.couponDisabled") : t("platformUi.couponEnabled"));
       await load();
     } catch (err) {
-      fail(err, "Could not update coupon");
+      fail(err, t("platformUi.couponErrUpdate"));
     } finally {
       setBusyId("");
     }
@@ -290,7 +303,7 @@ export function PlatformCoupons() {
     );
   }
 
-  const createHint = KINDS.find((k) => k.value === createForm.kind)?.hint;
+  const createHint = t(KIND_META[createForm.kind].hintKey);
 
   return (
     <div className="plat-subjects-v2 dash-admin dash-admin--modern plat-billing-v2">
@@ -303,25 +316,25 @@ export function PlatformCoupons() {
             <DashIcon name="fees" className="dash-icon--md" />
           </span>
           <div>
-            <p className="plat-subjects-v2__eyebrow">Billing</p>
-            <h2 className="plat-subjects-v2__title">Coupons</h2>
+            <p className="plat-subjects-v2__eyebrow">{t("platformUi.couponEyebrow")}</p>
+            <h2 className="plat-subjects-v2__title">{t("platformUi.couponTitle")}</h2>
             <p className="plat-subjects-v2__sub">
-              Create, edit, and disable codes that extend trials, discount invoices, or unlock a plan.
+              {t("platformUi.couponSub")}
             </p>
           </div>
         </div>
         <div className="plat-subjects-v2__hero-stats">
           <div className="plat-subjects-v2__stat">
             <strong>{stats.total}</strong>
-            <span>Codes</span>
+            <span>{t("platformUi.couponStatCodes")}</span>
           </div>
           <div className="plat-subjects-v2__stat">
             <strong>{stats.active}</strong>
-            <span>Active</span>
+            <span>{t("platformUi.couponStatActive")}</span>
           </div>
           <div className="plat-subjects-v2__stat">
             <strong>{stats.used}</strong>
-            <span>Redemptions</span>
+            <span>{t("platformUi.couponStatRedemptions")}</span>
           </div>
         </div>
       </header>
@@ -331,21 +344,21 @@ export function PlatformCoupons() {
           <DashIcon name="templates" className="dash-icon--sm" />
           <div>
             <strong>{stats.active}</strong>
-            <span>Active</span>
+            <span>{t("platformUi.couponStatActive")}</span>
           </div>
         </article>
         <article className="plat-subjects-v2__kpi">
           <DashIcon name="alert" className="dash-icon--sm" />
           <div>
             <strong>{stats.off}</strong>
-            <span>Disabled</span>
+            <span>{t("platformUi.couponStatDisabled")}</span>
           </div>
         </article>
         <article className="plat-subjects-v2__kpi">
           <DashIcon name="users" className="dash-icon--sm" />
           <div>
             <strong>{stats.used}</strong>
-            <span>Times used</span>
+            <span>{t("platformUi.couponTimesUsed")}</span>
           </div>
         </article>
       </div>
@@ -355,18 +368,18 @@ export function PlatformCoupons() {
           <DashIcon name="fees" className="dash-icon--sm" />
           <input
             type="search"
-            placeholder="Search code, type, or notes…"
+            placeholder={t("platformUi.couponSearchPh")}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            aria-label="Search coupons"
+            aria-label={t("platformUi.couponSearchAria")}
           />
         </div>
         <div className="plat-filter-tabs plat-subjects-v2__filters" role="tablist">
           {(
             [
-              { id: "ALL", label: "All" },
-              { id: "ACTIVE", label: "Active" },
-              { id: "OFF", label: "Disabled" },
+              { id: "ALL", label: t("common.all") },
+              { id: "ACTIVE", label: t("platformUi.couponStatActive") },
+              { id: "OFF", label: t("platformUi.couponDisabledLabel") },
             ] as const
           ).map((f) => (
             <button
@@ -393,7 +406,7 @@ export function PlatformCoupons() {
           }}
         >
           <DashIcon name="plus" className="dash-icon--sm" />
-          {showCreate ? "Cancel" : "New coupon"}
+          {showCreate ? t("common.cancel") : t("platformUi.couponNew")}
         </button>
       </div>
 
@@ -402,11 +415,11 @@ export function PlatformCoupons() {
           className="plat-billing-v2__panel plat-billing-v2__form"
           onSubmit={(e) => void onCreate(e)}
         >
-          <h3 className="plat-billing-v2__panel-title">Create coupon</h3>
+          <h3 className="plat-billing-v2__panel-title">{t("platformUi.couponCreate")}</h3>
           <p className="plat-billing-v2__panel-hint">{createHint}</p>
           <div className="plat-invoice-form__grid">
             <label className="plat-field">
-              <span>Code</span>
+              <span>{t("platformUi.couponCode")}</span>
               <input
                 value={createForm.code}
                 onChange={(e) =>
@@ -419,7 +432,7 @@ export function PlatformCoupons() {
               />
             </label>
             <label className="plat-field">
-              <span>Type</span>
+              <span>{t("platformUi.couponType")}</span>
               <select
                 className="plat-select"
                 value={createForm.kind}
@@ -427,16 +440,16 @@ export function PlatformCoupons() {
                   setCreateForm((f) => ({ ...f, kind: e.target.value as CouponKind }))
                 }
               >
-                {KINDS.map((k) => (
-                  <option key={k.value} value={k.value}>
-                    {k.label}
+                {KIND_VALUES.map((value) => (
+                  <option key={value} value={value}>
+                    {t(KIND_META[value].labelKey)}
                   </option>
                 ))}
               </select>
             </label>
             {createForm.kind === "PERCENT_OFF" ? (
               <label className="plat-field">
-                <span>Percent off</span>
+                <span>{t("platformUi.couponPercentOff")}</span>
                 <input
                   type="number"
                   min={1}
@@ -450,7 +463,7 @@ export function PlatformCoupons() {
             ) : null}
             {createForm.kind === "EXTRA_TRIAL_DAYS" ? (
               <label className="plat-field">
-                <span>Extra days</span>
+                <span>{t("platformUi.couponExtraDays")}</span>
                 <input
                   type="number"
                   min={1}
@@ -464,7 +477,7 @@ export function PlatformCoupons() {
             {createForm.kind === "COMPLIMENTARY" ? (
               <>
                 <label className="plat-field">
-                  <span>Months</span>
+                  <span>{t("platformUi.couponMonths")}</span>
                   <input
                     type="number"
                     min={1}
@@ -475,7 +488,7 @@ export function PlatformCoupons() {
                   />
                 </label>
                 <label className="plat-field">
-                  <span>Plan</span>
+                  <span>{t("platformUi.couponPlan")}</span>
                   <select
                     className="plat-select"
                     value={createForm.plan}
@@ -488,7 +501,7 @@ export function PlatformCoupons() {
                   >
                     {PAID_PLANS.map((p) => (
                       <option key={p.value} value={p.value}>
-                        {p.label}
+                        {t(p.labelKey)}
                       </option>
                     ))}
                   </select>
@@ -496,7 +509,7 @@ export function PlatformCoupons() {
               </>
             ) : null}
             <label className="plat-field">
-              <span>Max uses (optional)</span>
+              <span>{t("platformUi.couponMaxUses")}</span>
               <input
                 type="number"
                 min={1}
@@ -504,11 +517,11 @@ export function PlatformCoupons() {
                 onChange={(e) =>
                   setCreateForm((f) => ({ ...f, maxRedemptions: e.target.value }))
                 }
-                placeholder="Unlimited"
+                placeholder={t("platformUi.couponUnlimited")}
               />
             </label>
             <label className="plat-field">
-              <span>Expires (optional)</span>
+              <span>{t("platformUi.couponExpires")}</span>
               <input
                 type="date"
                 value={createForm.expiresAt}
@@ -519,11 +532,11 @@ export function PlatformCoupons() {
             </label>
           </div>
           <label className="plat-field">
-            <span>Notes (optional)</span>
+            <span>{t("platformUi.couponNotes")}</span>
             <input
               value={createForm.notes}
               onChange={(e) => setCreateForm((f) => ({ ...f, notes: e.target.value }))}
-              placeholder="Pilot schools, partner agency…"
+              placeholder={t("platformUi.couponNotesPh")}
             />
           </label>
           <div className="plat-subjects-v2__actions">
@@ -532,10 +545,10 @@ export function PlatformCoupons() {
               className="plat-btn plat-btn--ghost"
               onClick={() => setShowCreate(false)}
             >
-              Cancel
+              {t("common.cancel")}
             </button>
             <button type="submit" className="plat-btn plat-btn--primary" disabled={saving}>
-              {saving ? "Saving…" : "Create coupon"}
+              {saving ? t("platformUi.saving") : t("platformUi.couponCreate")}
             </button>
           </div>
         </form>
@@ -545,20 +558,20 @@ export function PlatformCoupons() {
         <table className="plat-subjects-v2__table">
           <thead>
             <tr>
-              <th>Code</th>
-              <th>Type</th>
-              <th>Effect</th>
-              <th>Usage</th>
-              <th>Expires</th>
-              <th>Status</th>
-              <th aria-label="Actions" />
+              <th>{t("platformUi.couponCode")}</th>
+              <th>{t("platformUi.couponType")}</th>
+              <th>{t("platformUi.couponEffect")}</th>
+              <th>{t("platformUi.couponUsage")}</th>
+              <th>{t("platformUi.couponExpiresCol")}</th>
+              <th>{t("platformUi.status")}</th>
+              <th aria-label={t("platformUi.actions")} />
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
               <tr>
                 <td colSpan={7} className="plat-subjects-v2__empty">
-                  No coupons match. Create one to extend a trial or unlock a plan.
+                  {t("platformUi.couponNoMatch")}
                 </td>
               </tr>
             ) : (
@@ -579,7 +592,7 @@ export function PlatformCoupons() {
                     </td>
                     <td className="plat-billing-v2__muted">{usageText(row)}</td>
                     <td className="plat-billing-v2__muted">
-                      {row.expiresAt ? formatDate(row.expiresAt) : "No expiry"}
+                      {row.expiresAt ? formatDate(row.expiresAt) : t("platformUi.couponNoExpiry")}
                     </td>
                     <td>
                       <span
@@ -589,7 +602,7 @@ export function PlatformCoupons() {
                             : "plat-invoice-status--draft"
                         }`}
                       >
-                        {row.isActive ? "Active" : "Off"}
+                        {row.isActive ? t("platformUi.couponStatActive") : "Off"}
                       </span>
                     </td>
                     <td>
@@ -604,7 +617,7 @@ export function PlatformCoupons() {
                               : startEdit(row)
                           }
                         >
-                          {editingId === row.id ? "Close" : "Edit"}
+                          {editingId === row.id ? t("common.close") : t("common.edit")}
                         </button>
                         <button
                           type="button"
@@ -616,7 +629,7 @@ export function PlatformCoupons() {
                           disabled={busyId === row.id}
                           onClick={() => void toggleActive(row)}
                         >
-                          {row.isActive ? "Disable" : "Enable"}
+                          {row.isActive ? t("platformUi.couponDisable") : t("platformUi.couponEnable")}
                         </button>
                       </div>
                     </td>
@@ -626,12 +639,12 @@ export function PlatformCoupons() {
                       <td colSpan={7}>
                         <h3 className="plat-billing-v2__panel-title">Edit {row.code}</h3>
                         <p className="plat-billing-v2__panel-hint">
-                          Code and type stay the same. Change the effect, limits, notes, or expiry.
+                          {t("platformUi.couponEditHint")}
                         </p>
                         <div className="plat-invoice-form__grid">
                           {row.kind === "PERCENT_OFF" ? (
                             <label className="plat-field">
-                              <span>Percent off</span>
+                              <span>{t("platformUi.couponPercentOff")}</span>
                               <input
                                 type="number"
                                 min={1}
@@ -647,7 +660,7 @@ export function PlatformCoupons() {
                           ) : null}
                           {row.kind === "EXTRA_TRIAL_DAYS" ? (
                             <label className="plat-field">
-                              <span>Extra days</span>
+                              <span>{t("platformUi.couponExtraDays")}</span>
                               <input
                                 type="number"
                                 min={1}
@@ -663,7 +676,7 @@ export function PlatformCoupons() {
                           {row.kind === "COMPLIMENTARY" ? (
                             <>
                               <label className="plat-field">
-                                <span>Months</span>
+                                <span>{t("platformUi.couponMonths")}</span>
                                 <input
                                   type="number"
                                   min={1}
@@ -676,7 +689,7 @@ export function PlatformCoupons() {
                                 />
                               </label>
                               <label className="plat-field">
-                                <span>Plan</span>
+                                <span>{t("platformUi.couponPlan")}</span>
                                 <select
                                   className="plat-select"
                                   value={draft.plan}
@@ -696,7 +709,7 @@ export function PlatformCoupons() {
                                 >
                                   {PAID_PLANS.map((p) => (
                                     <option key={p.value} value={p.value}>
-                                      {p.label}
+                                      {t(p.labelKey)}
                                     </option>
                                   ))}
                                 </select>
@@ -704,7 +717,7 @@ export function PlatformCoupons() {
                             </>
                           ) : null}
                           <label className="plat-field">
-                            <span>Max uses</span>
+                            <span>{t("platformUi.couponMaxUsesShort")}</span>
                             <input
                               type="number"
                               min={1}
@@ -714,11 +727,11 @@ export function PlatformCoupons() {
                                   d ? { ...d, maxRedemptions: e.target.value } : d,
                                 )
                               }
-                              placeholder="Unlimited"
+                              placeholder={t("platformUi.couponUnlimited")}
                             />
                           </label>
                           <label className="plat-field">
-                            <span>Expires</span>
+                            <span>{t("platformUi.couponExpiresCol")}</span>
                             <input
                               type="date"
                               value={draft.expiresAt}
@@ -731,7 +744,7 @@ export function PlatformCoupons() {
                           </label>
                         </div>
                         <label className="plat-field">
-                          <span>Notes</span>
+                          <span>{t("platformUi.couponNotesShort")}</span>
                           <input
                             value={draft.notes}
                             onChange={(e) =>
@@ -748,7 +761,7 @@ export function PlatformCoupons() {
                               setDraft(null);
                             }}
                           >
-                            Cancel
+                            {t("common.cancel")}
                           </button>
                           <button
                             type="button"
@@ -756,12 +769,12 @@ export function PlatformCoupons() {
                             disabled={busyId === row.id}
                             onClick={() => void saveEdit(row)}
                           >
-                            {busyId === row.id ? "Saving…" : "Save changes"}
+                            {busyId === row.id ? t("platformUi.saving") : t("platformUi.saveChanges")}
                           </button>
                         </div>
                         {row.redemptions && row.redemptions.length > 0 ? (
                           <>
-                            <h4 className="plat-billing-v2__panel-title">Recent redemptions</h4>
+                            <h4 className="plat-billing-v2__panel-title">{t("platformUi.couponRecent")}</h4>
                             <ul className="plat-coupon-redemptions">
                               {row.redemptions.map((r) => (
                                 <li key={r.id}>
@@ -778,7 +791,7 @@ export function PlatformCoupons() {
                           </>
                         ) : (
                           <p className="plat-billing-v2__panel-hint">
-                            No schools have used this code yet.
+                            {t("platformUi.couponNoRedemptions")}
                           </p>
                         )}
                       </td>

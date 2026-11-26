@@ -7,23 +7,29 @@ import { DashboardPage } from "@/components/dashboard/dashboard-page";
 import { AppToast } from "@/components/ui/app-toast";
 import { AUTH_ROLE_KEY, AUTH_TOKEN_KEY, type UserRole } from "@/lib/auth";
 import {
-  CONCERN_TYPE_LABELS,
-  RESOLUTION_LABELS,
-  STATUS_LABELS,
   dismissAttendanceConcern,
   getAttendanceConcern,
   resolveAttendanceConcern,
   reviewAttendanceConcern,
   type AttendanceConcern,
   type AttendanceConcernResolution,
+  type AttendanceConcernStatus,
 } from "@/lib/attendance-concerns";
 import { hasPermission, Permission } from "@/lib/permissions";
+import { useLocale } from "@/components/i18n/locale-provider";
 
-const RESOLUTIONS = Object.keys(
-  RESOLUTION_LABELS,
-) as AttendanceConcernResolution[];
+const RESOLUTIONS: AttendanceConcernResolution[] = [
+  "OFFICIAL_CORRECT",
+  "CORRECTED_OFFICIAL",
+  "AUTHORIZED_ABSENCE",
+  "LEFT_CAMPUS",
+  "TEMPORARILY_OUTSIDE",
+  "DUPLICATE_OR_INCORRECT",
+  "OTHER",
+];
 
 export default function AdminConcernDetailPage() {
+  const { t, tp } = useLocale();
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const shellRole: UserRole =
@@ -66,9 +72,9 @@ export default function AdminConcernDetailPage() {
     setError("");
     try {
       setConcern(await reviewAttendanceConcern(params.id));
-      setToast("Marked under review");
+      setToast(t("attendanceConcernDetailUi.markedReview"));
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Review failed");
+      setError(e instanceof Error ? e.message : t("attendanceConcernDetailUi.reviewFailed"));
     } finally {
       setBusy(false);
     }
@@ -84,9 +90,13 @@ export default function AdminConcernDetailPage() {
           ? await resolveAttendanceConcern(params.id, body)
           : await dismissAttendanceConcern(params.id, body),
       );
-      setToast(mode === "resolve" ? "Concern resolved" : "Concern dismissed");
+      setToast(
+        mode === "resolve"
+          ? t("attendanceConcernDetailUi.concernResolved")
+          : t("attendanceConcernDetailUi.concernDismissed"),
+      );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Action failed");
+      setError(err instanceof Error ? err.message : t("attendanceConcernDetailUi.actionFailed"));
     } finally {
       setBusy(false);
     }
@@ -104,7 +114,7 @@ export default function AdminConcernDetailPage() {
     : "";
 
   return (
-    <DashboardPage role={shellRole} title="Attendance concern">
+    <DashboardPage role={shellRole} title={tp("Attendance concern")}>
       <div className="att-concern att-concern--wide">
         <AppToast message={error} tone="error" onDismiss={() => setError("")} />
         <AppToast message={toast} tone="success" onDismiss={() => setToast("")} />
@@ -113,37 +123,41 @@ export default function AdminConcernDetailPage() {
           <div className="tch-v2__hero-glow" aria-hidden />
           <div className="tch-v2__hero-inner">
             <div className="tch-v2__hero-main">
-              <span className="tch-v2__chip">Concern</span>
+              <span className="tch-v2__chip">{t("attendanceConcernDetailUi.chip")}</span>
               <h2 className="tch-v2__hero-title">
-                {loading ? "Loading…" : classLabel || "Concern detail"}
+                {loading
+                  ? t("common.loading")
+                  : classLabel || t("attendanceConcernDetailUi.concernDetail")}
               </h2>
               <p className="tch-v2__hero-sub">
                 <Link
                   href="/admin/attendance/concerns"
                   className="tch-v2__hero-link"
                 >
-                  All concerns
+                  {t("attendanceConcernDetailUi.allConcerns")}
                 </Link>
                 {concern
-                  ? ` · ${CONCERN_TYPE_LABELS[concern.concernType]} · ${concern.date}${
+                  ? ` · ${t(`attendanceConcernsUi.type_${concern.concernType}`)} · ${concern.date}${
                       concern.subject ? ` · ${concern.subject.name}` : ""
                     }`
-                  : " · Review observation against official attendance."}
+                  : ` · ${t("attendanceConcernDetailUi.reviewSub")}`}
               </p>
             </div>
             {concern ? (
               <div className="tch-v2__hero-stats">
                 <div className="tch-v2__stat">
-                  <strong>{STATUS_LABELS[concern.status]}</strong>
-                  <span>Status</span>
+                  <strong>
+                    {t(`attendanceConcernsUi.status_${concern.status as AttendanceConcernStatus}`)}
+                  </strong>
+                  <span>{t("attendanceConcernDetailUi.status")}</span>
                 </div>
                 <div className="tch-v2__stat">
                   <strong>{concern.officialPresentCount ?? "—"}</strong>
-                  <span>Official P</span>
+                  <span>{t("attendanceConcernDetailUi.officialP")}</span>
                 </div>
                 <div className="tch-v2__stat">
                   <strong>{concern.observedPresentCount ?? "—"}</strong>
-                  <span>Observed P</span>
+                  <span>{t("attendanceConcernDetailUi.observedP")}</span>
                 </div>
                 <div className="tch-v2__stat tch-v2__stat--accent">
                   <strong>
@@ -151,7 +165,7 @@ export default function AdminConcernDetailPage() {
                       ? "—"
                       : `${concern.difference > 0 ? "+" : ""}${concern.difference}`}
                   </strong>
-                  <span>Delta</span>
+                  <span>{t("attendanceConcernDetailUi.delta")}</span>
                 </div>
               </div>
             ) : null}
@@ -161,39 +175,47 @@ export default function AdminConcernDetailPage() {
         {loading ? (
           <div className="att-concern__loading">
             <span className="dash-loading-spinner" aria-hidden />
-            <p>Loading concern…</p>
+            <p>{t("attendanceConcernDetailUi.loadingConcern")}</p>
           </div>
         ) : !concern ? (
           <div className="att-concern__empty-card">
-            <strong>Concern not found</strong>
-            <p>It may have been removed or you no longer have access.</p>
+            <strong>{t("attendanceConcernDetailUi.notFoundTitle")}</strong>
+            <p>{t("attendanceConcernDetailUi.notFoundBody")}</p>
             <Link
               href="/admin/attendance/concerns"
               className="sa-btn sa-btn--primary"
             >
-              Back to list
+              {t("attendanceConcernDetailUi.backToList")}
             </Link>
           </div>
         ) : (
           <div className="att-concern__detail-grid">
             <section className="att-concern__panel">
-              <h3 className="att-concern__panel-title">Observation</h3>
+              <h3 className="att-concern__panel-title">
+                {t("attendanceConcernDetailUi.observation")}
+              </h3>
               <dl className="att-concern__meta">
                 <div>
-                  <dt>Reported by</dt>
+                  <dt>{t("attendanceConcernDetailUi.reportedBy")}</dt>
                   <dd>{concern.reportedBy.name}</dd>
                 </div>
                 <div>
-                  <dt>Period</dt>
+                  <dt>{t("attendanceConcernDetailUi.period")}</dt>
                   <dd>{concern.periodLabel ?? "—"}</dd>
                 </div>
                 <div>
-                  <dt>Student</dt>
-                  <dd>{concern.student?.name ?? "Whole class"}</dd>
+                  <dt>{t("attendanceConcernDetailUi.student")}</dt>
+                  <dd>
+                    {concern.student?.name ?? t("attendanceConcernDetailUi.wholeClass")}
+                  </dd>
                 </div>
                 <div>
-                  <dt>Official submitted</dt>
-                  <dd>{concern.officialSubmitted ? "Yes" : "No"}</dd>
+                  <dt>{t("attendanceConcernDetailUi.officialSubmitted")}</dt>
+                  <dd>
+                    {concern.officialSubmitted
+                      ? t("attendanceConcernDetailUi.yes")
+                      : t("attendanceConcernDetailUi.no")}
+                  </dd>
                 </div>
               </dl>
               {concern.description ? (
@@ -208,24 +230,30 @@ export default function AdminConcernDetailPage() {
               ) : null}
               <div className="att-concern__counts att-concern__counts--lg">
                 <div>
-                  <span>Official</span>
+                  <span>{t("attendanceConcernDetailUi.official")}</span>
                   <strong>
-                    {concern.officialPresentCount ?? "—"} present ·{" "}
-                    {concern.officialAbsentCount ?? "—"} absent
+                    {t("attendanceConcernDetailUi.presentAbsent", {
+                      present: concern.officialPresentCount ?? "—",
+                      absent: concern.officialAbsentCount ?? "—",
+                    })}
                   </strong>
                 </div>
                 <div>
-                  <span>Observed</span>
+                  <span>{t("attendanceConcernDetailUi.observed")}</span>
                   <strong>
-                    {concern.observedPresentCount ?? "—"} present ·{" "}
-                    {concern.observedAbsentCount ?? "—"} absent
+                    {t("attendanceConcernDetailUi.presentAbsent", {
+                      present: concern.observedPresentCount ?? "—",
+                      absent: concern.observedAbsentCount ?? "—",
+                    })}
                   </strong>
                 </div>
               </div>
             </section>
 
             <section className="att-concern__panel">
-              <h3 className="att-concern__panel-title">Review actions</h3>
+              <h3 className="att-concern__panel-title">
+                {t("attendanceConcernDetailUi.reviewActions")}
+              </h3>
               {concern.status === "OPEN" ||
               concern.status === "UNDER_REVIEW" ? (
                 <>
@@ -236,12 +264,12 @@ export default function AdminConcernDetailPage() {
                       disabled={busy}
                       onClick={() => void onReview()}
                     >
-                      Mark under review
+                      {t("attendanceConcernDetailUi.markUnderReview")}
                     </button>
                   ) : null}
                   <form className="att-concern__resolve" onSubmit={onResolve}>
                     <label className="sa-field">
-                      <span>Resolution</span>
+                      <span>{t("attendanceConcernDetailUi.resolution")}</span>
                       <select
                         value={resolution}
                         onChange={(e) =>
@@ -252,18 +280,18 @@ export default function AdminConcernDetailPage() {
                       >
                         {RESOLUTIONS.map((r) => (
                           <option key={r} value={r}>
-                            {RESOLUTION_LABELS[r]}
+                            {t(`attendanceConcernDetailUi.resolution_${r}`)}
                           </option>
                         ))}
                       </select>
                     </label>
                     <label className="sa-field sa-field--wide">
-                      <span>Note (optional)</span>
+                      <span>{t("attendanceConcernDetailUi.noteOptional")}</span>
                       <textarea
                         value={note}
                         onChange={(e) => setNote(e.target.value)}
                         rows={3}
-                        placeholder="Explain the outcome for the audit trail"
+                        placeholder={t("attendanceConcernDetailUi.notePlaceholder")}
                       />
                     </label>
                     <div className="att-concern__actions">
@@ -272,7 +300,7 @@ export default function AdminConcernDetailPage() {
                         className="sa-btn sa-btn--primary"
                         disabled={busy}
                       >
-                        Resolve
+                        {t("attendanceConcernDetailUi.resolve")}
                       </button>
                       <button
                         type="button"
@@ -280,14 +308,12 @@ export default function AdminConcernDetailPage() {
                         disabled={busy}
                         onClick={() => void submitOutcome("dismiss")}
                       >
-                        Dismiss
+                        {t("attendanceConcernDetailUi.dismiss")}
                       </button>
                     </div>
                   </form>
                   <p className="att-concern__hint">
-                    Resolving with “Correct official attendance” does not edit
-                    the roll here — follow your school’s attendance correction
-                    process after confirming.
+                    {t("attendanceConcernDetailUi.resolveHint")}
                   </p>
                 </>
               ) : (
@@ -295,11 +321,13 @@ export default function AdminConcernDetailPage() {
                   <span
                     className={`att-concern__badge att-concern__badge--${concern.status.toLowerCase()}`}
                   >
-                    {STATUS_LABELS[concern.status]}
+                    {t(`attendanceConcernsUi.status_${concern.status as AttendanceConcernStatus}`)}
                   </span>
                   {concern.resolution ? (
                     <p>
-                      <strong>{RESOLUTION_LABELS[concern.resolution]}</strong>
+                      <strong>
+                        {t(`attendanceConcernDetailUi.resolution_${concern.resolution}`)}
+                      </strong>
                     </p>
                   ) : null}
                   {concern.resolutionNote ? (
@@ -307,7 +335,9 @@ export default function AdminConcernDetailPage() {
                   ) : null}
                   {concern.resolvedBy ? (
                     <p className="att-concern__hint">
-                      By {concern.resolvedBy.name}
+                      {t("attendanceConcernDetailUi.byReviewer", {
+                        name: concern.resolvedBy.name,
+                      })}
                     </p>
                   ) : null}
                 </div>

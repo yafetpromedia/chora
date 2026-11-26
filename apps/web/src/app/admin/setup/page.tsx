@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   addSection,
@@ -26,34 +26,9 @@ import { AppConfirmDialog } from "@/components/ui/app-confirm-dialog";
 import { SchoolWelcomeGate } from "@/components/auth/school-welcome-gate";
 import { BrandMark } from "@/components/brand-mark";
 import { BRAND_NAME } from "@/lib/brand";
-
-const STEPS = [
-  { num: 1 as const, label: "Grades" },
-  { num: 2 as const, label: "Sections" },
-  { num: 3 as const, label: "Attendance" },
-  { num: 4 as const, label: "Students" },
-];
+import { useLocale } from "@/components/i18n/locale-provider";
 
 type StepNum = 1 | 2 | 3 | 4;
-
-const STEP_COPY: Record<StepNum, { title: string; lead: string }> = {
-  1: {
-    title: "Grade structure",
-    lead: "Pick a preset or set your own range — for example Grade 1 to 6, or 9 to 12 with Nursery and KG.",
-  },
-  2: {
-    title: "Class sections",
-    lead: "Add A–H for every grade, or Natural / Social streams on Grades 11 & 12. Type any name you use.",
-  },
-  3: {
-    title: "Attendance mode",
-    lead: "Pick how teachers mark attendance. You can change this later in settings.",
-  },
-  4: {
-    title: "Ready to go",
-    lead: "Add students now or finish setup and come back from the dashboard.",
-  },
-};
 
 const PRESET_ICONS: Record<GradePresetKey, string> = {
   GRADES_1_8: "📚",
@@ -61,32 +36,21 @@ const PRESET_ICONS: Record<GradePresetKey, string> = {
   KG_12: "🌱",
 };
 
-const ATTENDANCE_MODES: {
-  value: AttendanceMode;
-  label: string;
-  desc: string;
-  icon: string;
-}[] = [
-  { value: "DAILY", label: "Daily", desc: "Once per day — primary schools", icon: "☀️" },
-  { value: "PERIOD", label: "Period", desc: "Each class period", icon: "🕐" },
-  { value: "BOTH", label: "Both", desc: "Daily + period tracking", icon: "⚡" },
-];
-
 const SECTION_PRESETS = [
-  { label: "A·B", names: ["A", "B"] },
-  { label: "A·B·C", names: ["A", "B", "C"] },
-  { label: "A·B·C·D", names: ["A", "B", "C", "D"] },
-  { label: "A·B·C·G·H", names: ["A", "B", "C", "G", "H"] },
+  { labelKey: "presetAb" as const, names: ["A", "B"] },
+  { labelKey: "presetAbc" as const, names: ["A", "B", "C"] },
+  { labelKey: "presetAbcd" as const, names: ["A", "B", "C", "D"] },
+  { labelKey: "presetAbcgh" as const, names: ["A", "B", "C", "G", "H"] },
 ] as const;
 
 const QUICK_LETTERS = ["A", "B", "C", "D", "E", "F", "G", "H"] as const;
 
 const STREAM_PRESETS = [
-  { label: "Natural", names: ["Natural"] },
-  { label: "Social", names: ["Social"] },
-  { label: "Nat A·B", names: ["Natural A", "Natural B"] },
-  { label: "Soc A·B", names: ["Social A", "Social B"] },
-  { label: "All streams", names: ["Natural A", "Natural B", "Social A", "Social B"] },
+  { labelKey: "streamNatural" as const, names: ["Natural"] },
+  { labelKey: "streamSocial" as const, names: ["Social"] },
+  { labelKey: "streamNatAb" as const, names: ["Natural A", "Natural B"] },
+  { labelKey: "streamSocAb" as const, names: ["Social A", "Social B"] },
+  { labelKey: "streamAll" as const, names: ["Natural A", "Natural B", "Social A", "Social B"] },
 ] as const;
 
 const GRADE_NUMBERS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const;
@@ -153,11 +117,15 @@ function StepNav({
   maxStep,
   gradesReady,
   onGoToStep,
+  steps,
+  progressAria,
 }: {
   step: StepNum;
   maxStep: StepNum;
   gradesReady?: boolean;
   onGoToStep: (s: StepNum) => void;
+  steps: { num: StepNum; label: string }[];
+  progressAria: string;
 }) {
   function canGoTo(target: StepNum) {
     if (target <= maxStep) return true;
@@ -166,8 +134,8 @@ function StepNav({
   }
 
   return (
-    <nav className="sw__steps" aria-label="Setup progress">
-      {STEPS.map((s) => {
+    <nav className="sw__steps" aria-label={progressAria}>
+      {steps.map((s) => {
         const done = step > s.num;
         const active = step === s.num;
         const clickable = canGoTo(s.num);
@@ -206,6 +174,7 @@ function StepNav({
 }
 
 export default function SchoolSetupPage() {
+  const { t } = useLocale();
   const [step, setStep] = useState<StepNum>(1);
   const [maxStep, setMaxStep] = useState<StepNum>(1);
   const [presets, setPresets] = useState<
@@ -236,6 +205,50 @@ export default function SchoolSetupPage() {
   } | null>(null);
   const [replaceStructureOpen, setReplaceStructureOpen] = useState(false);
   const router = useRouter();
+
+  const setupSteps = useMemo(
+    () => [
+      { num: 1 as const, label: t("adminSetupUi.stepGrades") },
+      { num: 2 as const, label: t("adminSetupUi.stepSections") },
+      { num: 3 as const, label: t("adminSetupUi.stepAttendance") },
+      { num: 4 as const, label: t("adminSetupUi.stepStudents") },
+    ],
+    [t],
+  );
+
+  const stepCopy = useMemo(
+    (): Record<StepNum, { title: string; lead: string }> => ({
+      1: { title: t("adminSetupUi.step1Title"), lead: t("adminSetupUi.step1Lead") },
+      2: { title: t("adminSetupUi.step2Title"), lead: t("adminSetupUi.step2Lead") },
+      3: { title: t("adminSetupUi.step3Title"), lead: t("adminSetupUi.step3Lead") },
+      4: { title: t("adminSetupUi.step4Title"), lead: t("adminSetupUi.step4Lead") },
+    }),
+    [t],
+  );
+
+  const attendanceModes = useMemo(
+    () => [
+      {
+        value: "DAILY" as AttendanceMode,
+        label: t("adminSetupUi.modeDaily"),
+        desc: t("adminSetupUi.modeDailyDesc"),
+        icon: "☀️",
+      },
+      {
+        value: "PERIOD" as AttendanceMode,
+        label: t("adminSetupUi.modePeriod"),
+        desc: t("adminSetupUi.modePeriodDesc"),
+        icon: "🕐",
+      },
+      {
+        value: "BOTH" as AttendanceMode,
+        label: t("adminSetupUi.modeBoth"),
+        desc: t("adminSetupUi.modeBothDesc"),
+        icon: "⚡",
+      },
+    ],
+    [t],
+  );
 
   useEffect(() => {
     if (!localStorage.getItem(AUTH_TOKEN_KEY) || localStorage.getItem(AUTH_ROLE_KEY) !== "admin") {
@@ -412,7 +425,7 @@ export default function SchoolSetupPage() {
       setActivePreset("CUSTOM");
       setSelected("CUSTOM");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not add grade");
+      setError(err instanceof Error ? err.message : t("adminSetupUi.errAddGrade"));
     } finally {
       setSectionBusy(false);
     }
@@ -440,7 +453,7 @@ export default function SchoolSetupPage() {
       }
       await refreshGrades();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not add sections");
+      setError(err instanceof Error ? err.message : t("adminSetupUi.errAddSections"));
     } finally {
       setSectionBusy(false);
     }
@@ -475,7 +488,7 @@ export default function SchoolSetupPage() {
       await refreshGrades();
       setRemoveSectionTarget(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not remove section");
+      setError(err instanceof Error ? err.message : t("adminSetupUi.errRemoveSection"));
     } finally {
       setSectionBusy(false);
     }
@@ -487,7 +500,7 @@ export default function SchoolSetupPage() {
       await updateAttendanceSettings(attendanceMode);
       goToStep(4);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not save attendance mode");
+      setError(err instanceof Error ? err.message : t("adminSetupUi.errAttendance"));
     }
   }
 
@@ -500,7 +513,7 @@ export default function SchoolSetupPage() {
       }
       router.replace(revisiting ? "/admin/settings" : "/admin");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not finish setup");
+      setError(err instanceof Error ? err.message : t("adminSetupUi.errFinish"));
     } finally {
       setLoading(false);
     }
@@ -511,14 +524,14 @@ export default function SchoolSetupPage() {
     customPreview.join("|") !== grades.map((g) => g.name).join("|");
   const presetChanging =
     gradesReady && (selected !== activePreset || customChanged);
-  const copy = STEP_COPY[step];
+  const copy = stepCopy[step];
 
   if (bootstrapping) {
     return (
       <div className="sw">
         <div className="sw__loading">
           <span className="dash-loading-spinner" aria-hidden />
-          Loading setup…
+          {t("adminSetupUi.loading")}
         </div>
       </div>
     );
@@ -531,10 +544,12 @@ export default function SchoolSetupPage() {
       <AppConfirmDialog
         open={Boolean(removeSectionTarget)}
         tone="danger"
-        title={`Remove section “${removeSectionTarget?.sectionName ?? ""}”?`}
-        message="This section will be removed from the grade. Students still assigned to it may need to be moved first."
-        confirmLabel="Remove section"
-        cancelLabel="Keep section"
+        title={t("adminSetupUi.removeSectionTitle", {
+          name: removeSectionTarget?.sectionName ?? "",
+        })}
+        message={t("adminSetupUi.removeSectionMsg")}
+        confirmLabel={t("adminSetupUi.removeSectionConfirm")}
+        cancelLabel={t("adminSetupUi.keepSection")}
         busy={sectionBusy}
         onCancel={() => {
           if (sectionBusy) return;
@@ -545,10 +560,10 @@ export default function SchoolSetupPage() {
       <AppConfirmDialog
         open={replaceStructureOpen}
         tone="warning"
-        title="Replace grade structure?"
-        message="All sections will be cleared. Remove enrolled students first if you already have classes set up."
-        confirmLabel="Replace structure"
-        cancelLabel="Cancel"
+        title={t("adminSetupUi.replaceTitle")}
+        message={t("adminSetupUi.replaceMsg")}
+        confirmLabel={t("adminSetupUi.replaceConfirm")}
+        cancelLabel={t("common.cancel")}
         busy={loading}
         onCancel={() => {
           if (loading) return;
@@ -562,12 +577,12 @@ export default function SchoolSetupPage() {
           <div className="sw__header-text">
             <span className="sw__header-title">{BRAND_NAME}</span>
             <span className="sw__header-sub">
-              {revisiting ? "Edit grades & sections" : "School setup"}
+              {revisiting ? t("adminSetupUi.editGradesSections") : t("adminSetupUi.schoolSetup")}
             </span>
           </div>
           {revisiting ? (
             <Link href="/admin/settings" className="sw__header-back">
-              ← Settings
+              {t("adminSetupUi.backSettings")}
             </Link>
           ) : null}
         </header>
@@ -578,6 +593,8 @@ export default function SchoolSetupPage() {
             maxStep={maxStep}
             gradesReady={gradesReady}
             onGoToStep={goToStep}
+            steps={setupSteps}
+            progressAria={t("adminSetupUi.setupProgressAria")}
           />
 
           <div className="sw__body">
@@ -593,23 +610,27 @@ export default function SchoolSetupPage() {
             {step === 2 ? (
               <div className="sw__toolbar-wrap">
                 <div className="sw__toolbar">
-                  <span className="sw__toolbar-label">{grades.length} grades</span>
+                  <span className="sw__toolbar-label">
+                    {t("adminSetupUi.gradesCount", { count: grades.length })}
+                  </span>
                   <div className="sw__toolbar-pills">
                     {SECTION_PRESETS.map((preset) => (
                       <button
-                        key={preset.label}
+                        key={preset.labelKey}
                         type="button"
                         className="sw__pill"
                         disabled={sectionBusy}
                         onClick={() => void applySections([...preset.names])}
                       >
-                        All {preset.label}
+                        {t("adminSetupUi.allPreset", {
+                          label: t(`adminSetupUi.${preset.labelKey}`),
+                        })}
                       </button>
                     ))}
                   </div>
                   <input
                     className="sw__toolbar-input"
-                    placeholder="A, B, C, G, H"
+                    placeholder={t("adminSetupUi.bulkPlaceholder")}
                     value={bulkSections}
                     onChange={(e) => setBulkSections(e.target.value)}
                     onKeyDown={(e) => {
@@ -622,16 +643,16 @@ export default function SchoolSetupPage() {
                     disabled={sectionBusy}
                     onClick={() => void onApplyBulkAll()}
                   >
-                    {sectionBusy ? "…" : "Apply all"}
+                    {sectionBusy ? "…" : t("adminSetupUi.applyAll")}
                   </button>
                 </div>
                 {upperGrades.length > 0 ? (
                   <div className="sw__toolbar sw__toolbar--streams">
-                    <span className="sw__toolbar-label">Gr 11–12</span>
+                    <span className="sw__toolbar-label">{t("adminSetupUi.upperGrades")}</span>
                     <div className="sw__toolbar-pills">
                       {STREAM_PRESETS.map((preset) => (
                         <button
-                          key={preset.label}
+                          key={preset.labelKey}
                           type="button"
                           className="sw__pill sw__pill--stream"
                           disabled={sectionBusy}
@@ -642,7 +663,7 @@ export default function SchoolSetupPage() {
                             )
                           }
                         >
-                          {preset.label}
+                          {t(`adminSetupUi.${preset.labelKey}`)}
                         </button>
                       ))}
                     </div>
@@ -675,7 +696,7 @@ export default function SchoolSetupPage() {
                           <span className="sw__option-title">{p.label}</span>
                           <span className="sw__option-desc">{p.description}</span>
                           {activePreset === p.key ? (
-                            <span className="sw__option-tag">Current</span>
+                            <span className="sw__option-tag">{t("adminSetupUi.currentTag")}</span>
                           ) : selected === p.key ? (
                             <span className="sw__option-check" aria-hidden>
                               ✓
@@ -698,12 +719,10 @@ export default function SchoolSetupPage() {
                         className="sw__range-head"
                         onClick={() => setSelected("CUSTOM")}
                       >
-                        <span className="sw__option-title">Custom range</span>
-                        <span className="sw__option-desc">
-                          Choose start and end grades. Add Nursery/KG or extra named levels if you need them.
-                        </span>
+                        <span className="sw__option-title">{t("adminSetupUi.customRange")}</span>
+                        <span className="sw__option-desc">{t("adminSetupUi.customRangeDesc")}</span>
                         {activePreset === "CUSTOM" ? (
-                          <span className="sw__option-tag">Current</span>
+                          <span className="sw__option-tag">{t("adminSetupUi.currentTag")}</span>
                         ) : selected === "CUSTOM" ? (
                           <span className="sw__option-check" aria-hidden>
                             ✓
@@ -712,7 +731,7 @@ export default function SchoolSetupPage() {
                       </button>
                       <div className="sw__range-row">
                         <label className="sw__range-field">
-                          <span>From</span>
+                          <span>{t("adminSetupUi.from")}</span>
                           <select
                             value={fromGrade}
                             onChange={(e) => {
@@ -724,13 +743,13 @@ export default function SchoolSetupPage() {
                           >
                             {GRADE_NUMBERS.map((n) => (
                               <option key={n} value={n}>
-                                Grade {n}
+                                {t("adminSetupUi.gradeN", { n })}
                               </option>
                             ))}
                           </select>
                         </label>
                         <label className="sw__range-field">
-                          <span>To</span>
+                          <span>{t("adminSetupUi.to")}</span>
                           <select
                             value={toGrade}
                             onChange={(e) => {
@@ -742,7 +761,7 @@ export default function SchoolSetupPage() {
                           >
                             {GRADE_NUMBERS.map((n) => (
                               <option key={n} value={n}>
-                                Grade {n}
+                                {t("adminSetupUi.gradeN", { n })}
                               </option>
                             ))}
                           </select>
@@ -756,23 +775,23 @@ export default function SchoolSetupPage() {
                               setSelected("CUSTOM");
                             }}
                           />
-                          Include Nursery, KG 1, KG 2
+                          {t("adminSetupUi.includeEarlyChildhood")}
                         </label>
                       </div>
                       <div className="sw__range-row">
                         <label className="sw__range-field sw__range-field--grow">
-                          <span>Extra grades (optional)</span>
+                          <span>{t("adminSetupUi.extraGrades")}</span>
                           <input
                             value={extraGradeNames}
                             onChange={(e) => {
                               setExtraGradeNames(e.target.value);
                               setSelected("CUSTOM");
                             }}
-                            placeholder="Remedial, Bridging…"
+                            placeholder={t("adminSetupUi.extraPlaceholder")}
                           />
                         </label>
                         <label className="sw__range-field sw__range-field--grow">
-                          <span>Default sections</span>
+                          <span>{t("adminSetupUi.defaultSections")}</span>
                           <input
                             value={defaultSections}
                             onChange={(e) => setDefaultSections(e.target.value)}
@@ -781,7 +800,10 @@ export default function SchoolSetupPage() {
                         </label>
                       </div>
                       <p className="sw__range-preview">
-                        {customPreview.length} levels: {customPreview.join(" · ")}
+                        {t("adminSetupUi.levelsPreview", {
+                          count: customPreview.length,
+                          list: customPreview.join(" · "),
+                        })}
                       </p>
                     </div>
                   </div>
@@ -800,17 +822,20 @@ export default function SchoolSetupPage() {
                                 type="button"
                                 className="sw__tag"
                                 disabled={sectionBusy}
-                                title={`Remove ${s.name}`}
+                                title={t("adminSetupUi.removeSectionTitleAttr", { name: s.name })}
                                 onClick={() => requestRemoveSection(g.id, s.id, s.name)}
                               >
                                 {s.name} ×
                               </button>
                             ))
                           ) : (
-                            <span className="sw__grade-empty">No sections</span>
+                            <span className="sw__grade-empty">{t("adminSetupUi.noSections")}</span>
                           )}
                         </div>
-                        <div className="sw__grade-add" aria-label={`Add section to ${g.name}`}>
+                        <div
+                          className="sw__grade-add"
+                          aria-label={t("adminSetupUi.addSectionAria", { grade: g.name })}
+                        >
                           {QUICK_LETTERS.map((letter) => {
                             const taken = g.sections.some(
                               (s) => s.name.toLowerCase() === letter.toLowerCase(),
@@ -821,7 +846,11 @@ export default function SchoolSetupPage() {
                                 type="button"
                                 className="sw__letter"
                                 disabled={sectionBusy || taken}
-                                title={taken ? `${letter} added` : `Add ${letter}`}
+                                title={
+                                  taken
+                                    ? t("adminSetupUi.letterAdded", { letter })
+                                    : t("adminSetupUi.addLetter", { letter })
+                                }
                                 onClick={() => void applySections([letter], [g.id])}
                               >
                                 {letter}
@@ -831,23 +860,23 @@ export default function SchoolSetupPage() {
                         </div>
                         {isUpperSecondaryGrade(g.name) ? (
                           <div className="sw__grade-streams">
-                            {STREAM_PRESETS.map((preset) => (
-                              <button
-                                key={preset.label}
-                                type="button"
-                                className="sw__stream"
-                                disabled={sectionBusy}
-                                onClick={() => void applySections([...preset.names], [g.id])}
-                              >
-                                {preset.label}
-                              </button>
-                            ))}
+                              {STREAM_PRESETS.map((preset) => (
+                                <button
+                                  key={preset.labelKey}
+                                  type="button"
+                                  className="sw__stream"
+                                  disabled={sectionBusy}
+                                  onClick={() => void applySections([...preset.names], [g.id])}
+                                >
+                                  {t(`adminSetupUi.${preset.labelKey}`)}
+                                </button>
+                              ))}
                           </div>
                         ) : null}
                         <div className="sw__grade-custom">
                           <input
                             className="sw__grade-custom-input"
-                            placeholder="Custom, e.g. Natural A"
+                            placeholder={t("adminSetupUi.customSectionPh")}
                             value={customByGrade[g.id] ?? ""}
                             disabled={sectionBusy}
                             onChange={(e) =>
@@ -866,20 +895,18 @@ export default function SchoolSetupPage() {
                             disabled={sectionBusy || !parseNames(customByGrade[g.id] ?? "").length}
                             onClick={() => void onApplyGradeCustom(g.id)}
                           >
-                            Add
+                            {t("adminSetupUi.add")}
                           </button>
                         </div>
                       </article>
                     ))}
                     <article className="sw__grade-card sw__grade-card--add">
-                      <h3 className="sw__grade-name">Add another grade</h3>
-                      <p className="sw__grade-empty">
-                        Use this for a level that is not in the numbered range.
-                      </p>
+                      <h3 className="sw__grade-name">{t("adminSetupUi.addAnotherGrade")}</h3>
+                      <p className="sw__grade-empty">{t("adminSetupUi.addAnotherGradeHint")}</p>
                       <div className="sw__grade-custom">
                         <input
                           className="sw__grade-custom-input"
-                          placeholder="e.g. Preparatory, Bridging"
+                          placeholder={t("adminSetupUi.newGradePh")}
                           value={newGradeName}
                           disabled={sectionBusy}
                           onChange={(e) => setNewGradeName(e.target.value)}
@@ -893,7 +920,7 @@ export default function SchoolSetupPage() {
                           disabled={sectionBusy || !newGradeName.trim()}
                           onClick={() => void onAddExtraGrade()}
                         >
-                          Add grade
+                          {t("adminSetupUi.addGrade")}
                         </button>
                       </div>
                     </article>
@@ -902,7 +929,7 @@ export default function SchoolSetupPage() {
 
                 {step === 3 ? (
                   <div className="sw__options">
-                    {ATTENDANCE_MODES.map((m) => (
+                    {attendanceModes.map((m) => (
                       <button
                         key={m.value}
                         type="button"
@@ -930,8 +957,8 @@ export default function SchoolSetupPage() {
                       <span className="sw__finish-icon" aria-hidden>
                         👨‍🎓
                       </span>
-                      <span className="sw__finish-title">Add students</span>
-                      <span className="sw__finish-desc">Manual entry or CSV import</span>
+                      <span className="sw__finish-title">{t("adminSetupUi.finishAddStudents")}</span>
+                      <span className="sw__finish-desc">{t("adminSetupUi.finishAddStudentsDesc")}</span>
                     </Link>
                     <button
                       type="button"
@@ -943,9 +970,9 @@ export default function SchoolSetupPage() {
                         🏠
                       </span>
                       <span className="sw__finish-title">
-                        {loading ? "Saving…" : "Skip for now"}
+                        {loading ? t("common.saving") : t("adminSetupUi.skipForNow")}
                       </span>
-                      <span className="sw__finish-desc">Go to dashboard</span>
+                      <span className="sw__finish-desc">{t("adminSetupUi.goDashboard")}</span>
                     </button>
                   </div>
                 ) : null}
@@ -959,7 +986,7 @@ export default function SchoolSetupPage() {
                   className="sw__back"
                   onClick={() => goToStep((step - 1) as StepNum)}
                 >
-                  ← Back
+                  {t("adminSetupUi.back")}
                 </button>
               ) : (
                 <span />
@@ -968,7 +995,7 @@ export default function SchoolSetupPage() {
               <div className="sw__footer-right">
                 {step === 2 ? (
                   <button type="button" className="sw__skip" onClick={() => goToStep(3)}>
-                    Skip sections
+                    {t("adminSetupUi.skipSections")}
                   </button>
                 ) : null}
 
@@ -980,12 +1007,12 @@ export default function SchoolSetupPage() {
                     onClick={() => void onApplyGradeStructure()}
                   >
                     {loading
-                      ? "Saving…"
+                      ? t("common.saving")
                       : presetChanging
-                        ? "Replace & continue"
+                        ? t("adminSetupUi.replaceContinue")
                         : gradesReady
-                          ? "Continue"
-                          : "Create & continue"}
+                          ? t("adminSetupUi.continue")
+                          : t("adminSetupUi.createContinue")}
                   </button>
                 ) : null}
 
@@ -996,18 +1023,18 @@ export default function SchoolSetupPage() {
                       className="sw__btn"
                       onClick={() => router.replace("/admin/settings")}
                     >
-                      Done
+                      {t("adminSetupUi.done")}
                     </button>
                   ) : (
                     <button type="button" className="sw__btn" onClick={() => goToStep(3)}>
-                      Continue
+                      {t("adminSetupUi.continue")}
                     </button>
                   )
                 ) : null}
 
                 {step === 3 ? (
                   <button type="button" className="sw__btn" onClick={() => void onSaveAttendanceMode()}>
-                    Continue
+                    {t("adminSetupUi.continue")}
                   </button>
                 ) : null}
               </div>

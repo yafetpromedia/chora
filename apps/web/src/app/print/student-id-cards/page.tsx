@@ -13,6 +13,7 @@ import {
 } from "@/lib/student-card-print";
 import { countStudentIdCards, listStudentIdCards, type StudentIdCard } from "@/lib/student-cards";
 import { BRAND_NAME } from "@/lib/brand";
+import { useLocale } from "@/components/i18n/locale-provider";
 
 function parseFilters(params: URLSearchParams) {
   const gradeId = params.get("gradeId") ?? undefined;
@@ -30,6 +31,7 @@ function parseFilters(params: URLSearchParams) {
 }
 
 function BulkPrintPageInner() {
+  const { t } = useLocale();
   const router = useRouter();
   const searchParams = useSearchParams();
   const filters = useMemo(() => parseFilters(searchParams), [searchParams]);
@@ -56,7 +58,11 @@ function BulkPrintPageInner() {
       setProgress({
         done: skip,
         total,
-        label: `Loading students ${skip + 1}–${Math.min(skip + take, total)} of ${total}…`,
+        label: t("idCardPrintChromeUi.loadingStudentsRange", {
+          start: skip + 1,
+          end: Math.min(skip + take, total),
+          total,
+        }),
       });
       const chunk = await listStudentIdCards({
         gradeId: filters.gradeId,
@@ -69,7 +75,7 @@ function BulkPrintPageInner() {
       if (chunk.length < take) break;
     }
     return all;
-  }, [filters, total]);
+  }, [filters, total, t]);
 
   useEffect(() => {
     if (!localStorage.getItem(AUTH_TOKEN_KEY)) {
@@ -101,7 +107,7 @@ function BulkPrintPageInner() {
           setProgress({
             done: 0,
             total: count,
-            label: `Loading batch ${filters.batch + 1}…`,
+            label: t("idCardPrintChromeUi.loadingBatchN", { n: filters.batch + 1 }),
           });
           loaded = await listStudentIdCards({
             gradeId: filters.gradeId,
@@ -120,7 +126,7 @@ function BulkPrintPageInner() {
               setProgress({
                 done,
                 total: qrTotal,
-                label: `Generating QR codes ${done} / ${qrTotal}…`,
+                label: t("idCardPrintChromeUi.generatingQr", { done, total: qrTotal }),
               });
             }
           });
@@ -131,7 +137,7 @@ function BulkPrintPageInner() {
         setPhase("ready");
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Could not prepare print");
+          setError(err instanceof Error ? err.message : t("idCardPrintChromeUi.preparePrintFailed"));
           setPhase("error");
         }
       }
@@ -141,7 +147,7 @@ function BulkPrintPageInner() {
     return () => {
       cancelled = true;
     };
-  }, [filters, router, loadAllCards]);
+  }, [filters, router, loadAllCards, t]);
 
   useEffect(() => {
     if (phase !== "ready" || cards.length === 0) return;
@@ -151,10 +157,10 @@ function BulkPrintPageInner() {
 
   const filterLabel = useMemo(() => {
     const parts: string[] = [];
-    if (filters.gradeId) parts.push("Filtered by grade");
-    if (filters.sectionId) parts.push("section");
-    return parts.length ? parts.join(" · ") : "All students";
-  }, [filters]);
+    if (filters.gradeId) parts.push(t("idCardPrintChromeUi.filteredByGrade"));
+    if (filters.sectionId) parts.push(t("idCardPrintChromeUi.filteredSection"));
+    return parts.length ? parts.join(" · ") : t("idCardPrintChromeUi.allStudents");
+  }, [filters, t]);
 
   if (phase === "error") {
     return (
@@ -167,7 +173,7 @@ function BulkPrintPageInner() {
   if (phase === "ready" && total === 0) {
     return (
       <div className="sid-print-page sid-print-page--error">
-        <p>No students match this filter.</p>
+        <p>{t("idCardPrintChromeUi.noStudentsFilter")}</p>
       </div>
     );
   }
@@ -178,19 +184,26 @@ function BulkPrintPageInner() {
     return (
       <div className="sid-print-page">
         <div className="sid-print-progress">
-          <p className="sid-print-progress__brand">{BRAND_NAME} · Bulk ID cards</p>
-          <h1>Preparing print job</h1>
-          <p className="sid-print-progress__label">{progress.label || "Starting…"}</p>
+          <p className="sid-print-progress__brand">
+            {t("idCardPrintChromeUi.bulkBrandStudent", { brand: BRAND_NAME })}
+          </p>
+          <h1>{t("idCardPrintChromeUi.preparingPrintJob")}</h1>
+          <p className="sid-print-progress__label">
+            {progress.label || t("idCardPrintChromeUi.starting")}
+          </p>
           <div className="sid-print-progress__bar" aria-hidden>
             <span style={{ width: `${pct}%` }} />
           </div>
           <p className="sid-print-progress__pct">{pct}%</p>
           {total > 0 ? (
             <p className="sid-print-progress__meta">
-              {total.toLocaleString()} students · {filterLabel}
+              {total.toLocaleString()} · {filterLabel}
               {filters.all
-                ? " · full run"
-                : ` · batch ${filters.batch + 1} of ${batchCount}`}
+                ? ` · ${t("idCardPrintChromeUi.fullRun")}`
+                : ` · ${t("idCardPrintChromeUi.batchOf", {
+                    current: filters.batch + 1,
+                    total: batchCount,
+                  })}`}
             </p>
           ) : null}
         </div>
@@ -198,7 +211,7 @@ function BulkPrintPageInner() {
     );
   }
 
-  const schoolName = cards[0]?.schoolName ?? "School";
+  const schoolName = cards[0]?.schoolName ?? t("idCardPrintChromeUi.schoolFallback");
   const printedAt = new Date().toLocaleString(undefined, {
     dateStyle: "medium",
     timeStyle: "short",
@@ -213,37 +226,47 @@ function BulkPrintPageInner() {
             <img src={cards[0].schoolLogoUrl} alt="" className="sid-print-meta__logo" />
           ) : null}
           <div className="sid-print-meta__copy">
-            <p className="sid-print-meta__brand">{BRAND_NAME} · Bulk student IDs</p>
+            <p className="sid-print-meta__brand">
+              {t("idCardPrintChromeUi.bulkStudentIds", { brand: BRAND_NAME })}
+            </p>
             <h1 className="sid-print-meta__title">{schoolName}</h1>
             <p className="sid-print-meta__sub">
-              {cards.length.toLocaleString()} of {total.toLocaleString()} students · {filterLabel}
+              {t("idCardPrintChromeUi.studentsOfTotal", {
+                shown: cards.length,
+                total,
+              })}{" "}
+              · {filterLabel}
               {!filters.all && batchCount > 1
-                ? ` · batch ${filters.batch + 1} / ${batchCount} (rows ${batchStart + 1}–${batchEnd})`
+                ? ` · ${t("idCardPrintChromeUi.batchRows", {
+                    current: filters.batch + 1,
+                    total: batchCount,
+                    start: batchStart + 1,
+                    end: batchEnd,
+                  })}`
                 : null}
             </p>
           </div>
         </div>
         <ul className="sid-print-checklist">
           {filters.style === "full" ? (
-            <li>
-              <strong>Full card</strong> — same layout as on screen (Sex, Address, all fields)
-            </li>
+            <li>{t("idCardPrintChromeUi.checklistFullCard")}</li>
           ) : (
             <li>
-              <strong>{filters.perPage === "8" ? "8" : "6"}</strong> mini cards per sheet ·{" "}
-              {filters.duplex ? "front + back per group" : "fronts only"}
+              {t("idCardPrintChromeUi.checklistMini", {
+                count: filters.perPage === "8" ? 8 : 6,
+                sides: filters.duplex
+                  ? t("idCardPrintChromeUi.frontBackGroup")
+                  : t("idCardPrintChromeUi.frontsOnly"),
+              })}
             </li>
           )}
-          <li>
-            Enable <strong>Print backgrounds</strong> / <strong>Background graphics</strong> in the
-            print dialog
-          </li>
-          {filters.duplex ? (
-            <li>Double-sided · <strong>Flip on long edge</strong></li>
-          ) : null}
-          <li>Save as PDF for print shops or copy centers</li>
+          <li>{t("idCardPrintChromeUi.printBackgroundsLine")}</li>
+          {filters.duplex ? <li>{t("idCardPrintChromeUi.doubleSidedLong")}</li> : null}
+          <li>{t("idCardPrintChromeUi.savePdfShops")}</li>
         </ul>
-        <p className="sid-print-meta__date">Generated {printedAt}</p>
+        <p className="sid-print-meta__date">
+          {t("idCardPrintChromeUi.generated", { date: printedAt })}
+        </p>
       </header>
 
       {filters.style === "full" ? (
@@ -260,27 +283,32 @@ function BulkPrintPageInner() {
 
       {!filters.all && batchCount > 1 && filters.batch + 1 < batchCount ? (
         <p className="sid-print-batch-nav no-print">
-          After this batch, open batch {filters.batch + 2}: add{" "}
-          <code>?batch={filters.batch + 1}</code> to the URL or re-run print from the app.
+          {t("idCardPrintChromeUi.batchNavAfter", {
+            next: filters.batch + 2,
+            n: filters.batch + 1,
+          })}
         </p>
       ) : null}
 
       <footer className="sid-print-foot">
-        {schoolName} · {cards.length} cards on this document
+        {schoolName} · {t("idCardPrintChromeUi.cardsOnDoc", { count: cards.length })}
       </footer>
+    </div>
+  );
+}
+
+function BulkPrintFallback() {
+  const { t } = useLocale();
+  return (
+    <div className="sid-print-page">
+      <p className="sid-print-page__loading">{t("idCardPrintChromeUi.loading")}</p>
     </div>
   );
 }
 
 export default function BulkStudentIdCardsPrintPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="sid-print-page">
-          <p className="sid-print-page__loading">Loading…</p>
-        </div>
-      }
-    >
+    <Suspense fallback={<BulkPrintFallback />}>
       <BulkPrintPageInner />
     </Suspense>
   );

@@ -5,6 +5,7 @@ import {
   Injectable,
   NotFoundException,
   OnModuleInit,
+  Optional,
 } from '@nestjs/common';
 import { PlatformRole, Prisma } from '@prisma/client';
 import { hashSync } from 'bcrypt';
@@ -17,6 +18,7 @@ import {
   type PlatformPermissionKey,
 } from '../common/permissions/platform-permissions';
 import { MailService } from '../common/mail.service';
+import { EmailService } from '../email/email.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -32,6 +34,7 @@ export class PlatformAccessService implements OnModuleInit {
   constructor(
     private readonly prisma: PrismaService,
     private readonly mail: MailService,
+    @Optional() private readonly email?: EmailService,
   ) {}
 
   async onModuleInit() {
@@ -536,6 +539,20 @@ export class PlatformAccessService implements OnModuleInit {
         : input.role === 'SUPPORT'
           ? 'Support'
           : 'Sales';
+    if (this.email) {
+      return this.email.sendNow({
+        to: input.to,
+        category: 'account_invitation',
+        templateId: 'account_invitation',
+        idempotencyKey: `platform-invite:${input.to}:${input.inviteUrl}`,
+        vars: {
+          firstName: input.firstName,
+          actorName: input.actorName,
+          roleLabel,
+          actionUrl: input.inviteUrl,
+        },
+      });
+    }
     return this.mail.send({
       to: input.to,
       subject: 'You are invited to the Chora platform console',

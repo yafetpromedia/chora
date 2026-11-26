@@ -1,14 +1,14 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
 import type { GradeWithSections } from "@/lib/api";
 import {
   createAdmissionApplication,
   type AdmissionApplication,
   type AdmissionCycle,
-  type AdmissionStatus,
   type CreateApplicationPayload,
 } from "@/lib/admissions";
+import { useLocale } from "@/components/i18n/locale-provider";
 
 type Props = {
   cycle: AdmissionCycle;
@@ -18,6 +18,7 @@ type Props = {
 };
 
 export function AdmissionRegisterDrawer({ cycle, grades, onClose, onSuccess }: Props) {
+  const { t } = useLocale();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [middleName, setMiddleName] = useState("");
@@ -78,7 +79,9 @@ export function AdmissionRegisterDrawer({ cycle, grades, onClose, onSuccess }: P
       const app = await createAdmissionApplication(body);
       onSuccess(app);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not register applicant");
+      setError(
+        err instanceof Error ? err.message : t("admissionRegisterUi.registerFailed"),
+      );
     } finally {
       setLoading(false);
     }
@@ -95,12 +98,15 @@ export function AdmissionRegisterDrawer({ cycle, grades, onClose, onSuccess }: P
         <header className="adm-drawer__head">
           <div>
             <p className="adm-drawer__eyebrow">{cycle.name}</p>
-            <h2 id="adm-drawer-title">Register applicant</h2>
-            <p className="adm-drawer__sub">
-              Select the grade they are applying for — placement uses rules for that grade.
-            </p>
+            <h2 id="adm-drawer-title">{t("admissionsUi.registerApplicant")}</h2>
+            <p className="adm-drawer__sub">{t("admissionRegisterUi.drawerSub")}</p>
           </div>
-          <button type="button" className="adm-drawer__close" onClick={onClose} aria-label="Close">
+          <button
+            type="button"
+            className="adm-drawer__close"
+            onClick={onClose}
+            aria-label={t("common.close")}
+          >
             ×
           </button>
         </header>
@@ -113,77 +119,77 @@ export function AdmissionRegisterDrawer({ cycle, grades, onClose, onSuccess }: P
           ) : null}
 
           <section className="adm-form-section">
-            <h3>Applicant</h3>
+            <h3>{t("admissionRegisterUi.sectionApplicant")}</h3>
             <div className="adm-form-grid">
               <label>
-                First name
+                {t("profile.firstName")}
                 <input value={firstName} onChange={(e) => setFirstName(e.target.value)} required />
               </label>
               <label>
-                Last name
+                {t("profile.lastName")}
                 <input value={lastName} onChange={(e) => setLastName(e.target.value)} required />
               </label>
               <label>
-                Middle name
+                {t("admissionRegisterUi.middleName")}
                 <input value={middleName} onChange={(e) => setMiddleName(e.target.value)} />
               </label>
               <label>
-                ID number
+                {t("admissionRegisterUi.idNumber")}
                 <input value={idNumber} onChange={(e) => setIdNumber(e.target.value)} />
               </label>
               <label>
-                Gender
+                {t("admissionRegisterUi.gender")}
                 <select value={gender} onChange={(e) => setGender(e.target.value as typeof gender)}>
-                  <option value="">—</option>
-                  <option value="MALE">Male</option>
-                  <option value="FEMALE">Female</option>
-                  <option value="OTHER">Other</option>
+                  <option value="">{t("admissionRegisterUi.genderUnset")}</option>
+                  <option value="MALE">{t("studentsUi.male")}</option>
+                  <option value="FEMALE">{t("studentsUi.female")}</option>
+                  <option value="OTHER">{t("studentsUi.other")}</option>
                 </select>
               </label>
               <label>
-                Date of birth
+                {t("admissionRegisterUi.dateOfBirth")}
                 <input type="date" value={dateOfBirth} onChange={(e) => setDateOfBirth(e.target.value)} />
               </label>
               <label>
-                Phone
+                {t("profile.phone")}
                 <input value={phone} onChange={(e) => setPhone(e.target.value)} />
               </label>
               <label>
-                Email
+                {t("profile.email")}
                 <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
               </label>
             </div>
           </section>
 
           <section className="adm-form-section">
-            <h3>Parents</h3>
+            <h3>{t("admissionRegisterUi.sectionParents")}</h3>
             <div className="adm-form-grid">
               <label>
-                Father name
+                {t("admissionRegisterUi.fatherName")}
                 <input value={fatherName} onChange={(e) => setFatherName(e.target.value)} required />
               </label>
               <label>
-                Father phone
+                {t("admissionRegisterUi.fatherPhone")}
                 <input value={fatherPhone} onChange={(e) => setFatherPhone(e.target.value)} required />
               </label>
               <label>
-                Mother name
+                {t("admissionRegisterUi.motherName")}
                 <input value={motherName} onChange={(e) => setMotherName(e.target.value)} required />
               </label>
               <label>
-                Mother phone
+                {t("admissionRegisterUi.motherPhone")}
                 <input value={motherPhone} onChange={(e) => setMotherPhone(e.target.value)} required />
               </label>
             </div>
           </section>
 
           <section className="adm-form-section">
-            <h3>Intake & scores</h3>
+            <h3>{t("admissionRegisterUi.sectionIntake")}</h3>
             <div className="adm-form-grid">
               <label>
-                Applying for grade
+                {t("admissionRegisterUi.applyingForGrade")}
                 <select value={targetGradeId} onChange={(e) => setTargetGradeId(e.target.value)} required>
-                  <option value="">Select grade</option>
+                  <option value="">{t("admissionsUi.selectGrade")}</option>
                   {grades.map((g) => (
                     <option key={g.id} value={g.id}>
                       {g.name}
@@ -192,18 +198,18 @@ export function AdmissionRegisterDrawer({ cycle, grades, onClose, onSuccess }: P
                 </select>
               </label>
               <label>
-                Entrance exam score
+                {t("admissionRegisterUi.entranceScore")}
                 <input
                   type="number"
                   min={0}
                   max={100}
                   value={entranceScore}
                   onChange={(e) => setEntranceScore(e.target.value)}
-                  placeholder="e.g. 78"
+                  placeholder={t("admissionRegisterUi.entrancePlaceholder")}
                 />
               </label>
               <label>
-                Interview score
+                {t("admissionRegisterUi.interviewScore")}
                 <input
                   type="number"
                   min={0}
@@ -213,7 +219,7 @@ export function AdmissionRegisterDrawer({ cycle, grades, onClose, onSuccess }: P
                 />
               </label>
               <label className="adm-form-full">
-                Notes
+                {t("admissionRegisterUi.notes")}
                 <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
               </label>
             </div>
@@ -221,10 +227,10 @@ export function AdmissionRegisterDrawer({ cycle, grades, onClose, onSuccess }: P
 
           <footer className="adm-drawer__foot">
             <button type="button" className="adm-btn adm-btn--ghost" onClick={onClose}>
-              Cancel
+              {t("common.cancel")}
             </button>
             <button type="submit" className="adm-btn adm-btn--primary" disabled={!canSubmit || loading}>
-              {loading ? "Saving…" : "Register applicant"}
+              {loading ? t("common.saving") : t("admissionsUi.registerApplicant")}
             </button>
           </footer>
         </form>

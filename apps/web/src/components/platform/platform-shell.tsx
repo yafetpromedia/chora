@@ -14,10 +14,75 @@ import { AiChatWidget } from "@/components/ai/ai-chat-widget";
 import { BrandMark } from "@/components/brand-mark";
 import { BRAND_NAME } from "@/lib/brand";
 import { PlatformNotifyBell } from "./platform-notify-bell";
-import {
-  SECTION_META,
-  type PlatformSection,
-} from "./platform-types";
+import type { PlatformSection } from "./platform-types";
+import { useLocale } from "@/components/i18n/locale-provider";
+import type { MessageKey } from "@/lib/i18n";
+
+const NAV_LABEL_KEYS: Record<PlatformSection, MessageKey> = {
+  overview: "platformChromeUi.navOverview",
+  schools: "platformChromeUi.navTenants",
+  curriculum: "platformChromeUi.navPackages",
+  subjects: "platformChromeUi.navSubjects",
+  library: "platformChromeUi.navLibrary",
+  messages: "platformChromeUi.navMessages",
+  support: "platformChromeUi.navSupport",
+  structures: "platformChromeUi.navStructures",
+  provisioning: "platformChromeUi.navProvisioning",
+  assessments: "platformChromeUi.navAssessments",
+  billing: "platformChromeUi.navBilling",
+  invoices: "platformChromeUi.navInvoices",
+  usage: "platformChromeUi.navUsage",
+  plans: "platformChromeUi.navPlans",
+  coupons: "platformChromeUi.navCoupons",
+  permissions: "platformChromeUi.navPermissions",
+  email: "platformChromeUi.navEmail",
+  profile: "platformChromeUi.navProfile",
+  settings: "platformChromeUi.navSettings",
+};
+
+const SECTION_TITLE_KEYS: Record<PlatformSection, MessageKey> = {
+  overview: "platformChromeUi.sectionOverviewTitle",
+  schools: "platformChromeUi.sectionSchoolsTitle",
+  curriculum: "platformChromeUi.sectionCurriculumTitle",
+  subjects: "platformChromeUi.sectionSubjectsTitle",
+  library: "platformChromeUi.sectionLibraryTitle",
+  messages: "platformChromeUi.sectionMessagesTitle",
+  support: "platformChromeUi.sectionSupportTitle",
+  structures: "platformChromeUi.sectionStructuresTitle",
+  provisioning: "platformChromeUi.sectionProvisioningTitle",
+  assessments: "platformChromeUi.sectionAssessmentsTitle",
+  billing: "platformChromeUi.sectionBillingTitle",
+  invoices: "platformChromeUi.sectionInvoicesTitle",
+  usage: "platformChromeUi.sectionUsageTitle",
+  plans: "platformChromeUi.sectionPlansTitle",
+  coupons: "platformChromeUi.sectionCouponsTitle",
+  permissions: "platformChromeUi.sectionPermissionsTitle",
+  profile: "platformChromeUi.sectionProfileTitle",
+  settings: "platformChromeUi.sectionSettingsTitle",
+  email: "platformChromeUi.sectionEmailTitle",
+};
+
+const SECTION_SUB_KEYS: Record<PlatformSection, MessageKey> = {
+  overview: "platformChromeUi.sectionOverviewSub",
+  schools: "platformChromeUi.sectionSchoolsSub",
+  curriculum: "platformChromeUi.sectionCurriculumSub",
+  subjects: "platformChromeUi.sectionSubjectsSub",
+  library: "platformChromeUi.sectionLibrarySub",
+  messages: "platformChromeUi.sectionMessagesSub",
+  support: "platformChromeUi.sectionSupportSub",
+  structures: "platformChromeUi.sectionStructuresSub",
+  provisioning: "platformChromeUi.sectionProvisioningSub",
+  assessments: "platformChromeUi.sectionAssessmentsSub",
+  billing: "platformChromeUi.sectionBillingSub",
+  invoices: "platformChromeUi.sectionInvoicesSub",
+  usage: "platformChromeUi.sectionUsageSub",
+  plans: "platformChromeUi.sectionPlansSub",
+  coupons: "platformChromeUi.sectionCouponsSub",
+  permissions: "platformChromeUi.sectionPermissionsSub",
+  profile: "platformChromeUi.sectionProfileSub",
+  settings: "platformChromeUi.sectionSettingsSub",
+  email: "platformChromeUi.sectionEmailSub",
+};
 
 const NAV: { id: PlatformSection; label: string; icon: DashIconName }[] = [
   { id: "overview", label: "Overview", icon: "overview" },
@@ -36,6 +101,7 @@ const NAV: { id: PlatformSection; label: string; icon: DashIconName }[] = [
   { id: "plans", label: "Plans", icon: "settings" },
   { id: "coupons", label: "Coupons", icon: "fees" },
   { id: "permissions", label: "Permissions", icon: "users" },
+  { id: "email", label: "Email", icon: "announcements" },
   { id: "profile", label: "Profile", icon: "profile" },
   { id: "settings", label: "Settings", icon: "settings" },
 ];
@@ -60,6 +126,7 @@ export function PlatformShell({
   onSectionChange,
   children,
 }: Props) {
+  const { t } = useLocale();
   const router = useRouter();
   const [mobileNav, setMobileNav] = useState(false);
   const hydrated = useSyncExternalStore(
@@ -80,10 +147,11 @@ export function PlatformShell({
     router.replace("/platform/login");
   }
 
-  const meta = SECTION_META[section];
+  const sectionTitle = t(SECTION_TITLE_KEYS[section]);
+  const sectionSubtitle = t(SECTION_SUB_KEYS[section]);
   const displayName = user
     ? `${user.firstName} ${user.lastName}`.trim() || user.email
-    : "Platform operator";
+    : t("platformChromeUi.operatorFallback");
   const visibleNav = NAV.filter((item) => canAccessPlatformSection(user, item.id));
   const mobileTabs = PLATFORM_MOBILE_TABS.flatMap((id) => {
     const item = visibleNav.find((entry) => entry.id === id);
@@ -103,13 +171,13 @@ export function PlatformShell({
     >
       <aside
         className={`dash-sidebar dash-sidebar--pro plat-sidebar${mobileNav ? " dash-sidebar--open" : ""}`}
-        aria-label="Platform navigation"
+        aria-label={t("platformChromeUi.ariaNav")}
       >
         <div className="dash-sidebar-brand dash-sidebar-brand--pro plat-sidebar-brand">
           <BrandMark className="logo-mark logo-mark--sidebar-pro plat-logo" />
           <div>
             <span className="dash-sidebar-title">{BRAND_NAME}</span>
-            <span className="dash-sidebar-role">Platform console</span>
+            <span className="dash-sidebar-role">{t("platformChromeUi.consoleRole")}</span>
           </div>
         </div>
 
@@ -136,14 +204,14 @@ export function PlatformShell({
                     <span className="dash-nav-icon-wrap" aria-hidden>
                       <DashIcon name={item.icon} />
                     </span>
-                    {item.label}
+                    {t(NAV_LABEL_KEYS[item.id])}
                   </button>
                 );
               })}
         </nav>
 
         <div className="dash-sidebar-foot dash-sidebar-foot--pro plat-sidebar-foot">
-          <p className="dash-sidebar-school-label">Signed in</p>
+          <p className="dash-sidebar-school-label">{t("platformChromeUi.signedIn")}</p>
           <p className="dash-sidebar-school">{displayName}</p>
           {user ? (
             <span className="plat-role-badge">{user.role}</span>
@@ -155,7 +223,7 @@ export function PlatformShell({
         <button
           type="button"
           className="dash-sidebar-backdrop"
-          aria-label="Close menu"
+          aria-label={t("platformChromeUi.closeMenu")}
           onClick={() => setMobileNav(false)}
         />
       ) : null}
@@ -165,14 +233,14 @@ export function PlatformShell({
           <button
             type="button"
             className="dash-menu-btn dash-menu-btn--pro"
-            aria-label="Open menu"
+            aria-label={t("platformChromeUi.openMenu")}
             onClick={() => setMobileNav(true)}
           >
             <DashIcon name="menu" />
           </button>
           <div className="dash-topbar-heading">
-            <h1 className="dash-topbar-title">{meta.title}</h1>
-            <p className="dash-topbar-sub">{meta.subtitle}</p>
+            <h1 className="dash-topbar-title">{sectionTitle}</h1>
+            <p className="dash-topbar-sub">{sectionSubtitle}</p>
           </div>
           <div className="dash-topbar-actions">
             <PlatformNotifyBell
@@ -188,14 +256,14 @@ export function PlatformShell({
               className="dash-logout dash-logout--pro"
             >
               <DashIcon name="logout" className="dash-icon--sm" />
-              <span>Log out</span>
+              <span>{t("platformChromeUi.logOut")}</span>
             </button>
           </div>
         </header>
         <div className="dash-content dash-content--pro">{children}</div>
       </div>
 
-      <nav className="dash-tabbar" aria-label="Primary navigation">
+      <nav className="dash-tabbar" aria-label={t("platformChromeUi.ariaPrimary")}>
         {mobileTabs.map((item) => {
           const active = section === item.id;
           return (
@@ -211,21 +279,21 @@ export function PlatformShell({
               <span className="dash-tabbar__icon" aria-hidden>
                 <DashIcon name={item.icon} />
               </span>
-              <span className="dash-tabbar__label">{item.label}</span>
+              <span className="dash-tabbar__label">{t(NAV_LABEL_KEYS[item.id])}</span>
             </button>
           );
         })}
         <button
           type="button"
           className={`dash-tabbar__item${moreActive || mobileNav ? " dash-tabbar__item--active" : ""}`}
-          aria-label="More menu"
+          aria-label={t("platformChromeUi.moreMenu")}
           aria-expanded={mobileNav}
           onClick={() => setMobileNav((open) => !open)}
         >
           <span className="dash-tabbar__icon" aria-hidden>
             <DashIcon name="menu" />
           </span>
-          <span className="dash-tabbar__label">More</span>
+          <span className="dash-tabbar__label">{t("platformChromeUi.more")}</span>
         </button>
       </nav>
 
@@ -237,14 +305,15 @@ export function PlatformShell({
 }
 
 export function PlatformFooterLinks() {
+  const { t } = useLocale();
   return (
     <p className="plat-footer-links">
       <Link href="/" className="auth-page-footer-link">
-        ← Public site
+        {t("platformChromeUi.publicSite")}
       </Link>
       <span aria-hidden> · </span>
       <Link href="/login" className="auth-page-footer-link">
-        School login
+        {t("platformChromeUi.schoolLogin")}
       </Link>
     </p>
   );

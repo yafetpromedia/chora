@@ -3,8 +3,10 @@
 import { useEffect, useState } from "react";
 import { getMyProfile, updateMyProfile } from "@/lib/profile";
 import { AppToast } from "@/components/ui/app-toast";
+import { useLocale } from "@/components/i18n/locale-provider";
 
 export function StudentResultsPrivacyCard() {
+  const { t } = useLocale();
   const [allowed, setAllowed] = useState(true);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -19,10 +21,12 @@ export function StudentResultsPrivacyCard() {
         }
       })
       .catch((err) =>
-        setError(err instanceof Error ? err.message : "Could not load privacy setting"),
+        setError(
+          err instanceof Error ? err.message : t("studentResultsPrivacyUi.loadFailed"),
+        ),
       )
       .finally(() => setLoading(false));
-  }, []);
+  }, [t]);
 
   async function onToggle(next: boolean) {
     setSaving(true);
@@ -33,11 +37,13 @@ export function StudentResultsPrivacyCard() {
       setAllowed(updated.student?.parentsCanViewResults !== false);
       setToast(
         next
-          ? "Parents can view your results again."
-          : "Parents can no longer see your results.",
+          ? t("studentResultsPrivacyUi.toastEnabled")
+          : t("studentResultsPrivacyUi.toastDisabled"),
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not update privacy setting");
+      setError(
+        err instanceof Error ? err.message : t("studentResultsPrivacyUi.updateFailed"),
+      );
     } finally {
       setSaving(false);
     }
@@ -46,19 +52,20 @@ export function StudentResultsPrivacyCard() {
   if (loading) {
     return (
       <section className="profile-card">
-        <p className="profile-card__sub">Loading privacy settings…</p>
+        <p className="profile-card__sub">{t("studentResultsPrivacyUi.loading")}</p>
       </section>
     );
   }
 
   return (
-    <section className="profile-card" aria-label="Results privacy">
+    <section
+      className="profile-card"
+      aria-label={t("studentResultsPrivacyUi.ariaLabel")}
+    >
       <div className="profile-card__head">
         <div>
-          <h3 className="profile-card__title">Results privacy</h3>
-          <p className="profile-card__sub">
-            Control whether linked parents can see your scores and report card
-          </p>
+          <h3 className="profile-card__title">{t("studentResultsPrivacyUi.title")}</h3>
+          <p className="profile-card__sub">{t("studentResultsPrivacyUi.sub")}</p>
         </div>
       </div>
 
@@ -72,11 +79,11 @@ export function StudentResultsPrivacyCard() {
           onChange={(e) => void onToggle(e.target.checked)}
         />
         <span>
-          <strong>Allow parents to see my results</strong>
+          <strong>{t("studentResultsPrivacyUi.toggleTitle")}</strong>
           <small>
             {allowed
-              ? "Parents can open Results and Report card for you."
-              : "Parents are blocked from your results until you turn this back on."}
+              ? t("studentResultsPrivacyUi.toggleOnSub")
+              : t("studentResultsPrivacyUi.toggleOffSub")}
           </small>
         </span>
       </label>
