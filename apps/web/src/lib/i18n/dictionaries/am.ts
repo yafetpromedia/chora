@@ -488,8 +488,13 @@ export const am: Dictionary = {
     grade: "ክፍል",
     fan: "ፋን",
     idRef: "መለያ / ማጣቀሻ",
+    usernameValue: "የተጠቃሚ ስም",
+    emailOwnHint:
+      "ጮራ የትምህርት ቤት ኢሜይልን ወደዚህ አድራሻ ይልካል። የራስዎን Gmail ወይም ያለዎትን ሌላ ኢንቦክስ ይጠቀሙ።",
+    emailPlaceholderHint:
+      "ይህ አድራሻ የመለያ መያዣ ብቻ ነው፣ ኢንቦክስ አይደለም። የትምህርት ቤት መልዕክቶች እንዲደርሱዎ በGmail ይቀይሩት።",
     usernamePlaceholder: "ፊደሎች፣ ቁጥሮች፣ . _ -",
-    emailPlaceholder: "you@example.com",
+    emailPlaceholder: "you@gmail.com",
     phonePlaceholder: "+251…",
   },
   roles: {

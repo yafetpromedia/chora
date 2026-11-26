@@ -37,6 +37,10 @@ function roleLabel(role: string, t: (key: string) => string) {
   return role;
 }
 
+function isPlaceholderInbox(email: string) {
+  return /@(parent|users)\.(chora|campusone)\.app$/i.test(email.trim());
+}
+
 function initials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   if (parts.length >= 2) {
@@ -220,7 +224,7 @@ export function UserProfilePanel() {
                 <dd>{school.name}</dd>
               </div>
               <div>
-                <dt>{t("profile.username")}</dt>
+                <dt>{t("profile.usernameValue")}</dt>
                 <dd>
                   <code>{user.username}</code>
                 </dd>
@@ -376,6 +380,17 @@ export function UserProfilePanel() {
                   autoComplete="email"
                   placeholder={t("profile.emailPlaceholder")}
                 />
+                <p
+                  className={
+                    isPlaceholderInbox(email)
+                      ? "profile-card__hint"
+                      : "profile-card__sub"
+                  }
+                >
+                  {isPlaceholderInbox(email)
+                    ? t("profile.emailPlaceholderHint")
+                    : t("profile.emailOwnHint")}
+                </p>
               </label>
               <div className="profile-form__row">
                 <label className="profile-field">
