@@ -2,6 +2,15 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
+
+function useMounted() {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+  return mounted;
+}
 import { useLocale } from "@/components/i18n/locale-provider";
 import type { GradeWithSections, StudentRecord } from "@/lib/api";
 import { resetStudentPortalPassword, updateStudent } from "@/lib/school-setup";
@@ -67,6 +76,7 @@ export function StudentManageDrawer({
   onViewIdCard,
 }: Props) {
   const { t } = useLocale();
+  const mounted = useMounted();
   const [tab, setTab] = useState<ManageTab>("contact");
   const [idCard, setIdCard] = useState<StudentIdCard | null>(null);
   const [idCardLoading, setIdCardLoading] = useState(false);
@@ -147,6 +157,14 @@ export function StudentManageDrawer({
   }
 
   useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
+
+  useEffect(() => {
     if (tab !== "idcard") return;
     void getStudentIdCard(student.id)
       .then(setIdCard)
@@ -202,12 +220,13 @@ export function StudentManageDrawer({
     }
   }
 
-  return (
+  const drawer = (
     <>
       <div className="stu-drawer-backdrop stu-manage-backdrop" onClick={onClose} aria-hidden />
       <aside
         className="stu-drawer stu-drawer--wide stu-manage-drawer"
         role="dialog"
+        aria-modal="true"
         aria-labelledby="manage-title"
       >
         <header className="stu-manage-hero">
@@ -608,31 +627,34 @@ export function StudentManageDrawer({
         </div>
 
         <footer className="stu-drawer__foot stu-manage-foot">
-          <button
-            type="button"
-            className="stu-btn stu-btn--danger stu-btn--ghost-danger"
-            disabled={busy || saving}
-            onClick={() => onRemove(student)}
-          >
-            {t("studentsUi.remove")}
-          </button>
-          <div className="stu-drawer__foot-actions">
+          {tab !== "idcard" ? (
+            <button
+              type="submit"
+              form="manage-form"
+              className="stu-btn stu-btn--primary stu-manage-foot__save"
+              disabled={saving}
+            >
+              {saving ? t("common.saving") : t("profile.saveChanges")}
+            </button>
+          ) : null}
+          <div className="stu-manage-foot__row">
             <button type="button" className="stu-btn stu-btn--ghost" onClick={onClose}>
               {t("common.cancel")}
             </button>
-            {tab !== "idcard" ? (
-              <button
-                type="submit"
-                form="manage-form"
-                className="stu-btn stu-btn--primary"
-                disabled={saving}
-              >
-                {saving ? t("common.saving") : t("profile.saveChanges")}
-              </button>
-            ) : null}
+            <button
+              type="button"
+              className="stu-btn stu-btn--ghost-danger"
+              disabled={busy || saving}
+              onClick={() => onRemove(student)}
+            >
+              {t("studentsUi.remove")}
+            </button>
           </div>
         </footer>
       </aside>
     </>
   );
+
+  if (!mounted) return null;
+  return createPortal(drawer, document.body);
 }

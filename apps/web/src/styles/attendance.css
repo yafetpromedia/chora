@@ -283,6 +283,19 @@
   border-color: var(--brand-teal);
 }
 
+.att-btn--danger {
+  color: #fff;
+  background: linear-gradient(135deg, #ef4444, #b91c1c);
+  border: 1px solid transparent;
+  box-shadow: 0 6px 14px rgba(185, 28, 28, 0.24);
+  font-weight: 750;
+}
+
+.att-btn--danger:hover:not(:disabled) {
+  filter: brightness(1.05);
+  transform: translateY(-1px);
+}
+
 .att-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;

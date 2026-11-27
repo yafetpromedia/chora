@@ -8,6 +8,7 @@ import { StudentManageDrawer } from "@/components/students/student-manage-drawer
 import { StudentIdCardModal } from "@/components/students/student-id-card-modal";
 import { StudentImportModal } from "@/components/students/student-import-modal";
 import { StudentRegisterDrawer } from "@/components/students/student-register-drawer";
+import { AppConfirmDialog } from "@/components/ui/app-confirm-dialog";
 import { AppToast } from "@/components/ui/app-toast";
 import { telHref } from "@/lib/student-photo";
 import {
@@ -174,6 +175,7 @@ export function StudentsWorkspace() {
   const [importOpen, setImportOpen] = useState(false);
   const [manageStudent, setManageStudent] = useState<StudentRecord | null>(null);
   const [idCardStudentId, setIdCardStudentId] = useState<string | null>(null);
+  const [removeTarget, setRemoveTarget] = useState<StudentRecord | null>(null);
 
   const verifiedCount = students.filter((s) => s.fayedaVerifiedAt).length;
   const gradeCount = new Set(students.map((s) => s.grade.id)).size;
@@ -267,15 +269,21 @@ export function StudentsWorkspace() {
     await refresh();
   }
 
-  async function onRemove(s: StudentRecord) {
+  function requestRemove(s: StudentRecord) {
+    setRemoveTarget(s);
+  }
+
+  async function confirmRemove() {
+    if (!removeTarget) return;
+    const s = removeTarget;
     const name = studentName(s);
-    if (!window.confirm(t("studentsUi.confirmRemove", { name }))) return;
     setBusy(true);
     setError("");
     try {
       await deleteStudent(s.id);
       setToast(t("studentsUi.removed", { name }));
       if (manageStudent?.id === s.id) setManageStudent(null);
+      setRemoveTarget(null);
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : t("studentsUi.couldNotRemove"));
@@ -477,7 +485,7 @@ export function StudentsWorkspace() {
                         t={t}
                         onIdCard={() => setIdCardStudentId(s.id)}
                         onManage={() => setManageStudent(s)}
-                        onRemove={() => void onRemove(s)}
+                        onRemove={() => requestRemove(s)}
                       />
                     </td>
                   </tr>
@@ -538,13 +546,31 @@ export function StudentsWorkspace() {
                   t={t}
                   onIdCard={() => setIdCardStudentId(s.id)}
                   onManage={() => setManageStudent(s)}
-                  onRemove={() => void onRemove(s)}
+                  onRemove={() => requestRemove(s)}
                 />
               </article>
             ))}
           </div>
         </>
       )}
+
+      <AppConfirmDialog
+        open={Boolean(removeTarget)}
+        tone="danger"
+        title={t("studentsUi.remove")}
+        message={
+          removeTarget
+            ? t("studentsUi.confirmRemove", { name: studentName(removeTarget) })
+            : ""
+        }
+        confirmLabel={t("studentsUi.remove")}
+        cancelLabel={t("common.cancel")}
+        busy={busy && Boolean(removeTarget)}
+        onCancel={() => {
+          if (!busy) setRemoveTarget(null);
+        }}
+        onConfirm={() => void confirmRemove()}
+      />
 
       {registerOpen && grades.length > 0 ? (
         <StudentRegisterDrawer
@@ -564,7 +590,7 @@ export function StudentsWorkspace() {
             setStudents((prev) => prev.map((row) => (row.id === updated.id ? updated : row)));
             setToast(t("studentsUi.studentUpdated", { name: studentName(updated) }));
           }}
-          onRemove={(s) => void onRemove(s)}
+          onRemove={(s) => requestRemove(s)}
           onViewIdCard={() => setIdCardStudentId(manageStudent.id)}
         />
       ) : null}

@@ -20,6 +20,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { SchoolPermission } from '../common/permissions/school-permissions';
 import { CreateTeacherDto } from './dto/create-teacher.dto';
 import {
+  AdminSetTeacherPhotoDto,
   ReviewTeacherPhotoDto,
   SubmitTeacherPhotoDto,
 } from './dto/teacher-photo.dto';
@@ -163,6 +164,32 @@ export class TeachersController {
       user.id,
       dto,
     );
+  }
+
+  @Patch(':userId/photo')
+  @Roles('admin', 'staff')
+  @RequirePermissions(SchoolPermission.TEACHERS_MANAGE)
+  setPhoto(
+    @CurrentUser() user: AuthUser,
+    @Param('userId') userId: string,
+    @Body() dto: AdminSetTeacherPhotoDto,
+  ) {
+    return this.teachersService.adminSetPhoto(
+      user.schoolId,
+      userId,
+      user.id,
+      dto,
+    );
+  }
+
+  @Delete(':userId/photo')
+  @Roles('admin', 'staff')
+  @RequirePermissions(SchoolPermission.TEACHERS_MANAGE)
+  clearPhoto(
+    @CurrentUser() user: AuthUser,
+    @Param('userId') userId: string,
+  ) {
+    return this.teachersService.adminClearPhoto(user.schoolId, userId);
   }
 
   @Delete(':userId')

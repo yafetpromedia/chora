@@ -526,9 +526,15 @@
 }
 
 .id-lookup__btn--danger {
-  background: #fff;
-  color: #b91c1c;
-  border-color: rgba(185, 28, 28, 0.28);
+  background: linear-gradient(135deg, #ef4444, #b91c1c);
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 6px 14px rgba(185, 28, 28, 0.24);
+  font-weight: 750;
+}
+
+.id-lookup__btn--danger:hover:not(:disabled) {
+  filter: brightness(1.05);
 }
 
 .id-lookup__btn--ghost {

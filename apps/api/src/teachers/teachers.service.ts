@@ -12,11 +12,13 @@ import {
   TeacherPhotoReviewStatus,
   UserRole,
 } from '@prisma/client';
+import { hashSync } from 'bcrypt';
 import { UsersService } from '../users/users.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateTeacherDto } from './dto/create-teacher.dto';
 import { UpdateTeacherDto } from './dto/update-teacher.dto';
 import {
+  AdminSetTeacherPhotoDto,
   ReviewTeacherPhotoDto,
   SubmitTeacherPhotoDto,
 } from './dto/teacher-photo.dto';
@@ -193,12 +195,43 @@ export class TeachersService {
       throw new NotFoundException('Staff member not found');
     }
 
-    if (dto.roleTemplateSlug || dto.phone !== undefined) {
+    const accountTouched =
+      dto.firstName !== undefined ||
+      dto.lastName !== undefined ||
+      dto.email !== undefined ||
+      dto.password !== undefined ||
+      dto.roleTemplateSlug !== undefined ||
+      dto.phone !== undefined;
+
+    if (accountTouched) {
       const data: {
+        firstName?: string;
+        lastName?: string;
+        email?: string;
+        passwordHash?: string;
         roleTemplateId?: string;
         role?: UserRole;
         phone?: string | null;
       } = {};
+      if (dto.firstName !== undefined) {
+        const firstName = dto.firstName.trim();
+        if (!firstName) throw new BadRequestException('First name is required');
+        data.firstName = firstName;
+      }
+      if (dto.lastName !== undefined) {
+        const lastName = dto.lastName.trim();
+        if (!lastName) throw new BadRequestException('Last name is required');
+        data.lastName = lastName;
+      }
+      if (dto.email !== undefined) {
+        data.email = await this.usersService.assertEmailAvailable(
+          dto.email,
+          userId,
+        );
+      }
+      if (dto.password?.trim()) {
+        data.passwordHash = hashSync(dto.password.trim(), 10);
+      }
       if (dto.roleTemplateSlug) {
         const template = await this.prisma.roleTemplate.findFirst({
           where: { schoolId, slug: dto.roleTemplateSlug },
@@ -497,6 +530,65 @@ export class TeachersService {
     }
 
     return this.getByUserId(schoolId, teacherUserId);
+  }
+
+  /** Admin/staff sets the published ID photo immediately (skips pending review). */
+  async adminSetPhoto(
+    schoolId: string,
+    targetUserId: string,
+    adminId: string,
+    dto: AdminSetTeacherPhotoDto,
+  ) {
+    this.assertValidPhotoUrl(dto.photoUrl);
+    const user = await this.prisma.user.findFirst({
+      where: { id: targetUserId, schoolId },
+      include: { teacherProfile: true },
+    });
+    if (!user) throw new NotFoundException('Staff member not found');
+
+    let profile = user.teacherProfile;
+    if (!profile) {
+      profile = await this.prisma.teacherProfile.create({
+        data: { userId: targetUserId, schoolId },
+      });
+    }
+
+    await this.prisma.teacherProfile.update({
+      where: { id: profile.id },
+      data: {
+        photoUrl: dto.photoUrl.trim(),
+        pendingPhotoUrl: null,
+        photoReviewStatus: TeacherPhotoReviewStatus.NONE,
+        photoSubmittedAt: null,
+        photoReviewedAt: new Date(),
+        photoReviewedById: adminId,
+        photoReviewNote: null,
+      },
+    });
+
+    return this.getByUserId(schoolId, targetUserId);
+  }
+
+  async adminClearPhoto(schoolId: string, targetUserId: string) {
+    const profile = await this.prisma.teacherProfile.findFirst({
+      where: { userId: targetUserId, schoolId },
+    });
+    if (!profile) throw new NotFoundException('Staff member not found');
+
+    await this.prisma.teacherProfile.update({
+      where: { id: profile.id },
+      data: {
+        photoUrl: null,
+        pendingPhotoUrl: null,
+        photoReviewStatus: TeacherPhotoReviewStatus.NONE,
+        photoSubmittedAt: null,
+        photoReviewedAt: null,
+        photoReviewedById: null,
+        photoReviewNote: null,
+      },
+    });
+
+    return this.getByUserId(schoolId, targetUserId);
   }
 
   private assertValidPhotoUrl(url: string | null) {

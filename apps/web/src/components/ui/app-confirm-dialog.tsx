@@ -73,7 +73,7 @@ export function AppConfirmDialog({
         aria-describedby={descId}
       >
         <div className="app-confirm__icon" aria-hidden>
-          {tone === "danger" ? "!" : tone === "warning" ? "!" : "?"}
+          {tone === "danger" ? "✕" : tone === "warning" ? "!" : "?"}
         </div>
         <div className="app-confirm__body">
           <h2 id={titleId} className="app-confirm__title">

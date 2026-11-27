@@ -341,8 +341,13 @@
 }
 
 .res-components-editor__remove-btn {
-  padding: 0.3rem 0.45rem;
+  padding: 0.35rem 0.6rem;
   white-space: nowrap;
+  color: #fff;
+  border-color: transparent;
+  background: linear-gradient(135deg, #ef4444, #b91c1c);
+  box-shadow: 0 4px 10px rgba(185, 28, 28, 0.2);
+  font-weight: 750;
 }
 
 .res-components-editor__add {
@@ -351,9 +356,13 @@
 }
 
 .res-components-editor__icon-btn:hover:not(:disabled),
-.res-components-editor__remove-btn:hover:not(:disabled),
 .res-components-editor__add:hover {
   background: rgba(42, 111, 111, 0.06);
+}
+
+.res-components-editor__remove-btn:hover:not(:disabled) {
+  filter: brightness(1.05);
+  background: linear-gradient(135deg, #ef4444, #b91c1c);
 }
 
 .res-components-editor__icon-btn:disabled,
@@ -413,12 +422,16 @@
 }
 
 .res-btn--danger {
-  color: #b91c1c;
-  border-color: rgba(185, 28, 28, 0.3);
+  color: #fff;
+  border-color: transparent;
+  background: linear-gradient(135deg, #ef4444, #b91c1c);
+  box-shadow: 0 6px 14px rgba(185, 28, 28, 0.24);
+  font-weight: 750;
 }
 
 .res-btn--danger:hover {
-  background: rgba(185, 28, 28, 0.08);
+  filter: brightness(1.05);
+  background: linear-gradient(135deg, #ef4444, #b91c1c);
 }
 
 .res-btn-primary {
@@ -7387,9 +7400,15 @@
 }
 
 .tpl-v2__btn--danger {
-  color: #b91c1c;
-  border-color: #fecaca;
-  background: #fef2f2;
+  color: #fff;
+  border-color: transparent;
+  background: linear-gradient(135deg, #ef4444, #b91c1c);
+  box-shadow: 0 6px 14px rgba(185, 28, 28, 0.24);
+  font-weight: 750;
+}
+
+.tpl-v2__btn--danger:hover:not(:disabled) {
+  filter: brightness(1.05);
 }
 
 .tpl-v2 .res-components-editor {

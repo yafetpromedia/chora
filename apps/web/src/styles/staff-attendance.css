@@ -177,9 +177,15 @@
 }
 
 .sa-btn--danger {
-  background: #fff;
-  border-color: rgba(220, 38, 38, 0.35);
-  color: #b91c1c;
+  background: linear-gradient(135deg, #ef4444, #b91c1c);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 6px 14px rgba(185, 28, 28, 0.24);
+  font-weight: 750;
+}
+
+.sa-btn--danger:hover:not(:disabled) {
+  filter: brightness(1.05);
 }
 
 .sa-btn--danger:disabled {

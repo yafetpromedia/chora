@@ -3,7 +3,9 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useLocale } from "@/components/i18n/locale-provider";
+import { AdminStaffPhotoField } from "@/components/admin/admin-staff-photo-field";
 import { DashIcon } from "@/components/dashboard/dash-icons";
+import { AppConfirmDialog } from "@/components/ui/app-confirm-dialog";
 import { AppToast } from "@/components/ui/app-toast";
 import { listGrades } from "@/lib/school-setup";
 import type { GradeWithSections } from "@/lib/api";
@@ -30,6 +32,23 @@ function initials(name: string) {
     .join("")
     .slice(0, 2)
     .toUpperCase();
+}
+
+function TeacherAvatar({ teacher }: { teacher: TeacherRecord }) {
+  const label = displayName(teacher);
+  if (teacher.photoUrl) {
+    return (
+      <span className="tch-v2__avatar tch-v2__avatar--photo" aria-hidden>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={teacher.photoUrl} alt="" />
+      </span>
+    );
+  }
+  return (
+    <span className="tch-v2__avatar" aria-hidden>
+      {initials(label)}
+    </span>
+  );
 }
 
 function displayName(t: TeacherRecord) {
@@ -152,6 +171,7 @@ export function TeachersWorkspace() {
   const [busy, setBusy] = useState(false);
   const [photoRequests, setPhotoRequests] = useState<TeacherPhotoRequest[]>([]);
   const [photoBusyId, setPhotoBusyId] = useState("");
+  const [removeTarget, setRemoveTarget] = useState<TeacherRecord | null>(null);
 
   const [email, setEmail] = useState("");
   const [firstName, setFirstName] = useState("");
@@ -355,6 +375,10 @@ export function TeachersWorkspace() {
 
   function openEdit(person: TeacherRecord) {
     setEditTarget(person);
+    setFirstName(person.firstName ?? "");
+    setLastName(person.lastName ?? "");
+    setEmail(person.email ?? "");
+    setPassword("");
     setRoleTemplateSlug(person.roleTemplateSlug ?? "subject_teacher");
     setPhone(person.phone ?? "");
     setGender(person.gender ?? "");
@@ -386,6 +410,10 @@ export function TeachersWorkspace() {
       const personal = personalPayload();
       if (editTarget) {
         await updateTeacher(editTarget.userId, {
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
+          email: email.trim(),
+          password: password.trim() || undefined,
           roleTemplateSlug,
           ...homeroomPayload,
           ...personal,
@@ -417,11 +445,14 @@ export function TeachersWorkspace() {
     }
   }
 
-  async function onRemove(teacher: TeacherRecord) {
+  function requestRemove(teacher: TeacherRecord) {
+    setRemoveTarget(teacher);
+  }
+
+  async function confirmRemove() {
+    if (!removeTarget) return;
+    const teacher = removeTarget;
     const name = displayName(teacher);
-    if (!window.confirm(t("teachersUi.removeConfirm", { name }))) {
-      return;
-    }
     setBusy(true);
     setError("");
     setToast("");
@@ -432,6 +463,7 @@ export function TeachersWorkspace() {
         setDrawerOpen(false);
         resetForm();
       }
+      setRemoveTarget(null);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : t("teachersUi.couldNotRemove"));
@@ -479,10 +511,10 @@ export function TeachersWorkspace() {
           type="button"
           className="tch-v2__action tch-v2__action--danger"
           disabled={busy}
-          onClick={() => void onRemove(teacher)}
+          onClick={() => requestRemove(teacher)}
           title={t("teachersUi.removeTeacher")}
         >
-          ×
+          {t("common.remove")}
         </button>
       </div>
     );
@@ -494,6 +526,23 @@ export function TeachersWorkspace() {
     <div className="tch-v2">
       <AppToast message={error} tone="error" onDismiss={() => setError("")} />
       <AppToast message={toast} tone="success" onDismiss={() => setToast("")} />
+      <AppConfirmDialog
+        open={Boolean(removeTarget)}
+        tone="danger"
+        title={t("teachersUi.removeTeacher")}
+        message={
+          removeTarget
+            ? t("teachersUi.removeConfirm", { name: displayName(removeTarget) })
+            : ""
+        }
+        confirmLabel={t("teachersUi.removeTeacher")}
+        cancelLabel={t("common.cancel")}
+        busy={busy && Boolean(removeTarget)}
+        onCancel={() => {
+          if (!busy) setRemoveTarget(null);
+        }}
+        onConfirm={() => void confirmRemove()}
+      />
 
       <header className="tch-v2__hero">
         <div className="tch-v2__hero-glow" aria-hidden />
@@ -715,9 +764,7 @@ export function TeachersWorkspace() {
                   <tr key={teacher.userId} className="tch-v2__row">
                     <td className="tch-v2__cell tch-v2__cell--teacher">
                       <div className="tch-v2__teacher">
-                        <span className="tch-v2__avatar" aria-hidden>
-                          {initials(displayName(teacher))}
-                        </span>
+                        <TeacherAvatar teacher={teacher} />
                         <div className="tch-v2__teacher-line">
                           <strong className="tch-v2__name">{displayName(teacher)}</strong>
                           <span className="tch-v2__badge tch-v2__badge--role">
@@ -756,9 +803,7 @@ export function TeachersWorkspace() {
             {filtered.map((teacher) => (
               <article key={teacher.userId} className="tch-v2__card">
                 <header className="tch-v2__card-head">
-                  <span className="tch-v2__avatar" aria-hidden>
-                    {initials(displayName(teacher))}
-                  </span>
+                  <TeacherAvatar teacher={teacher} />
                   <div>
                     <strong className="tch-v2__name">{displayName(teacher)}</strong>
                     <span className="tch-v2__meta">{teacher.email}</span>
@@ -793,7 +838,7 @@ export function TeachersWorkspace() {
 
       {drawerOpen ? (
         <div
-          className="stu-drawer-backdrop"
+          className="tch-drawer-backdrop"
           role="presentation"
           onClick={() => {
             setDrawerOpen(false);
@@ -801,23 +846,24 @@ export function TeachersWorkspace() {
           }}
         >
           <aside
-            className="stu-drawer stu-drawer--wide tch-drawer-panel"
+            className="tch-drawer-shell tch-drawer-shell--wide"
             onClick={(e) => e.stopPropagation()}
             role="dialog"
             aria-label={editTarget ? t("teachersUi.drawerEdit") : t("teachersUi.drawerAdd")}
           >
-            <header className="stu-drawer__head">
+            <header className="tch-drawer-shell__head">
               <div>
-                <h2 className="stu-drawer__title">
+                <p className="tch-drawer-shell__eyebrow">{t("teachersUi.chip")}</p>
+                <h2 className="tch-drawer-shell__title">
                   {editTarget ? t("teachersUi.profileTitle") : t("teachersUi.newTitle")}
                 </h2>
-                <p className="stu-drawer__sub">
+                <p className="tch-drawer-shell__sub">
                   {editTarget ? t("teachersUi.profileSubEdit") : t("teachersUi.profileSubNew")}
                 </p>
               </div>
               <button
                 type="button"
-                className="stu-drawer__close"
+                className="tch-drawer-shell__close"
                 aria-label={t("common.close")}
                 onClick={() => {
                   setDrawerOpen(false);
@@ -830,60 +876,79 @@ export function TeachersWorkspace() {
 
             <form
               id="tch-teacher-form"
-              className="stu-drawer__body tch-drawer"
+              className="tch-drawer-shell__form"
               onSubmit={(e) => void onSubmit(e)}
             >
-              {!editTarget ? (
-                <section className="tch-drawer-section">
-                  <h3 className="tch-drawer-section__title">{t("teachersUi.sectionAccount")}</h3>
-                  <label>
-                    {t("teachersUi.firstName")}
-                    <input
-                      value={firstName}
-                      onChange={(e) => setFirstName(e.target.value)}
-                      required
-                      autoComplete="given-name"
-                    />
-                  </label>
-                  <label>
-                    {t("teachersUi.lastName")}
-                    <input
-                      value={lastName}
-                      onChange={(e) => setLastName(e.target.value)}
-                      required
-                      autoComplete="family-name"
-                    />
-                  </label>
-                  <label>
-                    {t("teachersUi.schoolEmail")}
-                    <input
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                      autoComplete="email"
-                    />
-                  </label>
-                  <label>
-                    {t("teachersUi.tempPassword")}
-                    <input
-                      type="password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      minLength={8}
-                      placeholder={t("teachersUi.minEightChars")}
-                    />
-                  </label>
-                </section>
-              ) : (
-                <section className="tch-drawer-section tch-drawer-section--readonly">
-                  <h3 className="tch-drawer-section__title">{t("teachersUi.sectionAccount")}</h3>
-                  <p className="tch-drawer-readonly">
-                    <strong>{displayName(editTarget)}</strong>
-                    <span>{editTarget.email}</span>
+              <div className="tch-drawer-shell__body tch-drawer">
+              <section className="tch-drawer-section">
+                <h3 className="tch-drawer-section__title">{t("teachersUi.sectionAccount")}</h3>
+                <label>
+                  {t("teachersUi.firstName")}
+                  <input
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    required
+                    autoComplete="given-name"
+                  />
+                </label>
+                <label>
+                  {t("teachersUi.lastName")}
+                  <input
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    required
+                    autoComplete="family-name"
+                  />
+                </label>
+                <label>
+                  {t("teachersUi.schoolEmail")}
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    autoComplete="email"
+                  />
+                </label>
+                <label>
+                  {editTarget
+                    ? t("teachersUi.newPasswordOptional")
+                    : t("teachersUi.tempPassword")}
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    minLength={editTarget ? undefined : 8}
+                    placeholder={t("teachersUi.minEightChars")}
+                    autoComplete="new-password"
+                  />
+                  {editTarget ? (
+                    <em className="tch-drawer-hint">{t("teachersUi.leaveBlankPassword")}</em>
+                  ) : null}
+                </label>
+                {editTarget?.teacherId ? (
+                  <p className="tch-drawer-hint">
+                    {t("teachersUi.teacherId")}: <strong>{editTarget.teacherId}</strong>
                   </p>
-                </section>
-              )}
+                ) : null}
+              </section>
+
+              {editTarget ? (
+                <AdminStaffPhotoField
+                  userId={editTarget.userId}
+                  photoUrl={editTarget.photoUrl}
+                  onUpdated={(next) => {
+                    setPeople((rows) =>
+                      rows.map((p) => (p.userId === next.userId ? { ...p, ...next } : p)),
+                    );
+                    setEditTarget((prev) =>
+                      prev && prev.userId === next.userId ? { ...prev, ...next } : prev,
+                    );
+                  }}
+                  onToast={setToast}
+                  onError={setError}
+                />
+              ) : null}
 
               <section className="tch-drawer-section">
                 <h3 className="tch-drawer-section__title">{t("teachersUi.sectionIdCard")}</h3>
@@ -1068,8 +1133,9 @@ export function TeachersWorkspace() {
                   )}
                 </section>
               ) : null}
+              </div>
 
-              <footer className="tch-drawer__foot">
+              <footer className="tch-drawer-shell__foot">
                 <button
                   type="button"
                   className="att-btn att-btn--ghost"

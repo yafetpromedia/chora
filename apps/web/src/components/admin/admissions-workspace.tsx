@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useClientSnapshot } from "@/lib/use-client-snapshot";
 import { DashIcon } from "@/components/dashboard/dash-icons";
 import { AdmissionRegisterDrawer } from "@/components/admin/admission-register-drawer";
+import { AppConfirmDialog } from "@/components/ui/app-confirm-dialog";
 import { AppToast } from "@/components/ui/app-toast";
 import { hasPermission, Permission } from "@/lib/permissions";
 import { listGrades } from "@/lib/school-setup";
@@ -107,6 +108,7 @@ export function AdmissionsWorkspace() {
   const [ruleSectionId, setRuleSectionId] = useState("");
   const [ruleStream, setRuleStream] = useState("");
   const [editingRuleId, setEditingRuleId] = useState<string | null>(null);
+  const [removeAppId, setRemoveAppId] = useState<string | null>(null);
 
   const activeCycle = cycles.find((c) => c.id === cycleId) ?? null;
 
@@ -308,11 +310,18 @@ export function AdmissionsWorkspace() {
     }
   }
 
-  async function handleDelete(id: string) {
-    if (!canManage || !confirm(t("admissionsUi.confirmRemoveApplicant"))) return;
+  function requestDelete(id: string) {
+    if (!canManage) return;
+    setRemoveAppId(id);
+  }
+
+  async function confirmDeleteApplicant() {
+    if (!canManage || !removeAppId) return;
+    const id = removeAppId;
     setBusy(true);
     try {
       await deleteAdmissionApplication(id);
+      setRemoveAppId(null);
       await refreshApps();
       setToast(t("admissionsUi.applicantRemoved"));
     } catch (err) {
@@ -428,10 +437,34 @@ export function AdmissionsWorkspace() {
     }
   }
 
+  const showMobileRegister =
+    canManage && panel === "applicants" && !!activeCycle?.isOpen && !showRegister;
+
+  const removeApp = removeAppId
+    ? applications.find((a) => a.id === removeAppId) ?? null
+    : null;
+
   return (
-    <div className="adm-v2">
+    <div className={showMobileRegister ? "adm-v2 adm-v2--with-mobile-cta" : "adm-v2"}>
       <AppToast message={error} tone="error" onDismiss={() => setError("")} />
       <AppToast message={toast} tone="success" onDismiss={() => setToast("")} />
+      <AppConfirmDialog
+        open={Boolean(removeAppId)}
+        tone="danger"
+        title={t("admissionsUi.remove")}
+        message={
+          removeApp
+            ? `${t("admissionsUi.confirmRemoveApplicant")} (${applicantName(removeApp)})`
+            : t("admissionsUi.confirmRemoveApplicant")
+        }
+        confirmLabel={t("admissionsUi.remove")}
+        cancelLabel={t("common.cancel")}
+        busy={busy && Boolean(removeAppId)}
+        onCancel={() => {
+          if (!busy) setRemoveAppId(null);
+        }}
+        onConfirm={() => void confirmDeleteApplicant()}
+      />
 
       <header className="adm-v2__hero">
         <div className="adm-v2__hero-glow" aria-hidden />
@@ -531,31 +564,35 @@ export function AdmissionsWorkspace() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </label>
-        <select
-          className="adm-v2__filter"
-          value={cycleId}
-          onChange={(e) => void loadData(e.target.value)}
-        >
-          {cycles.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name} ({c.academicYear.name})
-            </option>
-          ))}
-        </select>
-        <select
-          className="adm-v2__filter"
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as AdmissionStatus | "ALL")}
-        >
-          {STATUS_FILTERS.map((s) => (
-            <option key={s} value={s}>
-              {s === "ALL" ? t("admissionsUi.allStatuses") : statusLabels[s]}
-            </option>
-          ))}
-        </select>
-        <div className="adm-v2__tabs">
+        <div className="adm-v2__filters">
+          <select
+            className="adm-v2__filter"
+            value={cycleId}
+            onChange={(e) => void loadData(e.target.value)}
+          >
+            {cycles.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name} ({c.academicYear.name})
+              </option>
+            ))}
+          </select>
+          <select
+            className="adm-v2__filter"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as AdmissionStatus | "ALL")}
+          >
+            {STATUS_FILTERS.map((s) => (
+              <option key={s} value={s}>
+                {s === "ALL" ? t("admissionsUi.allStatuses") : statusLabels[s]}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="adm-v2__tabs" role="tablist">
           <button
             type="button"
+            role="tab"
+            aria-selected={panel === "applicants"}
             className={panel === "applicants" ? "adm-v2__tab adm-v2__tab--active" : "adm-v2__tab"}
             onClick={() => setPanel("applicants")}
           >
@@ -563,43 +600,41 @@ export function AdmissionsWorkspace() {
           </button>
           <button
             type="button"
+            role="tab"
+            aria-selected={panel === "rules"}
             className={panel === "rules" ? "adm-v2__tab adm-v2__tab--active" : "adm-v2__tab"}
             onClick={() => setPanel("rules")}
           >
             {t("admissionsUi.tabPlacementRules")}
           </button>
         </div>
-        {canManage ? (
+        {canManage && panel === "applicants" ? (
           <div className="adm-v2__toolbar-actions">
-            {panel === "applicants" ? (
-              <>
-                <button
-                  type="button"
-                  className="adm-btn adm-btn--ghost"
-                  disabled={busy || !cycleId}
-                  onClick={() => void handleRunPlacement()}
-                  title={t("admissionsUi.rerunAllTitle")}
-                >
-                  {t("admissionsUi.rerunAll")}
-                </button>
-                <button
-                  type="button"
-                  className="adm-btn adm-btn--ghost"
-                  disabled={busy || !cycleId}
-                  onClick={() => void handleBulkEnroll()}
-                >
-                  {t("admissionsUi.enrollAllPlaced")}
-                </button>
-                <button
-                  type="button"
-                  className="adm-btn adm-btn--primary"
-                  disabled={!activeCycle?.isOpen}
-                  onClick={() => setShowRegister(true)}
-                >
-                  + {t("admissionsUi.registerApplicant")}
-                </button>
-              </>
-            ) : null}
+            <button
+              type="button"
+              className="adm-btn adm-btn--ghost"
+              disabled={busy || !cycleId}
+              onClick={() => void handleRunPlacement()}
+              title={t("admissionsUi.rerunAllTitle")}
+            >
+              {t("admissionsUi.rerunAll")}
+            </button>
+            <button
+              type="button"
+              className="adm-btn adm-btn--ghost"
+              disabled={busy || !cycleId}
+              onClick={() => void handleBulkEnroll()}
+            >
+              {t("admissionsUi.enrollAllPlaced")}
+            </button>
+            <button
+              type="button"
+              className="adm-btn adm-btn--primary adm-v2__register-desktop"
+              disabled={!activeCycle?.isOpen}
+              onClick={() => setShowRegister(true)}
+            >
+              + {t("admissionsUi.registerApplicant")}
+            </button>
           </div>
         ) : null}
       </div>
@@ -639,7 +674,7 @@ export function AdmissionsWorkspace() {
               <tbody>
                 {filtered.map((a) => (
                   <tr key={a.id}>
-                    <td>
+                    <td data-label={t("admissionsUi.colApplicant")}>
                       <div className="adm-v2__name">{applicantName(a)}</div>
                       <div className="adm-v2__meta">
                         {a.targetGrade?.name
@@ -650,7 +685,7 @@ export function AdmissionsWorkspace() {
                           : ""}
                       </div>
                     </td>
-                    <td>
+                    <td data-label={t("admissionsUi.colScore")}>
                       <strong>{a.totalScore ?? t("admissionsUi.emptyDash")}</strong>
                       {a.entranceScore != null ? (
                         <div className="adm-v2__meta">
@@ -661,7 +696,7 @@ export function AdmissionsWorkspace() {
                         </div>
                       ) : null}
                     </td>
-                    <td>
+                    <td data-label={t("admissionsUi.colPlacement")}>
                       <div>{placementLabel(a, t)}</div>
                       {a.placementNote ? (
                         <div className="adm-v2__meta">{a.placementNote}</div>
@@ -675,13 +710,13 @@ export function AdmissionsWorkspace() {
                         </Link>
                       ) : null}
                     </td>
-                    <td>
+                    <td data-label={t("admissionsUi.colStatus")}>
                       <span className={`adm-badge adm-badge--${a.status.toLowerCase()}`}>
                         {statusLabels[a.status]}
                       </span>
                     </td>
                     {canManage ? (
-                      <td>
+                      <td data-label={t("common.actions")}>
                         <div className="adm-v2__actions">
                           {a.status === "PLACED" ? (
                             <button
@@ -708,7 +743,7 @@ export function AdmissionsWorkspace() {
                               type="button"
                               className="adm-v2__action adm-v2__action--danger"
                               disabled={busy}
-                              onClick={() => void handleDelete(a.id)}
+                              onClick={() => requestDelete(a.id)}
                             >
                               {t("admissionsUi.remove")}
                             </button>
@@ -875,6 +910,18 @@ export function AdmissionsWorkspace() {
           )}
         </div>
       )}
+
+      {showMobileRegister ? (
+        <div className="adm-v2__mobile-cta">
+          <button
+            type="button"
+            className="adm-btn adm-btn--primary"
+            onClick={() => setShowRegister(true)}
+          >
+            + {t("admissionsUi.registerApplicant")}
+          </button>
+        </div>
+      ) : null}
 
       {showRegister && activeCycle ? (
         <AdmissionRegisterDrawer
