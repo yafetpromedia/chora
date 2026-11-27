@@ -512,7 +512,9 @@ export class TimetableService {
       orderBy: { sortOrder: 'asc' },
     });
     if (periods.length === 0) {
-      throw new BadRequestException('Add at least one period before generating.');
+      throw new BadRequestException(
+        'Add at least one period before generating.',
+      );
     }
 
     const classSubjects = await this.prisma.classSubject.findMany({
@@ -538,7 +540,11 @@ export class TimetableService {
     const lessons: GeneratorLesson[] = [];
     for (const cs of classSubjects) {
       const weeklySessions = Math.min(Math.max(cs.weeklySessions ?? 1, 1), 2);
-      for (let sessionIndex = 0; sessionIndex < weeklySessions; sessionIndex++) {
+      for (
+        let sessionIndex = 0;
+        sessionIndex < weeklySessions;
+        sessionIndex++
+      ) {
         lessons.push({
           id: `${cs.id}:${sessionIndex}`,
           classSubjectId: cs.id,
@@ -570,7 +576,9 @@ export class TimetableService {
           where: {
             timetableId: tt.id,
             ...(dto.gradeId ? { gradeId: dto.gradeId } : {}),
-            ...(dto.sectionId !== undefined ? { sectionId: dto.sectionId } : {}),
+            ...(dto.sectionId !== undefined
+              ? { sectionId: dto.sectionId }
+              : {}),
           },
         });
       }
@@ -611,9 +619,7 @@ export class TimetableService {
     });
 
     const classKeys = new Set(
-      classSubjects.map(
-        (cs) => `${cs.gradeId}:${cs.sectionId ?? ''}`,
-      ),
+      classSubjects.map((cs) => `${cs.gradeId}:${cs.sectionId ?? ''}`),
     );
 
     return {

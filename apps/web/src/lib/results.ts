@@ -48,11 +48,15 @@ export type ScoreGrid = {
   }>;
 };
 
+export type AcademicCalendarSystem = "ETHIOPIAN" | "GREGORIAN";
+
 export type AcademicYear = {
   id: string;
   name: string;
   startDate: string;
   endDate: string;
+  /** E.C. (Ethiopian) or G.C. (Gregorian) labeling for this year. */
+  calendarSystem?: AcademicCalendarSystem;
   isCurrent: boolean;
   _count?: { academicTerms: number; classSubjects: number };
 };
@@ -150,6 +154,7 @@ export async function createAcademicYear(body: {
   name: string;
   startDate: string;
   endDate: string;
+  calendarSystem?: AcademicCalendarSystem;
   isCurrent?: boolean;
 }) {
   return apiPost<AcademicYear>("/results/academic-years", body);
@@ -200,8 +205,17 @@ export async function createSubject(body: { name: string; code: string }) {
   return apiPost<Subject>("/results/subjects", body);
 }
 
-export async function updateSubject(subjectId: string, body: { name?: string }) {
+export async function updateSubject(
+  subjectId: string,
+  body: { name?: string; code?: string },
+) {
   return apiPatch<Subject>(`/results/subjects/${subjectId}`, body);
+}
+
+export async function deleteSubject(subjectId: string) {
+  return apiDelete<{ deleted: boolean; id: string }>(
+    `/results/subjects/${subjectId}`,
+  );
 }
 
 export async function listClassSubjects(academicYearId?: string) {

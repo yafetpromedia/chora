@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
@@ -25,6 +26,7 @@ import { VerifyStudentEnrollmentDto } from './dto/verify-student-enrollment.dto'
 import { InvitesService } from '../schools/invites.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { EmailService } from '../email/email.service';
 import { PlatformSettingsService } from '../platform/platform-settings.service';
 import { normalizeUsername } from '../users/username.util';
 import { UserRole as PrismaUserRole } from '@prisma/client';
@@ -41,6 +43,7 @@ export class AuthService {
     private readonly permissionsService: PermissionsService,
     private readonly prisma: PrismaService,
     private readonly platformSettings: PlatformSettingsService,
+    @Optional() private readonly email?: EmailService,
   ) {}
 
   async getProfile(actor: AuthUser) {
@@ -103,9 +106,8 @@ export class AuthService {
         createdAt: user.createdAt,
       },
       school,
-      student:
-        user.studentProfile ?
-          {
+      student: user.studentProfile
+        ? {
             grade: user.studentProfile.grade.name,
             section: user.studentProfile.section?.name ?? null,
             fan: user.studentProfile.fan,
@@ -113,9 +115,8 @@ export class AuthService {
             parentsCanViewResults: user.studentProfile.parentsCanViewResults,
           }
         : null,
-      teacher:
-        user.teacherProfile ?
-          {
+      teacher: user.teacherProfile
+        ? {
             homeroomGrade: user.teacherProfile.homeroomGrade?.name ?? null,
             homeroomSection: user.teacherProfile.homeroomSection?.name ?? null,
           }
@@ -186,6 +187,17 @@ export class AuthService {
       await this.prisma.studentProfile.updateMany({
         where: { userId: user.id },
         data: { portalTempPassword: null },
+      });
+    }
+
+    if (dto.newPassword) {
+      await this.email?.enqueueSafe({
+        to: user.email,
+        category: 'password_change',
+        templateId: 'password_change',
+        schoolId: user.schoolId,
+        idempotencyKey: `password-change:${user.id}:${Date.now()}`,
+        vars: { firstName: data.firstName ?? user.firstName },
       });
     }
 
@@ -261,6 +273,7 @@ export class AuthService {
       schoolId: school.id,
       schoolJoinCode: school.joinCode,
     });
+    await this.sendAccountOpened(user, school.name, true);
 
     const payload = await this.toSchoolPayload(user);
 
@@ -286,8 +299,14 @@ export class AuthService {
       dto.inviteToken,
     );
 
-    if (role === 'student' && !dto.externalRef?.trim() && !dto.username?.trim()) {
-      throw new BadRequestException('Student ID is required for student accounts');
+    if (
+      role === 'student' &&
+      !dto.externalRef?.trim() &&
+      !dto.username?.trim()
+    ) {
+      throw new BadRequestException(
+        'Student ID is required for student accounts',
+      );
     }
 
     const school = await this.schoolsService.findById(schoolId);
@@ -309,6 +328,7 @@ export class AuthService {
       schoolJoinCode: school.joinCode,
       externalRef: studentId || undefined,
     });
+    await this.sendAccountOpened(user, school.name, false);
 
     const payload = await this.toSchoolPayload(user);
 
@@ -337,7 +357,9 @@ export class AuthService {
     const school = await this.schoolsService.findByJoinCode(dto.schoolCode);
     const studentId = dto.externalRef?.trim();
     if (!studentId) {
-      throw new BadRequestException('Student ID is required for student accounts');
+      throw new BadRequestException(
+        'Student ID is required for student accounts',
+      );
     }
 
     await this.verifyEnrolledStudent(
@@ -369,6 +391,35 @@ export class AuthService {
       message:
         'You are enrolled. Sign in with your school code, student ID, and password from your admin.',
     };
+  }
+
+  private appUrl() {
+    return this.configService.get<string>('WEB_APP_URL')?.replace(/\/$/, '') ?? '';
+  }
+
+  private async sendAccountOpened(
+    user: { id: string; email: string; firstName: string; schoolId: string },
+    schoolName: string,
+    trial: boolean,
+  ) {
+    const actionUrl = this.appUrl();
+    await this.email?.enqueueSafe({
+      to: user.email,
+      category: 'welcome',
+      templateId: 'welcome',
+      schoolId: user.schoolId,
+      idempotencyKey: `welcome:${user.id}`,
+      vars: { firstName: user.firstName, schoolName, actionUrl },
+    });
+    if (!trial) return;
+    await this.email?.enqueueSafe({
+      to: user.email,
+      category: 'trial_activation',
+      templateId: 'trial_activation',
+      schoolId: user.schoolId,
+      idempotencyKey: `trial:${user.schoolId}`,
+      vars: { firstName: user.firstName, schoolName, actionUrl },
+    });
   }
 
   private async verifyEnrolledStudent(
@@ -491,12 +542,12 @@ export class AuthService {
       'JWT_REFRESH_SECRET',
       'dev-refresh-secret',
     );
-    const payload = await this.jwtService.verifyAsync<{ id: string; scope?: string }>(
-      dto.refreshToken,
-      {
-        secret: refreshSecret,
-      },
-    );
+    const payload = await this.jwtService.verifyAsync<{
+      id: string;
+      scope?: string;
+    }>(dto.refreshToken, {
+      secret: refreshSecret,
+    });
 
     if (payload.scope === 'platform') {
       throw new UnauthorizedException('Use platform refresh endpoint');
@@ -582,4 +633,3 @@ export class AuthService {
     };
   }
 }
-

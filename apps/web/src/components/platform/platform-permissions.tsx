@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { DashIcon } from "@/components/dashboard/dash-icons";
 import { AppToast } from "@/components/ui/app-toast";
+import { useLocale } from "@/components/i18n/locale-provider";
 import type { PlatformUser } from "@/lib/platform-auth";
 import {
   createPlatformOperator,
@@ -29,16 +30,16 @@ const ROLE_META: Record<
   SALES: { icon: "finance", tone: "sales" },
 };
 
-const AUDIT_LABELS: Record<string, string> = {
-  OPERATOR_CREATED: "Created operator",
-  OPERATOR_INVITED: "Invited operator",
-  OPERATOR_INVITE_RESENT: "Resent invite",
-  OPERATOR_INVITE_ACCEPTED: "Accepted invite",
-  OPERATOR_ROLE_CHANGED: "Changed role",
-  OPERATOR_DEACTIVATED: "Deactivated",
-  OPERATOR_ACTIVATED: "Reactivated",
-  OPERATOR_DELETED: "Removed operator",
-  ROLE_GRANTS_UPDATED: "Updated role grants",
+const AUDIT_ACTION_KEYS: Record<string, string> = {
+  OPERATOR_CREATED: "platformUi.permOperatorCreated",
+  OPERATOR_INVITED: "platformUi.permOperatorInvited",
+  OPERATOR_INVITE_RESENT: "platformUi.permInviteResent",
+  OPERATOR_INVITE_ACCEPTED: "platformUi.permAcceptedInvite",
+  OPERATOR_ROLE_CHANGED: "platformUi.permChangedRole",
+  OPERATOR_DEACTIVATED: "platformUi.permOperatorDeactivated",
+  OPERATOR_ACTIVATED: "platformUi.permOperatorReactivated",
+  OPERATOR_DELETED: "platformUi.permOperatorRemoved",
+  ROLE_GRANTS_UPDATED: "platformUi.permUpdatedGrants",
 };
 
 type Props = {
@@ -57,7 +58,7 @@ function sameGrants(a: PlatformPermissionKey[], b: PlatformPermissionKey[]) {
 }
 
 function formatWhen(value: string | null | undefined) {
-  if (!value) return "Never";
+  if (!value) return "—";
   try {
     return new Intl.DateTimeFormat(undefined, {
       dateStyle: "medium",
@@ -69,6 +70,10 @@ function formatWhen(value: string | null | undefined) {
 }
 
 export function PlatformPermissions({ user }: Props) {
+  const { t } = useLocale();
+  const AUDIT_LABELS: Record<string, string> = Object.fromEntries(
+    Object.entries(AUDIT_ACTION_KEYS).map(([k, key]) => [k, t(key)]),
+  );
   const isOwner = user?.role === "OWNER";
   const [data, setData] = useState<PlatformAccessControl | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -113,22 +118,24 @@ export function PlatformPermissions({ user }: Props) {
   }
 
   useEffect(() => {
-    setLoading(true);
-    void getPlatformAccessControl()
-      .then(async (payload) => {
-        applyPayload(payload);
-        if (user?.role === "OWNER") {
-          try {
-            setAudit(await getPlatformAccessAudit(40));
-          } catch {
-            /* ignore */
+    queueMicrotask(() => {
+      setLoading(true);
+      void getPlatformAccessControl()
+        .then(async (payload) => {
+          applyPayload(payload);
+          if (user?.role === "OWNER") {
+            try {
+              setAudit(await getPlatformAccessAudit(40));
+            } catch {
+              /* ignore */
+            }
           }
-        }
-      })
-      .catch((err) =>
-        setError(err instanceof Error ? err.message : "Could not load access control"),
-      )
-      .finally(() => setLoading(false));
+        })
+        .catch((err) =>
+          setError(err instanceof Error ? err.message : t("platformUi.permErrLoad")),
+        )
+        .finally(() => setLoading(false));
+    });
   }, [user?.role]);
 
   const dirty = useMemo(() => {
@@ -183,9 +190,9 @@ export function PlatformPermissions({ user }: Props) {
       });
       applyPayload(updated);
       await refreshAudit();
-      setToast("Role permissions saved.");
+      setToast(t("platformUi.permRoleSaved"));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not save permissions");
+      setError(err instanceof Error ? err.message : t("platformUi.permErrSave"));
     } finally {
       setSaving(false);
     }
@@ -208,9 +215,9 @@ export function PlatformPermissions({ user }: Props) {
       const updated = await updatePlatformOperatorRole(userId, role);
       applyPayload(updated);
       await refreshAudit();
-      setToast("Operator role updated.");
+      setToast(t("platformUi.permRoleUpdated"));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not update role");
+      setError(err instanceof Error ? err.message : t("platformUi.permErrRole"));
     } finally {
       setBusyUserId(null);
     }
@@ -227,7 +234,7 @@ export function PlatformPermissions({ user }: Props) {
       await refreshAudit();
       setToast(nextActive ? `${name} reactivated.` : `${name} deactivated.`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not update status");
+      setError(err instanceof Error ? err.message : t("platformUi.permErrStatus"));
     } finally {
       setBusyUserId(null);
     }
@@ -249,7 +256,7 @@ export function PlatformPermissions({ user }: Props) {
           : `Invite link ready for ${name} (email not sent — copy the link).`,
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not resend invite");
+      setError(err instanceof Error ? err.message : t("platformUi.permErrResend"));
     } finally {
       setBusyUserId(null);
     }
@@ -267,7 +274,7 @@ export function PlatformPermissions({ user }: Props) {
       setToast(`${deleteTarget.name} was removed.`);
       setDeleteTarget(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not remove operator");
+      setError(err instanceof Error ? err.message : t("platformUi.permErrRemove"));
     } finally {
       setBusyUserId(null);
     }
@@ -282,7 +289,11 @@ export function PlatformPermissions({ user }: Props) {
     setInviteUrl(null);
     try {
       const roleLabel =
-        newOp.role === "SALES" ? "Sales" : newOp.role === "SUPPORT" ? "Support" : "Owner";
+        newOp.role === "SALES"
+          ? t("platformUi.permRoleSales")
+          : newOp.role === "SUPPORT"
+            ? t("platformUi.permRoleSupport")
+            : t("platformUi.permRoleOwner");
 
       if (createMode === "invite") {
         const result = await invitePlatformOperator({
@@ -321,7 +332,7 @@ export function PlatformPermissions({ user }: Props) {
       });
       if (createMode === "password") setShowCreate(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not create operator");
+      setError(err instanceof Error ? err.message : t("platformUi.permErrCreate"));
     } finally {
       setCreating(false);
     }
@@ -331,9 +342,9 @@ export function PlatformPermissions({ user }: Props) {
     if (!inviteUrl) return;
     try {
       await navigator.clipboard.writeText(inviteUrl);
-      setToast("Invite link copied.");
+      setToast(t("platformUi.permInviteCopied"));
     } catch {
-      setError("Could not copy link");
+      setError(t("platformUi.permErrCopy"));
     }
   }
 
@@ -344,8 +355,8 @@ export function PlatformPermissions({ user }: Props) {
         tone="danger"
         title={`Remove ${deleteTarget?.name ?? "operator"}?`}
         message="They will lose platform console access immediately. This does not delete any school tenants."
-        confirmLabel="Remove operator"
-        cancelLabel="Keep"
+        confirmLabel={t("platformUi.permRemoveOperator")}
+        cancelLabel={t("platformUi.permKeep")}
         busy={Boolean(deleteTarget && busyUserId === deleteTarget.id)}
         onCancel={() => {
           if (busyUserId) return;
@@ -359,25 +370,25 @@ export function PlatformPermissions({ user }: Props) {
             <DashIcon name="users" className="dash-icon--md" />
           </span>
           <div>
-            <p className="plat-access__eyebrow">Access control</p>
-            <h2 className="plat-access__title">Platform permissions</h2>
+            <p className="plat-access__eyebrow">{t("platformUi.permEyebrow")}</p>
+            <h2 className="plat-access__title">{t("platformUi.permTitle")}</h2>
             <p className="plat-access__sub">
-              Edit what Support and Sales can do. Owner always keeps full control.
+              {t("platformUi.permSub")}
             </p>
           </div>
         </div>
         <div className="plat-access__hero-stats">
           <div className="plat-access__stat">
             <strong>{data?.roles.length ?? "—"}</strong>
-            <span>Roles</span>
+            <span>{t("platformUi.permStatRoles")}</span>
           </div>
           <div className="plat-access__stat">
             <strong>{data?.catalog.length ?? "—"}</strong>
-            <span>Capabilities</span>
+            <span>{t("platformUi.permStatCapabilities")}</span>
           </div>
           <div className="plat-access__stat">
             <strong>{data?.operators.length ?? "—"}</strong>
-            <span>Operators</span>
+            <span>{t("platformUi.permStatOperators")}</span>
           </div>
         </div>
       </header>
@@ -388,7 +399,7 @@ export function PlatformPermissions({ user }: Props) {
       {loading ? (
         <div className="plat-access__loading" aria-busy="true">
           <span className="plat-access__spinner" aria-hidden />
-          <p>Loading access control…</p>
+          <p>{t("platformUi.permLoading")}</p>
         </div>
       ) : null}
 
@@ -399,7 +410,7 @@ export function PlatformPermissions({ user }: Props) {
             {user.lastName.slice(0, 1)}
           </div>
           <div className="plat-access-you__main">
-            <p className="plat-access-you__eyebrow">Signed in as</p>
+            <p className="plat-access-you__eyebrow">{t("platformUi.permSignedInAs")}</p>
             <h3>
               {user.firstName} {user.lastName}
             </h3>
@@ -415,7 +426,7 @@ export function PlatformPermissions({ user }: Props) {
           </div>
           {!isOwner ? (
             <p className="plat-access-you__note">
-              Only owners can edit the permission matrix and operator roles.
+              {t("platformUi.permOwnerOnly")}
             </p>
           ) : null}
         </section>
@@ -426,11 +437,8 @@ export function PlatformPermissions({ user }: Props) {
           <section className="plat-access-panel">
             <div className="plat-access-panel__head">
               <div>
-                <h3>Permission matrix</h3>
-                <p>
-                  Toggle capabilities for Support and Sales. View access stays on for every
-                  operator role.
-                </p>
+                <h3>{t("platformUi.permMatrixTitle")}</h3>
+                <p>{t("platformUi.permMatrixSub")}</p>
               </div>
               {isOwner ? (
                 <div className="plat-access-panel__actions">
@@ -440,7 +448,7 @@ export function PlatformPermissions({ user }: Props) {
                     disabled={!dirty || saving}
                     onClick={onReset}
                   >
-                    Reset
+                    {t("platformUi.permReset")}
                   </button>
                   <button
                     type="button"
@@ -448,7 +456,7 @@ export function PlatformPermissions({ user }: Props) {
                     disabled={!dirty || saving}
                     onClick={() => void onSave()}
                   >
-                    {saving ? "Saving…" : "Save changes"}
+                    {saving ? t("platformUi.saving") : t("platformUi.saveChanges")}
                   </button>
                 </div>
               ) : null}
@@ -458,7 +466,7 @@ export function PlatformPermissions({ user }: Props) {
               <table className="plat-access-matrix">
                 <thead>
                   <tr>
-                    <th>Capability</th>
+                    <th>{t("platformUi.permCapability")}</th>
                     {data.roles.map((role) => (
                       <th key={role.id}>
                         <button
@@ -467,8 +475,8 @@ export function PlatformPermissions({ user }: Props) {
                           onClick={() => setSelectedRole(role.id)}
                         >
                           {role.title}
-                          {user?.role === role.id ? <span>You</span> : null}
-                          {!role.editable ? <em>Locked</em> : null}
+                          {user?.role === role.id ? <span>{t("platformUi.permYou")}</span> : null}
+                          {!role.editable ? <em>{t("platformUi.permLocked")}</em> : null}
                         </button>
                       </th>
                     ))}
@@ -512,9 +520,9 @@ export function PlatformPermissions({ user }: Props) {
                             ) : (
                               <span
                                 className={`plat-access-pill${on ? " is-on" : ""}`}
-                                aria-label={on ? "Allowed" : "Denied"}
+                                aria-label={on ? t("platformUi.permAllowed") : t("platformUi.permDenied")}
                               >
-                                {on ? "On" : "Off"}
+                                {on ? t("platformUi.billingActive") : t("platformUi.permOff")}
                               </span>
                             )}
                           </td>
@@ -544,7 +552,7 @@ export function PlatformPermissions({ user }: Props) {
                     </span>
                     <div>
                       <h4>{role.title}</h4>
-                      {isYou ? <span className="plat-you-pill">Your role</span> : null}
+                      {isYou ? <span className="plat-you-pill">{t("platformUi.permYourRole")}</span> : null}
                     </div>
                   </header>
                   <p>{role.description}</p>
@@ -570,7 +578,7 @@ export function PlatformPermissions({ user }: Props) {
           <section className="plat-access-panel">
             <div className="plat-access-panel__head">
               <div>
-                <h3>Operators</h3>
+                <h3>{t("platformUi.permStatOperators")}</h3>
                 <p>
                   Invite by email, deactivate access, or remove a login. Capability limits come
                   from the matrix above.
@@ -585,14 +593,14 @@ export function PlatformPermissions({ user }: Props) {
                     setInviteUrl(null);
                   }}
                 >
-                  {showCreate ? "Cancel" : "Add operator"}
+                  {showCreate ? t("common.cancel") : t("platformUi.permAddOperator")}
                 </button>
               ) : null}
             </div>
 
             {isOwner && showCreate ? (
               <form className="plat-access-create" onSubmit={(e) => void onCreateOperator(e)}>
-                <div className="plat-access-create__modes" role="tablist" aria-label="Add method">
+                <div className="plat-access-create__modes" role="tablist" aria-label={t("platformUi.permAddMethod")}>
                   <button
                     type="button"
                     role="tab"
@@ -600,7 +608,7 @@ export function PlatformPermissions({ user }: Props) {
                     className={createMode === "invite" ? "is-active" : undefined}
                     onClick={() => setCreateMode("invite")}
                   >
-                    Email invite
+                    {t("platformUi.permEmailInvite")}
                   </button>
                   <button
                     type="button"
@@ -609,12 +617,12 @@ export function PlatformPermissions({ user }: Props) {
                     className={createMode === "password" ? "is-active" : undefined}
                     onClick={() => setCreateMode("password")}
                   >
-                    Set password
+                    {t("platformUi.permSetPassword")}
                   </button>
                 </div>
                 <div className="plat-access-create__grid">
                   <label>
-                    <span>First name</span>
+                    <span>{t("platformUi.permFirstName")}</span>
                     <input
                       value={newOp.firstName}
                       onChange={(e) => setNewOp((p) => ({ ...p, firstName: e.target.value }))}
@@ -623,7 +631,7 @@ export function PlatformPermissions({ user }: Props) {
                     />
                   </label>
                   <label>
-                    <span>Last name</span>
+                    <span>{t("platformUi.permLastName")}</span>
                     <input
                       value={newOp.lastName}
                       onChange={(e) => setNewOp((p) => ({ ...p, lastName: e.target.value }))}
@@ -632,7 +640,7 @@ export function PlatformPermissions({ user }: Props) {
                     />
                   </label>
                   <label>
-                    <span>Email</span>
+                    <span>{t("platformUi.permEmail")}</span>
                     <input
                       type="email"
                       value={newOp.email}
@@ -644,20 +652,20 @@ export function PlatformPermissions({ user }: Props) {
                   </label>
                   {createMode === "password" ? (
                     <label>
-                      <span>Temporary password</span>
+                      <span>{t("platformUi.permTempPassword")}</span>
                       <input
                         type="text"
                         value={newOp.password}
                         onChange={(e) => setNewOp((p) => ({ ...p, password: e.target.value }))}
                         required
                         minLength={8}
-                        placeholder="At least 8 characters"
+                        placeholder={t("platformUi.permPasswordHint")}
                         autoComplete="new-password"
                       />
                     </label>
                   ) : null}
                   <label>
-                    <span>Role</span>
+                    <span>{t("platformUi.permRole")}</span>
                     <select
                       value={newOp.role}
                       onChange={(e) =>
@@ -667,9 +675,9 @@ export function PlatformPermissions({ user }: Props) {
                         }))
                       }
                     >
-                      <option value="SUPPORT">Support</option>
-                      <option value="SALES">Sales</option>
-                      <option value="OWNER">Owner</option>
+                      <option value="SUPPORT">{t("platformUi.permRoleSupport")}</option>
+                      <option value="SALES">{t("platformUi.permRoleSales")}</option>
+                      <option value="OWNER">{t("platformUi.permRoleOwner")}</option>
                     </select>
                   </label>
                 </div>
@@ -681,11 +689,11 @@ export function PlatformPermissions({ user }: Props) {
                   >
                     {creating
                       ? createMode === "invite"
-                        ? "Sending…"
-                        : "Creating…"
+                        ? t("platformUi.sending")
+                        : t("platformUi.creating")
                       : createMode === "invite"
-                        ? "Send invite"
-                        : "Create operator"}
+                        ? t("platformUi.permSendInvite")
+                        : t("platformUi.permCreateOperator")}
                   </button>
                 </div>
               </form>
@@ -693,10 +701,10 @@ export function PlatformPermissions({ user }: Props) {
 
             {inviteUrl ? (
               <div className="plat-access-invite-link">
-                <p>Invite link (share if email did not send):</p>
+                <p>{t("platformUi.permInviteLink")}</p>
                 <code>{inviteUrl}</code>
                 <button type="button" className="plat-v2__btn plat-v2__btn--ghost" onClick={() => void copyInviteUrl()}>
-                  Copy link
+                  {t("platformUi.permCopyLink")}
                 </button>
               </div>
             ) : null}
@@ -717,12 +725,12 @@ export function PlatformPermissions({ user }: Props) {
                     <div className="plat-access-op__main">
                       <strong>
                         {op.firstName} {op.lastName}
-                        {isYou ? <span className="plat-you-pill">You</span> : null}
+                        {isYou ? <span className="plat-you-pill">{t("platformUi.permYou")}</span> : null}
                         {!op.isActive ? (
-                          <span className="plat-status-pill plat-status-pill--off">Inactive</span>
+                          <span className="plat-status-pill plat-status-pill--off">{t("platformUi.permInactive")}</span>
                         ) : null}
                         {op.invitePending ? (
-                          <span className="plat-status-pill plat-status-pill--invite">Invite pending</span>
+                          <span className="plat-status-pill plat-status-pill--invite">{t("platformUi.permInvitePending")}</span>
                         ) : null}
                       </strong>
                       <span>{op.email}</span>
@@ -745,9 +753,9 @@ export function PlatformPermissions({ user }: Props) {
                           }
                           aria-label={`Role for ${op.firstName} ${op.lastName}`}
                         >
-                          <option value="OWNER">Owner</option>
-                          <option value="SUPPORT">Support</option>
-                          <option value="SALES">Sales</option>
+                          <option value="OWNER">{t("platformUi.permRoleOwner")}</option>
+                          <option value="SUPPORT">{t("platformUi.permRoleSupport")}</option>
+                          <option value="SALES">{t("platformUi.permRoleSales")}</option>
                         </select>
                         {!isYou ? (
                           <>
@@ -769,7 +777,7 @@ export function PlatformPermissions({ user }: Props) {
                                 void onToggleActive(op.id, !op.isActive, name)
                               }
                             >
-                              {op.isActive ? "Deactivate" : "Reactivate"}
+                              {op.isActive ? t("platformUi.permDeactivate") : t("platformUi.permReactivate")}
                             </button>
                             <button
                               type="button"
@@ -782,7 +790,7 @@ export function PlatformPermissions({ user }: Props) {
                                 })
                               }
                             >
-                              Remove
+                              {t("platformUi.permRemove")}
                             </button>
                           </>
                         ) : null}
@@ -802,12 +810,12 @@ export function PlatformPermissions({ user }: Props) {
             <section className="plat-access-panel">
               <div className="plat-access-panel__head">
                 <div>
-                  <h3>Audit log</h3>
-                  <p>Recent invites, role changes, deactivations, and removals.</p>
+                  <h3>{t("platformUi.permAuditTitle")}</h3>
+                  <p>{t("platformUi.permAuditSub")}</p>
                 </div>
               </div>
               {audit.length === 0 ? (
-                <p className="plat-access-audit__empty">No operator events yet.</p>
+                <p className="plat-access-audit__empty">{t("platformUi.permNoEvents")}</p>
               ) : (
                 <ul className="plat-access-audit">
                   {audit.map((row) => (
@@ -828,9 +836,9 @@ export function PlatformPermissions({ user }: Props) {
           <section className="plat-info-card">
             <DashIcon name="students" className="dash-icon--sm" />
             <div>
-              <h3>School-level permissions (separate)</h3>
+              <h3>{t("platformUi.permSchoolLevelTitle")}</h3>
               <p>
-                Each tenant manages staff from <strong>Admin → Teachers → Permissions</strong>.
+                Each tenant manages staff from <strong>{t("platformUi.permSchoolLevelPath")}</strong>.
                 School admins assign module access without a platform login.
               </p>
             </div>
@@ -838,7 +846,7 @@ export function PlatformPermissions({ user }: Props) {
 
           {isOwner && dirty ? (
             <div className="plat-access__save-bar">
-              <p>Unsaved permission changes</p>
+              <p>{t("platformUi.permUnsavedTitle")}</p>
               <div>
                 <button
                   type="button"
@@ -846,7 +854,7 @@ export function PlatformPermissions({ user }: Props) {
                   disabled={saving}
                   onClick={onReset}
                 >
-                  Discard
+                  {t("platformUi.permDiscard")}
                 </button>
                 <button
                   type="button"
@@ -854,7 +862,7 @@ export function PlatformPermissions({ user }: Props) {
                   disabled={saving}
                   onClick={() => void onSave()}
                 >
-                  {saving ? "Saving…" : "Save changes"}
+                  {saving ? t("platformUi.saving") : t("platformUi.saveChanges")}
                 </button>
               </div>
             </div>

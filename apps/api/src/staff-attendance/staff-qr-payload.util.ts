@@ -27,6 +27,11 @@ export function classifyStaffScanPayload(raw: string): {
     return { kind: 'student_card' };
   }
 
+  // Student ID QR is a public results URL on any phone.
+  if (/\/results\/card/i.test(trimmed) || /[?&]c=/i.test(trimmed)) {
+    return { kind: 'student_card' };
+  }
+
   return { kind: 'raw' };
 }
 

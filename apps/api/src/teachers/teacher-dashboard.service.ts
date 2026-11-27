@@ -5,6 +5,7 @@ import {
   ClassworkSubmissionStatus,
   UserRole,
 } from '@prisma/client';
+import { isWeekendDay } from '../common/school-calendar.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { TimetableService } from '../timetable/timetable.service';
 import { TeacherScopeService } from './teacher-scope.service';
@@ -41,32 +42,33 @@ export class TeacherDashboardService {
       select: { id: true, name: true },
     });
 
-    const [user, profile, grades, announcements, currentTerm] = await Promise.all([
-      this.prisma.user.findUnique({
-        where: { id: userId },
-        select: { firstName: true, lastName: true },
-      }),
-      this.prisma.teacherProfile.findUnique({
-        where: { userId },
-        include: {
-          homeroomGrade: { select: { id: true, name: true } },
-          homeroomSection: { select: { id: true, name: true } },
-          assignments: {
-            include: {
-              grade: { select: { id: true, name: true } },
-              section: { select: { id: true, name: true } },
-              subject: { select: { id: true, name: true, code: true } },
+    const [user, profile, grades, announcements, currentTerm] =
+      await Promise.all([
+        this.prisma.user.findUnique({
+          where: { id: userId },
+          select: { firstName: true, lastName: true },
+        }),
+        this.prisma.teacherProfile.findUnique({
+          where: { userId },
+          include: {
+            homeroomGrade: { select: { id: true, name: true } },
+            homeroomSection: { select: { id: true, name: true } },
+            assignments: {
+              include: {
+                grade: { select: { id: true, name: true } },
+                section: { select: { id: true, name: true } },
+                subject: { select: { id: true, name: true, code: true } },
+              },
             },
           },
-        },
-      }),
-      this.teacherScope.listGradesForTeacher(schoolId, userId),
-      this.prisma.announcement.count({ where: { schoolId } }),
-      this.prisma.academicTerm.findFirst({
-        where: { schoolId, isCurrent: true },
-        select: { id: true, name: true },
-      }),
-    ]);
+        }),
+        this.teacherScope.listGradesForTeacher(schoolId, userId),
+        this.prisma.announcement.count({ where: { schoolId } }),
+        this.prisma.academicTerm.findFirst({
+          where: { schoolId, isCurrent: true },
+          select: { id: true, name: true },
+        }),
+      ]);
 
     const classBuckets: {
       gradeId: string;
@@ -108,6 +110,13 @@ export class TeacherDashboardService {
 
     const canTakeAttendance = !!profile?.homeroomGradeId;
 
+    const schoolCalendar = await this.prisma.school.findUnique({
+      where: { id: schoolId },
+      select: { weekendDays: true },
+    });
+    const weekendDays = schoolCalendar?.weekendDays ?? [];
+    const todayIsWeekend = isWeekendDay(today, weekendDays, true);
+
     const attendancePending: {
       gradeId: string;
       sectionId: string | null;
@@ -121,36 +130,39 @@ export class TeacherDashboardService {
       ? classBuckets.filter((b) => b.isHomeroom)
       : [];
 
-    for (const bucket of homeroomBuckets) {
-      if (bucket.studentCount === 0) continue;
+    // Weekends are not school days — do not treat unmarked rolls as pending.
+    if (!todayIsWeekend) {
+      for (const bucket of homeroomBuckets) {
+        if (bucket.studentCount === 0) continue;
 
-      const studentIds = await this.prisma.studentProfile.findMany({
-        where: {
-          schoolId,
-          gradeId: bucket.gradeId,
-          ...(bucket.sectionId ? { sectionId: bucket.sectionId } : {}),
-        },
-        select: { id: true },
-      });
-      const ids = studentIds.map((s) => s.id);
-      const markedCount = await this.prisma.attendanceRecord.count({
-        where: {
-          schoolId,
-          date: today,
-          periodNumber: 0,
-          studentProfileId: { in: ids },
-        },
-      });
-      const pendingCount = bucket.studentCount - markedCount;
-      if (pendingCount > 0) {
-        attendancePending.push({
-          gradeId: bucket.gradeId,
-          sectionId: bucket.sectionId,
-          label: bucket.label,
-          studentCount: bucket.studentCount,
-          markedCount,
-          pendingCount,
+        const studentIds = await this.prisma.studentProfile.findMany({
+          where: {
+            schoolId,
+            gradeId: bucket.gradeId,
+            ...(bucket.sectionId ? { sectionId: bucket.sectionId } : {}),
+          },
+          select: { id: true },
         });
+        const ids = studentIds.map((s) => s.id);
+        const markedCount = await this.prisma.attendanceRecord.count({
+          where: {
+            schoolId,
+            date: today,
+            periodNumber: 0,
+            studentProfileId: { in: ids },
+          },
+        });
+        const pendingCount = bucket.studentCount - markedCount;
+        if (pendingCount > 0) {
+          attendancePending.push({
+            gradeId: bucket.gradeId,
+            sectionId: bucket.sectionId,
+            label: bucket.label,
+            studentCount: bucket.studentCount,
+            markedCount,
+            pendingCount,
+          });
+        }
       }
     }
 
@@ -405,7 +417,10 @@ export class TeacherDashboardService {
 
     let gradingTotal = 0;
     let gradingComplete = 0;
-    let missingScores = resultsPending.reduce((s, r) => s + r.missingCount, 0);
+    const missingScores = resultsPending.reduce(
+      (s, r) => s + r.missingCount,
+      0,
+    );
 
     if (currentTerm && teachingSlots.length > 0) {
       const assessments = await this.prisma.assessment.findMany({
@@ -527,8 +542,9 @@ export class TeacherDashboardService {
         missingScores,
       },
       classwork: {
-        published: classworkRows.filter((r) => r.status === ClassworkStatus.PUBLISHED)
-          .length,
+        published: classworkRows.filter(
+          (r) => r.status === ClassworkStatus.PUBLISHED,
+        ).length,
         draft: classworkRows.filter((r) => r.status === ClassworkStatus.DRAFT)
           .length,
         submissionsToGrade: classworkRows.reduce(

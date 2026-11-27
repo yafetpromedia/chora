@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useLocale } from "@/components/i18n/locale-provider";
 import { DashIcon } from "@/components/dashboard/dash-icons";
 import { AppToast } from "@/components/ui/app-toast";
 import { telHref } from "@/lib/student-photo";
@@ -20,6 +21,7 @@ function childLine(c: ParentRecord["children"][0]) {
 }
 
 export function ParentsWorkspace() {
+  const { t } = useLocale();
   const router = useRouter();
   const [parents, setParents] = useState<ParentRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -27,11 +29,16 @@ export function ParentsWorkspace() {
   const [saved, setSaved] = useState("");
   const [search, setSearch] = useState("");
   const [manageTarget, setManageTarget] = useState<ParentRecord | null>(null);
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [phone, setPhone] = useState("");
   const [username, setUsername] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [tempPassword, setTempPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [resetBusy, setResetBusy] = useState(false);
+
+  const emptyDash = t("parentsUi.emptyDash");
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -64,7 +71,9 @@ export function ParentsWorkspace() {
           })),
         ),
       )
-      .catch((err) => setError(err instanceof Error ? err.message : "Could not load parents"))
+      .catch((err) =>
+        setError(err instanceof Error ? err.message : t("parentsUi.loadFailed")),
+      )
       .finally(() => setLoading(false));
   };
 
@@ -77,10 +86,14 @@ export function ParentsWorkspace() {
       return;
     }
     load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- load on mount
   }, [router]);
 
   function openManage(parent: ParentRecord) {
     setManageTarget(parent);
+    setFirstName(parent.firstName ?? "");
+    setLastName(parent.lastName ?? "");
+    setPhone(parent.phone ?? "");
     setUsername(parent.username ?? "");
     setNewPassword("");
     setTempPassword("");
@@ -90,6 +103,9 @@ export function ParentsWorkspace() {
 
   function closeManage() {
     setManageTarget(null);
+    setFirstName("");
+    setLastName("");
+    setPhone("");
     setUsername("");
     setNewPassword("");
     setTempPassword("");
@@ -105,7 +121,7 @@ export function ParentsWorkspace() {
       const result = await resetParentPassword(manageTarget.userId);
       setTempPassword(result.tempPassword);
       setUsername(result.username ?? "");
-      setSaved("New temporary password generated. Share it securely with the parent.");
+      setSaved(t("parentsUi.tempPasswordGenerated"));
       setParents((rows) =>
         rows.map((p) =>
           p.userId === manageTarget.userId
@@ -117,7 +133,7 @@ export function ParentsWorkspace() {
         p ? { ...p, username: result.username ?? "" } : p,
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not reset password");
+      setError(err instanceof Error ? err.message : t("parentsUi.resetFailed"));
     } finally {
       setResetBusy(false);
     }
@@ -126,15 +142,37 @@ export function ParentsWorkspace() {
   async function onSaveAccount(e: FormEvent) {
     e.preventDefault();
     if (!manageTarget) return;
-    const body: { username?: string; password?: string } = {};
+    const body: {
+      firstName?: string;
+      lastName?: string;
+      phone?: string | null;
+      username?: string;
+      password?: string;
+    } = {};
+    if (firstName.trim() && firstName.trim() !== manageTarget.firstName) {
+      body.firstName = firstName.trim();
+    }
+    if (lastName.trim() && lastName.trim() !== manageTarget.lastName) {
+      body.lastName = lastName.trim();
+    }
+    const nextPhone = phone.trim() || null;
+    if (nextPhone !== (manageTarget.phone ?? null)) {
+      body.phone = nextPhone;
+    }
     if (username.trim() && username.trim() !== manageTarget.username) {
       body.username = username.trim();
     }
     if (newPassword.trim()) {
       body.password = newPassword.trim();
     }
-    if (!body.username && !body.password) {
-      setError("Change the username or enter a new password to save.");
+    if (
+      !body.firstName &&
+      !body.lastName &&
+      body.phone === undefined &&
+      !body.username &&
+      !body.password
+    ) {
+      setError(t("parentsUi.needChange"));
       return;
     }
     setBusy(true);
@@ -144,18 +182,44 @@ export function ParentsWorkspace() {
       const result = await updateParentAccount(manageTarget.userId, body);
       setSaved(
         result.passwordUpdated
-          ? "Login details updated."
-          : "Username updated.",
+          ? t("parentsUi.loginUpdated")
+          : t("parentsUi.usernameUpdated"),
       );
       setNewPassword("");
       setParents((rows) =>
         rows.map((p) =>
-          p.userId === manageTarget.userId ? { ...p, username: result.username } : p,
+          p.userId === manageTarget.userId
+            ? {
+                ...p,
+                username: result.username,
+                email: result.email,
+                phone: result.phone,
+                firstName: result.firstName,
+                lastName: result.lastName,
+                name: result.name,
+              }
+            : p,
         ),
       );
-      setManageTarget((p) => (p ? { ...p, username: result.username } : p));
+      setManageTarget((p) =>
+        p
+          ? {
+              ...p,
+              username: result.username,
+              email: result.email,
+              phone: result.phone,
+              firstName: result.firstName,
+              lastName: result.lastName,
+              name: result.name,
+            }
+          : p,
+      );
+      setFirstName(result.firstName);
+      setLastName(result.lastName);
+      setPhone(result.phone ?? "");
+      setUsername(result.username);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not save changes");
+      setError(err instanceof Error ? err.message : t("parentsUi.saveFailed"));
     } finally {
       setBusy(false);
     }
@@ -170,20 +234,18 @@ export function ParentsWorkspace() {
         <div className="par-v2__hero-glow" aria-hidden />
         <div className="par-v2__hero-inner">
           <div className="par-v2__hero-main">
-            <span className="par-v2__chip">Families</span>
-            <h2 className="par-v2__hero-title">Parents &amp; guardians</h2>
-            <p className="par-v2__hero-sub">
-              Manage parent portal logins, reset forgotten passwords, and view linked students.
-            </p>
+            <span className="par-v2__chip">{t("parentsUi.chip")}</span>
+            <h2 className="par-v2__hero-title">{t("parentsUi.title")}</h2>
+            <p className="par-v2__hero-sub">{t("parentsUi.heroSub")}</p>
           </div>
           <div className="par-v2__hero-stats">
             <div className="par-v2__stat">
               <strong>{parents.length}</strong>
-              <span>Accounts</span>
+              <span>{t("parentsUi.statAccounts")}</span>
             </div>
             <div className="par-v2__stat par-v2__stat--accent">
               <strong>{linkedChildren}</strong>
-              <span>Student links</span>
+              <span>{t("parentsUi.statStudentLinks")}</span>
             </div>
           </div>
         </div>
@@ -196,27 +258,30 @@ export function ParentsWorkspace() {
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search name, username, phone, child, grade…"
+            placeholder={t("parentsUi.searchPlaceholder")}
+            aria-label={t("common.search")}
           />
         </label>
         <p className="par-v2__toolbar-meta">
-          {filtered.length} of {parents.length} shown
+          {t("parentsUi.ofShown", { shown: filtered.length, total: parents.length })}
         </p>
       </div>
 
       {loading ? (
         <div className="par-v2__loading">
           <span className="par-v2__spinner" aria-hidden />
-          <p>Loading parents…</p>
+          <p>{t("parentsUi.loading")}</p>
         </div>
       ) : filtered.length === 0 ? (
         <div className="par-v2__empty">
           <DashIcon name="users" className="dash-icon--lg" />
-          <h3>{parents.length === 0 ? "No parent accounts yet" : "No matches"}</h3>
+          <h3>
+            {parents.length === 0 ? t("parentsUi.noParentsYet") : t("parentsUi.noMatches")}
+          </h3>
           <p>
             {parents.length === 0
-              ? "Add students with parent phone numbers — parent accounts are created automatically."
-              : "Try a different search term."}
+              ? t("parentsUi.noParentsHint")
+              : t("parentsUi.trySearch")}
           </p>
         </div>
       ) : (
@@ -224,11 +289,11 @@ export function ParentsWorkspace() {
           <table className="par-v2__table">
             <thead>
               <tr>
-                <th>Parent / guardian</th>
-                <th>Portal login</th>
-                <th>Contact</th>
-                <th>Children</th>
-                <th aria-label="Actions" />
+                <th>{t("parentsUi.colParent")}</th>
+                <th>{t("parentsUi.colPortalLogin")}</th>
+                <th>{t("parentsUi.colContact")}</th>
+                <th>{t("parentsUi.colChildren")}</th>
+                <th aria-label={t("common.actions")} />
               </tr>
             </thead>
             <tbody>
@@ -241,11 +306,11 @@ export function ParentsWorkspace() {
                         @{p.username}
                       </code>
                     ) : (
-                      <span className="par-v2__meta">No portal username</span>
+                      <span className="par-v2__meta">{t("parentsUi.noPortalUsername")}</span>
                     )}
                   </td>
                   <td>
-                    <code className="par-v2__username">{p.username || "—"}</code>
+                    <code className="par-v2__username">{p.username || emptyDash}</code>
                   </td>
                   <td>
                     {p.phone ? (
@@ -253,12 +318,12 @@ export function ParentsWorkspace() {
                         {p.phone}
                       </a>
                     ) : (
-                      <span className="par-v2__meta">—</span>
+                      <span className="par-v2__meta">{emptyDash}</span>
                     )}
                   </td>
                   <td>
                     {p.children.length === 0 ? (
-                      <span className="par-v2__meta">No students linked</span>
+                      <span className="par-v2__meta">{t("parentsUi.noStudentsLinked")}</span>
                     ) : (
                       <ul className="par-v2__children">
                         {p.children.map((c) => (
@@ -280,7 +345,7 @@ export function ParentsWorkspace() {
                       className="par-v2__btn"
                       onClick={() => openManage(p)}
                     >
-                      Manage login
+                      {t("parentsUi.manageLogin")}
                     </button>
                   </td>
                 </tr>
@@ -296,20 +361,27 @@ export function ParentsWorkspace() {
           <aside className="par-v2__drawer" role="dialog" aria-labelledby="par-drawer-title">
             <header className="par-v2__drawer-head">
               <div>
-                <p className="par-v2__drawer-eyebrow">Parent portal</p>
+                <p className="par-v2__drawer-eyebrow">{t("parentsUi.drawerEyebrow")}</p>
                 <h3 id="par-drawer-title">{manageTarget.name}</h3>
                 <p className="par-v2__drawer-sub">
-                  Parents sign in with <strong>school code + username + password</strong>.
+                  {t("parentsUi.drawerSub")}{" "}
+                  <strong>{t("parentsUi.drawerSubStrong")}</strong>
+                  {t("parentsUi.drawerSubEnd")}
                 </p>
               </div>
-              <button type="button" className="par-v2__close" onClick={closeManage} aria-label="Close">
+              <button
+                type="button"
+                className="par-v2__close"
+                onClick={closeManage}
+                aria-label={t("common.close")}
+              >
                 ×
               </button>
             </header>
 
             {tempPassword ? (
               <div className="par-v2__cred-box">
-                <p className="par-v2__cred-label">Temporary password (share once)</p>
+                <p className="par-v2__cred-label">{t("parentsUi.tempPasswordLabel")}</p>
                 <div className="par-v2__cred-row">
                   <code>{tempPassword}</code>
                   <button
@@ -317,55 +389,83 @@ export function ParentsWorkspace() {
                     className="par-v2__btn par-v2__btn--ghost"
                     onClick={() => void navigator.clipboard.writeText(tempPassword)}
                   >
-                    Copy
+                    {t("common.copy")}
                   </button>
                 </div>
                 <p className="par-v2__cred-hint">
-                  Username: <strong>{username}</strong> · Share with the parent along with your school code.
+                  {t("parentsUi.credHint")} <strong>{username}</strong> ·{" "}
+                  {t("parentsUi.credHintEnd")}
                 </p>
               </div>
             ) : null}
 
             <form className="par-v2__form" onSubmit={(e) => void onSaveAccount(e)}>
               <label className="par-v2__field">
-                <span>Username</span>
+                <span>{t("parentsUi.firstName")}</span>
                 <input
-                  value={username ?? ""}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder="Portal username"
-                  autoComplete="off"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  autoComplete="given-name"
                   required
                 />
-                <em>Used on the login page with your school code.</em>
               </label>
 
               <label className="par-v2__field">
-                <span>Set new password (optional)</span>
+                <span>{t("parentsUi.lastName")}</span>
+                <input
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  autoComplete="family-name"
+                  required
+                />
+              </label>
+
+              <label className="par-v2__field">
+                <span>{t("parentsUi.phone")}</span>
+                <input
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder={t("parentsUi.phonePlaceholder")}
+                  autoComplete="tel"
+                />
+              </label>
+
+              <label className="par-v2__field">
+                <span>{t("parentsUi.username")}</span>
+                <input
+                  value={username ?? ""}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder={t("parentsUi.usernamePlaceholder")}
+                  autoComplete="off"
+                  required
+                />
+                <em>{t("parentsUi.usernameHint")}</em>
+              </label>
+
+              <label className="par-v2__field">
+                <span>{t("parentsUi.newPasswordOptional")}</span>
                 <input
                   type="password"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="Min. 6 characters"
+                  placeholder={t("parentsUi.minSixChars")}
                   autoComplete="new-password"
                 />
-                <em>Leave blank unless you want to set a specific password.</em>
+                <em>{t("parentsUi.passwordHint")}</em>
               </label>
 
               <div className="par-v2__readonly">
                 <div>
-                  <span>Phone</span>
-                  <strong>{manageTarget.phone ?? "—"}</strong>
-                </div>
-                <div>
-                  <span>Portal email</span>
+                  <span>{t("parentsUi.portalEmail")}</span>
                   <strong>{manageTarget.email}</strong>
-                  <em>Not used for sign-in — parents use school code + username.</em>
+                  <em>{t("parentsUi.portalEmailHint")}</em>
                 </div>
               </div>
 
               {manageTarget.children.length > 0 ? (
                 <div className="par-v2__linked">
-                  <span className="par-v2__linked-label">Linked students</span>
+                  <span className="par-v2__linked-label">{t("parentsUi.linkedStudents")}</span>
                   <ul>
                     {manageTarget.children.map((c) => (
                       <li key={c.profileId}>{childLine(c)}</li>
@@ -381,10 +481,10 @@ export function ParentsWorkspace() {
                   disabled={resetBusy || busy}
                   onClick={() => void onResetPassword()}
                 >
-                  {resetBusy ? "Resetting…" : "Reset password"}
+                  {resetBusy ? t("parentsUi.resetting") : t("parentsUi.resetPassword")}
                 </button>
                 <button type="submit" className="par-v2__btn par-v2__btn--primary" disabled={busy}>
-                  {busy ? "Saving…" : "Save changes"}
+                  {busy ? t("common.saving") : t("parentsUi.saveChanges")}
                 </button>
               </div>
             </form>

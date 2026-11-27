@@ -1,5 +1,8 @@
+import { Gender } from '@prisma/client';
 import {
   IsEmail,
+  IsEnum,
+  IsISO8601,
   IsOptional,
   IsString,
   MinLength,
@@ -25,6 +28,34 @@ export class CreateTeacherDto {
   /** Role template slug, e.g. homeroom_teacher, registrar, finance_officer */
   @IsString()
   roleTemplateSlug!: string;
+
+  @IsOptional()
+  @IsString()
+  phone?: string;
+
+  @IsOptional()
+  @IsEnum(Gender)
+  gender?: Gender;
+
+  @IsOptional()
+  @IsISO8601()
+  dateOfBirth?: string;
+
+  @IsOptional()
+  @IsString()
+  bloodType?: string;
+
+  @IsOptional()
+  @IsString()
+  address?: string;
+
+  @IsOptional()
+  @IsString()
+  emergencyContactName?: string;
+
+  @IsOptional()
+  @IsString()
+  emergencyContactPhone?: string;
 
   @IsOptional()
   @IsString()

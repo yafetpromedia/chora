@@ -20,6 +20,12 @@ import {
 
 import { openClassworkFile } from "@/lib/teacher-cards";
 import { AppToast } from "@/components/ui/app-toast";
+import { useLocale } from "@/components/i18n/locale-provider";
+import {
+  classworkStatusLabel,
+  cwField,
+  studentPrefix,
+} from "@/components/classwork/classwork-i18n";
 
 type Props = {
 
@@ -46,52 +52,6 @@ function CwSheetIcon({ className }: { className?: string }) {
   );
 }
 
-const MODE_COPY: Record<
-  ClassworkType,
-  {
-    modeLabel: string;
-    heroTitle: string;
-    heroSub: string;
-    listTitle: string;
-    listSub: string;
-    empty: string;
-    emptyHint: string;
-    loading: string;
-    plural: string;
-    notePlaceholder: string;
-    fileHint: string;
-  }
-> = {
-  ASSIGNMENT: {
-    modeLabel: "Homework",
-    heroTitle: "Your assignments",
-    heroSub: "Read the brief, attach your work, and meet the due date.",
-    listTitle: "Due soon",
-    listSub: "Homework tasks from your teachers.",
-    empty: "No assignments right now",
-    emptyHint: "When teachers publish homework for your class, it will appear here.",
-    loading: "Loading assignments…",
-    plural: "assignments",
-    notePlaceholder: "Add a comment or link for your teacher…",
-    fileHint: "Upload your completed homework",
-  },
-  WORKSHEET: {
-    modeLabel: "Worksheets",
-    heroTitle: "Your worksheets",
-    heroSub: "Read the instructions, attach your work, and meet the due date.",
-    listTitle: "Due soon",
-    listSub: "Practice sheets from your teachers.",
-    empty: "No worksheets right now",
-    emptyHint: "When teachers publish worksheets, they will show up here.",
-    loading: "Loading worksheets…",
-    plural: "worksheets",
-    notePlaceholder: "Add a comment or link for your teacher…",
-    fileHint: "Upload your completed worksheet",
-  },
-};
-
-
-
 function formatDue(dueAt: string | null | undefined): string | null {
 
   if (!dueAt) return null;
@@ -115,16 +75,33 @@ function formatDue(dueAt: string | null | undefined): string | null {
 
 
 export function ClassworkStudentPanel({ mode }: Props) {
-
-  const copy = MODE_COPY[mode];
+  const { t } = useLocale();
+  const prefix = studentPrefix(mode);
+  const copy = {
+    modeLabel: cwField(t, prefix, "modeLabel"),
+    heroTitle: cwField(t, prefix, "heroTitle"),
+    heroSub: cwField(t, prefix, "heroSub"),
+    listTitle: cwField(t, prefix, "listTitle"),
+    listSub: cwField(t, prefix, "listSub"),
+    empty: cwField(t, prefix, "empty"),
+    emptyHint: cwField(t, prefix, "emptyHint"),
+    loading: cwField(t, prefix, "loading"),
+    plural: cwField(t, prefix, "plural"),
+    notePlaceholder: cwField(t, prefix, "notePlaceholder"),
+    fileHint: cwField(t, prefix, "fileHint"),
+  };
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [items, setItems] = useState<ClassworkAssignment[]>([]);
 
-  const [selectedId, setSelectedId] = useState("");
+  const [selectedIdState, setSelectedId] = useState("");
 
-  const [detail, setDetail] = useState<ClassworkAssignment | null>(null);
+  const [detailState, setDetail] = useState<ClassworkAssignment | null>(null);
+  const selectedId = items.some((i) => i.id === selectedIdState)
+    ? selectedIdState
+    : (items[0]?.id ?? "");
+  const detail = selectedId ? detailState : null;
 
   const [note, setNote] = useState("");
 
@@ -182,32 +159,25 @@ export function ClassworkStudentPanel({ mode }: Props) {
     void listStudentAssignments(mode)
       .then(setItems)
       .catch((err) =>
-        setError(err instanceof Error ? err.message : "Load failed"),
+        setError(err instanceof Error ? err.message : t("classworkUi.loadFailed")),
       )
       .finally(() => setLoading(false));
   }, [mode]);
 
   useEffect(() => {
-    if (items.length === 0) {
-      setSelectedId("");
-      return;
-    }
-    setSelectedId((cur) => {
-      if (cur && items.some((i) => i.id === cur)) return cur;
-      return items[0]?.id ?? "";
-    });
-  }, [items]);
-
-  useEffect(() => {
-    if (!selectedId) {
-      setDetail(null);
-      return;
-    }
+    if (!selectedId) return;
+    let cancelled = false;
     void getStudentAssignment(selectedId)
-      .then(setDetail)
-      .catch((err) =>
-        setError(err instanceof Error ? err.message : "Load failed"),
-      );
+      .then((d) => {
+        if (!cancelled) setDetail(d);
+      })
+      .catch((err) => {
+        if (!cancelled)
+          setError(err instanceof Error ? err.message : t("classworkUi.loadFailed"));
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [selectedId]);
 
 
@@ -236,7 +206,7 @@ export function ClassworkStudentPanel({ mode }: Props) {
 
       );
 
-      setSaved("Submitted successfully.");
+      setSaved(t("classworkUi.submitSuccess"));
 
       setNote("");
 
@@ -252,7 +222,7 @@ export function ClassworkStudentPanel({ mode }: Props) {
 
     } catch (err) {
 
-      setError(err instanceof Error ? err.message : "Submit failed");
+      setError(err instanceof Error ? err.message : t("classworkUi.submitFailed"));
 
     } finally {
 
@@ -312,15 +282,15 @@ export function ClassworkStudentPanel({ mode }: Props) {
         <div className="cw-hero__stats">
           <div className="cw-stat">
             <span className="cw-stat__value">{stats.total}</span>
-            <span className="cw-stat__label">Total</span>
+            <span className="cw-stat__label">{t("classworkUi.statTotal")}</span>
           </div>
           <div className="cw-stat">
             <span className="cw-stat__value">{stats.submitted}</span>
-            <span className="cw-stat__label">Done</span>
+            <span className="cw-stat__label">{t("classworkUi.statDone")}</span>
           </div>
           <div className="cw-stat cw-stat--accent">
             <span className="cw-stat__value">{stats.pending}</span>
-            <span className="cw-stat__label">To do</span>
+            <span className="cw-stat__label">{t("classworkUi.statTodo")}</span>
           </div>
         </div>
       </header>
@@ -336,16 +306,16 @@ export function ClassworkStudentPanel({ mode }: Props) {
           </div>
           <div className="cw-empty-v2__tips">
             <article className="cw-empty-v2__tip">
-              <strong>Check due dates</strong>
-              <p>Tasks show up with class, subject, and deadline when teachers publish them.</p>
+              <strong>{t("classworkUi.tipDueTitle")}</strong>
+              <p>{t("classworkUi.tipDueBody")}</p>
             </article>
             <article className="cw-empty-v2__tip">
-              <strong>Submit your work</strong>
-              <p>Upload a file or add a note — your teacher can grade and leave feedback.</p>
+              <strong>{t("classworkUi.tipSubmitTitle")}</strong>
+              <p>{t("classworkUi.tipSubmitBody")}</p>
             </article>
             <article className="cw-empty-v2__tip">
-              <strong>Track progress</strong>
-              <p>See pending, submitted, and graded status on each item in your list.</p>
+              <strong>{t("classworkUi.tipTrackTitle")}</strong>
+              <p>{t("classworkUi.tipTrackBody")}</p>
             </article>
           </div>
         </section>
@@ -362,12 +332,12 @@ export function ClassworkStudentPanel({ mode }: Props) {
                 </span>
               </div>
 
-              <div className="cw-student-filter" role="tablist" aria-label="Filter tasks">
+              <div className="cw-student-filter" role="tablist" aria-label={t("classworkUi.filterAria")}>
                 {(
                   [
-                    { id: "all" as const, label: "All", count: items.length },
-                    { id: "todo" as const, label: "To do", count: stats.pending },
-                    { id: "done" as const, label: "Done", count: stats.submitted },
+                    { id: "all" as const, label: t("classworkUi.filterAll"), count: items.length },
+                    { id: "todo" as const, label: t("classworkUi.filterTodo"), count: stats.pending },
+                    { id: "done" as const, label: t("classworkUi.filterDone"), count: stats.submitted },
                   ] as const
                 ).map((tab) => (
                   <button
@@ -387,7 +357,11 @@ export function ClassworkStudentPanel({ mode }: Props) {
               <ul className="cw-list cw-list--student">
                 {filteredItems.length === 0 ? (
                   <li className="cw-list__empty">
-                    <p>No {filter === "todo" ? "tasks to do" : "completed tasks"} in this view.</p>
+                    <p>
+                      {filter === "todo"
+                        ? t("classworkUi.noTodoInView")
+                        : t("classworkUi.noDoneInView")}
+                    </p>
                   </li>
                 ) : null}
                 {filteredItems.map((row) => {
@@ -415,14 +389,12 @@ export function ClassworkStudentPanel({ mode }: Props) {
                           {sub ? (
 
                             <span className={`cw-status cw-status--${sub.toLowerCase()}`}>
-
-                              {sub}
-
+                              {classworkStatusLabel(t, sub)}
                             </span>
-
                           ) : (
-
-                            <span className="cw-status cw-status--pending">Pending</span>
+                            <span className="cw-status cw-status--pending">
+                              {t("classworkUi.statusPending")}
+                            </span>
 
                           )}
 
@@ -460,7 +432,9 @@ export function ClassworkStudentPanel({ mode }: Props) {
 
                       <p className="cw-detail__due">
 
-                        Due {formatDue(detail.dueAt)}
+                        {t("classworkUi.duePrefix", {
+                          date: formatDue(detail.dueAt) ?? "",
+                        })}
 
                       </p>
 
@@ -480,7 +454,7 @@ export function ClassworkStudentPanel({ mode }: Props) {
 
                     >
 
-                      Download {detail.fileName ?? "attachment"}
+                      {t("classworkUi.download")} {detail.fileName ?? t("classworkUi.attachment")}
 
                     </button>
 
@@ -502,7 +476,7 @@ export function ClassworkStudentPanel({ mode }: Props) {
                 detail.mySubmission.score != null ? (
                   <div className="cw-grade-result">
                     <p className="cw-grade-result__score">
-                      Your score: <strong>{detail.mySubmission.score}</strong>
+                      {t("classworkUi.yourScore")} <strong>{detail.mySubmission.score}</strong>
                       {detail.maxScore ? ` / ${detail.maxScore}` : ""}
                     </p>
                     {detail.mySubmission.feedback ? (
@@ -512,11 +486,13 @@ export function ClassworkStudentPanel({ mode }: Props) {
                 ) : detail.mySubmission?.status === "SUBMITTED" ||
                   detail.mySubmission?.status === "LATE" ? (
                   <p className="cw-alert cw-alert--ok">
-                    You submitted
+                    {t("classworkUi.youSubmitted")}
                     {detail.mySubmission.submittedAt
-                      ? ` on ${formatDue(detail.mySubmission.submittedAt)}`
+                      ? t("classworkUi.submittedOnDate", {
+                          date: formatDue(detail.mySubmission.submittedAt) ?? "",
+                        })
                       : ""}
-                    . Your teacher will grade it soon.
+                    {t("classworkUi.teacherWillGrade")}
                   </p>
                 ) : (
 
@@ -524,7 +500,7 @@ export function ClassworkStudentPanel({ mode }: Props) {
 
                     <label className="cw-field">
 
-                      <span>Your note (optional)</span>
+                      <span>{t("classworkUi.yourNote")}</span>
 
                       <textarea
 
@@ -552,13 +528,10 @@ export function ClassworkStudentPanel({ mode }: Props) {
 
                         <span className="cw-file__text">
 
-                          <strong>{file ? file.name : "Choose a file"}</strong>
-
+                          <strong>{file ? file.name : t("classworkUi.chooseFile")}</strong>
                           {file
-
                             ? `${(file.size / 1024).toFixed(0)} KB`
-
-                            : "PDF, images, or documents"}
+                            : t("classworkUi.fileTypesHint")}
 
                         </span>
 
@@ -586,7 +559,7 @@ export function ClassworkStudentPanel({ mode }: Props) {
 
                     >
 
-                      {busy ? "Submitting…" : "Submit"}
+                      {busy ? t("classworkUi.submitting") : t("classworkUi.submit")}
 
                     </button>
 
@@ -602,13 +575,12 @@ export function ClassworkStudentPanel({ mode }: Props) {
 
                 <div className="cw-empty" style={{ padding: "2rem 1rem" }}>
 
-                  <p className="cw-empty__title">Select a {copy.plural.slice(0, -1)}</p>
-
-                  <p className="cw-empty__sub">
-
-                    Choose an item from the list to view instructions and submit.
-
+                  <p className="cw-empty__title">
+                    {t("classworkUi.selectItemTitle", {
+                      item: copy.plural.replace(/s$/, ""),
+                    })}
                   </p>
+                  <p className="cw-empty__sub">{t("classworkUi.selectItemSub")}</p>
 
                 </div>
 

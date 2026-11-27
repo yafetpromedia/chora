@@ -1,4 +1,4 @@
-import { apiFetch, apiPatch, apiPost, getApiBaseUrl } from "@/lib/api";
+import { apiFetch, apiPatch, apiPost, getUploadApiBaseUrl } from "@/lib/api";
 import { AUTH_TOKEN_KEY } from "@/lib/auth";
 
 export type ClassworkType = "WORKSHEET" | "ASSIGNMENT";
@@ -154,7 +154,7 @@ export async function uploadAssignmentFile(assignmentId: string, file: File) {
   const form = new FormData();
   form.append("file", file);
   const res = await fetch(
-    `${getApiBaseUrl()}/schools/classwork/assignments/${assignmentId}/attachment`,
+    `${getUploadApiBaseUrl()}/schools/classwork/assignments/${assignmentId}/attachment`,
     {
       method: "POST",
       headers: token ? { Authorization: `Bearer ${token}` } : {},
@@ -191,7 +191,7 @@ export async function submitStudentAssignment(
   if (note) form.append("note", note);
   if (file) form.append("file", file);
   const res = await fetch(
-    `${getApiBaseUrl()}/schools/classwork/student/${id}/submit`,
+    `${getUploadApiBaseUrl()}/schools/classwork/student/${id}/submit`,
     {
       method: "POST",
       headers: token ? { Authorization: `Bearer ${token}` } : {},

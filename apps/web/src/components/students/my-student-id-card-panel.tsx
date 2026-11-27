@@ -5,6 +5,7 @@ import { DashIcon } from "@/components/dashboard/dash-icons";
 import { StudentIdCardView } from "@/components/students/student-id-card";
 import { StudentIdCardModal } from "@/components/students/student-id-card-modal";
 import { getMyStudentIdCard, type StudentIdCard } from "@/lib/student-cards";
+import { useLocale } from "@/components/i18n/locale-provider";
 
 function IdCardIcon({ className }: { className?: string }) {
   return (
@@ -30,6 +31,7 @@ function classLabel(card: StudentIdCard) {
 }
 
 export function MyStudentIdCardPanel() {
+  const { t } = useLocale();
   const [card, setCard] = useState<StudentIdCard | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -39,7 +41,9 @@ export function MyStudentIdCardPanel() {
   useEffect(() => {
     void getMyStudentIdCard()
       .then(setCard)
-      .catch((err) => setError(err instanceof Error ? err.message : "Could not load your ID card"))
+      .catch((err) =>
+        setError(err instanceof Error ? err.message : t("idCardPortal.loadCampusFailed")),
+      )
       .finally(() => setLoading(false));
   }, []);
 
@@ -47,13 +51,17 @@ export function MyStudentIdCardPanel() {
     return (
       <div className="tid-loading">
         <div className="tid-loading__spinner" aria-hidden />
-        <p>Loading your campus ID…</p>
+        <p>{t("idCardPortal.loadingCampusId")}</p>
       </div>
     );
   }
 
   if (error) {
-    return <p className="tid-alert tid-alert--error">{error}. Contact your school office if this persists.</p>;
+    return (
+      <p className="tid-alert tid-alert--error">
+        {error}. {t("idCardPortal.errorPersist")}
+      </p>
+    );
   }
 
   if (!card) return null;
@@ -65,28 +73,31 @@ export function MyStudentIdCardPanel() {
       <header className="tid-hero">
         <div className="tid-hero__main">
           <div className="tid-hero__brand">
-            <span className="tid-hero__chip">Student ID</span>
+            <span className="tid-hero__chip">{t("idCardPortal.studentIdChip")}</span>
             <span className="tid-hero__icon" aria-hidden>
               <IdCardIcon />
             </span>
           </div>
           <h2 className="tid-hero__title">{card.name}</h2>
           <p className="tid-hero__sub">
-            {classLabel(card)} · Valid through {card.validThrough}
+            {t("idCardPortal.classAndValid", {
+              classLabel: classLabel(card),
+              date: card.validThrough,
+            })}
           </p>
         </div>
         <div className="tid-hero__stats">
           <div className="tid-stat">
             <span className="tid-stat__value">{displayId}</span>
-            <span className="tid-stat__label">Student ID</span>
+            <span className="tid-stat__label">{t("idCardPortal.studentIdLabel")}</span>
           </div>
           <div className="tid-stat">
             <span className="tid-stat__value">{card.cardCode}</span>
-            <span className="tid-stat__label">Card code</span>
+            <span className="tid-stat__label">{t("idCardPortal.cardCode")}</span>
           </div>
           <div className="tid-stat">
             <span className="tid-stat__value">{card.academicYear}</span>
-            <span className="tid-stat__label">Academic year</span>
+            <span className="tid-stat__label">{t("idCardPortal.academicYear")}</span>
           </div>
         </div>
       </header>
@@ -97,8 +108,8 @@ export function MyStudentIdCardPanel() {
             <DashIcon name="attendance" className="dash-icon--sm" />
           </span>
           <div>
-            <strong>Gate &amp; class</strong>
-            <p>Show this card at the school gate or when asked in class.</p>
+            <strong>{t("idCardPortal.tipGateClassTitle")}</strong>
+            <p>{t("idCardPortal.tipGateClassStudent")}</p>
           </div>
         </article>
         <article className="sid-portal__tip">
@@ -111,8 +122,8 @@ export function MyStudentIdCardPanel() {
             </svg>
           </span>
           <div>
-            <strong>Attendance scan</strong>
-            <p>Teachers scan the QR on the back of your card for roll call.</p>
+            <strong>{t("idCardPortal.tipAttendanceScanTitle")}</strong>
+            <p>{t("idCardPortal.tipAttendanceScanStudent")}</p>
           </div>
         </article>
         <article className="sid-portal__tip">
@@ -124,8 +135,8 @@ export function MyStudentIdCardPanel() {
             </svg>
           </span>
           <div>
-            <strong>Print or save</strong>
-            <p>Open full view to print both sides or save as PDF.</p>
+            <strong>{t("idCardPortal.tipPrintTitle")}</strong>
+            <p>{t("idCardPortal.tipPrintBody")}</p>
           </div>
         </article>
       </div>
@@ -133,8 +144,8 @@ export function MyStudentIdCardPanel() {
       <section className="tid-card tid-card--actions no-print">
         <div className="tid-card__head">
           <div>
-            <h3 className="tid-card__title">Card options</h3>
-            <p className="tid-card__sub">Preview the back side or open the print layout</p>
+            <h3 className="tid-card__title">{t("idCardPortal.cardOptions")}</h3>
+            <p className="tid-card__sub">{t("idCardPortal.cardOptionsSub")}</p>
           </div>
         </div>
         <div className="tid-actions">
@@ -145,7 +156,7 @@ export function MyStudentIdCardPanel() {
               onChange={(e) => setPreviewBack(e.target.checked)}
             />
             <span className="tid-toggle__track" aria-hidden />
-            <span className="tid-toggle__label">Show back of card</span>
+            <span className="tid-toggle__label">{t("idCardPortal.showBack")}</span>
           </label>
           <div className="sid-portal__action-btns">
             <button
@@ -153,7 +164,7 @@ export function MyStudentIdCardPanel() {
               className="tid-btn tid-btn--ghost"
               onClick={() => setModalOpen(true)}
             >
-              Full view
+              {t("idCardPortal.fullView")}
             </button>
             <button
               type="button"
@@ -165,7 +176,7 @@ export function MyStudentIdCardPanel() {
                 )
               }
             >
-              Open print view
+              {t("idCardPortal.openPrintView")}
             </button>
           </div>
         </div>
@@ -174,13 +185,11 @@ export function MyStudentIdCardPanel() {
       <section className="tid-card tid-card--preview">
         <div className="tid-card__head">
           <div>
-            <h3 className="tid-card__title">Your campus ID</h3>
-            <p className="tid-card__sub">
-              ISO CR80 — barcode on front, QR on back for attendance scanning.
-            </p>
+            <h3 className="tid-card__title">{t("idCardPortal.yourCampusId")}</h3>
+            <p className="tid-card__sub">{t("idCardPortal.campusIdSub")}</p>
           </div>
           <span className="tid-card__badge">
-            {previewBack ? "Front + back" : "Front"}
+            {previewBack ? t("idCardPortal.frontBack") : t("idCardPortal.frontOnly")}
           </span>
         </div>
         <div className="tid-preview-stage sid-portal__stage">
@@ -192,10 +201,7 @@ export function MyStudentIdCardPanel() {
         </div>
       </section>
 
-      <p className="tid-footnote no-print">
-        Lost your card? Ask the school office for a replacement. Do not share photos of your ID
-        publicly — it contains personal details.
-      </p>
+      <p className="tid-footnote no-print">{t("idCardPortal.footnote")}</p>
 
       {modalOpen ? (
         <StudentIdCardModal

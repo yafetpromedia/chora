@@ -144,11 +144,24 @@ export class SchoolProvisioningService {
       if (gradeCount === 0) {
         await this.gradesService.setupGrades(schoolId, gradePreset);
         gradesCreated = true;
-        await this.logStep(schoolId, packageKey, 'grades', ProvisioningStepStatus.SUCCESS, undefined, {
-          gradePreset,
-        });
+        await this.logStep(
+          schoolId,
+          packageKey,
+          'grades',
+          ProvisioningStepStatus.SUCCESS,
+          undefined,
+          {
+            gradePreset,
+          },
+        );
       } else {
-        await this.logStep(schoolId, packageKey, 'grades', ProvisioningStepStatus.SKIPPED, 'Grades already exist');
+        await this.logStep(
+          schoolId,
+          packageKey,
+          'grades',
+          ProvisioningStepStatus.SKIPPED,
+          'Grades already exist',
+        );
       }
     }
 
@@ -181,11 +194,21 @@ export class SchoolProvisioningService {
           },
         });
       }
-      await this.logStep(schoolId, packageKey, 'academic_terms', ProvisioningStepStatus.SUCCESS);
+      await this.logStep(
+        schoolId,
+        packageKey,
+        'academic_terms',
+        ProvisioningStepStatus.SUCCESS,
+      );
     }
 
     await this.academicsService.ensureGradingScale(schoolId);
-    await this.logStep(schoolId, packageKey, 'grading_scale', ProvisioningStepStatus.SUCCESS);
+    await this.logStep(
+      schoolId,
+      packageKey,
+      'grading_scale',
+      ProvisioningStepStatus.SUCCESS,
+    );
 
     const school = await this.prisma.school.findUnique({
       where: { id: schoolId },
@@ -201,10 +224,7 @@ export class SchoolProvisioningService {
     let subjectCount = 0;
     let subjectSkipped = 0;
     for (const s of pkg.subjects) {
-      if (
-        s.level === 'PRIMARY' &&
-        effectiveType === SchoolType.SECONDARY
-      ) {
+      if (s.level === 'PRIMARY' && effectiveType === SchoolType.SECONDARY) {
         continue;
       }
       if (
@@ -253,9 +273,16 @@ export class SchoolProvisioningService {
       });
       departmentCount += 1;
     }
-    await this.logStep(schoolId, packageKey, 'departments', ProvisioningStepStatus.SUCCESS, undefined, {
-      count: departmentCount,
-    });
+    await this.logStep(
+      schoolId,
+      packageKey,
+      'departments',
+      ProvisioningStepStatus.SUCCESS,
+      undefined,
+      {
+        count: departmentCount,
+      },
+    );
 
     let templateCount = 0;
     let templateSkipped = 0;
@@ -291,10 +318,17 @@ export class SchoolProvisioningService {
       });
       templateCount += 1;
     }
-    await this.logStep(schoolId, packageKey, 'message_templates', ProvisioningStepStatus.SUCCESS, undefined, {
-      count: templateCount,
-      skippedCustomized: templateSkipped,
-    });
+    await this.logStep(
+      schoolId,
+      packageKey,
+      'message_templates',
+      ProvisioningStepStatus.SUCCESS,
+      undefined,
+      {
+        count: templateCount,
+        skippedCustomized: templateSkipped,
+      },
+    );
 
     await this.libraryService.ensureCategories(schoolId);
     const categories = await this.prisma.libraryCategory.findMany({
@@ -329,10 +363,12 @@ export class SchoolProvisioningService {
       }
       if (existing) continue;
 
-      const gradeId = (platformRes?.gradeLabel ?? item.gradeLabel)
-        ? gradeByName.get(platformRes?.gradeLabel ?? item.gradeLabel ?? '') ??
-          null
-        : null;
+      const gradeId =
+        (platformRes?.gradeLabel ?? item.gradeLabel)
+          ? (gradeByName.get(
+              platformRes?.gradeLabel ?? item.gradeLabel ?? '',
+            ) ?? null)
+          : null;
 
       let fileUrl = platformRes?.fileUrl ?? null;
       if (fileUrl?.startsWith('/platform/library/files/')) {
@@ -364,10 +400,17 @@ export class SchoolProvisioningService {
       });
       libraryCount += 1;
     }
-    await this.logStep(schoolId, packageKey, 'library', ProvisioningStepStatus.SUCCESS, undefined, {
-      count: libraryCount,
-      skippedCustomized: librarySkipped,
-    });
+    await this.logStep(
+      schoolId,
+      packageKey,
+      'library',
+      ProvisioningStepStatus.SUCCESS,
+      undefined,
+      {
+        count: libraryCount,
+        skippedCustomized: librarySkipped,
+      },
+    );
 
     let assessmentTemplateCount = 0;
     for (const link of pkg.assessmentTemplates) {
@@ -398,7 +441,12 @@ export class SchoolProvisioningService {
       },
     });
 
-    await this.logStep(schoolId, packageKey, 'complete', ProvisioningStepStatus.SUCCESS);
+    await this.logStep(
+      schoolId,
+      packageKey,
+      'complete',
+      ProvisioningStepStatus.SUCCESS,
+    );
 
     return {
       packageKey,

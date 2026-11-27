@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { useLocale } from "@/components/i18n/locale-provider";
 import { apiFetch, type SchoolInfo } from "@/lib/api";
 import {
   listAdmissionApplications,
@@ -19,6 +20,7 @@ import { readSchoolBrand } from "@/lib/school-brand";
 import { getStaffWorkspaceSubtitle } from "@/lib/staff-workspace";
 import { hasPermission, Permission } from "@/lib/permissions";
 import { BRAND_NAME } from "@/lib/brand";
+import type { AppLocale } from "@/lib/i18n";
 
 type Props = {
   error: string;
@@ -26,8 +28,12 @@ type Props = {
 
 const PIPELINE_STATUSES = new Set(["APPLIED", "SCORED", "PLACED", "ACCEPTED"]);
 
-function todayLabel() {
-  return new Date().toLocaleDateString(undefined, {
+function localeTag(locale: AppLocale) {
+  return locale === "am" ? "am-ET" : undefined;
+}
+
+function todayLabel(locale: AppLocale) {
+  return new Date().toLocaleDateString(localeTag(locale), {
     weekday: "long",
     month: "long",
     day: "numeric",
@@ -35,6 +41,7 @@ function todayLabel() {
 }
 
 export function RegistrarDashboard({ error }: Props) {
+  const { t, locale } = useLocale();
   const [loading, setLoading] = useState(true);
   const [schoolName, setSchoolName] = useState(readSchoolBrand().name ?? BRAND_NAME);
   const [adminDay, setAdminDay] = useState<AdminDayOverview | null>(null);
@@ -107,7 +114,9 @@ export function RegistrarDashboard({ error }: Props) {
     <div className="dash-admin dash-admin--modern">
       <header className="dash-admin-hero dash-admin-hero--modern">
         <div className="dash-admin-hero__text">
-          <p className="dash-admin-hero__eyebrow">Registrar · {todayLabel()}</p>
+          <p className="dash-admin-hero__eyebrow">
+            {t("staffDash.registrarEyebrow")} · {todayLabel(locale)}
+          </p>
           <h1 className="dash-admin-hero__title">{schoolName}</h1>
           <p className="dash-admin-hero__sub">{getStaffWorkspaceSubtitle()}</p>
         </div>
@@ -126,7 +135,7 @@ export function RegistrarDashboard({ error }: Props) {
               <DashIcon name="students" className="dash-icon--sm" />
               <span>
                 {metrics.openCycle.name}
-                {metrics.openCycle.isOpen ? " · open" : " · closed"}
+                {metrics.openCycle.isOpen ? t("staffDash.cycleOpen") : t("staffDash.cycleClosed")}
               </span>
             </div>
           ) : null}
@@ -142,11 +151,11 @@ export function RegistrarDashboard({ error }: Props) {
       {loading ? (
         <div className="dash-loading dash-loading--pro">
           <span className="dash-loading-spinner" aria-hidden />
-          <p>Loading registrar analytics…</p>
+          <p>{t("staffDash.loadingRegistrar")}</p>
         </div>
       ) : (
         <>
-          <section className="dash-admin-kpis dash-admin-kpis--modern" aria-label="Registrar metrics">
+          <section className="dash-admin-kpis dash-admin-kpis--modern" aria-label={t("staffDash.registrarMetrics")}>
             {canStudents ? (
               <Link
                 href="/admin/students"
@@ -156,9 +165,9 @@ export function RegistrarDashboard({ error }: Props) {
                   <DashIcon name="students" />
                 </span>
                 <div>
-                  <p className="dash-admin-kpi__label">Students enrolled</p>
+                  <p className="dash-admin-kpi__label">{t("staffDash.studentsEnrolled")}</p>
                   <p className="dash-admin-kpi__value">{students.length}</p>
-                  <p className="dash-admin-kpi__hint">Active on roll</p>
+                  <p className="dash-admin-kpi__hint">{t("staffDash.activeOnRoll")}</p>
                 </div>
               </Link>
             ) : null}
@@ -172,12 +181,12 @@ export function RegistrarDashboard({ error }: Props) {
                   <DashIcon name="students" />
                 </span>
                 <div>
-                  <p className="dash-admin-kpi__label">In pipeline</p>
+                  <p className="dash-admin-kpi__label">{t("staffDash.inPipeline")}</p>
                   <p className="dash-admin-kpi__value">{metrics.pipeline}</p>
                   <p className="dash-admin-kpi__hint">
                     {metrics.readyToEnroll > 0
-                      ? `${metrics.readyToEnroll} ready to enroll`
-                      : "Applications in progress"}
+                      ? t("staffDash.readyToEnroll", { count: metrics.readyToEnroll })
+                      : t("staffDash.applicationsInProgress")}
                   </p>
                 </div>
               </Link>
@@ -192,9 +201,9 @@ export function RegistrarDashboard({ error }: Props) {
                   <DashIcon name="users" />
                 </span>
                 <div>
-                  <p className="dash-admin-kpi__label">Family accounts</p>
+                  <p className="dash-admin-kpi__label">{t("staffDash.familyAccounts")}</p>
                   <p className="dash-admin-kpi__value">{parents.length}</p>
-                  <p className="dash-admin-kpi__hint">Parent portal logins</p>
+                  <p className="dash-admin-kpi__hint">{t("staffDash.parentPortalLogins")}</p>
                 </div>
               </Link>
             ) : null}
@@ -208,10 +217,13 @@ export function RegistrarDashboard({ error }: Props) {
                   <DashIcon name="profile" />
                 </span>
                 <div>
-                  <p className="dash-admin-kpi__label">Parent linkage</p>
+                  <p className="dash-admin-kpi__label">{t("staffDash.parentLinkage")}</p>
                   <p className="dash-admin-kpi__value">{metrics.linkagePct}%</p>
                   <p className="dash-admin-kpi__hint">
-                    {metrics.linkedStudents} of {students.length} students linked
+                    {t("staffDash.studentsLinked", {
+                      linked: metrics.linkedStudents,
+                      total: students.length,
+                    })}
                   </p>
                 </div>
               </Link>

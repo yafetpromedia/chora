@@ -15,7 +15,8 @@ export class MailService {
   private transporter: Transporter | null = null;
 
   constructor(private readonly config: ConfigService) {
-    const enabled = this.config.get<string>('EMAIL_ENABLED', 'false') === 'true';
+    const enabled =
+      this.config.get<string>('EMAIL_ENABLED', 'false') === 'true';
     const host = this.config.get<string>('SMTP_HOST')?.trim();
     if (!enabled || !host) {
       return;
@@ -36,7 +37,9 @@ export class MailService {
     return Boolean(this.transporter);
   }
 
-  async send(input: SendMailInput): Promise<{ sent: boolean; reason?: string }> {
+  async send(
+    input: SendMailInput,
+  ): Promise<{ sent: boolean; reason?: string }> {
     if (!this.transporter) {
       return { sent: false, reason: 'Email is not configured' };
     }
@@ -44,7 +47,13 @@ export class MailService {
     const from =
       this.config.get<string>('EMAIL_FROM')?.trim() ||
       this.config.get<string>('SMTP_USER')?.trim() ||
-      'noreply@localhost';
+      '';
+    if (!from || /noreply@/i.test(from)) {
+      return {
+        sent: false,
+        reason: 'Set a real Awud Digitals mailbox as the From address',
+      };
+    }
 
     try {
       await this.transporter.sendMail({
@@ -57,8 +66,24 @@ export class MailService {
       return { sent: true };
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Send failed';
-      this.logger.warn(`Failed to send email to ${input.to}: ${message}`);
+      const detail = redactMailLog(
+        message,
+        this.config.get<string>('SMTP_PASS'),
+      );
+      this.logger.warn(`Failed to send email to [redacted-email]: ${detail}`);
       return { sent: false, reason: message };
     }
   }
+}
+
+function redactMailLog(message: string, password?: string): string {
+  let text = message.replace(
+    /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi,
+    '[redacted-email]',
+  );
+  const secret = password?.trim();
+  if (secret && secret.length >= 4) {
+    text = text.split(secret).join('[redacted]');
+  }
+  return text.slice(0, 300);
 }

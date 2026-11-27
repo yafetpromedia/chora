@@ -7,13 +7,19 @@ import { AcademicsService } from './academics.service';
 import { AssessmentTemplatesService } from './assessment-templates.service';
 import { ResultWorkflowService } from './result-workflow.service';
 import { ReportCardPublicController } from './report-card-public.controller';
+import { PublicStudentResultsController } from './public-student-results.controller';
+import { PublicStudentResultsService } from './public-student-results.service';
 import { ResultsController } from './results.controller';
 import { ResultsService } from './results.service';
 import { ScoreCorrectionsService } from './score-corrections.service';
 
 @Module({
   imports: [TeachersModule],
-  controllers: [ResultsController, ReportCardPublicController],
+  controllers: [
+    ResultsController,
+    ReportCardPublicController,
+    PublicStudentResultsController,
+  ],
   providers: [
     ResultsService,
     AcademicsService,
@@ -23,6 +29,7 @@ import { ScoreCorrectionsService } from './score-corrections.service';
     AcademicEnrollmentService,
     AcademicPromotionService,
     ScoreCorrectionsService,
+    PublicStudentResultsService,
   ],
   exports: [
     AcademicsService,

@@ -6,6 +6,8 @@ import { useId } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { LoginVisualPanel } from "@/components/auth/login-visual-panel";
 import { BrandMark } from "@/components/brand-mark";
+import { LanguageSwitcher } from "@/components/i18n/language-switcher";
+import { useLocale } from "@/components/i18n/locale-provider";
 import { BRAND_NAME } from "@/lib/brand";
 
 /** Shared seam curve (objectBoundingBox). Soft 3-wave graph down the middle. */
@@ -18,6 +20,7 @@ type LoginShellProps = {
 };
 
 export function LoginShell({ children, error }: LoginShellProps) {
+  const { t } = useLocale();
   const reduce = useReducedMotion();
   const uid = useId().replace(/:/g, "");
   const leftClipId = `login-split-left-${uid}`;
@@ -53,9 +56,12 @@ export function LoginShell({ children, error }: LoginShellProps) {
               <BrandMark className="logo-mark reg-top__logo" />
               <span>{BRAND_NAME}</span>
             </Link>
-            <Link href="/" className="reg-top__link">
-              Home
-            </Link>
+            <div className="reg-top__actions">
+              <LanguageSwitcher compact />
+              <Link href="/" className="reg-top__link">
+                {t("auth.home")}
+              </Link>
+            </div>
           </header>
 
           <motion.main
@@ -67,15 +73,10 @@ export function LoginShell({ children, error }: LoginShellProps) {
             <div className="reg-hero">
               <p className="reg-hero__eyebrow">
                 <span className="reg-hero__pulse" aria-hidden />
-                Welcome back
+                {t("auth.welcomeBack")}
               </p>
-              <h1 className="reg-hero__title">
-                Sign in to your <span>school portal</span>
-              </h1>
-              <p className="reg-hero__sub">
-                First verify your school code, then sign in with username and
-                password.
-              </p>
+              <h1 className="reg-hero__title">{t("auth.heroTitle")}</h1>
+              <p className="reg-hero__sub">{t("auth.heroSub")}</p>
             </div>
 
             {error ? (
@@ -114,9 +115,10 @@ export function LoginShell({ children, error }: LoginShellProps) {
 }
 
 export function LoginFooterLinks() {
+  const { t } = useLocale();
   return (
     <p className="reg-footer__line">
-      New school? <Link href="/register">Register</Link>
+      {t("auth.newSchool")} <Link href="/register">{t("auth.register")}</Link>
     </p>
   );
 }

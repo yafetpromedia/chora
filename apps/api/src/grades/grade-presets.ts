@@ -46,7 +46,10 @@ export function gradeNamesForRange(
 ): string[] {
   const from = Math.trunc(fromGrade);
   const to = Math.trunc(toGrade);
-  const numbered = Array.from({ length: to - from + 1 }, (_, i) => `Grade ${from + i}`);
+  const numbered = Array.from(
+    { length: to - from + 1 },
+    (_, i) => `Grade ${from + i}`,
+  );
   const extras = extraNames.map((n) => n.trim()).filter(Boolean);
   return [
     ...(includeEarlyChildhood ? [...EARLY_CHILDHOOD_GRADES] : []),

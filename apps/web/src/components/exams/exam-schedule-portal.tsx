@@ -8,12 +8,15 @@ import {
 import { ParentChildBar } from "@/components/parent/parent-child-bar";
 import { useParentChild } from "@/hooks/use-parent-child";
 import { AUTH_SCHOOL_NAME_KEY } from "@/lib/auth";
+import { useClientSnapshot } from "@/lib/use-client-snapshot";
 import {
   getPublishedExamSchedule,
   listPublishedExamSchedules,
   type ExamScheduleListItem,
   type PublishedExamSchedule,
 } from "@/lib/exam-schedule";
+import { DashIcon } from "@/components/dashboard/dash-icons";
+import { useLocale } from "@/components/i18n/locale-provider";
 
 type Role = "student" | "parent" | "teacher";
 
@@ -22,27 +25,26 @@ type Props = {
 };
 
 export function ExamSchedulePortal({ role }: Props) {
+  const { t } = useLocale();
   const parentChild = useParentChild();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [list, setList] = useState<ExamScheduleListItem[]>([]);
   const [selectedId, setSelectedId] = useState("");
-  const [schedule, setSchedule] = useState<PublishedExamSchedule | null>(null);
+  const [loadedSchedule, setSchedule] = useState<PublishedExamSchedule | null>(null);
   const [myGradeOnly, setMyGradeOnly] = useState(role !== "teacher");
-  const [schoolName, setSchoolName] = useState("");
+  const schoolName = useClientSnapshot(
+    () => localStorage.getItem(AUTH_SCHOOL_NAME_KEY)?.trim() ?? "",
+    "",
+  );
 
   const childId = role === "parent" ? parentChild.selectedId : undefined;
   const childrenReady =
     role !== "parent" || (!parentChild.loading && !parentChild.error);
-
-  useEffect(() => {
-    setSchoolName(localStorage.getItem(AUTH_SCHOOL_NAME_KEY)?.trim() ?? "");
-  }, []);
+  const schedule = selectedId && childrenReady ? loadedSchedule : null;
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setError("");
     void listPublishedExamSchedules()
       .then((rows) => {
         if (cancelled) return;
@@ -54,7 +56,9 @@ export function ExamSchedulePortal({ role }: Props) {
       })
       .catch((err) => {
         if (cancelled) return;
-        setError(err instanceof Error ? err.message : "Could not load schedules");
+        setError(
+          err instanceof Error ? err.message : t("examPortalUi.errLoadSchedules"),
+        );
         setList([]);
         setSelectedId("");
       })
@@ -67,16 +71,15 @@ export function ExamSchedulePortal({ role }: Props) {
   }, []);
 
   useEffect(() => {
-    if (!selectedId || !childrenReady) {
-      setSchedule(null);
-      return;
-    }
+    if (!selectedId || !childrenReady) return;
     if (role === "parent" && !childId && parentChild.children.length > 0) {
       return;
     }
 
     let cancelled = false;
-    setError("");
+    queueMicrotask(() => {
+      if (!cancelled) setError("");
+    });
     void getPublishedExamSchedule(
       selectedId,
       role === "parent" ? childId || undefined : undefined,
@@ -87,7 +90,9 @@ export function ExamSchedulePortal({ role }: Props) {
       .catch((err) => {
         if (cancelled) return;
         setSchedule(null);
-        setError(err instanceof Error ? err.message : "Could not load schedule");
+        setError(
+          err instanceof Error ? err.message : t("examPortalUi.errLoadSchedule"),
+        );
       });
     return () => {
       cancelled = true;
@@ -135,98 +140,187 @@ export function ExamSchedulePortal({ role }: Props) {
 
   const focusGradeName = grades.find((g) => g.id === focusGradeId)?.name;
 
+  const selectedSummary = list.find((row) => row.id === selectedId);
+
+  const slotCount = useMemo(() => {
+    if (!schedule) return 0;
+    return schedule.days.reduce((sum, day) => sum + day.slots.length, 0);
+  }, [schedule]);
+
+  const isTeacher = role === "teacher";
+
   function printBoard() {
     window.print();
   }
 
   if (loading || (role === "parent" && parentChild.loading)) {
-    return <p className="muted">Loading exam schedules…</p>;
+    return isTeacher ? (
+      <div className="tch-day tch-exam">
+        <p className="tch-day__loading">{t("examPortalUi.loading")}</p>
+      </div>
+    ) : (
+      <p className="muted">{t("examPortalUi.loading")}</p>
+    );
   }
 
   if (role === "parent" && parentChild.error) {
     return <p className="error">{parentChild.error}</p>;
   }
 
+  const toolbar = (
+    <div className="ex-portal__toolbar no-print">
+      <label className="ex-portal__pick">
+        <span>{t("examPortalUi.labelSchedule")}</span>
+        <select
+          value={selectedId}
+          onChange={(e) => setSelectedId(e.target.value)}
+        >
+          {list.map((row) => (
+            <option key={row.id} value={row.id}>
+              {row.title}
+              {row.shiftLabel ? ` · ${row.shiftLabel}` : ""}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      {canFilterGrade ? (
+        <label className="ex-portal__toggle">
+          <input
+            type="checkbox"
+            checked={myGradeOnly}
+            onChange={(e) => setMyGradeOnly(e.target.checked)}
+          />
+          <span>
+            {focusGradeName
+              ? t("examPortalUi.showGradeOnly", { grade: focusGradeName })
+              : t("examPortalUi.myGradeOnly")}
+          </span>
+        </label>
+      ) : null}
+
+      <button
+        type="button"
+        className="ex-btn ex-btn--ghost"
+        onClick={printBoard}
+        disabled={!schedule}
+      >
+        {t("examPortalUi.print")}
+      </button>
+    </div>
+  );
+
+  const boardBlock = schedule ? (
+    <ExamScheduleBoard
+      title={schedule.title}
+      shiftLabel={schedule.shiftLabel}
+      schoolName={schoolName || undefined}
+      yearName={
+        [schedule.academicYear.name, schedule.academicTerm?.name]
+          .filter(Boolean)
+          .join(" · ") || undefined
+      }
+      days={boardDays}
+      grades={boardGrades}
+    />
+  ) : (
+    <p className={isTeacher ? "tch-exam__hint muted" : "muted"}>
+      {t("examPortalUi.selectSchedule")}
+    </p>
+  );
+
   return (
-    <div className="ex-page ex-portal">
+    <div
+      className={
+        isTeacher ? "tch-day tch-exam ex-portal ex-portal--teacher" : "ex-page ex-portal"
+      }
+    >
+      {isTeacher ? (
+        <header className="tch-day__hero tch-exam__hero no-print">
+          <div className="tch-day__hero-main">
+            <div className="tch-day__brand">
+              <span className="tch-day__chip">{t("examPortalUi.chipExams")}</span>
+              <span className="tch-day__icon" aria-hidden>
+                <DashIcon name="calendar" className="dash-icon--sm" />
+              </span>
+            </div>
+            <h2 className="tch-day__title">
+              {selectedSummary?.title ?? t("examPortalUi.fallbackTitle")}
+            </h2>
+            <p className="tch-day__sub">
+              {selectedSummary?.shiftLabel
+                ? `${selectedSummary.shiftLabel} · `
+                : ""}
+              {t("examPortalUi.subtitlePublished")}
+              {schoolName ? ` · ${schoolName}` : ""}
+            </p>
+          </div>
+          <div className="tch-day__stats" aria-label={t("examPortalUi.ariaSummary")}>
+            <div className="tch-day__stat">
+              <strong>{list.length}</strong>
+              <span>{t("examPortalUi.statPublished")}</span>
+            </div>
+            <div className="tch-day__stat">
+              <strong>{schedule?.days.length ?? "—"}</strong>
+              <span>{t("examPortalUi.statDays")}</span>
+            </div>
+            <div className="tch-day__stat">
+              <strong>{grades.length || "—"}</strong>
+              <span>{t("examPortalUi.statGrades")}</span>
+            </div>
+            <div className="tch-day__stat">
+              <strong>{slotCount || "—"}</strong>
+              <span>{t("examPortalUi.statSessions")}</span>
+            </div>
+          </div>
+        </header>
+      ) : null}
+
       {role === "parent" ? (
         <div className="no-print">
           <ParentChildBar
-            children={parentChild.children}
+            options={parentChild.children}
             selectedId={parentChild.selectedId}
             onChange={parentChild.selectChild}
           />
         </div>
       ) : null}
 
-      {error ? <p className="error">{error}</p> : null}
+      {error ? (
+        <p className={isTeacher ? "tch-day__error" : "error"}>{error}</p>
+      ) : null}
 
       {list.length === 0 ? (
-        <div className="ex-portal__empty">
-          No published exam schedules yet. Check back after your school publishes one.
-        </div>
+        isTeacher ? (
+          <div className="tch-day__empty">
+            <div className="tch-day__empty-icon" aria-hidden>
+              <DashIcon name="calendar" />
+            </div>
+            <h2>{t("examPortalUi.emptyTitle")}</h2>
+            <p>{t("examPortalUi.emptyBodyTeacher")}</p>
+          </div>
+        ) : (
+          <div className="ex-portal__empty">
+            {t("examPortalUi.emptyBodyPortal")}
+          </div>
+        )
       ) : (
         <>
-          <div className="ex-portal__toolbar no-print">
-            <label className="ex-portal__pick">
-              <span>Schedule</span>
-              <select
-                value={selectedId}
-                onChange={(e) => setSelectedId(e.target.value)}
-              >
-                {list.map((row) => (
-                  <option key={row.id} value={row.id}>
-                    {row.title}
-                    {row.shiftLabel ? ` · ${row.shiftLabel}` : ""}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            {canFilterGrade ? (
-              <label className="ex-portal__toggle">
-                <input
-                  type="checkbox"
-                  checked={myGradeOnly}
-                  onChange={(e) => setMyGradeOnly(e.target.checked)}
-                />
-                <span>
-                  {focusGradeName
-                    ? `Show ${focusGradeName} only`
-                    : "My grade only"}
-                </span>
-              </label>
-            ) : null}
-
-            <button
-              type="button"
-              className="ex-btn ex-btn--ghost"
-              onClick={printBoard}
-              disabled={!schedule}
-            >
-              Print
-            </button>
-          </div>
-
-          {schedule ? (
-            <ExamScheduleBoard
-              title={schedule.title}
-              shiftLabel={schedule.shiftLabel}
-              schoolName={schoolName || undefined}
-              yearName={
-                [
-                  schedule.academicYear.name,
-                  schedule.academicTerm?.name,
-                ]
-                  .filter(Boolean)
-                  .join(" · ") || undefined
-              }
-              days={boardDays}
-              grades={boardGrades}
-            />
+          {isTeacher ? (
+            <section className="tch-day__board ex-portal__controls no-print">
+              <div className="tch-day__board-head">
+                <div>
+                  <h2>{t("examPortalUi.boardHeadTitle")}</h2>
+                  <p>{t("examPortalUi.boardHeadSub")}</p>
+                </div>
+              </div>
+              {toolbar}
+            </section>
           ) : (
-            <p className="muted">Select a schedule to view.</p>
+            toolbar
           )}
+
+          {boardBlock}
 
           {schedule?.notes ? (
             <p className="ex-portal__notes">{schedule.notes}</p>

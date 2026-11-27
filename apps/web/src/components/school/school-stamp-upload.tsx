@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { useLocale } from "@/components/i18n/locale-provider";
 import { fileToStampDataUrl } from "@/lib/student-photo";
 import { AppToast } from "@/components/ui/app-toast";
 
@@ -10,6 +11,7 @@ type Props = {
 };
 
 export function SchoolStampUpload({ value, onChange }: Props) {
+  const { t } = useLocale();
   const inputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState("");
 
@@ -20,7 +22,7 @@ export function SchoolStampUpload({ value, onChange }: Props) {
       const dataUrl = await fileToStampDataUrl(file);
       onChange(dataUrl);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Invalid image");
+      setError(err instanceof Error ? err.message : t("schoolBrandUploadUi.invalidImage"));
     }
   }
 
@@ -28,11 +30,9 @@ export function SchoolStampUpload({ value, onChange }: Props) {
 
   return (
     <div className="cfg-logo-upload cfg-stamp-upload">
-      <p className="cfg-logo-upload__label">School stamp</p>
+      <p className="cfg-logo-upload__label">{t("schoolBrandUploadUi.stampLabel")}</p>
       <p className="cfg-section__lead" style={{ marginTop: 0 }}>
-        Official seal for yearly report cards. You can optionally enable it on
-        student ID cards in the checkbox below. Prefer a clear PNG with a
-        transparent background.
+        {t("schoolBrandUploadUi.stampLead")}
       </p>
 
       <div className="cfg-logo-upload__row">
@@ -41,7 +41,7 @@ export function SchoolStampUpload({ value, onChange }: Props) {
             // eslint-disable-next-line @next/next/no-img-element
             <img src={preview} alt="" />
           ) : (
-            <span className="cfg-logo-upload__placeholder">No stamp</span>
+            <span className="cfg-logo-upload__placeholder">{t("schoolBrandUploadUi.noStamp")}</span>
           )}
         </div>
         <div className="cfg-logo-upload__actions">
@@ -50,11 +50,11 @@ export function SchoolStampUpload({ value, onChange }: Props) {
             className="cfg-btn cfg-btn--ghost"
             onClick={() => inputRef.current?.click()}
           >
-            {preview ? "Upload new" : "Upload PNG"}
+            {preview ? t("schoolBrandUploadUi.uploadNew") : t("schoolBrandUploadUi.uploadPng")}
           </button>
           {preview ? (
             <button type="button" className="cfg-btn cfg-btn--ghost" onClick={() => onChange("")}>
-              Remove
+              {t("common.remove")}
             </button>
           ) : null}
           <input
@@ -68,11 +68,11 @@ export function SchoolStampUpload({ value, onChange }: Props) {
       </div>
 
       <label className="cfg-field" style={{ marginTop: "1rem" }}>
-        <span>Or paste image URL</span>
+        <span>{t("schoolBrandUploadUi.pasteUrl")}</span>
         <input
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          placeholder="https://yourschool.edu/stamp.png"
+          placeholder={t("schoolBrandUploadUi.stampUrlPh")}
         />
       </label>
 

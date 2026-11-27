@@ -120,3 +120,25 @@ export function IconHr() {
     </svg>
   );
 }
+
+export function IconLanguage() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" {...stroke}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M3 12h18" />
+      <path d="M12 3a14 14 0 0 1 0 18" />
+      <path d="M12 3a14 14 0 0 0 0 18" />
+    </svg>
+  );
+}
+
+export function IconIdCard() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" {...stroke}>
+      <rect x="2" y="5" width="20" height="14" rx="2" />
+      <circle cx="8" cy="12" r="2.25" />
+      <path d="M13 10h6" />
+      <path d="M13 14h4" />
+    </svg>
+  );
+}

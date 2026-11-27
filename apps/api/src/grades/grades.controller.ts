@@ -1,4 +1,12 @@
-import { Body, Controller, Delete, Get, Param, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
 import type { AuthUser } from '../common/auth.types';
@@ -54,7 +62,11 @@ export class GradesController {
   @Post('grades')
   @Roles('admin')
   addGrade(@CurrentUser() user: AuthUser, @Body() dto: CreateGradeDto) {
-    return this.gradesService.addGrade(user.schoolId, dto.name, dto.sections ?? []);
+    return this.gradesService.addGrade(
+      user.schoolId,
+      dto.name,
+      dto.sections ?? [],
+    );
   }
 
   @Post('grades/:gradeId/sections')

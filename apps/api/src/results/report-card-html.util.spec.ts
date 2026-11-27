@@ -56,7 +56,7 @@ function basePayload(termCount: number): ReportCardPrintPayload {
       photoUrl: null,
     },
     terms,
-    termName: terms[0]!.name,
+    termName: terms[0].name,
     subjectRows,
     gradingScale: DEFAULT_GRADING_BANDS.map((b) => ({
       ...b,
@@ -134,13 +134,9 @@ describe('report-card-html.util', () => {
   });
 
   it('buildSubjectRows keeps only provided term columns', () => {
-    const two = buildSubjectRows(
-      ['Math'],
-      [[90], [80]],
-      DEFAULT_GRADING_BANDS,
-    );
-    expect(two[0]!.termScores).toEqual([90, 80]);
-    expect(two[0]!.average).toBe(85);
+    const two = buildSubjectRows(['Math'], [[90], [80]], DEFAULT_GRADING_BANDS);
+    expect(two[0].termScores).toEqual([90, 80]);
+    expect(two[0].average).toBe(85);
   });
 
   it.each([2, 3, 4] as const)(

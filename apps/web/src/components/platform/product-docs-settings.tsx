@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useLocale } from "@/components/i18n/locale-provider";
 import { AppToast } from "@/components/ui/app-toast";
 import { getApiBaseUrl } from "@/lib/api";
 import { platformUpload } from "@/lib/platform-auth";
@@ -42,28 +43,33 @@ export function ProductDocsSettings({
   onUploaded,
   disabled,
 }: Props) {
+  const { t } = useLocale();
   const inputRef = useRef<HTMLInputElement>(null);
   const thumbInputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState("");
   const [uploading, setUploading] = useState(false);
-  const [probe, setProbe] = useState<"idle" | "ok" | "missing">("idle");
+  const [probeResult, setProbeResult] = useState<{
+    url: string;
+    status: "ok" | "missing";
+  } | null>(null);
 
   const hasUploaded = Boolean(docsUrl.trim());
   const resolved = resolveProductDocsUrl(docsUrl);
+  const probe: "idle" | "ok" | "missing" =
+    probeResult && probeResult.url === resolved ? probeResult.status : "idle";
   const downloadHref = productDocsDownloadUrl(resolved);
   const usingFallback = !hasUploaded;
   const thumbPreview = resolvePreviewUrl(thumbnailUrl);
 
   useEffect(() => {
     let cancelled = false;
-    setProbe("idle");
     void fetch(resolved, { method: "HEAD", cache: "no-store" })
       .then((res) => {
         if (cancelled) return;
-        setProbe(res.ok ? "ok" : "missing");
+        setProbeResult({ url: resolved, status: res.ok ? "ok" : "missing" });
       })
       .catch(() => {
-        if (!cancelled) setProbe("missing");
+        if (!cancelled) setProbeResult({ url: resolved, status: "missing" });
       });
     return () => {
       cancelled = true;
@@ -74,11 +80,11 @@ export function ProductDocsSettings({
     if (!file) return;
     setError("");
     if (file.size > 40 * 1024 * 1024) {
-      setError("PDF must be 40 MB or smaller");
+      setError(t("platformUi.docsPdfTooLarge"));
       return;
     }
     if (file.type && file.type !== "application/pdf") {
-      setError("Please choose a PDF file");
+      setError(t("platformUi.docsChoosePdf"));
       return;
     }
     setUploading(true);
@@ -90,7 +96,7 @@ export function ProductDocsSettings({
       onUploaded(settings);
       onDocsUrlChange(settings.productDocsUrl ?? "");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload failed");
+      setError(err instanceof Error ? err.message : t("platformUi.uploadFailed"));
     } finally {
       setUploading(false);
     }
@@ -103,19 +109,19 @@ export function ProductDocsSettings({
       const dataUrl = await fileToDocsThumbnailDataUrl(file);
       onThumbnailUrlChange(dataUrl);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Invalid image");
+      setError(err instanceof Error ? err.message : t("platformUi.invalidImage"));
     }
   }
 
   return (
     <div className="cfg-logo-upload">
-      <p className="cfg-logo-upload__label">Product documentation PDF</p>
+      <p className="cfg-logo-upload__label">{t("platformUi.docsLabel")}</p>
       <p className="cfg-section__lead" style={{ marginTop: 0 }}>
-        Shown on the public homepage Explore section (
+        {t("platformUi.docsLeadBefore")}
         <a href="/#explore" target="_blank" rel="noopener noreferrer">
           /#explore
         </a>
-        ). Upload the Chora Product Documentation PDF (max 40&nbsp;MB).
+        {t("platformUi.docsLeadAfter")}
       </p>
 
       <div className="cfg-logo-upload__row" style={{ marginTop: "0.85rem" }}>
@@ -127,10 +133,10 @@ export function ProductDocsSettings({
             onClick={() => inputRef.current?.click()}
           >
             {uploading
-              ? "Uploading…"
+              ? t("platformUi.uploading")
               : hasUploaded
-                ? "Replace PDF"
-                : "Upload PDF"}
+                ? t("platformUi.docsReplace")
+                : t("platformUi.docsUpload")}
           </button>
           <a
             className="cfg-btn cfg-btn--ghost"
@@ -138,7 +144,7 @@ export function ProductDocsSettings({
             target="_blank"
             rel="noopener noreferrer"
           >
-            Download
+            {t("platformUi.docsDownload")}
           </a>
           <a
             className="cfg-btn cfg-btn--ghost"
@@ -146,7 +152,7 @@ export function ProductDocsSettings({
             target="_blank"
             rel="noopener noreferrer"
           >
-            View
+            {t("platformUi.docsView")}
           </a>
           <a
             className="cfg-btn cfg-btn--ghost"
@@ -154,7 +160,7 @@ export function ProductDocsSettings({
             target="_blank"
             rel="noopener noreferrer"
           >
-            Open Explore
+            {t("platformUi.docsOpenExplore")}
           </a>
           {hasUploaded ? (
             <button
@@ -163,7 +169,7 @@ export function ProductDocsSettings({
               disabled={disabled || uploading}
               onClick={() => onDocsUrlChange("")}
             >
-              Clear
+              {t("platformUi.docsClear")}
             </button>
           ) : null}
           <input
@@ -181,28 +187,24 @@ export function ProductDocsSettings({
 
       {hasUploaded ? (
         <p className="cfg-section__lead" style={{ marginTop: "0.65rem" }}>
-          Homepage uses uploaded file: <code>{docsUrl}</code>
-          {probe === "ok" ? " · reachable" : null}
-          {probe === "missing" ? " · not reachable yet (check API)" : null}
+          {t("platformUi.docsUsingUpload")} <code>{docsUrl}</code>
+          {probe === "ok" ? t("platformUi.docsReachable") : null}
+          {probe === "missing" ? t("platformUi.docsNotReachable") : null}
         </p>
       ) : (
         <p className="cfg-section__lead" style={{ marginTop: "0.65rem" }}>
-          No upload yet. Homepage uses fallback{" "}
+          {t("platformUi.docsNoUploadYet")}{" "}
           <code>{PRODUCT_DOCS_FALLBACK_PATH}</code>
-          {usingFallback && probe === "ok" ? " · available" : null}
-          {usingFallback && probe === "missing"
-            ? " · missing from public/ — upload a PDF here"
-            : null}
+          {usingFallback && probe === "ok" ? t("platformUi.docsAvailable") : null}
+          {usingFallback && probe === "missing" ? t("platformUi.docsMissingPublic") : null}
         </p>
       )}
 
       <p className="cfg-logo-upload__label" style={{ marginTop: "1.25rem" }}>
-        Documentation thumbnail (optional)
+        {t("platformUi.docsThumbLabel")}
       </p>
       <p className="cfg-section__lead" style={{ marginTop: 0 }}>
-        Cover image on the Explore docs card (JPEG/PNG/WebP, up to 25&nbsp;MB —
-        we compress it automatically). Leave empty for the default mockup. Save
-        settings after uploading.
+        {t("platformUi.docsThumbLead")}
       </p>
 
       <div
@@ -239,7 +241,9 @@ export function ProductDocsSettings({
             disabled={disabled}
             onClick={() => thumbInputRef.current?.click()}
           >
-            {thumbPreview ? "Upload new thumbnail" : "Upload thumbnail"}
+            {thumbPreview
+              ? t("platformUi.demoUploadNewThumb")
+              : t("platformUi.demoUploadThumb")}
           </button>
           {thumbPreview ? (
             <button
@@ -248,7 +252,7 @@ export function ProductDocsSettings({
               disabled={disabled}
               onClick={() => onThumbnailUrlChange("")}
             >
-              Remove thumbnail
+              {t("platformUi.demoRemoveThumb")}
             </button>
           ) : null}
           <input

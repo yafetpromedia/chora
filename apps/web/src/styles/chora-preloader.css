@@ -1,0 +1,143 @@
+/* Chora Campus Platform Fullscreen Preloader */
+
+@keyframes choraBreathe {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes choraLoadBar {
+  0% {
+    width: 0%;
+  }
+  100% {
+    width: 100%;
+  }
+}
+
+.chora-preloader {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #081e1e;
+  background-image: radial-gradient(
+    ellipse 75% 55% at 65% 22%,
+    rgba(22, 117, 109, 0.28),
+    transparent 70%
+  );
+  font-family: var(--font-figtree), "Figtree", system-ui, -apple-system, sans-serif;
+  transition:
+    opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@media print {
+  #chora-preloader,
+  .chora-preloader,
+  [data-print-hide="true"] {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    position: absolute !important;
+    width: 0 !important;
+    height: 0 !important;
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+  }
+}
+
+/* Print / PDF routes: never paint the splash even on screen */
+html.sid-print-route #chora-preloader,
+html.sid-print-route .chora-preloader,
+body.sid-print-route #chora-preloader,
+body.sid-print-route .chora-preloader {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+.chora-preloader--exit {
+  opacity: 0;
+  transform: translateY(-18px);
+  pointer-events: none;
+}
+
+.chora-preloader__icon {
+  width: 84px;
+  height: 84px;
+}
+
+.chora-preloader__svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.chora-icon-anim {
+  animation: choraBreathe 3s ease-in-out infinite;
+}
+
+.chora-preloader__copy {
+  margin-top: 16px;
+  text-align: center;
+}
+
+.chora-preloader__name {
+  color: #ffffff;
+  font-weight: 800;
+  font-size: 26px;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.chora-preloader__tagline {
+  color: #7fd4cc;
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+.chora-preloader__track {
+  margin-top: 24px;
+  width: 260px;
+  height: 5px;
+  border-radius: 999px;
+  background: #0e3130;
+  overflow: hidden;
+  border: 1px solid #1d3e3d;
+}
+
+.chora-preloader__bar {
+  height: 100%;
+  width: 0;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #16756d, #1e8a7f, #4fd1c5);
+}
+
+.chora-bar-fill {
+  animation: choraLoadBar 2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chora-icon-anim,
+  .chora-bar-fill {
+    animation: none;
+  }
+
+  .chora-preloader__bar {
+    width: 100%;
+  }
+
+  .chora-preloader {
+    transition-duration: 0.01ms;
+  }
+}

@@ -8,6 +8,8 @@ import type { AdminAnalyticsOverview } from "@/lib/dashboard-analytics";
 import type { AdminDayOverview } from "@/lib/dashboard-day";
 import { AdminAnalyticsSection } from "@/components/dashboard/admin-analytics";
 import { DashIcon } from "@/components/dashboard/dash-icons";
+import { useLocale } from "@/components/i18n/locale-provider";
+import type { AppLocale } from "@/lib/i18n";
 
 type Props = {
   schoolName: string;
@@ -20,17 +22,21 @@ type Props = {
   error: string;
 };
 
-function todayLabel() {
-  return new Date().toLocaleDateString(undefined, {
+function localeTag(locale: AppLocale) {
+  return locale === "am" ? "am-ET" : undefined;
+}
+
+function todayLabel(locale: AppLocale) {
+  return new Date().toLocaleDateString(localeTag(locale), {
     weekday: "long",
     month: "long",
     day: "numeric",
   });
 }
 
-function formatDate(iso: string) {
+function formatDate(iso: string, locale: AppLocale) {
   try {
-    return new Date(iso).toLocaleDateString(undefined, {
+    return new Date(iso).toLocaleDateString(localeTag(locale), {
       month: "short",
       day: "numeric",
       year: "numeric",
@@ -50,6 +56,7 @@ export function AdminDashboard({
   canViewFinance,
   error,
 }: Props) {
+  const { t, locale } = useLocale();
   const att = analytics?.attendanceToday;
   const staffAtt = analytics?.staffAttendanceToday;
   const fin = analytics?.finance;
@@ -59,14 +66,12 @@ export function AdminDashboard({
     <div className="dash-admin dash-admin--modern">
       <header className="dash-admin-hero dash-admin-hero--modern">
         <div className="dash-admin-hero__text">
-          <p className="dash-admin-hero__eyebrow">{todayLabel()}</p>
+          <p className="dash-admin-hero__eyebrow">{todayLabel(locale)}</p>
           <h1 className="dash-admin-hero__title">
             {isPrincipalView ? `${schoolName}` : schoolName}
           </h1>
           <p className="dash-admin-hero__sub">
-            {isPrincipalView
-              ? "Leadership overview — attendance, fees, and academics."
-              : "Real-time analytics for your campus operations."}
+            {isPrincipalView ? t("adminDash.leadershipSub") : t("adminDash.realtimeSub")}
           </p>
         </div>
         <div className="dash-admin-hero__aside">
@@ -82,7 +87,7 @@ export function AdminDashboard({
           {enroll ? (
             <div className="dash-admin-hero__chip dash-admin-hero__chip--muted">
               <DashIcon name="students" className="dash-icon--sm" />
-              <span>{enroll.students} students enrolled</span>
+              <span>{t("adminDash.studentsEnrolled", { count: enroll.students })}</span>
             </div>
           ) : null}
         </div>
@@ -97,18 +102,21 @@ export function AdminDashboard({
       {subscription && !isPrincipalView ? <TrialBanner subscription={subscription} /> : null}
 
       {analytics ? (
-        <section className="dash-admin-kpis dash-admin-kpis--modern" aria-label="Key metrics">
+        <section className="dash-admin-kpis dash-admin-kpis--modern" aria-label={t("adminDash.keyMetrics")}>
           <article className="dash-admin-kpi dash-admin-kpi--modern">
             <span className="dash-admin-kpi__icon dash-admin-kpi__icon--teal">
               <DashIcon name="attendance" />
             </span>
             <div>
-              <p className="dash-admin-kpi__label">Attendance today</p>
+              <p className="dash-admin-kpi__label">{t("adminDash.attendanceToday")}</p>
               <p className="dash-admin-kpi__value">
                 {att?.rate != null ? `${att.rate}%` : "—"}
               </p>
               <p className="dash-admin-kpi__hint">
-                {att?.marked ?? 0} marked · {att?.absent ?? 0} absent
+                {t("adminDash.markedAbsent", {
+                  marked: att?.marked ?? 0,
+                  absent: att?.absent ?? 0,
+                })}
               </p>
             </div>
           </article>
@@ -121,7 +129,7 @@ export function AdminDashboard({
               <DashIcon name="users" />
             </span>
             <div>
-              <p className="dash-admin-kpi__label">Staff attendance</p>
+              <p className="dash-admin-kpi__label">{t("adminDash.staffAttendance")}</p>
               <p className="dash-admin-kpi__value">
                 {staffAtt
                   ? `${staffAtt.present + staffAtt.late}`
@@ -129,8 +137,12 @@ export function AdminDashboard({
               </p>
               <p className="dash-admin-kpi__hint">
                 {staffAtt
-                  ? `${staffAtt.marked}/${staffAtt.totalStaff} marked · ${staffAtt.late} late`
-                  : "Teachers & staff"}
+                  ? t("adminDash.staffMarked", {
+                      marked: staffAtt.marked,
+                      total: staffAtt.totalStaff,
+                      late: staffAtt.late,
+                    })
+                  : t("adminDash.teachersStaff")}
               </p>
             </div>
           </Link>
@@ -141,9 +153,11 @@ export function AdminDashboard({
                 <DashIcon name="finance" />
               </span>
               <div>
-                <p className="dash-admin-kpi__label">Collected</p>
+                <p className="dash-admin-kpi__label">{t("adminDash.collected")}</p>
                 <p className="dash-admin-kpi__value"><EtbAmount cents={fin.collectedCents} symbolSize={18} /></p>
-                <p className="dash-admin-kpi__hint">{fin.collectionRate}% of billed fees</p>
+                <p className="dash-admin-kpi__hint">
+                  {t("adminDash.ofBilled", { rate: fin.collectionRate })}
+                </p>
               </div>
             </Link>
           ) : (
@@ -152,9 +166,9 @@ export function AdminDashboard({
                 <DashIcon name="announcements" />
               </span>
               <div>
-                <p className="dash-admin-kpi__label">Announcements</p>
+                <p className="dash-admin-kpi__label">{t("adminDash.announcements")}</p>
                 <p className="dash-admin-kpi__value">{announcements.length}</p>
-                <p className="dash-admin-kpi__hint">Campus updates</p>
+                <p className="dash-admin-kpi__hint">{t("adminDash.campusUpdates")}</p>
               </div>
             </article>
           )}
@@ -164,10 +178,10 @@ export function AdminDashboard({
               <DashIcon name="teachers" />
             </span>
             <div>
-              <p className="dash-admin-kpi__label">Teachers</p>
+              <p className="dash-admin-kpi__label">{t("adminDash.teachers")}</p>
               <p className="dash-admin-kpi__value">{enroll?.teachers ?? "—"}</p>
               <p className="dash-admin-kpi__hint">
-                {adminDay?.staff.classesActive ?? 0} classes active
+                {t("adminDash.classesActive", { count: adminDay?.staff.classesActive ?? 0 })}
               </p>
             </div>
           </Link>
@@ -177,10 +191,10 @@ export function AdminDashboard({
               <DashIcon name="users" />
             </span>
             <div>
-              <p className="dash-admin-kpi__label">Families</p>
+              <p className="dash-admin-kpi__label">{t("adminDash.families")}</p>
               <p className="dash-admin-kpi__value">{enroll?.parents ?? "—"}</p>
               <p className="dash-admin-kpi__hint">
-                {enroll?.portalTotal ?? 0} portal accounts
+                {t("adminDash.portalAccounts", { count: enroll?.portalTotal ?? 0 })}
               </p>
             </div>
           </Link>
@@ -194,19 +208,19 @@ export function AdminDashboard({
       <article className="da-card da-card--feed">
         <header className="da-card__head">
           <div>
-            <h2 className="da-card__title">Announcements</h2>
-            <p className="da-card__sub">Latest campus updates</p>
+            <h2 className="da-card__title">{t("adminDash.announcements")}</h2>
+            <p className="da-card__sub">{t("adminDash.latestUpdates")}</p>
           </div>
           <Link href="/admin/announcements" className="da-card__link">
-            Manage <DashIcon name="chevron" className="dash-icon--xs" />
+            {t("adminDash.manage")} <DashIcon name="chevron" className="dash-icon--xs" />
           </Link>
         </header>
         {announcements.length === 0 ? (
           <div className="da-feed-empty">
-            <p>No announcements yet.</p>
+            <p>{t("adminDash.noAnnouncements")}</p>
             {!isPrincipalView ? (
               <Link href="/admin/announcements" className="att-btn att-btn--primary">
-                Post announcement
+                {t("adminDash.postAnnouncement")}
               </Link>
             ) : null}
           </div>
@@ -216,7 +230,7 @@ export function AdminDashboard({
               <li key={item.id} className="dash-admin-feed__item">
                 <div>
                   <p className="dash-admin-feed__title">{item.title}</p>
-                  <p className="dash-admin-feed__meta">{formatDate(item.createdAt)}</p>
+                  <p className="dash-admin-feed__meta">{formatDate(item.createdAt, locale)}</p>
                 </div>
                 {item.body ? (
                   <p className="dash-admin-feed__body">

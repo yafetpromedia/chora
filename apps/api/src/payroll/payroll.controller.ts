@@ -108,10 +108,7 @@ export class PayrollController {
   @Get('employees/:userId/compensation')
   @Roles('admin', 'staff')
   @RequirePermissions(SchoolPermission.PAYROLL_VIEW)
-  listComp(
-    @CurrentUser() user: AuthUser,
-    @Param('userId') userId: string,
-  ) {
+  listComp(@CurrentUser() user: AuthUser, @Param('userId') userId: string) {
     return this.payroll.listCompensation(user.schoolId, userId);
   }
 
@@ -123,12 +120,7 @@ export class PayrollController {
     @Param('userId') userId: string,
     @Body() dto: CreateEmployeeCompensationDto,
   ) {
-    return this.payroll.createCompensation(
-      user.schoolId,
-      user.id,
-      userId,
-      dto,
-    );
+    return this.payroll.createCompensation(user.schoolId, user.id, userId, dto);
   }
 
   @Get('periods')
@@ -233,12 +225,7 @@ export class PayrollController {
     @Param('snapshotId') snapshotId: string,
     @Body() dto: RecordPayrollPaymentDto,
   ) {
-    return this.payroll.recordPayment(
-      user.schoolId,
-      user.id,
-      snapshotId,
-      dto,
-    );
+    return this.payroll.recordPayment(user.schoolId, user.id, snapshotId, dto);
   }
 
   @Get('overtime-approvals')
@@ -276,11 +263,6 @@ export class PayrollController {
     if (!canSelf && !canManage) {
       throw new ForbiddenException('Insufficient permissions');
     }
-    return this.payroll.getPayslip(
-      user.schoolId,
-      id,
-      user.id,
-      canManage,
-    );
+    return this.payroll.getPayslip(user.schoolId, id, user.id, canManage);
   }
 }

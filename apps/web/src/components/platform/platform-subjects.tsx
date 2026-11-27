@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DashIcon } from "@/components/dashboard/dash-icons";
 import { AppToast } from "@/components/ui/app-toast";
+import { useLocale } from "@/components/i18n/locale-provider";
 import {
   handlePlatformAuthFailure,
   platformFetch,
@@ -24,25 +25,32 @@ type PlatformSubjectRow = {
 };
 
 const LEVEL_FILTERS = ["ALL", "PRIMARY", "SECONDARY"] as const;
-const CURRICULUM_OPTIONS = [
-  { value: "GENERAL", label: "General" },
-  { value: "ETHIOPIAN_PRIVATE", label: "Ethiopian" },
-  { value: "CAMBRIDGE", label: "Cambridge" },
-  { value: "AMERICAN", label: "American" },
+const CURRICULUM_VALUES = [
+  "GENERAL",
+  "ETHIOPIAN_PRIVATE",
+  "CAMBRIDGE",
+  "AMERICAN",
 ] as const;
 
-function formatCurriculum(value: string | null) {
-  if (!value) return "General";
-  return CURRICULUM_OPTIONS.find((c) => c.value === value)?.label ?? value;
-}
-
-function formatLevel(value: string | null) {
-  if (!value || value === "ALL") return "All levels";
-  return value.charAt(0) + value.slice(1).toLowerCase();
-}
-
 export function PlatformSubjects() {
+  const { t } = useLocale();
   const router = useRouter();
+  const CURRICULUM_OPTIONS = [
+    { value: "GENERAL", label: t("platformUi.curriculumGeneral") },
+    { value: "ETHIOPIAN_PRIVATE", label: t("platformUi.curriculumEthiopian") },
+    { value: "CAMBRIDGE", label: t("platformUi.curriculumCambridge") },
+    { value: "AMERICAN", label: t("platformUi.curriculumAmerican") },
+  ] as const;
+  function formatCurriculum(value: string | null) {
+    if (!value) return t("platformUi.curriculumGeneral");
+    return CURRICULUM_OPTIONS.find((c) => c.value === value)?.label ?? value;
+  }
+  function formatLevel(value: string | null) {
+    if (!value || value === "ALL") return t("platformUi.allLevels");
+    if (value === "PRIMARY") return t("platformUi.primary");
+    if (value === "SECONDARY") return t("platformUi.secondary");
+    return value.charAt(0) + value.slice(1).toLowerCase();
+  }
   const [subjects, setSubjects] = useState<PlatformSubjectRow[]>([]);
   const [query, setQuery] = useState("");
   const [levelFilter, setLevelFilter] = useState<(typeof LEVEL_FILTERS)[number]>("ALL");
@@ -82,18 +90,18 @@ export function PlatformSubjects() {
     try {
       await loadSubjects();
     } catch (err) {
-      fail(err, "Load failed");
+      fail(err, t("platformUi.loadFailed"));
     } finally {
       setLoading(false);
     }
   }, [loadSubjects, router]);
 
   useEffect(() => {
-    void load();
+    queueMicrotask(() => void load());
   }, [load]);
 
   useEffect(() => {
-    if (!loading) void loadSubjects();
+    if (!loading) queueMicrotask(() => void loadSubjects());
   }, [showArchived, loadSubjects, loading]);
 
   const stats = useMemo(() => {
@@ -139,7 +147,7 @@ export function PlatformSubjects() {
       setFormName("");
       await loadSubjects();
     } catch (err) {
-      fail(err, "Create failed");
+      fail(err, t("platformUi.createFailed"));
     } finally {
       setBusy(false);
     }
@@ -175,14 +183,14 @@ export function PlatformSubjects() {
       cancelEdit();
       await loadSubjects();
     } catch (err) {
-      fail(err, "Save failed");
+      fail(err, t("platformUi.saveFailed"));
     } finally {
       setBusy(false);
     }
   }
 
   async function archiveSubject(id: string) {
-    if (!confirm("Archive this platform subject?")) return;
+    if (!confirm(t("platformUi.subjArchiveConfirm"))) return;
     setBusy(true);
     setError("");
     try {
@@ -190,7 +198,7 @@ export function PlatformSubjects() {
       if (editingId === id) cancelEdit();
       await loadSubjects();
     } catch (err) {
-      fail(err, "Archive failed");
+      fail(err, t("platformUi.archiveFailed"));
     } finally {
       setBusy(false);
     }
@@ -215,26 +223,25 @@ export function PlatformSubjects() {
             <DashIcon name="subjects" className="dash-icon--md" />
           </span>
           <div>
-            <p className="plat-subjects-v2__eyebrow">Content & Curriculum Engine</p>
-            <h2 className="plat-subjects-v2__title">Subject repository</h2>
+            <p className="plat-subjects-v2__eyebrow">{t("platformUi.contentEngineEyebrow")}</p>
+            <h2 className="plat-subjects-v2__title">{t("platformUi.subjTitle")}</h2>
             <p className="plat-subjects-v2__sub">
-              Master subjects copied to schools on provision. Schools can customize
-              copies — customized rows are not overwritten.
+              {t("platformUi.subjSub")}
             </p>
           </div>
         </div>
         <div className="plat-subjects-v2__hero-stats">
           <div className="plat-subjects-v2__stat">
             <strong>{stats.active}</strong>
-            <span>Active</span>
+            <span>{t("platformUi.subjStatActive")}</span>
           </div>
           <div className="plat-subjects-v2__stat">
             <strong>{stats.inPackages}</strong>
-            <span>In packages</span>
+            <span>{t("platformUi.subjStatInPackages")}</span>
           </div>
           <div className="plat-subjects-v2__stat">
             <strong>{stats.inSchools}</strong>
-            <span>In schools</span>
+            <span>{t("platformUi.subjStatInSchools")}</span>
           </div>
         </div>
       </header>
@@ -244,21 +251,21 @@ export function PlatformSubjects() {
           <DashIcon name="subjects" className="dash-icon--sm" />
           <div>
             <strong>{stats.primary}</strong>
-            <span>Primary</span>
+            <span>{t("platformUi.subjStatPrimary")}</span>
           </div>
         </article>
         <article className="plat-subjects-v2__kpi">
           <DashIcon name="teachers" className="dash-icon--sm" />
           <div>
             <strong>{stats.secondary}</strong>
-            <span>Secondary</span>
+            <span>{t("platformUi.subjStatSecondary")}</span>
           </div>
         </article>
         <article className="plat-subjects-v2__kpi">
           <DashIcon name="library" className="dash-icon--sm" />
           <div>
             <strong>{stats.archived}</strong>
-            <span>Archived</span>
+            <span>{t("platformUi.subjStatArchived")}</span>
           </div>
         </article>
       </div>
@@ -268,10 +275,10 @@ export function PlatformSubjects() {
           <DashIcon name="subjects" className="dash-icon--sm" />
           <input
             type="search"
-            placeholder="Search subjects…"
+            placeholder={t("platformUi.subjSearchPh")}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            aria-label="Search subjects"
+            aria-label={t("platformUi.subjSearchAria")}
           />
         </div>
         <div className="plat-filter-tabs plat-subjects-v2__filters" role="tablist">
@@ -286,7 +293,7 @@ export function PlatformSubjects() {
               }`}
               onClick={() => setLevelFilter(level)}
             >
-              {level === "ALL" ? "All levels" : formatLevel(level)}
+              {level === "ALL" ? t("platformUi.allLevels") : formatLevel(level)}
             </button>
           ))}
         </div>
@@ -296,7 +303,7 @@ export function PlatformSubjects() {
             checked={showArchived}
             onChange={(e) => setShowArchived(e.target.checked)}
           />
-          Show archived
+          {t("platformUi.showArchived")}
         </label>
         <button
           type="button"
@@ -304,19 +311,19 @@ export function PlatformSubjects() {
           onClick={() => setFormOpen((v) => !v)}
         >
           <DashIcon name="plus" className="dash-icon--sm" />
-          {formOpen ? "Cancel" : "New subject"}
+          {formOpen ? t("common.cancel") : t("platformUi.newSubject")}
         </button>
       </div>
 
       {formOpen ? (
         <div className="plat-curriculum-form plat-subjects-v2__form">
           <input
-            placeholder="Code (e.g. BIO)"
+            placeholder={t("platformUi.subjCodePh")}
             value={formCode}
             onChange={(e) => setFormCode(e.target.value.toUpperCase())}
           />
           <input
-            placeholder="Name"
+            placeholder={t("platformUi.name")}
             value={formName}
             onChange={(e) => setFormName(e.target.value)}
           />
@@ -331,9 +338,9 @@ export function PlatformSubjects() {
             ))}
           </select>
           <select value={formLevel} onChange={(e) => setFormLevel(e.target.value)}>
-            <option value="ALL">All levels</option>
-            <option value="PRIMARY">Primary</option>
-            <option value="SECONDARY">Secondary</option>
+            <option value="ALL">{t("platformUi.allLevels")}</option>
+            <option value="PRIMARY">{t("platformUi.primary")}</option>
+            <option value="SECONDARY">{t("platformUi.secondary")}</option>
           </select>
           <button
             type="button"
@@ -341,7 +348,7 @@ export function PlatformSubjects() {
             disabled={busy || !formCode.trim() || !formName.trim()}
             onClick={() => void createSubject()}
           >
-            {busy ? "Saving…" : "Save subject"}
+            {busy ? t("platformUi.saving") : t("platformUi.saveSubject")}
           </button>
         </div>
       ) : null}
@@ -350,20 +357,20 @@ export function PlatformSubjects() {
         <table className="plat-subjects-v2__table">
           <thead>
             <tr>
-              <th>Code</th>
-              <th>Subject</th>
-              <th>Curriculum</th>
-              <th>Level</th>
-              <th>Packages</th>
-              <th>Schools</th>
-              <th aria-label="Actions" />
+              <th>{t("platformUi.subjColCode")}</th>
+              <th>{t("platformUi.subjColSubject")}</th>
+              <th>{t("platformUi.subjColCurriculum")}</th>
+              <th>{t("platformUi.subjColLevel")}</th>
+              <th>{t("platformUi.subjColPackages")}</th>
+              <th>{t("platformUi.subjColSchools")}</th>
+              <th aria-label={t("platformUi.actions")} />
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
               <tr>
                 <td colSpan={7} className="plat-subjects-v2__empty">
-                  No subjects match your filters.
+                  {t("platformUi.subjNoMatch")}
                 </td>
               </tr>
             ) : (
@@ -416,9 +423,9 @@ export function PlatformSubjects() {
                           value={editLevel}
                           onChange={(e) => setEditLevel(e.target.value)}
                         >
-                          <option value="ALL">All levels</option>
-                          <option value="PRIMARY">Primary</option>
-                          <option value="SECONDARY">Secondary</option>
+                          <option value="ALL">{t("platformUi.allLevels")}</option>
+                          <option value="PRIMARY">{t("platformUi.primary")}</option>
+                          <option value="SECONDARY">{t("platformUi.secondary")}</option>
                         </select>
                       ) : (
                         <span
@@ -444,7 +451,7 @@ export function PlatformSubjects() {
                               disabled={busy}
                               onClick={() => void saveEdit()}
                             >
-                              Save
+                              {t("common.save")}
                             </button>
                             <button
                               type="button"
@@ -452,7 +459,7 @@ export function PlatformSubjects() {
                               disabled={busy}
                               onClick={cancelEdit}
                             >
-                              Cancel
+                              {t("common.cancel")}
                             </button>
                           </>
                         ) : !s.isArchived ? (
@@ -463,7 +470,7 @@ export function PlatformSubjects() {
                               disabled={busy}
                               onClick={() => startEdit(s)}
                             >
-                              Edit
+                              {t("common.edit")}
                             </button>
                             <button
                               type="button"
@@ -471,11 +478,11 @@ export function PlatformSubjects() {
                               disabled={busy}
                               onClick={() => void archiveSubject(s.id)}
                             >
-                              Archive
+                              {t("platformUi.subjArchive")}
                             </button>
                           </>
                         ) : (
-                          <span className="plat-subjects-v2__archived-badge">Archived</span>
+                          <span className="plat-subjects-v2__archived-badge">{t("platformUi.subjStatArchived")}</span>
                         )}
                       </div>
                     </td>

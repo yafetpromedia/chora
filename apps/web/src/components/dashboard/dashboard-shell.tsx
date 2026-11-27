@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useRef, useState, type MouseEvent } from "react";
-import { apiFetch, apiPost, getSchoolSubscription, type Announcement, type SchoolInfo, type SubscriptionStatus } from "@/lib/api";
+import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
+import { apiDelete, apiFetch, apiPost, getSchoolSubscription, type Announcement, type SchoolInfo, type SubscriptionStatus } from "@/lib/api";
 import type { AdminDayOverview } from "@/lib/dashboard-day";
 import {
   AUTH_ROLE_KEY,
@@ -19,6 +19,7 @@ import {
 } from "@/lib/school-brand";
 import { BRAND_NAME } from "@/lib/brand";
 import {
+  deleteStaffNotification,
   listStaffNotifications,
   markAllStaffNotificationsRead,
   markStaffNotificationRead,
@@ -37,6 +38,8 @@ import {
   type NavItem,
 } from "./nav-config";
 import { AiChatWidget } from "@/components/ai/ai-chat-widget";
+import { LanguageSwitcher } from "@/components/i18n/language-switcher";
+import { useLocale } from "@/components/i18n/locale-provider";
 import { TrialPaywall } from "@/components/trial-paywall";
 
 const ACTION_ALERT_DISMISS_KEY = "campusone.actionAlerts.dismissed";
@@ -127,16 +130,18 @@ type Props = {
 };
 
 export function DashboardShell({ role, children, title, subtitle }: Props) {
+  const { t, tn, tp, ts } = useLocale();
   const pathname = usePathname();
   const router = useRouter();
   const [schoolName, setSchoolName] = useState(BRAND_NAME);
   const [schoolLogoUrl, setSchoolLogoUrl] = useState<string | null>(null);
   const [mobileNav, setMobileNav] = useState(false);
   const [navRole, setNavRole] = useState<UserRole>(role);
-  const [nav, setNav] = useState<NavItem[]>([]);
-  const [enabledModules, setEnabledModules] = useState<string[]>(() =>
+  const [subscription, setSubscription] = useState<SubscriptionStatus | null>(null);
+  const [cachedEnabledModules, setEnabledModules] = useState<string[]>(() =>
     readCachedModules(),
   );
+  const enabledModules = subscription?.enabledModules ?? cachedEnabledModules;
   const [canTakeAttendance, setCanTakeAttendance] = useState(false);
   const [shellReady, setShellReady] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -151,12 +156,17 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
   const [expandedNav, setExpandedNav] = useState<Record<string, boolean>>(() =>
     readExpandedNav(role),
   );
-  const [subscription, setSubscription] = useState<SubscriptionStatus | null>(null);
   const notifyRef = useRef<HTMLDivElement | null>(null);
   const navListRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
-    setDismissedActionTypes(readDismissedActionAlerts());
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) setDismissedActionTypes(readDismissedActionAlerts());
+    });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -174,7 +184,7 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
       return;
     }
     const effectiveRole = stored ?? role;
-    setNavRole(effectiveRole);
+    queueMicrotask(() => setNavRole(effectiveRole));
 
     async function loadNav() {
       // Prefer last-known entitlements while / until subscription is verified.
@@ -200,19 +210,15 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
         }
       }
       setCanTakeAttendance(attendanceOk);
-      setNav(
-        navForRole(effectiveRole, {
-          canTakeAttendance: attendanceOk,
-          enabledModules: modules,
-        }),
-      );
       setShellReady(true);
     }
 
     void loadNav();
     const brand = readSchoolBrand();
-    setSchoolName(brand.name);
-    setSchoolLogoUrl(brand.logoUrl);
+    queueMicrotask(() => {
+      setSchoolName(brand.name);
+      setSchoolLogoUrl(brand.logoUrl);
+    });
     applySchoolTheme(brand);
 
     void apiFetch<{ school: SchoolInfo | null }>("/schools/me")
@@ -247,29 +253,20 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
     }
   }, [role, router]);
 
-  useEffect(() => {
-    if (!shellReady) return;
-    setNav(
-      navForRole(navRole, {
-        canTakeAttendance,
-        enabledModules,
-      }),
-    );
-  }, [shellReady, navRole, canTakeAttendance, enabledModules]);
+  const nav = useMemo<NavItem[]>(
+    () =>
+      shellReady
+        ? navForRole(navRole, {
+            canTakeAttendance,
+            enabledModules,
+          })
+        : [],
+    [shellReady, navRole, canTakeAttendance, enabledModules],
+  );
 
   useEffect(() => {
     if (!subscription?.enabledModules) return;
-    const next = subscription.enabledModules;
-    writeCachedModules(next);
-    setEnabledModules((prev) => {
-      if (
-        prev.length === next.length &&
-        prev.every((m, i) => m === next[i])
-      ) {
-        return prev;
-      }
-      return next;
-    });
+    writeCachedModules(subscription.enabledModules);
   }, [subscription]);
 
   useEffect(() => {
@@ -316,26 +313,28 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
   }, []);
 
   useEffect(() => {
-    setExpandedNav((prev) => {
-      let changed = false;
-      const next = { ...prev };
-      for (const item of nav) {
-        if (!item.children?.length) continue;
-        const groupActive = item.children.some((child) =>
-          isNavChildActive(pathname, child.href),
-        );
-        // Open the active section; close others when you leave (e.g. Results).
-        if (groupActive) {
-          if (!next[item.href]) {
-            next[item.href] = true;
+    queueMicrotask(() => {
+      setExpandedNav((prev) => {
+        let changed = false;
+        const next = { ...prev };
+        for (const item of nav) {
+          if (!item.children?.length) continue;
+          const groupActive = item.children.some((child) =>
+            isNavChildActive(pathname, child.href),
+          );
+          // Open the active section; close others when you leave (e.g. Results).
+          if (groupActive) {
+            if (!next[item.href]) {
+              next[item.href] = true;
+              changed = true;
+            }
+          } else if (next[item.href]) {
+            next[item.href] = false;
             changed = true;
           }
-        } else if (next[item.href]) {
-          next[item.href] = false;
-          changed = true;
         }
-      }
-      return changed ? next : prev;
+        return changed ? next : prev;
+      });
     });
   }, [pathname, nav]);
 
@@ -428,10 +427,24 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
         await apiPost(`/announcements/${item.id}/read`, {});
         setUnreadCount((prev) => Math.max(0, prev - 1));
       } catch {
-        return;
+        return false;
       }
     }
     setNotifications((prev) => prev.filter((n) => n.id !== item.id));
+    return true;
+  }
+
+  async function deleteAnnouncement(item: Announcement) {
+    try {
+      await apiDelete(`/announcements/${item.id}`);
+      if (!item.isRead) {
+        setUnreadCount((prev) => Math.max(0, prev - 1));
+      }
+      setNotifications((prev) => prev.filter((n) => n.id !== item.id));
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   async function openNotification(item: Announcement) {
@@ -441,10 +454,16 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
     if (href) router.push(href);
   }
 
-  async function dismissNotification(item: Announcement, event: MouseEvent) {
+  async function markNotificationRead(item: Announcement, event: MouseEvent) {
     event.preventDefault();
     event.stopPropagation();
     await markAnnouncementRead(item);
+  }
+
+  async function dismissNotification(item: Announcement, event: MouseEvent) {
+    event.preventDefault();
+    event.stopPropagation();
+    await deleteAnnouncement(item);
   }
 
   async function markAllNotificationsRead() {
@@ -479,12 +498,26 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
     if (item.link) router.push(item.link);
   }
 
-  async function dismissStaffNotification(item: StaffNotification, event: MouseEvent) {
+  async function markStaffItemRead(item: StaffNotification, event: MouseEvent) {
     event.preventDefault();
     event.stopPropagation();
     try {
       await markStaffNotificationRead(item.id);
       setStaffUnreadCount((prev) => Math.max(0, prev - 1));
+      setStaffNotifications((prev) => prev.filter((n) => n.id !== item.id));
+    } catch {
+      /* no-op */
+    }
+  }
+
+  async function dismissStaffNotification(item: StaffNotification, event: MouseEvent) {
+    event.preventDefault();
+    event.stopPropagation();
+    try {
+      await deleteStaffNotification(item.id);
+      if (!item.readAt) {
+        setStaffUnreadCount((prev) => Math.max(0, prev - 1));
+      }
       setStaffNotifications((prev) => prev.filter((n) => n.id !== item.id));
     } catch {
       /* no-op */
@@ -509,16 +542,16 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
     setActionAlerts((prev) => prev.filter((alert) => alert.type !== type));
   }
 
-  const roleLabel =
+  const roleWorkspaceKey =
     navRole === "admin"
-      ? "Admin"
+      ? "Admin workspace"
       : navRole === "staff"
-        ? "Staff"
+        ? "Staff workspace"
         : navRole === "teacher"
-          ? "Teacher"
+          ? "Teacher workspace"
           : navRole === "parent"
-            ? "Parent"
-            : "Student";
+            ? "Parent workspace"
+            : "Student workspace";
 
   const isAdminWorkspace = role === "admin" || role === "staff";
   const visibleActionAlerts = actionAlerts.filter((alert) => {
@@ -538,7 +571,12 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
     unreadCount +
     staffUnreadCount +
     (isAdminWorkspace ? actionAlertCount : 0);
-  const pageTitle = title ?? (isAdminWorkspace ? "Dashboard" : `${roleLabel} dashboard`);
+  const pageTitle = title
+    ? tp(title)
+    : isAdminWorkspace
+      ? tn("Dashboard")
+      : tn(roleWorkspaceKey);
+  const pageSubtitle = subtitle ? ts(subtitle) : "";
   const mobileTabs = mobilePrimaryNav(nav, navRole);
   const moreActive = isMobileMoreActive(pathname, mobileTabs);
   const showMobileTabs = shellReady && mobileTabs.length > 0;
@@ -549,13 +587,13 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
     >
       <aside
         className={`dash-sidebar dash-sidebar--pro${mobileNav ? " dash-sidebar--open" : ""}`}
-        aria-label="Main navigation"
+        aria-label={t("shell.mainNavigation")}
       >
         <div className="dash-sidebar-brand dash-sidebar-brand--pro dash-sidebar-brand--dual">
           <SchoolBrandLockup
             schoolName={schoolName}
             schoolLogoUrl={schoolLogoUrl}
-            roleLabel={`${roleLabel} workspace`}
+            roleLabel={tn(roleWorkspaceKey)}
           />
         </div>
 
@@ -584,7 +622,7 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
                       <span className="dash-nav-icon-wrap" aria-hidden>
                         <DashIcon name={item.icon} />
                       </span>
-                      {item.label}
+                      {tn(item.label)}
                     </Link>
                   );
                 }
@@ -610,7 +648,7 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
                       <span className="dash-nav-icon-wrap" aria-hidden>
                         <DashIcon name={item.icon} />
                       </span>
-                      <span className="dash-nav-branch-label">{item.label}</span>
+                      <span className="dash-nav-branch-label">{tn(item.label)}</span>
                       <DashIcon name="chevron" className="dash-nav-chevron" />
                     </button>
                     {groupOpen ? (
@@ -626,13 +664,17 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
                             >
                               {child.tone === "ai" ? (
                                 <span className="dash-nav-sub-item__spark" aria-hidden>
-                                  ✦
+                                  <DashIcon name="sparkle" className="dash-icon--xs" />
                                 </span>
                               ) : null}
                               <span className="dash-nav-sub-item__text">
-                                <span className="dash-nav-sub-item__label">{child.label}</span>
+                                <span className="dash-nav-sub-item__label">
+                                  {tn(child.label)}
+                                </span>
                                 {child.description ? (
-                                  <span className="dash-nav-sub-item__desc">{child.description}</span>
+                                  <span className="dash-nav-sub-item__desc">
+                                    {tn(child.description)}
+                                  </span>
                                 ) : null}
                               </span>
                             </Link>
@@ -646,7 +688,7 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
         </nav>
 
         <div className="dash-sidebar-foot dash-sidebar-foot--pro">
-          <p className="dash-sidebar-school-label">School</p>
+          <p className="dash-sidebar-school-label">{tn("School")}</p>
           <p className="dash-sidebar-school">{schoolName}</p>
         </div>
       </aside>
@@ -655,7 +697,7 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
         <button
           type="button"
           className="dash-sidebar-backdrop"
-          aria-label="Close menu"
+          aria-label={t("common.close")}
           onClick={() => setMobileNav(false)}
         />
       ) : null}
@@ -665,24 +707,31 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
           <button
             type="button"
             className="dash-menu-btn dash-menu-btn--pro"
-            aria-label="Open menu"
+            aria-label={t("common.openMenu")}
             onClick={() => setMobileNav(true)}
           >
             <DashIcon name="menu" />
           </button>
           <div className="dash-topbar-heading">
             <h1 className="dash-topbar-title">{pageTitle}</h1>
-            {subtitle ? <p className="dash-topbar-sub">{subtitle}</p> : null}
+            {pageSubtitle ? (
+              <p className="dash-topbar-sub">{pageSubtitle}</p>
+            ) : null}
           </div>
           <div className="dash-topbar-actions">
+            <LanguageSwitcher compact />
             <div className="dash-notify-wrap" ref={notifyRef}>
               <button
                 type="button"
                 className="dash-notify"
                 title={
                   notifyBadgeCount > 0
-                    ? `${notifyBadgeCount} notification${notifyBadgeCount === 1 ? "" : "s"}`
-                    : "Notifications"
+                    ? notifyBadgeCount === 1
+                      ? t("shell.notificationCountOne")
+                      : t("shell.notificationsCount", {
+                          count: notifyBadgeCount,
+                        })
+                    : t("common.notifications")
                 }
                 onClick={() => void toggleNotifications()}
               >
@@ -694,29 +743,36 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
                 ) : null}
               </button>
               {notificationsOpen ? (
-                <section className="dash-notify-panel" aria-label="Notifications">
+                <section
+                  className="dash-notify-panel"
+                  aria-label={t("common.notifications")}
+                >
                   <header className="dash-notify-head">
-                    <h2>Notifications</h2>
+                    <h2>{t("common.notifications")}</h2>
                     <button
                       type="button"
                       className="dash-notify-mark-all"
                       onClick={() => void markAllNotificationsRead()}
                       disabled={unreadCount === 0 && staffUnreadCount === 0}
                     >
-                      Mark all read
+                      {t("common.markAllRead")}
                     </button>
                   </header>
                   {notifyLoading ? (
-                    <p className="dash-notify-empty">Loading…</p>
+                    <p className="dash-notify-empty">{t("common.loading")}</p>
                   ) : visibleActionAlerts.length === 0 &&
                     unreadNotifications.length === 0 &&
                     unreadStaff.length === 0 ? (
-                    <p className="dash-notify-empty">No notifications yet.</p>
+                    <p className="dash-notify-empty">
+                      {t("common.noNotifications")}
+                    </p>
                   ) : (
                     <>
                       {visibleActionAlerts.length > 0 ? (
                         <>
-                          <p className="dash-notify-section">Action needed</p>
+                          <p className="dash-notify-section">
+                            {t("common.actionNeeded")}
+                          </p>
                           <ul className="dash-notify-list dash-notify-list--actions">
                             {visibleActionAlerts.map((alert) => (
                               <li key={alert.type} className="dash-notify-row">
@@ -728,15 +784,15 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
                                   <span className="dash-notify-action__count">{alert.count}</span>
                                   <span className="dash-notify-action__text">
                                     <strong>{alert.label}</strong>
-                                    <span>Tap to open</span>
+                                    <span>{t("common.tapToOpen")}</span>
                                   </span>
                                   <DashIcon name="chevron" className="dash-icon--xs" />
                                 </button>
                                 <button
                                   type="button"
                                   className="dash-notify-dismiss"
-                                  aria-label={`Dismiss ${alert.label}`}
-                                  title="Dismiss for today"
+                                  aria-label={t("shell.dismissAlert", { label: alert.label })}
+                                  title={t("shell.dismissForToday")}
                                   onClick={(e) => dismissActionAlert(alert.type, e)}
                                 >
                                   ×
@@ -748,7 +804,9 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
                       ) : null}
                       {unreadStaff.length > 0 ? (
                         <>
-                          <p className="dash-notify-section">Attendance & alerts</p>
+                          <p className="dash-notify-section">
+                            {t("shell.attendanceAlerts")}
+                          </p>
                           <ul className="dash-notify-list">
                             {visibleStaffNotifications.map((item) => (
                               <li key={item.id} className="dash-notify-row">
@@ -762,19 +820,30 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
                                     <p className="dash-notify-body">{item.body}</p>
                                   ) : null}
                                   <p className="dash-notify-time">
-                                    {item.link ? "Tap to open · " : ""}
+                                    {item.link ? t("shell.tapToOpenDot") : ""}
                                     {new Date(item.createdAt).toLocaleString()}
                                   </p>
                                 </button>
-                                <button
-                                  type="button"
-                                  className="dash-notify-dismiss"
-                                  aria-label={`Dismiss ${item.title}`}
-                                  title="Dismiss"
-                                  onClick={(e) => void dismissStaffNotification(item, e)}
-                                >
-                                  ×
-                                </button>
+                                <div className="dash-notify-actions">
+                                  <button
+                                    type="button"
+                                    className="dash-notify-mark"
+                                    aria-label={t("shell.markTitleAsRead", { title: item.title })}
+                                    title={t("common.markAsRead")}
+                                    onClick={(e) => void markStaffItemRead(item, e)}
+                                  >
+                                    {t("dash.mark")}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="dash-notify-dismiss"
+                                    aria-label={t("shell.deleteTitle", { title: item.title })}
+                                    title={t("common.delete")}
+                                    onClick={(e) => void dismissStaffNotification(item, e)}
+                                  >
+                                    ×
+                                  </button>
+                                </div>
                               </li>
                             ))}
                           </ul>
@@ -783,7 +852,9 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
                       {unreadNotifications.length > 0 ? (
                         <>
                           {visibleActionAlerts.length > 0 || unreadStaff.length > 0 ? (
-                            <p className="dash-notify-section">Announcements</p>
+                            <p className="dash-notify-section">
+                              {t("common.announcements")}
+                            </p>
                           ) : null}
                           <ul className="dash-notify-list">
                             {visibleNotifications.map((item) => {
@@ -800,19 +871,30 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
                                       <p className="dash-notify-body">{item.body}</p>
                                     ) : null}
                                     <p className="dash-notify-time">
-                                      {href ? "Tap to open · " : ""}
+                                      {href ? t("shell.tapToOpenDot") : ""}
                                       {new Date(item.createdAt).toLocaleString()}
                                     </p>
                                   </button>
-                                  <button
-                                    type="button"
-                                    className="dash-notify-dismiss"
-                                    aria-label={`Dismiss ${item.title}`}
-                                    title="Dismiss"
-                                    onClick={(e) => void dismissNotification(item, e)}
-                                  >
-                                    ×
-                                  </button>
+                                  <div className="dash-notify-actions">
+                                    <button
+                                      type="button"
+                                      className="dash-notify-mark"
+                                      aria-label={t("shell.markTitleAsRead", { title: item.title })}
+                                      title={t("common.markAsRead")}
+                                      onClick={(e) => void markNotificationRead(item, e)}
+                                    >
+                                      {t("dash.mark")}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="dash-notify-dismiss"
+                                      aria-label={t("shell.deleteTitle", { title: item.title })}
+                                      title={t("common.delete")}
+                                      onClick={(e) => void dismissNotification(item, e)}
+                                    >
+                                      ×
+                                    </button>
+                                  </div>
                                 </li>
                               );
                             })}
@@ -827,15 +909,27 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
                             onClick={() => setShowAllNotifications((v) => !v)}
                           >
                             {showAllNotifications
-                              ? "Show less"
-                              : `View all (${unreadNotifications.length + unreadStaff.length})`}
+                              ? t("shell.showLess")
+                              : t("shell.viewAllCount", {
+                                  count:
+                                    unreadNotifications.length +
+                                    unreadStaff.length,
+                                })}
                           </button>
                         ) : (
                           <span className="dash-notify-count">
-                            {unreadCount + staffUnreadCount} unread
                             {actionAlertCount > 0
-                              ? ` · ${actionAlertCount} action${actionAlertCount === 1 ? "" : "s"}`
-                              : ""}
+                              ? t("shell.unreadWithActions", {
+                                  count: unreadCount + staffUnreadCount,
+                                  actions: actionAlertCount,
+                                  actionWord:
+                                    actionAlertCount === 1
+                                      ? t("common.action")
+                                      : t("common.actions"),
+                                })
+                              : t("shell.unreadSummary", {
+                                  count: unreadCount + staffUnreadCount,
+                                })}
                           </span>
                         )}
                       </footer>
@@ -846,7 +940,7 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
             </div>
             <button type="button" onClick={logout} className="dash-logout dash-logout--pro">
               <DashIcon name="logout" className="dash-icon--sm" />
-              <span>Log out</span>
+              <span>{t("common.logOut")}</span>
             </button>
           </div>
         </header>
@@ -854,7 +948,7 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
       </div>
 
       {showMobileTabs ? (
-        <nav className="dash-tabbar" aria-label="Primary navigation">
+        <nav className="dash-tabbar" aria-label={t("shell.primaryNavigation")}>
           {mobileTabs.map((item) => {
             const active = isNavActive(pathname, item.href);
             return (
@@ -867,21 +961,21 @@ export function DashboardShell({ role, children, title, subtitle }: Props) {
                 <span className="dash-tabbar__icon" aria-hidden>
                   <DashIcon name={item.icon} />
                 </span>
-                <span className="dash-tabbar__label">{item.label}</span>
+                <span className="dash-tabbar__label">{tn(item.label)}</span>
               </Link>
             );
           })}
           <button
             type="button"
             className={`dash-tabbar__item${moreActive || mobileNav ? " dash-tabbar__item--active" : ""}`}
-            aria-label="More menu"
+            aria-label={tn("More")}
             aria-expanded={mobileNav}
             onClick={() => setMobileNav((open) => !open)}
           >
             <span className="dash-tabbar__icon" aria-hidden>
               <DashIcon name="menu" />
             </span>
-            <span className="dash-tabbar__label">More</span>
+            <span className="dash-tabbar__label">{tn("More")}</span>
           </button>
         </nav>
       ) : null}

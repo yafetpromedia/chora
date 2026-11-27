@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useLocale } from "@/components/i18n/locale-provider";
 import { fetchCurriculumPackages, type CurriculumPackageOption } from "@/lib/api";
 import { platformFetch } from "@/lib/platform-auth";
 import { AppToast } from "@/components/ui/app-toast";
@@ -12,6 +13,7 @@ type Props = {
 };
 
 export function CreateSchoolDrawer({ open, onClose, onCreated }: Props) {
+  const { t } = useLocale();
   const [schoolName, setSchoolName] = useState("");
   const [country, setCountry] = useState("Ethiopia");
   const [curriculumPackageKey, setCurriculumPackageKey] = useState("ETHIOPIAN_PRIVATE");
@@ -63,7 +65,7 @@ export function CreateSchoolDrawer({ open, onClose, onCreated }: Props) {
       onCreated();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not create tenant");
+      setError(err instanceof Error ? err.message : t("platformUi.errCreateTenant"));
     } finally {
       setBusy(false);
     }
@@ -74,7 +76,7 @@ export function CreateSchoolDrawer({ open, onClose, onCreated }: Props) {
       <button
         type="button"
         className="stu-drawer-backdrop"
-        aria-label="Close"
+        aria-label={t("common.close")}
         onClick={onClose}
       />
       <aside
@@ -85,11 +87,9 @@ export function CreateSchoolDrawer({ open, onClose, onCreated }: Props) {
         <header className="stu-drawer__head">
           <div>
             <h2 id="plat-create-school-title" className="stu-drawer__title">
-              New tenant
+              {t("platformUi.createTitle")}
             </h2>
-            <p className="stu-drawer__sub">
-              Creates the tenant workspace, trial status, and the first admin account.
-            </p>
+            <p className="stu-drawer__sub">{t("platformUi.createSub")}</p>
           </div>
           <button type="button" className="stu-drawer__close" onClick={onClose}>
             ×
@@ -100,7 +100,7 @@ export function CreateSchoolDrawer({ open, onClose, onCreated }: Props) {
           <AppToast message={error} tone="error" onDismiss={() => setError("")} />
 
           <label className="plat-field">
-            <span>Organization name</span>
+            <span>{t("platformUi.createOrgName")}</span>
             <input
               value={schoolName}
               onChange={(e) => setSchoolName(e.target.value)}
@@ -109,27 +109,27 @@ export function CreateSchoolDrawer({ open, onClose, onCreated }: Props) {
             />
           </label>
           <label className="plat-field">
-            <span>Curriculum package</span>
+            <span>{t("platformUi.createCurriculum")}</span>
             <select
               value={curriculumPackageKey}
               onChange={(e) => setCurriculumPackageKey(e.target.value)}
             >
               {packages.length === 0 ? (
-                <option value="ETHIOPIAN_PRIVATE">Ethiopian private school</option>
+                <option value="ETHIOPIAN_PRIVATE">{t("platformUi.createEthiopianPrivate")}</option>
               ) : (
                 packages.map((p) => (
                   <option key={p.key} value={p.key}>
                     {p.label}
                     {!p.isBlank
-                      ? ` (${p.counts.subjects} subjects)`
-                      : " (blank)"}
+                      ? ` ${t("platformUi.createSubjectsSuffix", { count: p.counts.subjects })}`
+                      : ` ${t("platformUi.createBlankSuffix")}`}
                   </option>
                 ))
               )}
             </select>
           </label>
           <label className="plat-field">
-            <span>Country</span>
+            <span>{t("platformUi.createCountry")}</span>
             <input
               value={country}
               onChange={(e) => setCountry(e.target.value)}
@@ -137,11 +137,11 @@ export function CreateSchoolDrawer({ open, onClose, onCreated }: Props) {
             />
           </label>
 
-          <p className="plat-form-divider">First admin user</p>
+          <p className="plat-form-divider">{t("platformUi.createFirstAdmin")}</p>
 
           <div className="plat-field-row">
             <label className="plat-field">
-              <span>First name</span>
+              <span>{t("platformUi.createFirstName")}</span>
               <input
                 value={adminFirstName}
                 onChange={(e) => setAdminFirstName(e.target.value)}
@@ -150,7 +150,7 @@ export function CreateSchoolDrawer({ open, onClose, onCreated }: Props) {
               />
             </label>
             <label className="plat-field">
-              <span>Last name</span>
+              <span>{t("platformUi.createLastName")}</span>
               <input
                 value={adminLastName}
                 onChange={(e) => setAdminLastName(e.target.value)}
@@ -160,7 +160,7 @@ export function CreateSchoolDrawer({ open, onClose, onCreated }: Props) {
             </label>
           </div>
           <label className="plat-field">
-            <span>Admin email</span>
+            <span>{t("platformUi.createAdminEmail")}</span>
             <input
               type="email"
               value={adminEmail}
@@ -170,7 +170,7 @@ export function CreateSchoolDrawer({ open, onClose, onCreated }: Props) {
             />
           </label>
           <label className="plat-field">
-            <span>Admin password</span>
+            <span>{t("platformUi.createAdminPassword")}</span>
             <input
               type="password"
               value={adminPassword}
@@ -183,10 +183,10 @@ export function CreateSchoolDrawer({ open, onClose, onCreated }: Props) {
 
           <footer className="stu-drawer__foot stu-drawer__foot--split">
             <button type="button" className="plat-btn plat-btn--ghost" onClick={onClose}>
-              Cancel
+              {t("common.cancel")}
             </button>
             <button type="submit" className="plat-btn plat-btn--primary" disabled={busy}>
-              {busy ? "Creating…" : "Create tenant"}
+              {busy ? t("platformUi.createCreating") : t("platformUi.createSubmit")}
             </button>
           </footer>
         </form>

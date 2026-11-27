@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { DashIcon } from "@/components/dashboard/dash-icons";
+import { useLocale } from "@/components/i18n/locale-provider";
 import { AppToast } from "@/components/ui/app-toast";
 import { platformFetch } from "@/lib/platform-auth";
 
@@ -16,6 +17,7 @@ type ProvisioningLogRow = {
 };
 
 export function PlatformProvisioning() {
+  const { t, locale } = useLocale();
   const [logs, setLogs] = useState<ProvisioningLogRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -28,14 +30,14 @@ export function PlatformProvisioning() {
       );
       setLogs(rows);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Load failed");
+      setError(err instanceof Error ? err.message : t("platformUi.loadFailed"));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
-    void load();
+    queueMicrotask(() => void load());
   }, [load]);
 
   const stats = useMemo(() => {
@@ -64,26 +66,23 @@ export function PlatformProvisioning() {
             <DashIcon name="settings" className="dash-icon--md" />
           </span>
           <div>
-            <p className="plat-subjects-v2__eyebrow">Content & Curriculum Engine</p>
-            <h2 className="plat-subjects-v2__title">School provisioning</h2>
-            <p className="plat-subjects-v2__sub">
-              Audit trail when schools are created or re-provisioned from a
-              curriculum package.
-            </p>
+            <p className="plat-subjects-v2__eyebrow">{t("platformUi.contentEngineEyebrow")}</p>
+            <h2 className="plat-subjects-v2__title">{t("platformUi.provTitle")}</h2>
+            <p className="plat-subjects-v2__sub">{t("platformUi.provSub")}</p>
           </div>
         </div>
         <div className="plat-subjects-v2__hero-stats">
           <div className="plat-subjects-v2__stat">
             <strong>{stats.total}</strong>
-            <span>Events</span>
+            <span>{t("platformUi.provStatEvents")}</span>
           </div>
           <div className="plat-subjects-v2__stat">
             <strong>{stats.schools}</strong>
-            <span>Schools</span>
+            <span>{t("platformUi.provStatSchools")}</span>
           </div>
           <div className="plat-subjects-v2__stat">
             <strong>{stats.failed}</strong>
-            <span>Failed</span>
+            <span>{t("platformUi.provStatFailed")}</span>
           </div>
         </div>
       </header>
@@ -94,7 +93,7 @@ export function PlatformProvisioning() {
           className="plat-btn plat-btn--ghost plat-tenants-v2__toolbar-btn"
           onClick={() => void load()}
         >
-          Refresh
+          {t("platformUi.refresh")}
         </button>
       </div>
 
@@ -102,31 +101,31 @@ export function PlatformProvisioning() {
         <table className="plat-subjects-v2__table">
           <thead>
             <tr>
-              <th>When</th>
-              <th>School</th>
-              <th>Package</th>
-              <th>Step</th>
-              <th>Status</th>
+              <th>{t("platformUi.provColWhen")}</th>
+              <th>{t("platformUi.provColSchool")}</th>
+              <th>{t("platformUi.provColPackage")}</th>
+              <th>{t("platformUi.provColStep")}</th>
+              <th>{t("platformUi.provColStatus")}</th>
             </tr>
           </thead>
           <tbody>
             {logs.length === 0 ? (
               <tr>
                 <td colSpan={5} className="plat-subjects-v2__empty">
-                  No provisioning runs yet.
+                  {t("platformUi.provEmpty")}
                 </td>
               </tr>
             ) : (
               logs.map((log) => (
                 <tr key={log.id}>
                   <td className="plat-subjects-v2__muted">
-                    {new Date(log.createdAt).toLocaleString()}
+                    {new Date(log.createdAt).toLocaleString(locale === "am" ? "am-ET" : undefined)}
                   </td>
                   <td>
                     <span className="plat-subjects-v2__name">{log.school.name}</span>
                     <span className="plat-subjects-v2__code"> {log.school.joinCode}</span>
                   </td>
-                  <td>{log.packageKey ?? "—"}</td>
+                  <td>{log.packageKey ?? t("platformUi.emDash")}</td>
                   <td>{log.step}</td>
                   <td>
                     <span className="plat-subjects-v2__pill">{log.status}</span>

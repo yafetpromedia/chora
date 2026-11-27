@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useLocale } from "@/components/i18n/locale-provider";
 import { listStudents } from "@/lib/school-setup";
 import { getFinanceAnalytics, type FinanceAnalytics } from "@/lib/finance";
 import { EtbAmount } from "@/components/billing/etb-amount";
@@ -22,6 +23,7 @@ type Props = {
 };
 
 export function FinanceOfficerDashboard({ error }: Props) {
+  const { t } = useLocale();
   const [loading, setLoading] = useState(true);
   const [schoolName, setSchoolName] = useState(BRAND_NAME);
   const [adminDay, setAdminDay] = useState<AdminDayOverview | null>(null);
@@ -65,27 +67,27 @@ export function FinanceOfficerDashboard({ error }: Props) {
       adminDay={adminDay}
       error={error}
       loading={loading}
-      loadingText="Loading finance analytics…"
+      loadingText={t("staffDash.loadingFinance")}
       chips={
         finance ? (
           <div className="dash-admin-hero__chip dash-admin-hero__chip--muted">
             <DashIcon name="finance" className="dash-icon--sm" />
-            <span>{collectionRate}% collected this term</span>
+            <span>{t("staffDash.collectedThisTerm", { rate: collectionRate })}</span>
           </div>
         ) : null
       }
     >
       {finance ? (
         <>
-          <StaffKpiGrid label="Finance metrics">
+          <StaffKpiGrid label={t("staffDash.financeMetrics")}>
             <Link href="/admin/finance" className="dash-admin-kpi dash-admin-kpi--modern dash-admin-kpi--link">
               <span className="dash-admin-kpi__icon dash-admin-kpi__icon--green">
                 <DashIcon name="finance" />
               </span>
               <div>
-                <p className="dash-admin-kpi__label">Collected</p>
+                <p className="dash-admin-kpi__label">{t("adminDash.collected")}</p>
                 <p className="dash-admin-kpi__value"><EtbAmount cents={finance.collectedCents} symbolSize={18} /></p>
-                <p className="dash-admin-kpi__hint">Total fees received</p>
+                <p className="dash-admin-kpi__hint">{t("staffDash.totalFeesReceived")}</p>
               </div>
             </Link>
 
@@ -94,9 +96,9 @@ export function FinanceOfficerDashboard({ error }: Props) {
                 <DashIcon name="finance" />
               </span>
               <div>
-                <p className="dash-admin-kpi__label">Outstanding</p>
+                <p className="dash-admin-kpi__label">{t("adminDash.outstanding")}</p>
                 <p className="dash-admin-kpi__value"><EtbAmount cents={finance.outstandingCents} symbolSize={18} /></p>
-                <p className="dash-admin-kpi__hint">Unpaid balances</p>
+                <p className="dash-admin-kpi__hint">{t("staffDash.unpaidBalances")}</p>
               </div>
             </Link>
 
@@ -105,9 +107,9 @@ export function FinanceOfficerDashboard({ error }: Props) {
                 <DashIcon name="students" />
               </span>
               <div>
-                <p className="dash-admin-kpi__label">Paid students</p>
+                <p className="dash-admin-kpi__label">{t("staffDash.paidStudents")}</p>
                 <p className="dash-admin-kpi__value">{finance.paidStudents}</p>
-                <p className="dash-admin-kpi__hint">{finance.unpaidStudents} still owing</p>
+                <p className="dash-admin-kpi__hint">{t("staffDash.stillOwing", { count: finance.unpaidStudents })}</p>
               </div>
             </article>
 
@@ -116,23 +118,23 @@ export function FinanceOfficerDashboard({ error }: Props) {
                 <DashIcon name="announcements" />
               </span>
               <div>
-                <p className="dash-admin-kpi__label">Overdue fees</p>
+                <p className="dash-admin-kpi__label">{t("staffDash.overdueFees")}</p>
                 <p className="dash-admin-kpi__value">{finance.overdueFeesCount}</p>
-                <p className="dash-admin-kpi__hint">Need follow-up</p>
+                <p className="dash-admin-kpi__hint">{t("staffDash.needFollowUp")}</p>
               </div>
             </article>
           </StaffKpiGrid>
 
-          <section className="da-analytics" aria-label="Finance analytics">
+          <section className="da-analytics" aria-label={t("staffDash.financeAnalyticsAria")}>
             <div className="da-analytics__grid">
               <article className="da-card da-card--span2">
                 <header className="da-card__head">
                   <div>
-                    <h2 className="da-card__title">Fee collection</h2>
-                    <p className="da-card__sub">Collected vs outstanding</p>
+                    <h2 className="da-card__title">{t("adminDash.feeCollection")}</h2>
+                    <p className="da-card__sub">{t("staffDash.collectedVsOutstanding")}</p>
                   </div>
                   <Link href="/admin/finance" className="da-card__link">
-                    Finance <DashIcon name="chevron" className="dash-icon--xs" />
+                    {t("staffDash.financeLink")} <DashIcon name="chevron" className="dash-icon--xs" />
                   </Link>
                 </header>
                 <FinanceRing
@@ -144,16 +146,18 @@ export function FinanceOfficerDashboard({ error }: Props) {
               <article className="da-card">
                 <header className="da-card__head">
                   <div>
-                    <h2 className="da-card__title">This month</h2>
+                    <h2 className="da-card__title">{t("staffDash.thisMonth")}</h2>
                     <p className="da-card__sub">{finance.month}</p>
                   </div>
                 </header>
                 <ul className="da-finance__legend" style={{ marginTop: "0.5rem" }}>
                   <li className="da-finance__meta">
-                    Collected <strong><EtbAmount cents={finance.collectedThisMonthCents} /></strong>
+                    {t("adminDash.collected")}{" "}
+                    <strong><EtbAmount cents={finance.collectedThisMonthCents} /></strong>
                   </li>
                   <li className="da-finance__meta">
-                    Expected <strong><EtbAmount cents={finance.expectedRevenueCents} /></strong>
+                    {t("staffDash.expected")}{" "}
+                    <strong><EtbAmount cents={finance.expectedRevenueCents} /></strong>
                   </li>
                 </ul>
               </article>
@@ -161,29 +165,29 @@ export function FinanceOfficerDashboard({ error }: Props) {
               <article className="da-card da-card--span2">
                 <header className="da-card__head">
                   <div>
-                    <h2 className="da-card__title">Payment status</h2>
-                    <p className="da-card__sub">{studentCount} students on roll</p>
+                    <h2 className="da-card__title">{t("staffDash.paymentStatus")}</h2>
+                    <p className="da-card__sub">{t("staffDash.studentsOnRoll", { count: studentCount })}</p>
                   </div>
                 </header>
                 <BarChart
                   rows={[
                     {
-                      label: "Fully paid",
+                      label: t("staffDash.fullyPaid"),
                       value: finance.paidStudents,
                       color: "var(--brand-teal-dark)",
                     },
                     {
-                      label: "Outstanding",
+                      label: t("adminDash.outstanding"),
                       value: finance.unpaidStudents,
                       color: "#f59e0b",
                     },
                     {
-                      label: "Overdue fees",
+                      label: t("staffDash.overdueFees"),
                       value: finance.overdueFeesCount,
                       color: "#ef4444",
                     },
                   ]}
-                  emptyText="No fee data yet."
+                  emptyText={t("staffDash.noFeeData")}
                 />
               </article>
             </div>
@@ -191,7 +195,7 @@ export function FinanceOfficerDashboard({ error }: Props) {
         </>
       ) : (
         <div className="da-feed-empty">
-          <p>Finance data is not available yet.</p>
+          <p>{t("staffDash.financeUnavailable")}</p>
         </div>
       )}
     </StaffDashboardShell>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { useLocale } from "@/components/i18n/locale-provider";
 import { AppToast } from "@/components/ui/app-toast";
 import { getApiBaseUrl } from "@/lib/api";
 import { platformUpload } from "@/lib/platform-auth";
@@ -37,6 +38,7 @@ export function DemoVideoSettings({
   onUploaded,
   disabled,
 }: Props) {
+  const { t } = useLocale();
   const videoInputRef = useRef<HTMLInputElement>(null);
   const thumbInputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState("");
@@ -54,7 +56,7 @@ export function DemoVideoSettings({
       onUploaded(settings);
       onVideoUrlChange(settings.demoVideoUrl ?? "");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload failed");
+      setError(err instanceof Error ? err.message : t("platformUi.uploadFailed"));
     } finally {
       setUploading(false);
     }
@@ -67,7 +69,7 @@ export function DemoVideoSettings({
       const dataUrl = await fileToHeroDataUrl(file);
       onThumbnailUrlChange(dataUrl);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Invalid image");
+      setError(err instanceof Error ? err.message : t("platformUi.invalidImage"));
     }
   }
 
@@ -76,21 +78,20 @@ export function DemoVideoSettings({
 
   return (
     <div className="cfg-logo-upload">
-      <p className="cfg-logo-upload__label">See Chora in Action video</p>
+      <p className="cfg-logo-upload__label">{t("platformUi.demoLabel")}</p>
       <p className="cfg-section__lead" style={{ marginTop: 0 }}>
-        Shown on the public homepage and <code>/demo</code>. Paste a YouTube
-        link, or upload an MP4 / WebM (max 250&nbsp;MB).
+        {t("platformUi.demoLead")}
       </p>
 
       <div className="cfg-field" style={{ marginTop: "0.85rem" }}>
-        <label htmlFor="ps-demo-video-url">Video URL</label>
+        <label htmlFor="ps-demo-video-url">{t("platformUi.demoUrlLabel")}</label>
         <input
           id="ps-demo-video-url"
           type="url"
           value={videoUrl}
           onChange={(e) => onVideoUrlChange(e.target.value)}
           disabled={disabled || uploading}
-          placeholder="https://www.youtube.com/watch?v=… or uploaded file URL"
+          placeholder={t("platformUi.demoUrlPh")}
           autoComplete="off"
         />
       </div>
@@ -103,7 +104,11 @@ export function DemoVideoSettings({
             disabled={disabled || uploading}
             onClick={() => videoInputRef.current?.click()}
           >
-            {uploading ? "Uploading…" : hasVideo ? "Replace video file" : "Upload video file"}
+            {uploading
+              ? t("platformUi.uploading")
+              : hasVideo
+                ? t("platformUi.demoReplaceVideo")
+                : t("platformUi.demoUploadVideo")}
           </button>
           {hasVideo ? (
             <button
@@ -112,7 +117,7 @@ export function DemoVideoSettings({
               disabled={disabled || uploading}
               onClick={() => onVideoUrlChange("")}
             >
-              Clear video
+              {t("platformUi.demoClearVideo")}
             </button>
           ) : null}
           <input
@@ -129,11 +134,10 @@ export function DemoVideoSettings({
       </div>
 
       <p className="cfg-logo-upload__label" style={{ marginTop: "1.25rem" }}>
-        Video thumbnail (optional)
+        {t("platformUi.demoThumbLabel")}
       </p>
       <p className="cfg-section__lead" style={{ marginTop: 0 }}>
-        Custom poster shown before play. Leave empty to use the default{" "}
-        <strong>See Chora in Action</strong> artwork.
+        {t("platformUi.demoThumbLead")}
       </p>
 
       <div
@@ -164,7 +168,7 @@ export function DemoVideoSettings({
             disabled={disabled}
             onClick={() => thumbInputRef.current?.click()}
           >
-            {preview ? "Upload new thumbnail" : "Upload thumbnail"}
+            {preview ? t("platformUi.demoUploadNewThumb") : t("platformUi.demoUploadThumb")}
           </button>
           {preview ? (
             <button
@@ -173,7 +177,7 @@ export function DemoVideoSettings({
               disabled={disabled}
               onClick={() => onThumbnailUrlChange("")}
             >
-              Remove thumbnail
+              {t("platformUi.demoRemoveThumb")}
             </button>
           ) : null}
           <input

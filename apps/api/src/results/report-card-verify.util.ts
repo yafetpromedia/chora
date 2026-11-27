@@ -50,7 +50,9 @@ export function parseReportCardVerifyToken(
   const b = Buffer.from(expected);
   if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
   try {
-    const parsed = JSON.parse(fromB64url(body).toString('utf8')) as ReportCardVerifyPayload;
+    const parsed = JSON.parse(
+      fromB64url(body).toString('utf8'),
+    ) as ReportCardVerifyPayload;
     if (
       parsed?.v !== 1 ||
       !parsed.schoolId ||

@@ -49,7 +49,10 @@ export class FinanceController {
 
   @Post('years')
   @Roles('admin')
-  createYear(@CurrentUser() user: AuthUser, @Body() dto: CreateAcademicYearDto) {
+  createYear(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: CreateAcademicYearDto,
+  ) {
     return this.financeService.createYear(user.schoolId, dto);
   }
 
@@ -115,10 +118,7 @@ export class FinanceController {
 
   @Post('payments/:id/approve')
   @Roles('admin', 'staff')
-  approvePending(
-    @CurrentUser() user: AuthUser,
-    @Param('id') id: string,
-  ) {
+  approvePending(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.financeService.approvePendingPayment(
       user.schoolId,
       id,
@@ -143,10 +143,7 @@ export class FinanceController {
 
   @Get('payments/:id/receipt')
   @Roles('admin', 'parent')
-  async receipt(
-    @CurrentUser() user: AuthUser,
-    @Param('id') id: string,
-  ) {
+  async receipt(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.financeService.getPaymentReceipt(user.schoolId, id);
   }
 
@@ -194,11 +191,7 @@ export class FinanceController {
     @CurrentUser() user: AuthUser,
     @Param('profileId') profileId: string,
   ) {
-    return this.financeService.parentFeesDue(
-      user.id,
-      user.schoolId,
-      profileId,
-    );
+    return this.financeService.parentFeesDue(user.id, user.schoolId, profileId);
   }
 
   @Post('parent/students/:profileId/pay-request')
@@ -243,9 +236,6 @@ export class FinanceController {
     @CurrentUser() user: AuthUser,
     @Body() dto: VerifyChapaPaymentDto,
   ) {
-    return this.financeService.verifyChapaPaymentForParent(
-      user.id,
-      dto.txRef,
-    );
+    return this.financeService.verifyChapaPaymentForParent(user.id, dto.txRef);
   }
 }

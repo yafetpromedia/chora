@@ -5,6 +5,7 @@ import { FormEvent, useState } from "react";
 import type { SubscriptionStatus } from "@/lib/api";
 import { redeemSchoolCoupon } from "@/lib/api";
 import { BRAND_NAME } from "@/lib/brand";
+import { useLocale } from "@/components/i18n/locale-provider";
 
 type Props = {
   subscription: SubscriptionStatus;
@@ -13,6 +14,7 @@ type Props = {
 };
 
 export function TrialPaywall({ subscription, role, onRedeemed }: Props) {
+  const { t } = useLocale();
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -27,10 +29,10 @@ export function TrialPaywall({ subscription, role, onRedeemed }: Props) {
     setMessage("");
     try {
       const next = await redeemSchoolCoupon(code.trim());
-      setMessage(next.coupon?.result ?? next.message ?? "Coupon applied.");
+      setMessage(next.coupon?.result ?? next.message ?? t("trialPaywall.couponApplied"));
       onRedeemed?.(next);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not apply coupon");
+      setError(err instanceof Error ? err.message : t("trialPaywall.applyFailed"));
     } finally {
       setBusy(false);
     }
@@ -41,19 +43,17 @@ export function TrialPaywall({ subscription, role, onRedeemed }: Props) {
       <div className="trial-paywall__card">
         <p className="trial-paywall__eyebrow">{BRAND_NAME}</p>
         <h2 id="trial-paywall-title" className="trial-paywall__title">
-          Your trial has ended
+          {t("trialPaywall.title")}
         </h2>
         <p className="trial-paywall__text">
-          {isAdmin
-            ? "Pay for a plan to keep using the school workspace, or enter a coupon code if you have one."
-            : "This school’s trial has ended. Ask the administrator to pay for a plan or enter a coupon code."}
+          {isAdmin ? t("trialPaywall.bodyAdmin") : t("trialPaywall.bodyOther")}
         </p>
 
         {isAdmin ? (
           <>
             <form className="trial-paywall__form" onSubmit={(e) => void onRedeem(e)}>
               <label>
-                <span>Coupon code</span>
+                <span>{t("trialPaywall.couponCode")}</span>
                 <input
                   value={code}
                   onChange={(e) => setCode(e.target.value.toUpperCase())}
@@ -62,16 +62,18 @@ export function TrialPaywall({ subscription, role, onRedeemed }: Props) {
                 />
               </label>
               <button type="submit" disabled={busy || !code.trim()}>
-                {busy ? "Applying…" : "Apply coupon"}
+                {busy ? t("trialPaywall.applying") : t("trialPaywall.applyCoupon")}
               </button>
             </form>
             {error ? <p className="trial-paywall__error">{error}</p> : null}
             {message ? <p className="trial-paywall__ok">{message}</p> : null}
             {subscription.couponCode ? (
-              <p className="trial-paywall__hint">Saved coupon: {subscription.couponCode}</p>
+              <p className="trial-paywall__hint">
+                {t("trialPaywall.savedCoupon", { code: subscription.couponCode })}
+              </p>
             ) : null}
             <Link href="/admin/billing/plans" className="trial-paywall__cta">
-              Pay for a plan
+              {t("trialPaywall.payForPlan")}
             </Link>
           </>
         ) : null}

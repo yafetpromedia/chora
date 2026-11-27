@@ -1,4 +1,12 @@
-import { IsBoolean, IsDateString, IsOptional, IsString } from 'class-validator';
+import {
+  IsBoolean,
+  IsDateString,
+  IsIn,
+  IsOptional,
+  IsString,
+} from 'class-validator';
+
+export type AcademicCalendarSystemDto = 'ETHIOPIAN' | 'GREGORIAN';
 
 export class CreateAcademicYearDto {
   @IsString()
@@ -9,6 +17,11 @@ export class CreateAcademicYearDto {
 
   @IsDateString()
   endDate!: string;
+
+  /** E.C. (Ethiopian) or G.C. (Gregorian). */
+  @IsOptional()
+  @IsIn(['ETHIOPIAN', 'GREGORIAN'])
+  calendarSystem?: AcademicCalendarSystemDto;
 
   @IsOptional()
   @IsBoolean()

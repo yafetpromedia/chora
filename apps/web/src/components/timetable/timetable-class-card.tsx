@@ -1,5 +1,6 @@
 "use client";
 
+import { useLocale } from "@/components/i18n/locale-provider";
 import type { TimetableOverviewClass } from "@/lib/timetable";
 
 type Props = {
@@ -9,6 +10,7 @@ type Props = {
 };
 
 export function TimetableClassCard({ cls, onOpen, onStack }: Props) {
+  const { t } = useLocale();
   const open = Math.max(cls.totalSlots - cls.scheduled, 0);
   const pct =
     cls.totalSlots > 0
@@ -33,24 +35,24 @@ export function TimetableClassCard({ cls, onOpen, onStack }: Props) {
       </div>
       <dl className="tt-class-card__meta">
         <div>
-          <dt>Scheduled</dt>
+          <dt>{t("timetableUi.classCardScheduled")}</dt>
           <dd>
             {cls.scheduled}
             <span> / {cls.totalSlots}</span>
           </dd>
         </div>
         <div>
-          <dt>Open</dt>
+          <dt>{t("timetableUi.classCardOpen")}</dt>
           <dd>{open}</dd>
         </div>
       </dl>
       <div className="tt-class-card__actions">
         <button type="button" className="tt-admin__btn tt-admin__btn--primary" onClick={onOpen}>
-          Open class
+          {t("timetableUi.openClass")}
         </button>
         {onStack ? (
         <button type="button" className="tt-admin__btn tt-admin__btn--ghost" onClick={onStack}>
-          View board
+          {t("timetableUi.viewBoard")}
         </button>
         ) : null}
       </div>

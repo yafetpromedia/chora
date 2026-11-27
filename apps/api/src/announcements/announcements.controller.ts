@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import type { AuthUser } from '../common/auth.types';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -20,26 +28,37 @@ export class AnnouncementsController {
   }
 
   @Get()
-  @Roles('admin', 'teacher', 'student', 'parent')
+  @Roles('admin', 'teacher', 'student', 'parent', 'staff')
   list(@CurrentUser() user: AuthUser) {
     return this.announcementsService.list(user.schoolId, user.id);
   }
 
   @Get('unread-count')
-  @Roles('admin', 'teacher', 'student', 'parent')
+  @Roles('admin', 'teacher', 'student', 'parent', 'staff')
   unreadCount(@CurrentUser() user: AuthUser) {
     return this.announcementsService.unreadCount(user.schoolId, user.id);
   }
 
   @Post('read-all')
-  @Roles('admin', 'teacher', 'student', 'parent')
+  @Roles('admin', 'teacher', 'student', 'parent', 'staff')
   markAllRead(@CurrentUser() user: AuthUser) {
     return this.announcementsService.markAllRead(user.schoolId, user.id);
   }
 
   @Post(':id/read')
-  @Roles('admin', 'teacher', 'student', 'parent')
+  @Roles('admin', 'teacher', 'student', 'parent', 'staff')
   markRead(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     return this.announcementsService.markRead(id, user.id);
+  }
+
+  /** Remove from this user's inbox (marks read; deletes personal alerts). */
+  @Delete(':id')
+  @Roles('admin', 'teacher', 'student', 'parent', 'staff')
+  dismiss(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.announcementsService.dismissForUser(
+      id,
+      user.schoolId,
+      user.id,
+    );
   }
 }

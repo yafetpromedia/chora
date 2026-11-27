@@ -2,20 +2,24 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useLocale } from "@/components/i18n/locale-provider";
 import { DashIcon } from "@/components/dashboard/dash-icons";
 import {
   AcademicsBadge,
   AcademicsEmpty,
   AcademicsHero,
 } from "@/components/academics/academics-ui";
+import { AppConfirmDialog } from "@/components/ui/app-confirm-dialog";
 import { AppToast } from "@/components/ui/app-toast";
 import {
   createSubject,
+  deleteSubject,
   listClassSubjects,
   listSubjects,
   updateSubject,
   type Subject,
 } from "@/lib/results";
+import { suggestSubjectCode } from "@/lib/subject-label";
 
 function subjectInitials(name: string, code: string) {
   const words = name.trim().split(/\s+/).filter(Boolean);
@@ -80,13 +84,19 @@ function buildSubjectInsights(
   return result;
 }
 
-function formatGradePreview(grades: string[]) {
+function formatGradePreview(
+  grades: string[],
+  t: (key: string, vars?: Record<string, string | number>) => string,
+) {
   if (grades.length === 0) return "";
   if (grades.length <= 2) return grades.join(", ");
-  return `${grades.slice(0, 2).join(", ")} +${grades.length - 2} more`;
+  return `${grades.slice(0, 2).join(", ")} ${t("subjectsUi.moreGrades", {
+    count: grades.length - 2,
+  })}`;
 }
 
 export function SubjectsWorkspace() {
+  const { t, locale } = useLocale();
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [subjectInsights, setSubjectInsights] = useState<Record<string, SubjectInsights>>({});
   const [loading, setLoading] = useState(true);
@@ -94,10 +104,13 @@ export function SubjectsWorkspace() {
   const [success, setSuccess] = useState("");
   const [search, setSearch] = useState("");
   const [busy, setBusy] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [panelOpen, setPanelOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Subject | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Subject | null>(null);
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
+  const [codeTouched, setCodeTouched] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -107,14 +120,31 @@ export function SubjectsWorkspace() {
       setSubjects(rows);
       setSubjectInsights(buildSubjectInsights(assignments));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load subjects");
+      setError(err instanceof Error ? err.message : t("subjectsUi.loadFailed"));
     } finally {
       setLoading(false);
     }
   }
 
   useEffect(() => {
-    void load();
+    let cancelled = false;
+    void (async () => {
+      try {
+        const [rows, assignments] = await Promise.all([listSubjects(), listClassSubjects()]);
+        if (cancelled) return;
+        setSubjects(rows);
+        setSubjectInsights(buildSubjectInsights(assignments));
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : t("subjectsUi.loadFailed"));
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const assignedCount = useMemo(
@@ -135,6 +165,7 @@ export function SubjectsWorkspace() {
   function resetForm() {
     setName("");
     setCode("");
+    setCodeTouched(false);
     setEditTarget(null);
   }
 
@@ -147,7 +178,15 @@ export function SubjectsWorkspace() {
     setEditTarget(subject);
     setName(subject.name);
     setCode(subject.code);
+    setCodeTouched(true);
     setPanelOpen(true);
+  }
+
+  function onNameChange(value: string) {
+    setName(value);
+    if (!editTarget && !codeTouched) {
+      setCode(suggestSubjectCode(value));
+    }
   }
 
   async function onSave(e: FormEvent) {
@@ -156,50 +195,76 @@ export function SubjectsWorkspace() {
     setError("");
     setSuccess("");
     try {
+      const nextName = name.trim();
+      const nextCode = code.trim().toUpperCase();
       if (editTarget) {
-        await updateSubject(editTarget.id, { name: name.trim() });
-        setSuccess(`${name.trim()} updated.`);
+        await updateSubject(editTarget.id, { name: nextName, code: nextCode });
+        setSuccess(t("subjectsUi.updated", { name: nextName }));
       } else {
-        await createSubject({ name: name.trim(), code: code.trim().toUpperCase() });
-        setSuccess(`${name.trim()} added to the catalog.`);
+        await createSubject({ name: nextName, code: nextCode });
+        setSuccess(t("subjectsUi.added", { name: nextName }));
       }
       setPanelOpen(false);
       resetForm();
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Save failed");
+      setError(err instanceof Error ? err.message : t("subjectsUi.saveFailed"));
     } finally {
       setBusy(false);
     }
   }
 
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    setError("");
+    setSuccess("");
+    try {
+      await deleteSubject(deleteTarget.id);
+      setSuccess(t("subjectsUi.deleted", { name: deleteTarget.name }));
+      if (editTarget?.id === deleteTarget.id) {
+        setPanelOpen(false);
+        resetForm();
+      }
+      setDeleteTarget(null);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("subjectsUi.deleteFailed"));
+      setDeleteTarget(null);
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   const heroStats = [
-    { label: "In catalog", value: loading ? "—" : subjects.length },
-    { label: "In classes", value: loading ? "—" : assignedCount },
+    { label: t("subjectsUi.statInCatalog"), value: loading ? "—" : subjects.length },
+    { label: t("subjectsUi.statInClasses"), value: loading ? "—" : assignedCount },
     {
-      label: "Unassigned",
+      label: t("subjectsUi.statUnassigned"),
       value: loading ? "—" : Math.max(subjects.length - assignedCount, 0),
     },
-    { label: "Showing", value: loading ? "—" : filtered.length },
+    { label: t("subjectsUi.statShowing"), value: loading ? "—" : filtered.length },
   ];
 
   return (
     <div className="acad-page sub-v2">
       <AcademicsHero
-        chip="Academics"
+        chip={t("subjectsUi.chip")}
         compact
         backHref="/admin/academics"
-        title="Subject catalog"
-        subtitle="Define what your school teaches — then assign subjects to grades, sections, and teachers for the active year."
+        title={t("subjectsUi.title")}
+        subtitle={t("subjectsUi.subtitle")}
         stats={heroStats}
         badges={
           <>
             <AcademicsBadge variant="live">
-              {loading ? "Loading…" : `${subjects.length} subjects`}
+              {loading
+                ? t("common.loading")
+                : t("subjectsUi.badgeSubjects", { count: subjects.length })}
             </AcademicsBadge>
             {!loading && assignedCount > 0 ? (
               <AcademicsBadge variant="default">
-                {assignedCount} linked to classes
+                {t("subjectsUi.badgeLinked", { count: assignedCount })}
               </AcademicsBadge>
             ) : null}
           </>
@@ -212,6 +277,27 @@ export function SubjectsWorkspace() {
         tone="success"
         onDismiss={() => setSuccess("")}
       />
+      <AppConfirmDialog
+        open={Boolean(deleteTarget)}
+        title={t("subjectsUi.deleteTitle", {
+          name: deleteTarget?.name ?? t("subjectsUi.panelNew"),
+        })}
+        message={
+          deleteTarget
+            ? t("subjectsUi.deleteMessage", {
+                name: deleteTarget.name,
+                code: deleteTarget.code,
+              })
+            : ""
+        }
+        confirmLabel={t("subjectsUi.confirmDelete")}
+        tone="danger"
+        busy={deleting}
+        onCancel={() => {
+          if (!deleting) setDeleteTarget(null);
+        }}
+        onConfirm={() => void confirmDelete()}
+      />
 
       <div className="sub-v2__layout">
         <section className="sub-v2__main">
@@ -222,25 +308,25 @@ export function SubjectsWorkspace() {
                 type="search"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search name or code…"
+                placeholder={t("subjectsUi.searchPlaceholder")}
               />
             </label>
             <button type="button" className="sub-v2__btn sub-v2__btn--primary" onClick={openCreate}>
-              + Add subject
+              {t("subjectsUi.addSubject")}
             </button>
           </div>
 
           {loading ? (
             <div className="sub-v2__loading">
               <span className="sub-v2__loading-spinner" aria-hidden />
-              <p>Loading catalog…</p>
+              <p>{t("subjectsUi.loadingCatalog")}</p>
             </div>
           ) : filtered.length === 0 ? (
             <AcademicsEmpty
               message={
                 subjects.length === 0
-                  ? "No subjects yet. Add Mathematics, English, Biology, and other core subjects to get started."
-                  : "No subjects match your search."
+                  ? t("subjectsUi.emptyNoSubjects")
+                  : t("subjectsUi.emptyNoSearch")
               }
             />
           ) : (
@@ -264,46 +350,68 @@ export function SubjectsWorkspace() {
                         <div className="sub-v2__details">
                           <div className="sub-v2__detail-pills">
                             <span className="sub-v2__detail-pill">
-                              <strong>{classes}</strong> class{classes === 1 ? "" : "es"}
+                              <strong>{classes}</strong>{" "}
+                              {classes === 1
+                                ? t("subjectsUi.classOne")
+                                : t("subjectsUi.classMany")}
                             </span>
                             <span className="sub-v2__detail-pill">
-                              <strong>{info?.gradeCount ?? 0}</strong> grade
-                              {(info?.gradeCount ?? 0) === 1 ? "" : "s"}
+                              <strong>{info?.gradeCount ?? 0}</strong>{" "}
+                              {(info?.gradeCount ?? 0) === 1
+                                ? t("subjectsUi.gradeOne")
+                                : t("subjectsUi.gradeMany")}
                             </span>
                             <span className="sub-v2__detail-pill">
-                              <strong>{info?.teacherCount ?? 0}</strong> teacher
-                              {(info?.teacherCount ?? 0) === 1 ? "" : "s"}
+                              <strong>{info?.teacherCount ?? 0}</strong>{" "}
+                              {(info?.teacherCount ?? 0) === 1
+                                ? t("subjectsUi.teacherOne")
+                                : t("subjectsUi.teacherMany")}
                             </span>
                           </div>
                           {info?.grades.length ? (
                             <p className="sub-v2__detail-line">
-                              <span>Used in</span> {formatGradePreview(info.grades)}
+                              <span>{t("subjectsUi.usedIn")}</span>{" "}
+                              {formatGradePreview(info.grades, t)}
                             </p>
                           ) : null}
                           {(info?.needsTeacher ?? 0) > 0 ? (
                             <p className="sub-v2__detail-warn">
-                              {info?.needsTeacher} class{(info?.needsTeacher ?? 0) === 1 ? "" : "es"}{" "}
-                              need a teacher
+                              {t("subjectsUi.needsTeacher", {
+                                count: info?.needsTeacher ?? 0,
+                                plural:
+                                  locale === "en" &&
+                                  (info?.needsTeacher ?? 0) !== 1
+                                    ? "es"
+                                    : "",
+                              })}
                             </p>
                           ) : null}
                         </div>
                       ) : (
-                        <p className="sub-v2__meta">Not assigned to any class yet</p>
+                        <p className="sub-v2__meta">{t("subjectsUi.notAssigned")}</p>
                       )}
 
                       <div className="sub-v2__tags">
                         {s.isSystem ? (
-                          <span className="sub-v2__tag sub-v2__tag--system">Core catalog</span>
+                          <span className="sub-v2__tag sub-v2__tag--system">
+                            {t("subjectsUi.tagCore")}
+                          </span>
                         ) : (
-                          <span className="sub-v2__tag">School custom</span>
+                          <span className="sub-v2__tag">{t("subjectsUi.tagCustom")}</span>
                         )}
                         {s.isCustomized ? (
-                          <span className="sub-v2__tag sub-v2__tag--edited">Renamed</span>
+                          <span className="sub-v2__tag sub-v2__tag--edited">
+                            {t("subjectsUi.tagRenamed")}
+                          </span>
                         ) : null}
                         {assigned ? (
-                          <span className="sub-v2__tag sub-v2__tag--active">In use</span>
+                          <span className="sub-v2__tag sub-v2__tag--active">
+                            {t("subjectsUi.tagInUse")}
+                          </span>
                         ) : (
-                          <span className="sub-v2__tag sub-v2__tag--idle">Unassigned</span>
+                          <span className="sub-v2__tag sub-v2__tag--idle">
+                            {t("subjectsUi.tagUnassigned")}
+                          </span>
                         )}
                       </div>
                     </div>
@@ -312,14 +420,27 @@ export function SubjectsWorkspace() {
                         href="/admin/subjects/assign"
                         className="sub-v2__action sub-v2__action--primary"
                       >
-                        {assigned ? "Manage" : "Assign"}
+                        {assigned ? t("subjectsUi.manage") : t("subjectsUi.assign")}
                       </Link>
                       <button
                         type="button"
                         className="sub-v2__action"
                         onClick={() => openEdit(s)}
                       >
-                        Edit
+                        {t("subjectsUi.edit")}
+                      </button>
+                      <button
+                        type="button"
+                        className="sub-v2__action sub-v2__action--danger"
+                        onClick={() => setDeleteTarget(s)}
+                        disabled={assigned}
+                        title={
+                          assigned
+                            ? t("subjectsUi.removeFromClassesFirst")
+                            : t("subjectsUi.deleteName", { name: s.name })
+                        }
+                      >
+                        {t("common.delete")}
                       </button>
                     </div>
                   </li>
@@ -336,44 +457,56 @@ export function SubjectsWorkspace() {
                 <DashIcon name="library" className="dash-icon--sm" />
               </div>
               <div>
-                <h3>{editTarget ? "Edit subject" : "New subject"}</h3>
+                <h3>
+                  {editTarget ? t("subjectsUi.panelEdit") : t("subjectsUi.panelNew")}
+                </h3>
                 <p>
                   {editTarget
-                    ? "Update the display name. Codes stay fixed once created."
-                    : "Add a subject to your school catalog before assigning it to classes."}
+                    ? t("subjectsUi.panelEditSub")
+                    : t("subjectsUi.panelNewSub")}
                 </p>
               </div>
             </header>
 
             <div className="sub-v2__form-fields">
               <label>
-                Subject name
+                {t("subjectsUi.fieldName")}
                 <input
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. Mathematics"
+                  onChange={(e) => onNameChange(e.target.value)}
+                  placeholder={t("subjectsUi.namePlaceholder")}
                   required
                 />
               </label>
               <label>
-                Code
+                {t("subjectsUi.fieldCode")}
                 <input
                   value={code}
-                  onChange={(e) => setCode(e.target.value.toUpperCase())}
-                  placeholder="e.g. MATH"
-                  required={!editTarget}
-                  disabled={!!editTarget}
+                  onChange={(e) => {
+                    setCodeTouched(true);
+                    setCode(e.target.value.toUpperCase());
+                  }}
+                  placeholder={t("subjectsUi.codePlaceholder")}
+                  required
                   maxLength={12}
                 />
               </label>
-              {editTarget ? (
-                <p className="sub-v2__form-note">
-                  Subject codes are permanent identifiers used in results and timetables.
-                </p>
-              ) : null}
+              <p className="sub-v2__form-note">
+                {t("subjectsUi.formNote")}
+              </p>
             </div>
 
             <footer className="sub-v2__form-foot">
+              {editTarget ? (
+                <button
+                  type="button"
+                  className="acad-btn acad-btn--danger acad-btn--block"
+                  disabled={busy || deleting}
+                  onClick={() => setDeleteTarget(editTarget)}
+                >
+                  {t("subjectsUi.confirmDelete")}
+                </button>
+              ) : null}
               <button
                 type="button"
                 className="acad-btn acad-btn--ghost acad-btn--block"
@@ -382,10 +515,14 @@ export function SubjectsWorkspace() {
                   resetForm();
                 }}
               >
-                Cancel
+                {t("common.cancel")}
               </button>
               <button type="submit" className="acad-btn acad-btn--primary acad-btn--block" disabled={busy}>
-                {busy ? "Saving…" : editTarget ? "Save changes" : "Add subject"}
+                {busy
+                  ? t("common.saving")
+                  : editTarget
+                    ? t("subjectsUi.saveChanges")
+                    : t("subjectsUi.addSubject")}
               </button>
             </footer>
           </form>

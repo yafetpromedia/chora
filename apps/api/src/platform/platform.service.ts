@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  Optional,
+} from '@nestjs/common';
 import {
   AttendanceConcernStatus,
   Plan,
@@ -16,6 +21,7 @@ import { SchoolsService } from '../schools/schools.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { UsersService } from '../users/users.service';
 import { PlanCatalogService } from '../subscriptions/plan-catalog.service';
+import { EmailService } from '../email/email.service';
 import { CreateTenantSchoolDto } from './dto/create-tenant-school.dto';
 import type { UpdatePlanCatalogDto } from './dto/update-plan-catalog.dto';
 import type { UpdateSchoolPlanDto } from './dto/update-plan-catalog.dto';
@@ -30,6 +36,7 @@ export class PlatformService {
     private readonly planCatalogService: PlanCatalogService,
     private readonly curriculumCatalog: CurriculumCatalogService,
     private readonly provisioning: SchoolProvisioningService,
+    @Optional() private readonly email?: EmailService,
   ) {}
 
   listCurriculumPackages() {
@@ -65,7 +72,9 @@ export class PlatformService {
   }
 
   async updateSchoolPlan(schoolId: string, dto: UpdateSchoolPlanDto) {
-    const school = await this.prisma.school.findUnique({ where: { id: schoolId } });
+    const school = await this.prisma.school.findUnique({
+      where: { id: schoolId },
+    });
     if (!school) throw new NotFoundException('School not found');
 
     const sub = await this.subscriptionsService.adminSetSchoolPlan(schoolId, {
@@ -126,7 +135,9 @@ export class PlatformService {
       }),
     ]);
 
-    const trialSchools = subscriptions.filter((s) => s.plan === Plan.TRIAL).length;
+    const trialSchools = subscriptions.filter(
+      (s) => s.plan === Plan.TRIAL,
+    ).length;
     const paidSchools = subscriptions.filter(
       (s) => s.plan !== Plan.TRIAL && s.isActive,
     ).length;
@@ -218,7 +229,9 @@ export class PlatformService {
         description: row.description,
         subjectName: row.subjectNameSnapshot,
         periodLabel: row.periodLabel,
-        classLabel: [row.grade.name, row.section?.name].filter(Boolean).join(' · '),
+        classLabel: [row.grade.name, row.section?.name]
+          .filter(Boolean)
+          .join(' · '),
         date: row.date.toISOString().slice(0, 10),
         createdAt: row.createdAt.toISOString(),
       })),
@@ -332,6 +345,29 @@ export class PlatformService {
       data: { status },
       select: { id: true, name: true, status: true },
     });
+    const statusLabel =
+      status === SchoolStatus.ACTIVE
+        ? 'Active'
+        : status === SchoolStatus.SUSPENDED
+          ? 'Suspended'
+          : 'Trial';
+    const message =
+      status === SchoolStatus.ACTIVE
+        ? `${school.name} is active on Chora.`
+        : status === SchoolStatus.SUSPENDED
+          ? `${school.name} is suspended on Chora. Sign-in for this school is paused.`
+          : `${school.name} is on a Chora trial.`;
+    try {
+      await this.email?.notifySchoolAdmins({
+        schoolId,
+        category: 'school_decision',
+        templateId: 'school_decision',
+        idempotencyPrefix: `school-status:${schoolId}:${status}:${new Date().toISOString().slice(0, 13)}`,
+        vars: { statusLabel, message, schoolName: school.name },
+      });
+    } catch {
+      // Status change already succeeded.
+    }
     return school;
   }
 
@@ -373,8 +409,10 @@ export class PlatformService {
     });
 
     const adminUsername =
-      dto.adminEmail.split('@')[0]?.toLowerCase().replace(/[^a-z0-9._-]/g, '') ||
-      'admin';
+      dto.adminEmail
+        .split('@')[0]
+        ?.toLowerCase()
+        .replace(/[^a-z0-9._-]/g, '') || 'admin';
     const admin = await this.usersService.createUser({
       username: adminUsername,
       email: dto.adminEmail,
@@ -384,6 +422,24 @@ export class PlatformService {
       role: 'admin',
       schoolId: school.id,
       schoolJoinCode: school.joinCode,
+    });
+    const actionUrl =
+      process.env.WEB_APP_URL?.replace(/\/$/, '') ?? '';
+    await this.email?.enqueueSafe({
+      to: admin.email,
+      category: 'welcome',
+      templateId: 'welcome',
+      schoolId: school.id,
+      idempotencyKey: `welcome:${admin.id}`,
+      vars: { firstName: admin.firstName, schoolName: school.name, actionUrl },
+    });
+    await this.email?.enqueueSafe({
+      to: admin.email,
+      category: 'trial_activation',
+      templateId: 'trial_activation',
+      schoolId: school.id,
+      idempotencyKey: `trial:${school.id}`,
+      vars: { firstName: admin.firstName, schoolName: school.name, actionUrl },
     });
 
     return {

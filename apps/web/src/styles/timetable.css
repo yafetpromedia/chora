@@ -46,25 +46,20 @@
 }
 
 .tt-hero {
-  display: grid;
-  gap: 1rem;
-  padding: 1.2rem 1.25rem;
+  padding: 1.25rem 1.35rem;
   border-radius: 1.15rem;
-  background: linear-gradient(145deg, var(--brand-ink) 0%, var(--brand-teal-dark) 52%, var(--brand-teal) 100%);
   color: #fff;
-  box-shadow: 0 14px 40px rgba(30, 74, 74, 0.2);
   min-width: 0;
 }
 
 @media (min-width: 860px) {
   .tt-hero {
-    grid-template-columns: 1fr auto;
-    align-items: end;
     padding: 1.35rem 1.5rem;
   }
 }
 
 .tt-hero__main {
+  flex: 1 1 240px;
   min-width: 0;
 }
 
@@ -269,6 +264,14 @@
   font-size: 0.95rem;
   font-weight: 800;
   color: var(--lite-black);
+  line-height: 1.3;
+}
+
+.tt-timeline__subject-name {
+  margin: 0.15rem 0 0;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--brand-muted);
   line-height: 1.3;
 }
 

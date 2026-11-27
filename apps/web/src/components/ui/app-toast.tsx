@@ -19,7 +19,10 @@ export function AppToast({
   durationMs = 4000,
 }: Props) {
   const onDismissRef = useRef(onDismiss);
-  onDismissRef.current = onDismiss;
+
+  useEffect(() => {
+    onDismissRef.current = onDismiss;
+  }, [onDismiss]);
 
   useEffect(() => {
     if (!message || durationMs <= 0) return;

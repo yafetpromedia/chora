@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { useLocale } from "@/components/i18n/locale-provider";
 import type {
   TimetablePeriod,
   TimetableSlot,
@@ -39,8 +40,11 @@ function shortClassLabel(gradeName: string, sectionName: string | null) {
 function subjectLabel(entry: TimetableSlot) {
   const name = entry.subject.name.trim();
   const code = entry.subject.code?.trim();
-  if (code && code.toLowerCase() !== name.toLowerCase()) {
-    return { full: `${name} (${code})`, compact: code };
+  if (code) {
+    return {
+      full: code.toLowerCase() !== name.toLowerCase() ? `${name} (${code})` : name,
+      compact: code,
+    };
   }
   return { full: name, compact: name.length > 8 ? name.slice(0, 7) : name };
 }
@@ -80,6 +84,7 @@ export function TimetableMasterBoard({
   classes,
   onEditClass,
 }: Props) {
+  const { t } = useLocale();
   const visibleDays = useMemo(
     () => boardWeekdays(weekdays, classes),
     [weekdays, classes],
@@ -88,20 +93,24 @@ export function TimetableMasterBoard({
   if (classes.length === 0 || periods.length === 0) {
     return (
       <div className="tt-admin__empty">
-        <p>No classes to show on the board.</p>
+        <p>{t("timetableUi.noClassesOnBoard")}</p>
       </div>
     );
   }
 
   return (
     <div className="tt-board" id="tt-board-print">
-      <h2 className="tt-board__print-title">School timetable</h2>
+      <h2 className="tt-board__print-title">{t("timetableUi.printTitle")}</h2>
       <div className="tt-board__scroll">
         <table className="tt-board__table">
           <thead>
             <tr>
-              <th className="tt-board__corner tt-board__corner--day">Day</th>
-              <th className="tt-board__corner tt-board__corner--period">#</th>
+              <th className="tt-board__corner tt-board__corner--day">
+                {t("timetableUi.boardDay")}
+              </th>
+              <th className="tt-board__corner tt-board__corner--period">
+                {t("timetableUi.boardPeriodNum")}
+              </th>
               {classes.map((cls) => {
                 const label = shortClassLabel(cls.gradeName, cls.sectionName);
                 return (
@@ -110,7 +119,7 @@ export function TimetableMasterBoard({
                       type="button"
                       className="tt-board__class-btn"
                       onClick={() => onEditClass(cls)}
-                      title={`Edit ${label}`}
+                      title={t("timetableUi.editClassTitle", { label })}
                     >
                       {label}
                     </button>

@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useLocale } from "@/components/i18n/locale-provider";
 import { DashIcon } from "@/components/dashboard/dash-icons";
 import {
   ResultsStudentPicker,
@@ -58,6 +59,7 @@ export function ReportCardCommentsPanel({
   hideSelectors = false,
   onError,
 }: Props) {
+  const { t } = useLocale();
   const [termId, setTermId] = useState(defaultTermId ?? "");
   const [studentId, setStudentId] = useState(defaultStudentId ?? "");
   const [report, setReport] = useState<ReportCard | null>(null);
@@ -69,13 +71,17 @@ export function ReportCardCommentsPanel({
   const [error, setError] = useState("");
   const [saved, setSaved] = useState("");
 
-  useEffect(() => {
+  const [prevDefaultTermId, setPrevDefaultTermId] = useState(defaultTermId);
+  if (defaultTermId !== prevDefaultTermId) {
+    setPrevDefaultTermId(defaultTermId);
     if (defaultTermId) setTermId(defaultTermId);
-  }, [defaultTermId]);
+  }
 
-  useEffect(() => {
+  const [prevDefaultStudentId, setPrevDefaultStudentId] = useState(defaultStudentId);
+  if (defaultStudentId !== prevDefaultStudentId) {
+    setPrevDefaultStudentId(defaultStudentId);
     if (defaultStudentId) setStudentId(defaultStudentId);
-  }, [defaultStudentId]);
+  }
 
   const studentOptions = useMemo<ResultsStudentOption[]>(
     () =>
@@ -92,29 +98,42 @@ export function ReportCardCommentsPanel({
     [students],
   );
 
-  const loadReport = useCallback(async () => {
-    if (!studentId || !termId) return;
-    setLoading(true);
-    setError("");
-    setSaved("");
-    try {
-      const card = await getReportCard(studentId, termId);
-      setReport(card);
-      setTeacherComment(card.teacherComment ?? "");
-      setPrincipalComment(card.principalComment ?? "");
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Could not load report";
-      setError(message);
-      onError?.(message);
-      setReport(null);
-    } finally {
-      setLoading(false);
+  const reportKey = studentId && termId ? `${studentId}:${termId}` : "";
+  const [prevReportKey, setPrevReportKey] = useState("");
+  if (reportKey !== prevReportKey) {
+    setPrevReportKey(reportKey);
+    if (reportKey) {
+      setLoading(true);
+      setError("");
+      setSaved("");
     }
-  }, [studentId, termId, onError]);
+  }
 
   useEffect(() => {
-    if (studentId && termId) void loadReport();
-  }, [studentId, termId, loadReport]);
+    if (!studentId || !termId) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const card = await getReportCard(studentId, termId);
+        if (cancelled) return;
+        setReport(card);
+        setTeacherComment(card.teacherComment ?? "");
+        setPrincipalComment(card.principalComment ?? "");
+      } catch (err) {
+        if (cancelled) return;
+        const message =
+          err instanceof Error ? err.message : t("resultsUi.loadReportCommentsFailed");
+        setError(message);
+        onError?.(message);
+        setReport(null);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [studentId, termId, onError]);
 
   async function onSave() {
     if (!studentId || !termId) return;
@@ -126,9 +145,9 @@ export function ReportCardCommentsPanel({
         teacherComment,
         principalComment,
       });
-      setSaved("Comments saved.");
+      setSaved(t("resultsUi.commentsSaved"));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Save failed");
+      setError(err instanceof Error ? err.message : t("resultsUi.saveCommentsFailed"));
     } finally {
       setSaving(false);
     }
@@ -136,7 +155,7 @@ export function ReportCardCommentsPanel({
 
   async function onAiDraft(kind: "teacher" | "principal") {
     if (!report) {
-      setError("Load a report card first.");
+      setError(t("resultsUi.aiLoadFirst"));
       return;
     }
     setAiBusy(kind);
@@ -151,7 +170,7 @@ export function ReportCardCommentsPanel({
       if (kind === "teacher") setTeacherComment(res.content);
       else setPrincipalComment(res.content);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "AI draft failed");
+      setError(err instanceof Error ? err.message : t("resultsUi.aiDraftFailed"));
     } finally {
       setAiBusy(null);
     }
@@ -164,10 +183,10 @@ export function ReportCardCommentsPanel({
           <DashIcon name="profile" className="dash-icon--sm" />
         </span>
         <div className="rc-comments__titles">
-          <h3>Teacher &amp; principal comments</h3>
-          <p>Remarks print on the report card back page when scores are published.</p>
+          <h3>{t("resultsUi.rcxTitle")}</h3>
+          <p>{t("resultsUi.rcxSub")}</p>
         </div>
-        <span className="rc-comments__badge">General remarks</span>
+        <span className="rc-comments__badge">{t("resultsUi.rcxBadge")}</span>
       </header>
 
       {!hideSelectors ? (
@@ -181,9 +200,9 @@ export function ReportCardCommentsPanel({
             />
           </div>
           <label className="rc-v2__field">
-            <span>Term</span>
+            <span>{t("resultsUi.term")}</span>
             <select value={termId} onChange={(e) => setTermId(e.target.value)}>
-              <option value="">Select term</option>
+              <option value="">{t("resultsUi.selectTerm")}</option>
               {terms.map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.name} ({t.academicYear.name})
@@ -197,7 +216,7 @@ export function ReportCardCommentsPanel({
       {loading ? (
         <div className="rc-v2__loading">
           <span className="rc-v2__loading-spinner" aria-hidden />
-          <p>Loading comments…</p>
+          <p>{t("resultsUi.loadingComments")}</p>
         </div>
       ) : null}
 
@@ -205,46 +224,46 @@ export function ReportCardCommentsPanel({
         <div className="rc-comments__grid">
           <label className="rc-comments__field">
             <span className="rc-comments__label-row">
-              <span>Teacher comment</span>
+              <span>{t("resultsUi.teacherComment")}</span>
               <button
                 type="button"
                 className="rc-comments__ai"
                 disabled={aiBusy !== null}
                 onClick={() => void onAiDraft("teacher")}
               >
-                {aiBusy === "teacher" ? "Drafting…" : "Draft with AI"}
+                {aiBusy === "teacher" ? t("resultsUi.drafting") : t("resultsUi.draftWithAi")}
               </button>
             </span>
             <textarea
               rows={7}
               value={teacherComment}
               onChange={(e) => setTeacherComment(e.target.value)}
-              placeholder="Homeroom or class teacher remark…"
+              placeholder={t("resultsUi.teacherCommentPlaceholder")}
             />
           </label>
           <label className="rc-comments__field">
             <span className="rc-comments__label-row">
-              <span>Principal comment</span>
+              <span>{t("resultsUi.principalComment")}</span>
               <button
                 type="button"
                 className="rc-comments__ai"
                 disabled={aiBusy !== null}
                 onClick={() => void onAiDraft("principal")}
               >
-                {aiBusy === "principal" ? "Drafting…" : "Draft with AI"}
+                {aiBusy === "principal" ? t("resultsUi.drafting") : t("resultsUi.draftWithAi")}
               </button>
             </span>
             <textarea
               rows={7}
               value={principalComment}
               onChange={(e) => setPrincipalComment(e.target.value)}
-              placeholder="Principal or academic director remark…"
+              placeholder={t("resultsUi.principalCommentPlaceholder")}
             />
           </label>
         </div>
       ) : !loading && studentId && termId ? (
         <div className="rc-v2__empty rc-v2__empty--inline">
-          <p>Comments load automatically for the selected student and term.</p>
+          <p>{t("resultsUi.rcxEmptyHint")}</p>
         </div>
       ) : null}
 
@@ -253,14 +272,14 @@ export function ReportCardCommentsPanel({
 
       {report ? (
         <div className="rc-comments__foot">
-          <p>Saved remarks appear under General Remarks on the printed card.</p>
+          <p>{t("resultsUi.rcxFoot")}</p>
           <button
             type="button"
             className="rc-v2__btn rc-v2__btn--primary"
             disabled={saving}
             onClick={() => void onSave()}
           >
-            {saving ? "Saving…" : "Save comments"}
+            {saving ? t("common.saving") : t("resultsUi.saveComments")}
           </button>
         </div>
       ) : null}

@@ -14,6 +14,7 @@ import { CreateStudentDto } from './dto/create-student.dto';
 import { UpdateStudentDto } from './dto/update-student.dto';
 import {
   buildCardScanPayload,
+  buildStudentCardPublicResultsUrl,
   buildStudentPortalEmail,
   generateSchoolStudentId,
   generateStudentCardCode,
@@ -95,7 +96,10 @@ export class StudentsService {
     return this.prisma.studentProfile.findMany({
       where: { schoolId },
       include: this.studentInclude,
-      orderBy: [{ grade: { sortOrder: 'asc' } }, { user: { firstName: 'asc' } }],
+      orderBy: [
+        { grade: { sortOrder: 'asc' } },
+        { user: { firstName: 'asc' } },
+      ],
     });
   }
 
@@ -211,7 +215,14 @@ export class StudentsService {
       throw new NotFoundException('School not found');
     }
 
-    const data: { username?: string; passwordHash?: string; email?: string } = {};
+    const data: {
+      username?: string;
+      passwordHash?: string;
+      email?: string;
+      firstName?: string;
+      lastName?: string;
+      phone?: string | null;
+    } = {};
     const nextUsername = dto.username?.trim()
       ? await this.usersService.assertUsernameAvailable(
           schoolId,
@@ -225,6 +236,20 @@ export class StudentsService {
       data.email = buildParentContactEmail(school.joinCode, nextUsername);
     } else if (isLegacyParentContactEmail(user.email)) {
       data.email = buildParentContactEmail(school.joinCode, user.username);
+    }
+
+    if (dto.firstName !== undefined) {
+      const firstName = dto.firstName.trim();
+      if (!firstName) throw new BadRequestException('First name is required');
+      data.firstName = firstName;
+    }
+    if (dto.lastName !== undefined) {
+      const lastName = dto.lastName.trim();
+      if (!lastName) throw new BadRequestException('Last name is required');
+      data.lastName = lastName;
+    }
+    if (dto.phone !== undefined) {
+      data.phone = dto.phone?.trim() || null;
     }
 
     if (dto.password?.trim()) {
@@ -253,6 +278,8 @@ export class StudentsService {
       username: updated.username,
       email: updated.email,
       phone: updated.phone,
+      firstName: updated.firstName,
+      lastName: updated.lastName,
       name: `${updated.firstName} ${updated.lastName}`.trim(),
       passwordUpdated: !!dto.password?.trim(),
     };
@@ -282,7 +309,7 @@ export class StudentsService {
     }
 
     const gradeId = dto.gradeId ?? profile.gradeId;
-    let sectionId: string | null =
+    const sectionId: string | null =
       dto.sectionId === null ? null : (dto.sectionId ?? profile.sectionId);
 
     if (sectionId) {
@@ -444,7 +471,10 @@ export class StudentsService {
   }
 
   async create(schoolId: string, dto: CreateStudentDto) {
-    await this.subscriptionsService.assertCanAddUser(schoolId, UserRole.student);
+    await this.subscriptionsService.assertCanAddUser(
+      schoolId,
+      UserRole.student,
+    );
 
     let fayedaFields: {
       middleName?: string | null;
@@ -529,8 +559,7 @@ export class StudentsService {
 
     const tempPassword = this.generateTempPassword();
 
-    const fatherName =
-      dto.fatherName?.trim() || dto.parentName?.trim() || '';
+    const fatherName = dto.fatherName?.trim() || dto.parentName?.trim() || '';
     const fatherPhone =
       dto.fatherPhone?.trim() || dto.parentPhone?.trim() || '';
     const motherName = dto.motherName?.trim() || '';
@@ -598,8 +627,7 @@ export class StudentsService {
           middleName:
             fayedaFields.middleName ?? (dto.middleName?.trim() || null),
           dateOfBirth,
-          photoUrl:
-            fayedaFields.photoUrl ?? (dto.photoUrl?.trim() || null),
+          photoUrl: fayedaFields.photoUrl ?? (dto.photoUrl?.trim() || null),
           fan: fayedaFields.fan ?? null,
           fcn: idNumber,
           nationality: fayedaFields.nationality ?? null,
@@ -762,7 +790,9 @@ export class StudentsService {
     const dobKey = (d: Date | string | null | undefined) => {
       if (!d) return '';
       const iso =
-        d instanceof Date ? d.toISOString().slice(0, 10) : String(d).slice(0, 10);
+        d instanceof Date
+          ? d.toISOString().slice(0, 10)
+          : String(d).slice(0, 10);
       return iso;
     };
     const nameKey = (first: string, last: string) =>
@@ -1040,8 +1070,7 @@ export class StudentsService {
               ? { studentId: row.studentId.trim() }
               : {}),
             idNumber:
-              row.idNumber?.trim() ||
-              `IMPID-${String(i + 1).padStart(4, '0')}`,
+              row.idNumber?.trim() || `IMPID-${String(i + 1).padStart(4, '0')}`,
             dateOfBirth,
             ...(fan ? { fan } : {}),
             fatherName,
@@ -1125,9 +1154,12 @@ export class StudentsService {
   private importErrorMessage(err: unknown): string {
     if (err instanceof Prisma.PrismaClientKnownRequestError) {
       if (err.code === 'P2002') {
-        const fields = Array.isArray(err.meta?.target)
-          ? (err.meta.target as string[]).join(', ')
-          : String(err.meta?.target ?? 'unique field');
+        const target = err.meta?.target;
+        const fields = Array.isArray(target)
+          ? target.join(', ')
+          : typeof target === 'string'
+            ? target
+            : 'unique field';
         if (fields.includes('fan')) {
           return 'FAN already registered at this school';
         }
@@ -1274,7 +1306,7 @@ export class StudentsService {
       return Number.isNaN(d.getTime()) ? undefined : raw;
     }
     // DD/MM/YYYY or DD-MM-YYYY
-    const m = raw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+    const m = raw.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
     if (m) {
       const day = m[1].padStart(2, '0');
       const month = m[2].padStart(2, '0');
@@ -1385,7 +1417,10 @@ export class StudentsService {
     const profiles = await this.prisma.studentProfile.findMany({
       where: this.idCardListWhere(schoolId, gradeId, sectionId),
       include: this.studentInclude,
-      orderBy: [{ grade: { sortOrder: 'asc' } }, { user: { firstName: 'asc' } }],
+      orderBy: [
+        { grade: { sortOrder: 'asc' } },
+        { user: { firstName: 'asc' } },
+      ],
       ...(skipN !== undefined ? { skip: skipN } : {}),
       ...(takeN !== undefined ? { take: takeN } : {}),
     });
@@ -1441,7 +1476,9 @@ export class StudentsService {
   /** Defaults off; tolerates DB before the idCardShowStamp migration. */
   private async readIdCardShowStamp(schoolId: string): Promise<boolean> {
     try {
-      const rows = await this.prisma.$queryRawUnsafe<Array<{ v: boolean | null }>>(
+      const rows = await this.prisma.$queryRawUnsafe<
+        Array<{ v: boolean | null }>
+      >(
         `SELECT "idCardShowStamp" AS v FROM "School" WHERE id = $1 LIMIT 1`,
         schoolId,
       );
@@ -1571,6 +1608,10 @@ export class StudentsService {
       studentProfileId: profile.id,
       cardCode,
       scanPayload: buildCardScanPayload(cardCode),
+      publicResultsUrl: buildStudentCardPublicResultsUrl(
+        school.joinCode,
+        cardCode,
+      ),
       name,
       firstName: profile.user.firstName,
       lastName: profile.user.lastName,
@@ -1696,11 +1737,7 @@ export class StudentsService {
     if (!nameChanged && !phoneChanged) return;
 
     if (phoneChanged) {
-      await this.unlinkParentFromStudent(
-        tx,
-        link.parentId,
-        studentProfileId,
-      );
+      await this.unlinkParentFromStudent(tx, link.parentId, studentProfileId);
       await this.linkParent(tx, schoolId, name, phoneRaw, studentProfileId);
       return;
     }
@@ -1777,10 +1814,9 @@ export class StudentsService {
         },
       });
     } else {
-      const email =
-        isLegacyParentContactEmail(user.email)
-          ? buildParentContactEmail(school.joinCode, user.username)
-          : undefined;
+      const email = isLegacyParentContactEmail(user.email)
+        ? buildParentContactEmail(school.joinCode, user.username)
+        : undefined;
       await tx.user.update({
         where: { id: user.id },
         data: {

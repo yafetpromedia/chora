@@ -19,6 +19,12 @@ import { SchoolTenantGuard } from '../common/guards/school-tenant.guard';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { SchoolPermission } from '../common/permissions/school-permissions';
 import { CreateTeacherDto } from './dto/create-teacher.dto';
+import {
+  AdminSetTeacherPhotoDto,
+  ReviewTeacherPhotoDto,
+  SubmitTeacherPhotoDto,
+} from './dto/teacher-photo.dto';
+import { SetHomeroomGroupDto } from './dto/set-homeroom-group.dto';
 import { UpdateTeacherDto } from './dto/update-teacher.dto';
 import { TeacherDashboardService } from './teacher-dashboard.service';
 import { TeacherScopeService } from './teacher-scope.service';
@@ -43,10 +49,32 @@ export class TeachersController {
     return this.teachersService.list(user.schoolId, group);
   }
 
+  @Get('photo-requests')
+  @Roles('admin', 'staff')
+  @RequirePermissions(SchoolPermission.TEACHERS_MANAGE)
+  listPhotoRequests(@CurrentUser() user: AuthUser) {
+    return this.teachersService.listPendingPhotoRequests(user.schoolId);
+  }
+
   @Get('me')
   @Roles('admin', 'teacher')
   getMe(@CurrentUser() user: AuthUser) {
     return this.teachersService.getMe(user.schoolId, user.id);
+  }
+
+  @Post('me/photo')
+  @Roles('teacher')
+  submitMyPhoto(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: SubmitTeacherPhotoDto,
+  ) {
+    return this.teachersService.submitMyPhoto(user.schoolId, user.id, dto);
+  }
+
+  @Delete('me/photo/pending')
+  @Roles('teacher')
+  cancelMyPendingPhoto(@CurrentUser() user: AuthUser) {
+    return this.teachersService.cancelMyPendingPhoto(user.schoolId, user.id);
   }
 
   @Get('me/dashboard')
@@ -83,6 +111,27 @@ export class TeachersController {
     return this.teachersService.listGradesForSchool(user.schoolId);
   }
 
+  @Get('me/students')
+  @Roles('teacher')
+  myHomeroomStudents(@CurrentUser() user: AuthUser) {
+    return this.teachersService.listHomeroomStudents(user.schoolId, user.id);
+  }
+
+  @Patch('me/students/:studentProfileId/group')
+  @Roles('teacher')
+  setHomeroomGroup(
+    @CurrentUser() user: AuthUser,
+    @Param('studentProfileId') studentProfileId: string,
+    @Body() dto: SetHomeroomGroupDto,
+  ) {
+    return this.teachersService.setHomeroomGroup(
+      user.schoolId,
+      user.id,
+      studentProfileId,
+      dto.group,
+    );
+  }
+
   @Post()
   @Roles('admin')
   @RequirePermissions(SchoolPermission.TEACHERS_MANAGE)
@@ -99,6 +148,48 @@ export class TeachersController {
     @Body() dto: UpdateTeacherDto,
   ) {
     return this.teachersService.update(user.schoolId, userId, dto);
+  }
+
+  @Patch(':userId/photo/review')
+  @Roles('admin', 'staff')
+  @RequirePermissions(SchoolPermission.TEACHERS_MANAGE)
+  reviewPhoto(
+    @CurrentUser() user: AuthUser,
+    @Param('userId') userId: string,
+    @Body() dto: ReviewTeacherPhotoDto,
+  ) {
+    return this.teachersService.reviewPhoto(
+      user.schoolId,
+      userId,
+      user.id,
+      dto,
+    );
+  }
+
+  @Patch(':userId/photo')
+  @Roles('admin', 'staff')
+  @RequirePermissions(SchoolPermission.TEACHERS_MANAGE)
+  setPhoto(
+    @CurrentUser() user: AuthUser,
+    @Param('userId') userId: string,
+    @Body() dto: AdminSetTeacherPhotoDto,
+  ) {
+    return this.teachersService.adminSetPhoto(
+      user.schoolId,
+      userId,
+      user.id,
+      dto,
+    );
+  }
+
+  @Delete(':userId/photo')
+  @Roles('admin', 'staff')
+  @RequirePermissions(SchoolPermission.TEACHERS_MANAGE)
+  clearPhoto(
+    @CurrentUser() user: AuthUser,
+    @Param('userId') userId: string,
+  ) {
+    return this.teachersService.adminClearPhoto(user.schoolId, userId);
   }
 
   @Delete(':userId')

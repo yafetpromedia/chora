@@ -15,8 +15,15 @@ export function SchoolWelcomeGate() {
   const [welcome, setWelcome] = useState<PendingSchoolWelcome | null>(null);
 
   useEffect(() => {
-    const pending = readPendingSchoolWelcome();
-    if (pending) setWelcome(pending);
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      const pending = readPendingSchoolWelcome();
+      if (pending) setWelcome(pending);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   if (!welcome) return null;

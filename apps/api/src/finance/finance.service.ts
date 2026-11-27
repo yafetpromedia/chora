@@ -2,14 +2,9 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
-  OnModuleInit,
+  Optional,
 } from '@nestjs/common';
-import {
-  PaymentMethod,
-  PaymentStatus,
-  Prisma,
-  StudentFeeStatus,
-} from '@prisma/client';
+import { PaymentMethod, PaymentStatus, StudentFeeStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { ChapaService } from '../payments/chapa.service';
@@ -17,6 +12,7 @@ import { DEFAULT_FEE_TYPES } from './finance.constants';
 import { AssignGradeFeesDto } from './dto/assign-grade-fees.dto';
 import { CreateAcademicYearDto } from './dto/create-academic-year.dto';
 import { CreateFeeScheduleDto } from './dto/create-fee-schedule.dto';
+import { EmailService } from '../email/email.service';
 import { RecordPaymentDto } from './dto/record-payment.dto';
 
 export function computeAmountDue(
@@ -36,16 +32,13 @@ export function formatEtb(cents: number): string {
 }
 
 @Injectable()
-export class FinanceService implements OnModuleInit {
+export class FinanceService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly subscriptionsService: SubscriptionsService,
     private readonly chapaService: ChapaService,
+    @Optional() private readonly email?: EmailService,
   ) {}
-
-  async onModuleInit() {
-    // Do not auto-seed demo finance records for a hardcoded school.
-  }
 
   async seedDemoFinance(schoolId: string) {
     const year = await this.ensureCurrentYear(schoolId);
@@ -162,6 +155,7 @@ export class FinanceService implements OnModuleInit {
         name: dto.name.trim(),
         startDate: new Date(dto.startDate),
         endDate: new Date(dto.endDate),
+        calendarSystem: dto.calendarSystem ?? 'ETHIOPIAN',
         isCurrent: dto.isCurrent ?? false,
       },
     });
@@ -215,7 +209,11 @@ export class FinanceService implements OnModuleInit {
     return grades.filter((g) => g.sortOrder >= min && g.sortOrder <= max);
   }
 
-  private scheduleCreateData(schoolId: string, dto: CreateFeeScheduleDto, gradeId: string | null) {
+  private scheduleCreateData(
+    schoolId: string,
+    dto: CreateFeeScheduleDto,
+    gradeId: string | null,
+  ) {
     return {
       schoolId,
       feeTypeId: dto.feeTypeId,
@@ -522,7 +520,7 @@ export class FinanceService implements OnModuleInit {
           studentProfileId: dto.studentProfileId,
           receiptNumber,
           amountCents: dto.amountCents,
-          method: dto.method as PaymentMethod,
+          method: dto.method,
           status: PaymentStatus.COMPLETED,
           reference: dto.reference?.trim() ?? null,
           notes: dto.notes?.trim() ?? null,
@@ -668,9 +666,6 @@ export class FinanceService implements OnModuleInit {
     const collected = fees.reduce((s, f) => s + f.paidAmountCents, 0);
     const outstanding = expectedRevenue - collected;
 
-    const paidStudentIds = new Set(
-      fees.filter((f) => f.status === StudentFeeStatus.PAID).map((f) => f.studentProfileId),
-    );
     const studentsWithFees = new Set(fees.map((f) => f.studentProfileId));
     const overdueCount = fees.filter(
       (f) => f.status === StudentFeeStatus.OVERDUE,
@@ -733,7 +728,13 @@ export class FinanceService implements OnModuleInit {
       where: {
         schoolId,
         dueDate: target,
-        status: { in: [StudentFeeStatus.PENDING, StudentFeeStatus.PARTIAL, StudentFeeStatus.OVERDUE] },
+        status: {
+          in: [
+            StudentFeeStatus.PENDING,
+            StudentFeeStatus.PARTIAL,
+            StudentFeeStatus.OVERDUE,
+          ],
+        },
       },
       include: {
         studentProfile: {
@@ -749,7 +750,9 @@ export class FinanceService implements OnModuleInit {
     let sent = 0;
     for (const fee of fees) {
       const balance = fee.amountDueCents - fee.paidAmountCents;
-      const parentIds = [...new Set(fee.studentProfile.parents.map((p) => p.parentId))];
+      const parentIds = [
+        ...new Set(fee.studentProfile.parents.map((p) => p.parentId)),
+      ];
       if (parentIds.length === 0) continue;
 
       const title = `Fee reminder: ${fee.feeType.name}`;
@@ -806,7 +809,11 @@ export class FinanceService implements OnModuleInit {
     return { totalDueCents: totalDue, children };
   }
 
-  async parentFeesDue(parentId: string, schoolId: string, studentProfileId: string) {
+  async parentFeesDue(
+    parentId: string,
+    schoolId: string,
+    studentProfileId: string,
+  ) {
     await this.assertParentAccess(parentId, studentProfileId);
     const [summary, school, pendingPayments] = await Promise.all([
       this.getStudentFinanceSummary(schoolId, studentProfileId),
@@ -956,31 +963,35 @@ export class FinanceService implements OnModuleInit {
       },
     });
 
-    const webAppUrl = process.env.WEB_APP_URL?.trim() || 'http://localhost:3000';
-    const apiUrl = process.env.API_PUBLIC_URL?.trim() || 'http://localhost:3001';
+    const webAppUrl =
+      process.env.WEB_APP_URL?.trim() || 'http://localhost:3000';
+    const apiUrl =
+      process.env.API_PUBLIC_URL?.trim() || 'http://localhost:3001';
     const phone = this.normalizeEthiopianPhone(parent.phone);
 
     let checkout_url: string;
     try {
       ({ checkout_url } = await this.chapaService.initializeTransaction({
-      amount: String(amountCents / 100),
-      currency: 'ETB',
-      email: parent.email,
-      first_name: parent.firstName,
-      last_name: parent.lastName,
-      ...(phone ? { phone_number: phone } : {}),
-      tx_ref: txRef,
-      callback_url: `${apiUrl}/payments/chapa/callback`,
-      return_url: `${webAppUrl}/parent/fees?chapa_return=1&tx_ref=${encodeURIComponent(txRef)}`,
-      customization: {
-        title: school?.name ?? 'School fee payment',
-        description: `Fee payment for ${summary.student.name}`,
-      },
-    }));
+        amount: String(amountCents / 100),
+        currency: 'ETB',
+        email: parent.email,
+        first_name: parent.firstName,
+        last_name: parent.lastName,
+        ...(phone ? { phone_number: phone } : {}),
+        tx_ref: txRef,
+        callback_url: `${apiUrl}/payments/chapa/callback`,
+        return_url: `${webAppUrl}/parent/fees?chapa_return=1&tx_ref=${encodeURIComponent(txRef)}`,
+        customization: {
+          title: school?.name ?? 'School fee payment',
+          description: `Fee payment for ${summary.student.name}`,
+        },
+      }));
     } catch (err) {
       await this.prisma.payment.delete({ where: { id: payment.id } });
       throw new BadRequestException(
-        err instanceof Error ? err.message : 'Chapa checkout could not be started',
+        err instanceof Error
+          ? err.message
+          : 'Chapa checkout could not be started',
       );
     }
 
@@ -1062,15 +1073,14 @@ export class FinanceService implements OnModuleInit {
       where: {
         method: PaymentMethod.CHAPA,
         ...(parentId ? { submittedBy: parentId } : {}),
-        OR: [
-          { reference: txRef },
-          { reference: { startsWith: `${txRef}|` } },
-        ],
+        OR: [{ reference: txRef }, { reference: { startsWith: `${txRef}|` } }],
       },
     });
   }
 
-  private normalizeEthiopianPhone(phone: string | null | undefined): string | null {
+  private normalizeEthiopianPhone(
+    phone: string | null | undefined,
+  ): string | null {
     if (!phone?.trim()) return null;
     const digits = phone.replace(/\D/g, '');
     if (digits.length === 10 && /^0[79]/.test(digits)) return digits;
@@ -1131,7 +1141,9 @@ export class FinanceService implements OnModuleInit {
       !/^data:image\/(jpeg|jpg|png|webp|gif);base64,/i.test(proof) &&
       !/^https:\/\//i.test(proof)
     ) {
-      throw new BadRequestException('Receipt must be an image upload or an https link');
+      throw new BadRequestException(
+        'Receipt must be an image upload or an https link',
+      );
     }
 
     const summary = await this.getStudentFinanceSummary(
@@ -1246,7 +1258,9 @@ export class FinanceService implements OnModuleInit {
     );
 
     if (allocations.length === 0) {
-      throw new BadRequestException('No outstanding fees to apply this payment to');
+      throw new BadRequestException(
+        'No outstanding fees to apply this payment to',
+      );
     }
 
     const allocSum = allocations.reduce((s, a) => s + a.amountCents, 0);
@@ -1290,6 +1304,7 @@ export class FinanceService implements OnModuleInit {
 
     await this.notifyParentPaymentApproved(
       schoolId,
+      pending.id,
       pending.studentProfileId,
       pending.amountCents,
       pending.receiptNumber,
@@ -1330,8 +1345,7 @@ export class FinanceService implements OnModuleInit {
     amountCents: number,
   ): { studentFeeId: string; amountCents: number }[] {
     const sorted = [...fees].sort(
-      (a, b) =>
-        new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime(),
+      (a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime(),
     );
     let remaining = amountCents;
     const allocations: { studentFeeId: string; amountCents: number }[] = [];
@@ -1353,6 +1367,7 @@ export class FinanceService implements OnModuleInit {
 
   private async notifyParentPaymentApproved(
     schoolId: string,
+    paymentId: string,
     studentProfileId: string,
     amountCents: number,
     receiptNumber: string,
@@ -1370,6 +1385,7 @@ export class FinanceService implements OnModuleInit {
     const name = student
       ? `${student.user.firstName} ${student.user.lastName}`
       : 'your child';
+    const childName = student?.user.firstName ?? 'your child';
 
     await this.prisma.parentNotification.createMany({
       data: links.map((l) => ({
@@ -1380,6 +1396,26 @@ export class FinanceService implements OnModuleInit {
         body: `${formatEtb(amountCents)} for ${name} was verified.\nReceipt #: ${receiptNumber}`,
       })),
     });
+
+    try {
+      await this.email?.notifyParents({
+        schoolId,
+        preference: 'paymentConfirmationEnabled',
+        category: 'payment_receipt',
+        templateId: 'payment_receipt',
+        messages: links.map((link) => ({
+          parentId: link.parentId,
+          idempotencyKey: `payment-receipt:${paymentId}:${link.parentId}`,
+          vars: {
+            childName,
+            amount: formatEtb(amountCents),
+            receiptNumber,
+          },
+        })),
+      });
+    } catch {
+      // In-app payment notice is already stored.
+    }
   }
 
   private async assertParentAccess(parentId: string, studentProfileId: string) {

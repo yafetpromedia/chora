@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useLocale } from "@/components/i18n/locale-provider";
 import { StudentIdCardView } from "@/components/students/student-id-card";
 import {
   getStudentIdCard,
@@ -28,23 +29,32 @@ export function StudentIdCardModal({
   showBack = true,
   downloadHint = false,
 }: Props) {
-  const [card, setCard] = useState<StudentIdCard | null>(initialCard ?? null);
+  const { t } = useLocale();
+  const [fetchedCard, setCard] = useState<StudentIdCard | null>(null);
+  const card = initialCard ?? fetchedCard;
   const [loading, setLoading] = useState(!initialCard && !!studentProfileId);
   const [error, setError] = useState("");
   const [duplex, setDuplex] = useState(showBack);
 
-  useEffect(() => {
-    if (initialCard) {
-      setCard(initialCard);
+  const fetchKey = initialCard ? "" : (studentProfileId ?? "");
+  const [prevFetchKey, setPrevFetchKey] = useState(fetchKey);
+  if (fetchKey !== prevFetchKey) {
+    setPrevFetchKey(fetchKey);
+    if (fetchKey) {
+      setLoading(true);
+      setError("");
+    } else {
       setLoading(false);
-      return;
     }
-    if (!studentProfileId) return;
-    setLoading(true);
-    setError("");
+  }
+
+  useEffect(() => {
+    if (initialCard || !studentProfileId) return;
     void getStudentIdCard(studentProfileId)
       .then(setCard)
-      .catch((err) => setError(err instanceof Error ? err.message : "Could not load ID card"))
+      .catch((err) =>
+        setError(err instanceof Error ? err.message : t("idCardPortal.loadFailed")),
+      )
       .finally(() => setLoading(false));
   }, [studentProfileId, initialCard]);
 
@@ -52,20 +62,30 @@ export function StudentIdCardModal({
 
   return (
     <>
-      <button type="button" className="sid-modal-backdrop" aria-label="Close" onClick={onClose} />
+      <button
+        type="button"
+        className="sid-modal-backdrop"
+        aria-label={t("common.close")}
+        onClick={onClose}
+      />
       <div className="sid-modal" role="dialog" aria-labelledby="sid-modal-title">
         <header className="sid-modal__head">
           <div>
             <h2 id="sid-modal-title" className="sid-modal__title">
-              Student ID card
+              {t("studentIdCardModalUi.title")}
             </h2>
             <p className="sid-modal__sub">
               {downloadHint
-                ? "Print or save as PDF — use both sides for lamination."
-                : "Print, download, or show for attendance scan"}
+                ? t("studentIdCardModalUi.subDownload")
+                : t("studentIdCardModalUi.subDefault")}
             </p>
           </div>
-          <button type="button" className="sid-modal__close" onClick={onClose} aria-label="Close">
+          <button
+            type="button"
+            className="sid-modal__close"
+            onClick={onClose}
+            aria-label={t("common.close")}
+          >
             ×
           </button>
         </header>
@@ -77,7 +97,7 @@ export function StudentIdCardModal({
               checked={duplex}
               onChange={(e) => setDuplex(e.target.checked)}
             />
-            Show back of card
+            {t("idCardPortal.showBack")}
           </label>
           <button
             type="button"
@@ -88,18 +108,19 @@ export function StudentIdCardModal({
               printStudentIdCard({ studentProfileId, duplex });
             }}
           >
-            Print / PDF
+            {t("studentIdCardModalUi.printPdf")}
           </button>
           <span className="sid-modal__download-hint">
-            Opens a print-ready page · turn on <strong>Background graphics</strong>
-            {duplex ? " · print double-sided (flip long edge)" : ""}
-            {downloadHint ? " · or choose Save as PDF" : ""}
+            {t("studentIdCardModalUi.printHintPrefix")}
+            <strong>{t("studentIdCardModalUi.printHintBg")}</strong>
+            {duplex ? t("studentIdCardModalUi.printHintDuplex") : ""}
+            {downloadHint ? t("studentIdCardModalUi.printHintPdf") : ""}
           </span>
         </div>
 
         <div className="sid-modal__body sid-print-sheet">
           {loading ? (
-            <p className="setup-hint">Loading ID card…</p>
+            <p className="setup-hint">{t("idCardPortal.loadingIdCard")}</p>
           ) : error ? (
             <p className="att-toast att-toast--error">{error}</p>
           ) : card ? (
@@ -112,11 +133,9 @@ export function StudentIdCardModal({
                   {card.studentId ? ` · ${card.studentId}` : ""}
                 </p>
                 {duplex ? (
-                  <p className="sid-print-meta__hint">
-                    Page 1 — front · Page 2 — back · Enable double-sided printing for lamination
-                  </p>
+                  <p className="sid-print-meta__hint">{t("studentIdCardModalUi.pageFrontBack")}</p>
                 ) : (
-                  <p className="sid-print-meta__hint">Front of card only</p>
+                  <p className="sid-print-meta__hint">{t("studentIdCardModalUi.frontOnly")}</p>
                 )}
               </header>
               <StudentIdCardView

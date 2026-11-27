@@ -5,6 +5,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import { AuthVisualPanel } from "@/components/auth/auth-visual-panel";
 import { BrandMark } from "@/components/brand-mark";
 import { BRAND_NAME } from "@/lib/brand";
+import { useLocale } from "@/components/i18n/locale-provider";
 
 type AuthShellProps = {
   mode: "login" | "register";
@@ -23,6 +24,7 @@ export function AuthShell({
   footer,
   showDemoHint = false,
 }: AuthShellProps) {
+  const { t } = useLocale();
   const reduce = useReducedMotion();
 
   return (
@@ -33,7 +35,7 @@ export function AuthShell({
           <span>{BRAND_NAME}</span>
         </Link>
         <Link href="/" className="auth-topbar-link">
-          Home
+          {t("auth.home")}
         </Link>
       </header>
 
@@ -49,7 +51,9 @@ export function AuthShell({
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
           >
-            <p className="auth-eyebrow">{mode === "login" ? "Sign in" : "Create account"}</p>
+            <p className="auth-eyebrow">
+              {mode === "login" ? t("authShellUi.eyebrowLogin") : t("authShellUi.eyebrowRegister")}
+            </p>
             <h1 className="auth-heading">{title}</h1>
             <p className="auth-subheading">{subtitle}</p>
 
@@ -59,11 +63,13 @@ export function AuthShell({
 
             {showDemoHint ? (
               <div className="auth-demo-box" role="note">
-                <p className="auth-demo-title">Demo workspace</p>
+                <p className="auth-demo-title">{t("authShellUi.demoTitle")}</p>
                 <p className="auth-demo-text">
-                  Demo: <strong>BRIGHT1</strong> · <strong>admin</strong> / <strong>Passw0rd!</strong>
+                  {t("authShellUi.demoLine1")}{" "}
+                  <strong>BRIGHT1</strong> · <strong>admin</strong> / <strong>Passw0rd!</strong>
                   <br />
-                  School code: <strong>BRIGHT1</strong> (for sign in)
+                  {t("authShellUi.demoSchoolCode")} <strong>BRIGHT1</strong>{" "}
+                  {t("authShellUi.demoSignInHint")}
                 </p>
               </div>
             ) : null}

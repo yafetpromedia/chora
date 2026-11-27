@@ -18,7 +18,11 @@ import { SchoolDayDashboardService } from './school-day-dashboard.service';
     StaffAttendanceModule,
   ],
   controllers: [DashboardsController],
-  providers: [DashboardsService, SchoolDayDashboardService, AdminAnalyticsService],
+  providers: [
+    DashboardsService,
+    SchoolDayDashboardService,
+    AdminAnalyticsService,
+  ],
   exports: [AdminAnalyticsService],
 })
 export class DashboardsModule {}

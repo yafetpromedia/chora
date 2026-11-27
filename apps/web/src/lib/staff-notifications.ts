@@ -1,4 +1,4 @@
-import { apiFetch, apiPatch, apiPost } from "@/lib/api";
+import { apiDelete, apiFetch, apiPatch, apiPost } from "@/lib/api";
 
 export type StaffNotification = {
   id: string;
@@ -27,4 +27,10 @@ export async function markStaffNotificationRead(id: string) {
 
 export async function markAllStaffNotificationsRead() {
   return apiPost<{ updated: number }>("/notifications/read-all", {});
+}
+
+export async function deleteStaffNotification(id: string) {
+  return apiDelete<{ ok: boolean; deleted: boolean }>(
+    `/notifications/${encodeURIComponent(id)}`,
+  );
 }

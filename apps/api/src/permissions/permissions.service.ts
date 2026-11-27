@@ -2,7 +2,6 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
-  OnModuleInit,
 } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 import {
@@ -15,10 +14,14 @@ import { DEFAULT_ROLE_TEMPLATES } from '../common/permissions/role-template.defa
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
-export class PermissionsService implements OnModuleInit {
+export class PermissionsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async onModuleInit() {
+  /**
+   * Explicit operator bootstrap only — never called from Nest startup.
+   * Use scripts/runtime-bootstrap.mjs with CHORA_ALLOW_RUNTIME_BOOTSTRAP=1.
+   */
+  async runExplicitBootstrap() {
     await this.seedPermissionCatalog();
     const schools = await this.prisma.school.findMany({ select: { id: true } });
     for (const school of schools) {
@@ -62,9 +65,8 @@ export class PermissionsService implements OnModuleInit {
         where: { schoolId, slug: tpl.slug },
       });
 
-      const template =
-        existing ??
-        (await this.prisma.roleTemplate.create({
+      if (!existing) {
+        const template = await this.prisma.roleTemplate.create({
           data: {
             schoolId,
             slug: tpl.slug,
@@ -73,11 +75,7 @@ export class PermissionsService implements OnModuleInit {
             portalRole: tpl.portalRole,
             isSystem: true,
           },
-        }));
-
-      // Only seed permissions for newly created system templates.
-      // Do not wipe customized role-template permission sets on every boot.
-      if (!existing) {
+        });
         await this.prisma.roleTemplatePermission.createMany({
           data: patterns.map((permissionKey) => ({
             roleTemplateId: template.id,
@@ -90,7 +88,7 @@ export class PermissionsService implements OnModuleInit {
   }
 
   /** Map deprecated SchoolStaffRole enum to role templates. */
-  private async migrateLegacyStaffRoles() {
+  async migrateLegacyStaffRoles() {
     const map: Record<string, string> = {
       SCHOOL_ADMIN: 'school_admin',
       VICE_PRINCIPAL: 'academic_director',
@@ -165,7 +163,11 @@ export class PermissionsService implements OnModuleInit {
     });
 
     if (!user) {
-      return { permissions: [], roleTemplateSlug: null, roleTemplateName: null };
+      return {
+        permissions: [],
+        roleTemplateSlug: null,
+        roleTemplateName: null,
+      };
     }
 
     const set = new Set<PermissionKey>();
@@ -219,11 +221,15 @@ export class PermissionsService implements OnModuleInit {
     }));
   }
 
-  async listCatalog() {
-    return PERMISSION_META;
+  listCatalog() {
+    return Promise.resolve(PERMISSION_META);
   }
 
-  async assignTemplate(userId: string, schoolId: string, roleTemplateId: string) {
+  async assignTemplate(
+    userId: string,
+    schoolId: string,
+    roleTemplateId: string,
+  ) {
     const template = await this.prisma.roleTemplate.findFirst({
       where: { id: roleTemplateId, schoolId },
     });

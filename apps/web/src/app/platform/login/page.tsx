@@ -10,8 +10,10 @@ import { useLandingHeroImage } from "@/hooks/use-landing-hero-image";
 import { BrandMark } from "@/components/brand-mark";
 import { BRAND_NAME } from "@/lib/brand";
 import { platformLogin, persistPlatformSession } from "@/lib/platform-auth";
+import { useLocale } from "@/components/i18n/locale-provider";
 
 function PlatformLoginForm() {
+  const { t } = useLocale();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -31,7 +33,7 @@ function PlatformLoginForm() {
       persistPlatformSession(res);
       router.push("/platform");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Login failed");
+      setError(err instanceof Error ? err.message : t("platformLoginUi.errLogin"));
     } finally {
       setLoading(false);
     }
@@ -49,7 +51,7 @@ function PlatformLoginForm() {
               <span>{BRAND_NAME}</span>
             </Link>
             <Link href="/login" className="reg-top__link">
-              School sign in
+              {t("platformLoginUi.schoolSignIn")}
             </Link>
           </header>
 
@@ -60,18 +62,16 @@ function PlatformLoginForm() {
             transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
           >
             <div className="reg-hero">
-              <p className="reg-hero__eyebrow">Operator console</p>
-              <h1 className="reg-hero__title">
-                Platform <span>admin</span>
-              </h1>
+              <p className="reg-hero__eyebrow">{t("platformLoginUi.eyebrow")}</p>
+              <h1 className="reg-hero__title">{t("platformLoginUi.title")}</h1>
               <p className="reg-hero__sub">
-                Manage schools, trials, billing, and curriculum for {BRAND_NAME}.
+                {t("platformLoginUi.sub", { brand: BRAND_NAME })}
               </p>
             </div>
 
             {invited ? (
               <p className="auth-alert reg-error" role="status" style={{ borderColor: "#86efac", background: "#f0fdf4", color: "#166534" }}>
-                Password saved. Sign in with your email.
+                {t("platformLoginUi.invitedOk")}
               </p>
             ) : null}
 
@@ -87,7 +87,7 @@ function PlatformLoginForm() {
                   <div className="reg-form__full">
                     <AuthInput
                       id="platform-email"
-                      label="Email"
+                      label={t("platformLoginUi.email")}
                       type="email"
                       icon="email"
                       variant="login"
@@ -101,12 +101,12 @@ function PlatformLoginForm() {
                   <div className="reg-form__full">
                     <AuthInput
                       id="platform-password"
-                      label="Password"
+                      label={t("platformLoginUi.password")}
                       type="password"
                       icon="password"
                       variant="login"
                       autoComplete="current-password"
-                      placeholder="Your password"
+                      placeholder={t("platformLoginUi.passwordPh")}
                       value={password}
                       onChange={setPassword}
                       required
@@ -118,8 +118,8 @@ function PlatformLoginForm() {
                   <AuthSubmitButton
                     variant="page"
                     loading={loading}
-                    label="Sign in"
-                    loadingLabel="Signing in…"
+                    label={t("platformLoginUi.signIn")}
+                    loadingLabel={t("platformLoginUi.signingIn")}
                   />
                 </div>
               </form>
@@ -127,10 +127,10 @@ function PlatformLoginForm() {
 
             <div className="reg-footer">
               <p className="reg-footer__line">
-                Running a school?{" "}
-                <Link href="/login">School sign in</Link>
+                {t("platformLoginUi.footerSchool")}{" "}
+                <Link href="/login">{t("platformLoginUi.schoolSignIn")}</Link>
                 <span aria-hidden>·</span>
-                <Link href="/register">Register</Link>
+                <Link href="/register">{t("platformLoginUi.register")}</Link>
               </p>
             </div>
           </motion.main>
@@ -146,12 +146,11 @@ function PlatformLoginForm() {
             </div>
             <div className="reg-visual__content reg-visual__content--photo">
               <div className="reg-visual__copy">
-                <p className="reg-visual__eyebrow">{BRAND_NAME} platform</p>
-                <h2 className="reg-visual__title">One console for every school</h2>
-                <p className="reg-visual__body">
-                  Provision workspaces, manage plans, and keep curriculum packs
-                  current — without touching school portals.
+                <p className="reg-visual__eyebrow">
+                  {t("platformLoginUi.visualEyebrow", { brand: BRAND_NAME })}
                 </p>
+                <h2 className="reg-visual__title">{t("platformLoginUi.visualTitle")}</h2>
+                <p className="reg-visual__body">{t("platformLoginUi.visualBody")}</p>
               </div>
             </div>
           </div>

@@ -1,4 +1,4 @@
-import { apiFetch, apiPatch, apiPost, getApiBaseUrl } from "@/lib/api";
+import { apiFetch, apiPatch, apiPost, getApiBaseUrl, getUploadApiBaseUrl } from "@/lib/api";
 import { AUTH_TOKEN_KEY } from "@/lib/auth";
 
 export type StudentRecordSummary = {
@@ -179,7 +179,7 @@ export async function uploadDocument(
   form.append("type", type);
   if (title) form.append("title", title);
   const res = await fetch(
-    `${getApiBaseUrl()}/schools/students/${profileId}/records/documents`,
+    `${getUploadApiBaseUrl()}/schools/students/${profileId}/records/documents`,
     {
       method: "POST",
       headers: token ? { Authorization: `Bearer ${token}` } : {},

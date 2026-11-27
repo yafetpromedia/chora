@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef } from "react";
 import { createPortal } from "react-dom";
+import { useHydrated } from "@/lib/use-client-snapshot";
 
 export type AppConfirmTone = "danger" | "warning" | "default";
 
@@ -31,11 +32,7 @@ export function AppConfirmDialog({
   const titleId = useId();
   const descId = useId();
   const confirmRef = useRef<HTMLButtonElement>(null);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const mounted = useHydrated();
 
   useEffect(() => {
     if (!open) return;
@@ -76,7 +73,7 @@ export function AppConfirmDialog({
         aria-describedby={descId}
       >
         <div className="app-confirm__icon" aria-hidden>
-          {tone === "danger" ? "!" : tone === "warning" ? "!" : "?"}
+          {tone === "danger" ? "✕" : tone === "warning" ? "!" : "?"}
         </div>
         <div className="app-confirm__body">
           <h2 id={titleId} className="app-confirm__title">

@@ -1484,3 +1484,106 @@
   color: #334155;
   line-height: 1.45;
 }
+
+/* -- Modern homework / worksheet hub polish -- */
+
+.cw-page--modern {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  max-width: 1100px;
+}
+
+.cw-hero--day {
+  background:
+    radial-gradient(ellipse 70% 80% at 100% 0%, rgba(22, 117, 109, 0.28), transparent 55%),
+    linear-gradient(145deg, #0b2f2e 0%, #123f3d 48%, #0f3533 100%) !important;
+  border: 1px solid rgba(22, 117, 109, 0.14);
+  box-shadow: 0 12px 36px rgba(8, 40, 39, 0.18) !important;
+}
+
+.cw-page--modern .cw-filter {
+  padding: 0.9rem 1rem;
+  border-radius: 1rem;
+  border: 1px solid var(--brand-border);
+  background: #fff;
+  box-shadow: 0 4px 18px rgba(30, 74, 74, 0.05);
+}
+
+.cw-page--modern .cw-card {
+  border-radius: 1.05rem;
+  border: 1px solid var(--brand-border);
+  box-shadow: 0 4px 18px rgba(30, 74, 74, 0.05);
+}
+
+.cw-page--modern .cw-card--compose {
+  border-left: 3px solid #16756d;
+}
+
+.cw-page--modern .cw-card__title {
+  font-size: 1.05rem;
+}
+
+.cw-page--modern .cw-card__sub {
+  color: var(--brand-muted);
+}
+
+.cw-page--modern .cw-btn--primary {
+  min-height: 2.45rem;
+  border-radius: 0.75rem;
+  font-weight: 750;
+}
+
+.cw-empty--panel {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+  padding: 1.35rem 1.1rem;
+  border-radius: 0.95rem;
+  border: 1px dashed rgba(22, 117, 109, 0.28);
+  background: linear-gradient(180deg, rgba(237, 248, 248, 0.9), #fff);
+}
+
+.cw-empty__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.6rem;
+  height: 2.6rem;
+  margin-bottom: 0.25rem;
+  border-radius: 0.8rem;
+  background: #e7f5f4;
+  color: var(--brand-teal-dark);
+}
+
+.cw-empty__icon svg {
+  width: 1.2rem;
+  height: 1.2rem;
+}
+
+.cw-page--modern .cw-inbox__item {
+  border-radius: 0.85rem;
+  border: 1px solid #e4efee;
+  background: #f8fbfb;
+  transition:
+    transform 0.16s ease,
+    border-color 0.16s ease,
+    box-shadow 0.16s ease;
+}
+
+.cw-page--modern .cw-inbox__item:hover {
+  transform: translateY(-1px);
+  border-color: rgba(22, 117, 109, 0.35);
+  box-shadow: 0 8px 20px rgba(30, 74, 74, 0.08);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cw-page--modern .cw-inbox__item {
+    transition: none;
+  }
+
+  .cw-page--modern .cw-inbox__item:hover {
+    transform: none;
+  }
+}

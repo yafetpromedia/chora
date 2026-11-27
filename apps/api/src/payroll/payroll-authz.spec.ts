@@ -13,7 +13,11 @@ describe('payroll payslip authorization contracts', () => {
     );
   }
 
-  function canViewOtherPayslip(permissions: string[], actorId: string, ownerId: string) {
+  function canViewOtherPayslip(
+    permissions: string[],
+    actorId: string,
+    ownerId: string,
+  ) {
     if (!canAccessPayslipEndpoint(permissions)) return false;
     if (permissionMatches(permissions, 'payslip.manage')) return true;
     return actorId === ownerId;
@@ -21,21 +25,17 @@ describe('payroll payslip authorization contracts', () => {
 
   it('allows employee with payslip.self for own payslip', () => {
     expect(canAccessPayslipEndpoint(['payslip.self'])).toBe(true);
-    expect(
-      canViewOtherPayslip(['payslip.self'], 'emp-1', 'emp-1'),
-    ).toBe(true);
+    expect(canViewOtherPayslip(['payslip.self'], 'emp-1', 'emp-1')).toBe(true);
   });
 
   it('denies employee viewing another employee payslip', () => {
-    expect(
-      canViewOtherPayslip(['payslip.self'], 'emp-1', 'emp-2'),
-    ).toBe(false);
+    expect(canViewOtherPayslip(['payslip.self'], 'emp-1', 'emp-2')).toBe(false);
   });
 
   it('allows payslip.manage for same-school peer payslip', () => {
-    expect(
-      canViewOtherPayslip(['payslip.manage'], 'officer-1', 'emp-2'),
-    ).toBe(true);
+    expect(canViewOtherPayslip(['payslip.manage'], 'officer-1', 'emp-2')).toBe(
+      true,
+    );
   });
 
   it('denies payroll.view alone from payslip endpoint', () => {

@@ -10,7 +10,9 @@ import {
   type ScoreCorrectionRequest,
   type ScoreCorrectionStatus,
 } from "@/lib/results";
+import { useLocale } from "@/components/i18n/locale-provider";
 import { AppToast } from "@/components/ui/app-toast";
+import { subjectCompactLabel } from "@/lib/subject-label";
 
 type Mode = "teacher" | "admin";
 
@@ -22,12 +24,18 @@ type Props = {
   onError?: (message: string) => void;
 };
 
-const STATUS_LABEL: Record<ScoreCorrectionStatus, string> = {
-  OPEN: "Awaiting teacher",
-  PROPOSED: "Awaiting approval",
-  APPROVED: "Approved",
-  REJECTED: "Rejected",
-};
+function statusLabel(
+  status: ScoreCorrectionStatus,
+  t: (key: string) => string,
+) {
+  const map: Record<ScoreCorrectionStatus, string> = {
+    OPEN: t("scoreCorrectionsUi.statusOpen"),
+    PROPOSED: t("scoreCorrectionsUi.statusProposed"),
+    APPROVED: t("scoreCorrectionsUi.statusApproved"),
+    REJECTED: t("scoreCorrectionsUi.statusRejected"),
+  };
+  return map[status];
+}
 
 export function ScoreCorrectionsPanel({
   mode,
@@ -36,7 +44,9 @@ export function ScoreCorrectionsPanel({
   onCountChange,
   onError,
 }: Props) {
-  const [termId, setTermId] = useState(defaultTermId ?? "");
+  const { t } = useLocale();
+  const [termIdState, setTermId] = useState(defaultTermId ?? "");
+  const termId = termIdState || defaultTermId || "";
   const [statusFilter, setStatusFilter] = useState<ScoreCorrectionStatus | "">(
     mode === "admin" ? "PROPOSED" : "",
   );
@@ -65,25 +75,73 @@ export function ScoreCorrectionsPanel({
       onCountChange?.(pending);
     } catch (err) {
       const msg =
-        err instanceof Error ? err.message : "Could not load score reports";
+        err instanceof Error ? err.message : t("scoreCorrectionsUi.loadFailed");
       setError(msg);
       onError?.(msg);
     } finally {
       setLoading(false);
     }
-  }, [termId, statusFilter, mode, onCountChange, onError]);
+  }, [termId, statusFilter, mode, onCountChange, onError, t]);
+
+  const loadKey = `${termId}|${statusFilter}`;
+  const [prevLoadKey, setPrevLoadKey] = useState(loadKey);
+  if (loadKey !== prevLoadKey) {
+    setPrevLoadKey(loadKey);
+    setLoading(true);
+  }
 
   useEffect(() => {
-    if (defaultTermId && !termId) setTermId(defaultTermId);
-  }, [defaultTermId, termId]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+    let cancelled = false;
+    void (async () => {
+      try {
+        const data = await listScoreCorrections({
+          ...(termId ? { termId } : {}),
+          ...(statusFilter ? { status: statusFilter } : {}),
+        });
+        if (cancelled) return;
+        setRows(data);
+        const pending =
+          mode === "admin"
+            ? data.filter((r) => r.status === "PROPOSED").length
+            : data.filter((r) => r.status === "OPEN" || r.status === "PROPOSED")
+                .length;
+        onCountChange?.(pending);
+      } catch (err) {
+        if (cancelled) return;
+        const msg =
+          err instanceof Error ? err.message : t("scoreCorrectionsUi.loadFailed");
+        setError(msg);
+        onError?.(msg);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [termId, statusFilter, mode, onCountChange, onError, t]);
 
   const active = useMemo(
     () => rows.find((r) => r.id === activeId) ?? null,
     [rows, activeId],
+  );
+
+  const queueStats = useMemo(() => {
+    const open = rows.filter((r) => r.status === "OPEN").length;
+    const proposed = rows.filter((r) => r.status === "PROPOSED").length;
+    const closed = rows.filter(
+      (r) => r.status === "APPROVED" || r.status === "REJECTED",
+    ).length;
+    const actionNeeded =
+      mode === "admin"
+        ? proposed
+        : open + proposed;
+    return { open, proposed, closed, actionNeeded, total: rows.length };
+  }, [rows, mode]);
+
+  const selectedTerm = useMemo(
+    () => terms.find((t) => t.id === termId) ?? null,
+    [terms, termId],
   );
 
   function openRow(row: ScoreCorrectionRequest) {
@@ -103,7 +161,7 @@ export function ScoreCorrectionsPanel({
     if (!active) return;
     const score = Number(proposedScore);
     if (!Number.isFinite(score) || score < 0) {
-      setError("Enter a valid proposed score");
+      setError(t("scoreCorrectionsUi.invalidScore"));
       return;
     }
     setBusyId(active.id);
@@ -113,11 +171,11 @@ export function ScoreCorrectionsPanel({
         proposedScore: Math.round(score),
         ...(note.trim() ? { replyNote: note.trim() } : {}),
       });
-      setFlash("Proposed score sent for admin approval");
+      setFlash(t("scoreCorrectionsUi.proposedSent"));
       setActiveId(null);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not propose score");
+      setError(err instanceof Error ? err.message : t("scoreCorrectionsUi.proposeFailed"));
     } finally {
       setBusyId(null);
     }
@@ -132,53 +190,88 @@ export function ScoreCorrectionsPanel({
         await approveScoreCorrection(active.id, {
           ...(note.trim() ? { reviewNote: note.trim() } : {}),
         });
-        setFlash("Correction approved — published score updated");
+        setFlash(t("scoreCorrectionsUi.approvedFlash"));
       } else {
         await rejectScoreCorrection(active.id, {
           ...(note.trim() ? { reviewNote: note.trim() } : {}),
         });
-        setFlash("Correction rejected — published score unchanged");
+        setFlash(t("scoreCorrectionsUi.rejectedFlash"));
       }
       setActiveId(null);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not complete review");
+      setError(err instanceof Error ? err.message : t("scoreCorrectionsUi.reviewFailed"));
     } finally {
       setBusyId(null);
     }
   }
 
   return (
-    <section className="res-approvals res-approvals--queue">
-      <div className="res-approvals__banner">
-        <div className="res-approvals__banner-icon" aria-hidden>
-          ✓
+    <section
+      className={`res-approvals res-approvals--queue res-score-reports${
+        mode === "teacher" ? " res-score-reports--teacher" : ""
+      }`}
+    >
+      <div className="res-scores-head res-scores-head--modern res-score-reports__head">
+        <div className="res-scores-context res-scores-context--hero">
+          <div className="res-scores-context__main">
+            <div className="res-scores-context__brand">
+              <span className="res-scores-context__chip">
+                {mode === "admin"
+                  ? t("scoreCorrectionsUi.chipAdmin")
+                  : t("scoreCorrectionsUi.chipTeacher")}
+              </span>
+            </div>
+            <h2 className="res-scores-context__title">
+              {mode === "admin"
+                ? t("scoreCorrectionsUi.titleAdmin")
+                : t("scoreCorrectionsUi.titleTeacher")}
+            </h2>
+            <p className="res-scores-context__meta">
+              {selectedTerm?.name ??
+                (termId
+                  ? t("scoreCorrectionsUi.metaSelectedTerm")
+                  : t("scoreCorrectionsUi.metaAllTerms"))}
+              {mode === "admin"
+                ? t("scoreCorrectionsUi.metaAdmin")
+                : t("scoreCorrectionsUi.metaTeacher")}
+            </p>
+          </div>
+          <div
+            className="res-scores-context__metrics"
+            aria-label={t("scoreCorrectionsUi.queueAria")}
+          >
+            <div className="res-metric-pill">
+              <strong>{loading ? "…" : queueStats.total}</strong>
+              <span>{t("scoreCorrectionsUi.total")}</span>
+            </div>
+            {mode === "teacher" ? (
+              <div className="res-metric-pill">
+                <strong>{loading ? "…" : queueStats.open}</strong>
+                <span>{t("scoreCorrectionsUi.awaitingYou")}</span>
+              </div>
+            ) : (
+              <div className="res-metric-pill">
+                <strong>{loading ? "…" : queueStats.proposed}</strong>
+                <span>{t("scoreCorrectionsUi.toReview")}</span>
+              </div>
+            )}
+            <div className="res-metric-pill res-metric-pill--accent">
+              <strong>{loading ? "…" : queueStats.actionNeeded}</strong>
+              <span>{t("scoreCorrectionsUi.action")}</span>
+            </div>
+          </div>
         </div>
-        <div className="res-approvals__banner-copy">
-          <h2 className="res-approvals__title">
-            {mode === "admin" ? "Score correction approvals" : "Score reports"}
-          </h2>
-          <p className="res-approvals__sub">
-            {mode === "admin"
-              ? "Teachers propose a corrected mark after a family report. Approve to update the published score without reopening the whole sheet."
-              : "Families can flag a published mark. Propose a corrected score — admin must approve before it goes live."}
-          </p>
-        </div>
-        <span className="res-approvals__count">{loading ? "…" : rows.length}</span>
-      </div>
 
-      <AppToast message={error} tone="error" onDismiss={() => setError("")} />
-      {flash ? <p className="res-approvals__flash">{flash}</p> : null}
-
-      <div className="res-approvals__toolbar">
+        <div className="res-approvals__toolbar res-score-reports__toolbar">
         {terms.length > 0 ? (
           <label className="res-approvals__filter">
-            <span>Term</span>
+            <span>{t("scoreCorrectionsUi.term")}</span>
             <select
               value={termId}
               onChange={(e) => setTermId(e.target.value)}
             >
-              <option value="">All terms</option>
+              <option value="">{t("scoreCorrectionsUi.allTerms")}</option>
               {terms.map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.name}
@@ -188,7 +281,7 @@ export function ScoreCorrectionsPanel({
           </label>
         ) : null}
         <label className="res-approvals__filter">
-          <span>Status</span>
+          <span>{t("scoreCorrectionsUi.status")}</span>
           <select
             value={statusFilter}
             onChange={(e) =>
@@ -197,39 +290,45 @@ export function ScoreCorrectionsPanel({
               )
             }
           >
-            <option value="">All open & closed</option>
-            <option value="OPEN">Awaiting teacher</option>
-            <option value="PROPOSED">Awaiting approval</option>
-            <option value="APPROVED">Approved</option>
-            <option value="REJECTED">Rejected</option>
+            <option value="">{t("scoreCorrectionsUi.filterAll")}</option>
+            <option value="OPEN">{t("scoreCorrectionsUi.statusOpen")}</option>
+            <option value="PROPOSED">{t("scoreCorrectionsUi.statusProposed")}</option>
+            <option value="APPROVED">{t("scoreCorrectionsUi.statusApproved")}</option>
+            <option value="REJECTED">{t("scoreCorrectionsUi.statusRejected")}</option>
           </select>
         </label>
+        </div>
       </div>
 
-      <div className="res-approvals__table-wrap">
+      <AppToast message={error} tone="error" onDismiss={() => setError("")} />
+      {flash ? <p className="res-approvals__flash">{flash}</p> : null}
+
+      <div className="res-approvals__table-wrap res-score-reports__table-wrap">
         <table className="res-approvals__table">
           <thead>
             <tr>
-              <th>Student</th>
-              <th>Subject / component</th>
-              <th>Scores</th>
-              <th>Status</th>
-              <th className="res-approvals__actions-col">Actions</th>
+              <th>{t("scoreCorrectionsUi.colStudent")}</th>
+              <th>{t("scoreCorrectionsUi.colSubject")}</th>
+              <th>{t("scoreCorrectionsUi.colScores")}</th>
+              <th>{t("scoreCorrectionsUi.colStatus")}</th>
+              <th className="res-approvals__actions-col">
+                {t("scoreCorrectionsUi.colActions")}
+              </th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
                 <td colSpan={5} className="res-approvals__empty">
-                  Loading…
+                  {t("scoreCorrectionsUi.loading")}
                 </td>
               </tr>
             ) : rows.length === 0 ? (
               <tr>
                 <td colSpan={5} className="res-approvals__empty">
                   {mode === "admin"
-                    ? "No corrections waiting in this filter."
-                    : "No score reports yet."}
+                    ? t("scoreCorrectionsUi.emptyAdmin")
+                    : t("scoreCorrectionsUi.emptyTeacher")}
                 </td>
               </tr>
             ) : (
@@ -245,7 +344,9 @@ export function ScoreCorrectionsPanel({
                     </div>
                   </td>
                   <td>
-                    <strong>{row.subjectName}</strong>
+                    <strong title={row.subjectName}>
+                      {subjectCompactLabel({ name: row.subjectName })}
+                    </strong>
                     <div className="res-approvals__meta">
                       {row.assessmentName} · {row.termName}
                     </div>
@@ -253,14 +354,14 @@ export function ScoreCorrectionsPanel({
                   </td>
                   <td>
                     <div>
-                      Current:{" "}
+                      {t("scoreCorrectionsUi.current")}{" "}
                       <strong>
                         {row.currentScore == null ? "—" : row.currentScore}/
                         {row.maxScore}
                       </strong>
                     </div>
                     <div className="res-approvals__meta">
-                      Proposed:{" "}
+                      {t("scoreCorrectionsUi.proposed")}{" "}
                       {row.proposedScore == null
                         ? "—"
                         : `${row.proposedScore}/${row.maxScore}`}
@@ -276,7 +377,7 @@ export function ScoreCorrectionsPanel({
                             : "draft"
                       }`}
                     >
-                      {STATUS_LABEL[row.status]}
+                      {statusLabel(row.status, t)}
                     </span>
                   </td>
                   <td className="res-approvals__actions-col">
@@ -286,10 +387,10 @@ export function ScoreCorrectionsPanel({
                       onClick={() => openRow(row)}
                     >
                       {mode === "teacher" && row.status === "OPEN"
-                        ? "Propose"
+                        ? t("scoreCorrectionsUi.btnPropose")
                         : mode === "admin" && row.status === "PROPOSED"
-                          ? "Review"
-                          : "View"}
+                          ? t("scoreCorrectionsUi.btnReview")
+                          : t("scoreCorrectionsUi.btnView")}
                     </button>
                   </td>
                 </tr>
@@ -304,9 +405,15 @@ export function ScoreCorrectionsPanel({
           <div className="res-correction-drawer__panel">
             <header className="res-correction-drawer__head">
               <div>
-                <h3>{active.subjectName} — {active.assessmentName}</h3>
+                <h3>
+                  {subjectCompactLabel({ name: active.subjectName })} —{" "}
+                  {active.assessmentName}
+                </h3>
                 <p>
-                  {active.studentName} · reported by {active.reportedByName}
+                  {t("scoreCorrectionsUi.reportedBy", {
+                    student: active.studentName,
+                    name: active.reportedByName,
+                  })}
                 </p>
               </div>
               <button
@@ -314,28 +421,28 @@ export function ScoreCorrectionsPanel({
                 className="res-approvals__btn res-approvals__btn--sm"
                 onClick={() => setActiveId(null)}
               >
-                Close
+                {t("scoreCorrectionsUi.close")}
               </button>
             </header>
             <p className="res-correction-drawer__msg">{active.message}</p>
             <dl className="res-correction-drawer__stats">
               <div>
-                <dt>Current published</dt>
+                <dt>{t("scoreCorrectionsUi.currentPublished")}</dt>
                 <dd>
                   {active.currentScore == null ? "—" : active.currentScore}/
                   {active.maxScore}
                 </dd>
               </div>
               <div>
-                <dt>Status</dt>
-                <dd>{STATUS_LABEL[active.status]}</dd>
+                <dt>{t("scoreCorrectionsUi.status")}</dt>
+                <dd>{statusLabel(active.status, t)}</dd>
               </div>
             </dl>
 
             {mode === "teacher" && active.status === "OPEN" ? (
               <>
                 <label className="res-correction-drawer__field">
-                  <span>Proposed score</span>
+                  <span>{t("scoreCorrectionsUi.proposedScore")}</span>
                   <input
                     type="number"
                     min={0}
@@ -345,7 +452,7 @@ export function ScoreCorrectionsPanel({
                   />
                 </label>
                 <label className="res-correction-drawer__field">
-                  <span>Note to admin (optional)</span>
+                  <span>{t("scoreCorrectionsUi.noteToAdmin")}</span>
                   <textarea
                     rows={3}
                     value={note}
@@ -359,7 +466,9 @@ export function ScoreCorrectionsPanel({
                     disabled={busyId === active.id}
                     onClick={() => void submitPropose()}
                   >
-                    {busyId === active.id ? "Sending…" : "Send for approval"}
+                    {busyId === active.id
+                      ? t("scoreCorrectionsUi.sending")
+                      : t("scoreCorrectionsUi.sendForApproval")}
                   </button>
                 </div>
               </>
@@ -368,13 +477,13 @@ export function ScoreCorrectionsPanel({
             {mode === "admin" && active.status === "PROPOSED" ? (
               <>
                 <p className="res-correction-drawer__proposed">
-                  Teacher proposes{" "}
+                  {t("scoreCorrectionsUi.teacherProposes")}{" "}
                   <strong>
                     {active.proposedScore}/{active.maxScore}
                   </strong>
                 </p>
                 <label className="res-correction-drawer__field">
-                  <span>Review note (optional)</span>
+                  <span>{t("scoreCorrectionsUi.reviewNote")}</span>
                   <textarea
                     rows={3}
                     value={note}
@@ -388,7 +497,9 @@ export function ScoreCorrectionsPanel({
                     disabled={busyId === active.id}
                     onClick={() => void submitReview("approve")}
                   >
-                    {busyId === active.id ? "Working…" : "Approve & update score"}
+                    {busyId === active.id
+                      ? t("scoreCorrectionsUi.working")
+                      : t("scoreCorrectionsUi.approveUpdate")}
                   </button>
                   <button
                     type="button"
@@ -396,7 +507,7 @@ export function ScoreCorrectionsPanel({
                     disabled={busyId === active.id}
                     onClick={() => void submitReview("reject")}
                   >
-                    Reject
+                    {t("scoreCorrectionsUi.reject")}
                   </button>
                 </div>
               </>
@@ -408,8 +519,8 @@ export function ScoreCorrectionsPanel({
             (mode === "admin" && active.status === "OPEN") ? (
               <p className="res-correction-drawer__hint">
                 {active.reviewNote
-                  ? `Note: ${active.reviewNote}`
-                  : "No further action on this item for your role."}
+                  ? t("scoreCorrectionsUi.notePrefix", { note: active.reviewNote })
+                  : t("scoreCorrectionsUi.noFurtherAction")}
               </p>
             ) : null}
           </div>

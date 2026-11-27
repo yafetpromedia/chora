@@ -2,7 +2,10 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useLocale } from "@/components/i18n/locale-provider";
+import { AdminStaffPhotoField } from "@/components/admin/admin-staff-photo-field";
 import { DashIcon } from "@/components/dashboard/dash-icons";
+import { AppConfirmDialog } from "@/components/ui/app-confirm-dialog";
 import { AppToast } from "@/components/ui/app-toast";
 import { listGrades } from "@/lib/school-setup";
 import type { GradeWithSections } from "@/lib/api";
@@ -12,9 +15,12 @@ import {
   createTeacher,
   deleteTeacher,
   listRoleTemplates,
+  listTeacherPhotoRequests,
   listTeachers,
+  reviewTeacherPhoto,
   updateTeacher,
   type RoleTemplate,
+  type TeacherPhotoRequest,
   type TeacherRecord,
 } from "@/lib/teachers";
 
@@ -26,6 +32,23 @@ function initials(name: string) {
     .join("")
     .slice(0, 2)
     .toUpperCase();
+}
+
+function TeacherAvatar({ teacher }: { teacher: TeacherRecord }) {
+  const label = displayName(teacher);
+  if (teacher.photoUrl) {
+    return (
+      <span className="tch-v2__avatar tch-v2__avatar--photo" aria-hidden>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={teacher.photoUrl} alt="" />
+      </span>
+    );
+  }
+  return (
+    <span className="tch-v2__avatar" aria-hidden>
+      {initials(label)}
+    </span>
+  );
 }
 
 function displayName(t: TeacherRecord) {
@@ -55,10 +78,16 @@ function subjectNames(t: TeacherRecord) {
   return Array.from(names).sort((a, b) => a.localeCompare(b));
 }
 
-function SubjectsCell({ teacher }: { teacher: TeacherRecord }) {
+function SubjectsCell({
+  teacher,
+  emptyDash,
+}: {
+  teacher: TeacherRecord;
+  emptyDash: string;
+}) {
   const subjects = subjectNames(teacher);
   if (subjects.length === 0) {
-    return <span className="tch-v2__dash">—</span>;
+    return <span className="tch-v2__dash">{emptyDash}</span>;
   }
   const shown = subjects.slice(0, 3);
   const rest = subjects.length - shown.length;
@@ -116,14 +145,17 @@ function assignSubjectsHref(teacher: TeacherRecord, grades: GradeWithSections[])
   return `/admin/subjects/assign?${q}`;
 }
 
-function roleLabel(t: TeacherRecord) {
+function roleLabel(person: TeacherRecord, tr: (key: string) => string) {
   return (
-    t.roleTemplateName ??
-    (t.roleTemplateSlug ? ROLE_TEMPLATE_LABELS[t.roleTemplateSlug] : "Teacher")
+    person.roleTemplateName ??
+    (person.roleTemplateSlug
+      ? ROLE_TEMPLATE_LABELS[person.roleTemplateSlug]
+      : tr("teachersUi.defaultRoleTeacher"))
   );
 }
 
 export function TeachersWorkspace() {
+  const { t, tn, tp } = useLocale();
   const [people, setPeople] = useState<TeacherRecord[]>([]);
   const [templates, setTemplates] = useState<RoleTemplate[]>([]);
   const [grades, setGrades] = useState<GradeWithSections[]>([]);
@@ -135,13 +167,23 @@ export function TeachersWorkspace() {
   const [gradeFilter, setGradeFilter] = useState("");
   const [sectionFilter, setSectionFilter] = useState("");
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [editTarget, setEditTarget] = useState<TeacherRecord | null>(null);
+  const [editTargetState, setEditTarget] = useState<TeacherRecord | null>(null);
   const [busy, setBusy] = useState(false);
+  const [photoRequests, setPhotoRequests] = useState<TeacherPhotoRequest[]>([]);
+  const [photoBusyId, setPhotoBusyId] = useState("");
+  const [removeTarget, setRemoveTarget] = useState<TeacherRecord | null>(null);
 
   const [email, setEmail] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [password, setPassword] = useState("");
+  const [phone, setPhone] = useState("");
+  const [gender, setGender] = useState<"" | "MALE" | "FEMALE" | "OTHER">("");
+  const [dateOfBirth, setDateOfBirth] = useState("");
+  const [bloodType, setBloodType] = useState("");
+  const [address, setAddress] = useState("");
+  const [emergencyContactName, setEmergencyContactName] = useState("");
+  const [emergencyContactPhone, setEmergencyContactPhone] = useState("");
   const [roleTemplateSlug, setRoleTemplateSlug] = useState("subject_teacher");
   const [hasHomeroom, setHasHomeroom] = useState(false);
   const [homeroomGradeId, setHomeroomGradeId] = useState("");
@@ -176,31 +218,31 @@ export function TeachersWorkspace() {
 
     if (q) {
       rows = rows.filter(
-        (t) =>
-          displayName(t).toLowerCase().includes(q) ||
-          t.email.toLowerCase().includes(q) ||
-          (t.teacherId ?? "").toLowerCase().includes(q) ||
-          (t.homeroom?.gradeName ?? "").toLowerCase().includes(q) ||
-          (t.homeroom?.sectionName ?? "").toLowerCase().includes(q) ||
-          roleLabel(t).toLowerCase().includes(q) ||
-          subjectNames(t).some((s) => s.toLowerCase().includes(q)),
+        (person) =>
+          displayName(person).toLowerCase().includes(q) ||
+          person.email.toLowerCase().includes(q) ||
+          (person.teacherId ?? "").toLowerCase().includes(q) ||
+          (person.homeroom?.gradeName ?? "").toLowerCase().includes(q) ||
+          (person.homeroom?.sectionName ?? "").toLowerCase().includes(q) ||
+          roleLabel(person, t).toLowerCase().includes(q) ||
+          subjectNames(person).some((s) => s.toLowerCase().includes(q)),
       );
     }
 
     if (roleFilter) {
-      rows = rows.filter((t) => t.roleTemplateSlug === roleFilter);
+      rows = rows.filter((person) => person.roleTemplateSlug === roleFilter);
     }
 
     if (gradeFilter) {
-      rows = rows.filter((t) => t.homeroom?.gradeId === gradeFilter);
+      rows = rows.filter((person) => person.homeroom?.gradeId === gradeFilter);
     }
 
     if (sectionFilter && gradeFilter) {
-      rows = rows.filter((t) => t.homeroom?.sectionId === sectionFilter);
+      rows = rows.filter((person) => person.homeroom?.sectionId === sectionFilter);
     }
 
     return rows;
-  }, [people, search, roleFilter, gradeFilter, sectionFilter]);
+  }, [people, search, roleFilter, gradeFilter, sectionFilter, t]);
 
   function clearFilters() {
     setSearch("");
@@ -213,34 +255,112 @@ export function TeachersWorkspace() {
     setLoading(true);
     setError("");
     try {
-      const [rows, tpls] = await Promise.all([
+      const [rows, tpls, photos] = await Promise.all([
         listTeachers("teachers"),
         listRoleTemplates(),
+        listTeacherPhotoRequests().catch(() => [] as TeacherPhotoRequest[]),
       ]);
       setPeople(rows);
       setTemplates(tpls);
+      setPhotoRequests(photos);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load teachers");
+      setError(err instanceof Error ? err.message : t("teachersUi.loadFailed"));
     } finally {
       setLoading(false);
     }
   }
 
-  useEffect(() => {
-    void Promise.all([load(), listGrades().then(setGrades)]).catch(() => undefined);
-  }, []);
+  async function onReviewPhoto(
+    req: TeacherPhotoRequest,
+    action: "approve" | "reject",
+  ) {
+    let note: string | undefined;
+    if (action === "reject") {
+      const raw = window.prompt(t("teachersUi.rejectPrompt"));
+      if (raw === null) return;
+      note = raw.trim() || undefined;
+    }
+    setPhotoBusyId(req.userId);
+    setError("");
+    try {
+      await reviewTeacherPhoto(req.userId, {
+        action,
+        note,
+      });
+      setToast(
+        action === "approve"
+          ? t("teachersUi.photoApproved", { name: req.name })
+          : t("teachersUi.photoRejected", { name: req.name }),
+      );
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("teachersUi.photoReviewFailed"));
+    } finally {
+      setPhotoBusyId("");
+    }
+  }
 
   useEffect(() => {
-    if (!editTarget) return;
-    const fresh = people.find((p) => p.userId === editTarget.userId);
-    if (fresh) setEditTarget(fresh);
-  }, [people, editTarget?.userId]);
+    let cancelled = false;
+    void (async () => {
+      try {
+        const [rows, tpls] = await Promise.all([
+          listTeachers("teachers"),
+          listRoleTemplates(),
+        ]);
+        if (cancelled) return;
+        setPeople(rows);
+        setTemplates(tpls);
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : t("teachersUi.loadFailed"));
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    listGrades()
+      .then((g) => {
+        if (!cancelled) setGrades(g);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [t]);
+
+  const editTarget = useMemo(
+    () =>
+      editTargetState
+        ? (people.find((p) => p.userId === editTargetState.userId) ?? editTargetState)
+        : null,
+    [people, editTargetState],
+  );
+
+  function personalPayload() {
+    return {
+      phone: phone.trim() || null,
+      gender: gender || null,
+      dateOfBirth: dateOfBirth || null,
+      bloodType: bloodType.trim() || null,
+      address: address.trim() || null,
+      emergencyContactName: emergencyContactName.trim() || null,
+      emergencyContactPhone: emergencyContactPhone.trim() || null,
+    };
+  }
 
   function resetForm() {
     setEmail("");
     setFirstName("");
     setLastName("");
     setPassword("");
+    setPhone("");
+    setGender("");
+    setDateOfBirth("");
+    setBloodType("");
+    setAddress("");
+    setEmergencyContactName("");
+    setEmergencyContactPhone("");
     setRoleTemplateSlug("subject_teacher");
     setHasHomeroom(false);
     setHomeroomGradeId("");
@@ -255,7 +375,18 @@ export function TeachersWorkspace() {
 
   function openEdit(person: TeacherRecord) {
     setEditTarget(person);
+    setFirstName(person.firstName ?? "");
+    setLastName(person.lastName ?? "");
+    setEmail(person.email ?? "");
+    setPassword("");
     setRoleTemplateSlug(person.roleTemplateSlug ?? "subject_teacher");
+    setPhone(person.phone ?? "");
+    setGender(person.gender ?? "");
+    setDateOfBirth(person.dateOfBirth ?? "");
+    setBloodType(person.bloodType ?? "");
+    setAddress(person.address ?? "");
+    setEmergencyContactName(person.emergencyContactName ?? "");
+    setEmergencyContactPhone(person.emergencyContactPhone ?? "");
     const hr = person.homeroom;
     setHasHomeroom(!!hr);
     setHomeroomGradeId(hr?.gradeId ?? "");
@@ -266,7 +397,7 @@ export function TeachersWorkspace() {
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (hasHomeroom && homeroomNeedsSection && !homeroomSectionId) {
-      setError("Select a section for this homeroom class.");
+      setError(t("teachersUi.selectHomeroomSection"));
       return;
     }
     setBusy(true);
@@ -276,10 +407,16 @@ export function TeachersWorkspace() {
         homeroomGradeId: hasHomeroom && homeroomGradeId ? homeroomGradeId : null,
         homeroomSectionId: hasHomeroom && homeroomSectionId ? homeroomSectionId : null,
       };
+      const personal = personalPayload();
       if (editTarget) {
         await updateTeacher(editTarget.userId, {
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
+          email: email.trim(),
+          password: password.trim() || undefined,
           roleTemplateSlug,
           ...homeroomPayload,
+          ...personal,
         });
       } else {
         await createTeacher({
@@ -290,68 +427,82 @@ export function TeachersWorkspace() {
           roleTemplateSlug,
           homeroomGradeId: homeroomPayload.homeroomGradeId ?? undefined,
           homeroomSectionId: homeroomPayload.homeroomSectionId ?? undefined,
+          ...personal,
         });
       }
       setDrawerOpen(false);
       resetForm();
-      setToast(editTarget ? `${displayName(editTarget)} updated.` : "Teacher added.");
+      setToast(
+        editTarget
+          ? t("teachersUi.updated", { name: displayName(editTarget) })
+          : t("teachersUi.teacherAdded"),
+      );
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Save failed");
+      setError(err instanceof Error ? err.message : t("teachersUi.saveFailed"));
     } finally {
       setBusy(false);
     }
   }
 
-  async function onRemove(t: TeacherRecord) {
-    const name = displayName(t);
-    if (
-      !window.confirm(
-        `Remove ${name} from the school? Their login will be deleted. This cannot be undone.`,
-      )
-    ) {
-      return;
-    }
+  function requestRemove(teacher: TeacherRecord) {
+    setRemoveTarget(teacher);
+  }
+
+  async function confirmRemove() {
+    if (!removeTarget) return;
+    const teacher = removeTarget;
+    const name = displayName(teacher);
     setBusy(true);
     setError("");
     setToast("");
     try {
-      await deleteTeacher(t.userId);
-      setToast(`${name} removed.`);
-      if (editTarget?.userId === t.userId) {
+      await deleteTeacher(teacher.userId);
+      setToast(t("teachersUi.removed", { name }));
+      if (editTarget?.userId === teacher.userId) {
         setDrawerOpen(false);
         resetForm();
       }
+      setRemoveTarget(null);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not remove teacher");
+      setError(err instanceof Error ? err.message : t("teachersUi.couldNotRemove"));
     } finally {
       setBusy(false);
     }
   }
 
-  function renderActions(t: TeacherRecord, compact?: boolean) {
-    const name = displayName(t);
+  function renderActions(teacher: TeacherRecord, compact?: boolean) {
+    const name = displayName(teacher);
     const canViewAttendance = hasPermission(Permission.STAFF_ATTENDANCE_READ);
-    const attendanceHref = `/admin/staff-attendance?userId=${encodeURIComponent(t.userId)}&name=${encodeURIComponent(name)}`;
+    const attendanceHref = `/admin/staff-attendance?userId=${encodeURIComponent(teacher.userId)}&name=${encodeURIComponent(name)}`;
 
     return (
       <div className={`tch-v2__actions${compact ? " tch-v2__actions--compact" : ""}`}>
         {canViewAttendance ? (
-          <Link href={attendanceHref} className="tch-v2__action" title="Attendance history">
-            Attendance
+          <Link
+            href={attendanceHref}
+            className="tch-v2__action"
+            title={t("teachersUi.attendanceHistory")}
+          >
+            {t("teachersUi.attendance")}
           </Link>
         ) : null}
-        <button type="button" className="tch-v2__action" onClick={() => openEdit(t)} title="Edit homeroom">
-          Edit
+        <button
+          type="button"
+          className="tch-v2__action"
+          onClick={() => openEdit(teacher)}
+          title={t("teachersUi.editHomeroom")}
+        >
+          {t("common.edit")}
         </button>
-        {t.teacherId ? (
+        {teacher.teacherId ? (
           <a
-            href={`/print/teacher-id-card?userId=${t.userId}&duplex=1`}
+            href={`/print/teacher-id-card?userId=${teacher.userId}&duplex=1`}
             className="tch-v2__action"
             target="_blank"
             rel="noreferrer"
-            title="Print ID card"
+            title={t("teachersUi.printIdCard")}
           >
             ID
           </a>
@@ -360,31 +511,49 @@ export function TeachersWorkspace() {
           type="button"
           className="tch-v2__action tch-v2__action--danger"
           disabled={busy}
-          onClick={() => void onRemove(t)}
-          title="Remove teacher"
+          onClick={() => requestRemove(teacher)}
+          title={t("teachersUi.removeTeacher")}
         >
-          ×
+          {t("common.remove")}
         </button>
       </div>
     );
   }
 
+  const emptyDash = "—";
+
   return (
     <div className="tch-v2">
       <AppToast message={error} tone="error" onDismiss={() => setError("")} />
       <AppToast message={toast} tone="success" onDismiss={() => setToast("")} />
+      <AppConfirmDialog
+        open={Boolean(removeTarget)}
+        tone="danger"
+        title={t("teachersUi.removeTeacher")}
+        message={
+          removeTarget
+            ? t("teachersUi.removeConfirm", { name: displayName(removeTarget) })
+            : ""
+        }
+        confirmLabel={t("teachersUi.removeTeacher")}
+        cancelLabel={t("common.cancel")}
+        busy={busy && Boolean(removeTarget)}
+        onCancel={() => {
+          if (!busy) setRemoveTarget(null);
+        }}
+        onConfirm={() => void confirmRemove()}
+      />
 
       <header className="tch-v2__hero">
         <div className="tch-v2__hero-glow" aria-hidden />
         <div className="tch-v2__hero-inner">
           <div className="tch-v2__hero-main">
-            <span className="tch-v2__chip">Faculty</span>
-            <h2 className="tch-v2__hero-title">Teachers</h2>
+            <span className="tch-v2__chip">{t("teachersUi.chip")}</span>
+            <h2 className="tch-v2__hero-title">{tp("Teachers")}</h2>
             <p className="tch-v2__hero-sub">
-              Homeroom and taught subjects are listed below. Manage class
-              assignments on{" "}
+              {t("teachersUi.heroSubPrefix")}{" "}
               <Link href="/admin/subjects/assign" className="tch-v2__hero-link">
-                Assign subjects
+                {tn("Assign subjects")}
               </Link>
               .
             </p>
@@ -392,23 +561,95 @@ export function TeachersWorkspace() {
           <div className="tch-v2__hero-stats">
             <div className="tch-v2__stat">
               <strong>{people.length}</strong>
-              <span>Teachers</span>
+              <span>{t("teachersUi.statTeachers")}</span>
             </div>
             <div className="tch-v2__stat">
               <strong>{homeroomCount}</strong>
-              <span>Homeroom</span>
+              <span>{t("teachersUi.statHomeroom")}</span>
             </div>
             <div className="tch-v2__stat">
               <strong>{subjectTeacherCount}</strong>
-              <span>Subject</span>
+              <span>{t("teachersUi.statSubject")}</span>
             </div>
             <div className="tch-v2__stat tch-v2__stat--accent">
               <strong>{filtered.length}</strong>
-              <span>Showing</span>
+              <span>{t("teachersUi.statShowing")}</span>
             </div>
+            {photoRequests.length > 0 ? (
+              <div className="tch-v2__stat">
+                <strong>{photoRequests.length}</strong>
+                <span>{t("teachersUi.statPhotoPending")}</span>
+              </div>
+            ) : null}
           </div>
         </div>
       </header>
+
+      {photoRequests.length > 0 ? (
+        <section className="tch-v2__photo-queue" aria-label={t("teachersUi.photoQueueAria")}>
+          <div className="tch-v2__photo-queue-head">
+            <h3>{t("teachersUi.photoQueueTitle")}</h3>
+            <p>{t("teachersUi.photoQueueSub")}</p>
+          </div>
+          <ul className="tch-v2__photo-queue-list">
+            {photoRequests.map((req) => (
+              <li key={req.userId} className="tch-v2__photo-queue-item">
+                <div className="tch-v2__photo-queue-previews">
+                  <div className="tch-v2__photo-queue-shot">
+                    {req.pendingPhotoUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={req.pendingPhotoUrl} alt="" />
+                    ) : null}
+                    <span>{t("teachersUi.labelNew")}</span>
+                  </div>
+                  <div className="tch-v2__photo-queue-shot tch-v2__photo-queue-shot--current">
+                    {req.photoUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={req.photoUrl} alt="" />
+                    ) : (
+                      <em>{t("teachersUi.none")}</em>
+                    )}
+                    <span>{t("teachersUi.labelCurrent")}</span>
+                  </div>
+                </div>
+                <div className="tch-v2__photo-queue-meta">
+                  <strong>{req.name}</strong>
+                  <span>
+                    {req.teacherId ?? emptyDash} · {req.email}
+                  </span>
+                  {req.photoSubmittedAt ? (
+                    <span>
+                      {t("teachersUi.submitted")}{" "}
+                      {new Date(req.photoSubmittedAt).toLocaleString(undefined, {
+                        dateStyle: "medium",
+                        timeStyle: "short",
+                      })}
+                    </span>
+                  ) : null}
+                </div>
+                <div className="tch-v2__photo-queue-actions">
+                  <button
+                    type="button"
+                    className="att-btn att-btn--primary"
+                    disabled={photoBusyId === req.userId}
+                    onClick={() => void onReviewPhoto(req, "approve")}
+                  >
+                    {t("teachersUi.approve")}
+                  </button>
+                  <button
+                    type="button"
+                    className="att-btn att-btn--ghost"
+                    disabled={photoBusyId === req.userId}
+                    onClick={() => void onReviewPhoto(req, "reject")}
+                  >
+                    {t("teachersUi.reject")}
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       <div className="tch-v2__toolbar">
         <label className="tch-v2__search">
@@ -417,16 +658,17 @@ export function TeachersWorkspace() {
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search name, email, ID, subject, homeroom…"
+            placeholder={t("teachersUi.searchPlaceholder")}
+            aria-label={t("common.search")}
           />
         </label>
         <select
           className="tch-v2__filter"
           value={roleFilter}
           onChange={(e) => setRoleFilter(e.target.value)}
-          aria-label="Filter by role"
+          aria-label={t("teachersUi.filterByRole")}
         >
-          <option value="">All roles</option>
+          <option value="">{t("teachersUi.allRoles")}</option>
           {teacherRoles.map((r) => (
             <option key={r.slug} value={r.slug}>
               {r.name}
@@ -440,9 +682,9 @@ export function TeachersWorkspace() {
             setGradeFilter(e.target.value);
             setSectionFilter("");
           }}
-          aria-label="Filter by grade"
+          aria-label={t("teachersUi.filterByGrade")}
         >
-          <option value="">All grades</option>
+          <option value="">{t("teachersUi.allGrades")}</option>
           {grades.map((g) => (
             <option key={g.id} value={g.id}>
               {g.name}
@@ -454,9 +696,9 @@ export function TeachersWorkspace() {
             className="tch-v2__filter"
             value={sectionFilter}
             onChange={(e) => setSectionFilter(e.target.value)}
-            aria-label="Filter by section"
+            aria-label={t("teachersUi.filterBySection")}
           >
-            <option value="">All sections</option>
+            <option value="">{t("teachersUi.allSections")}</option>
             {filterGrade?.sections.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}
@@ -467,41 +709,41 @@ export function TeachersWorkspace() {
         <div className="tch-v2__toolbar-actions">
           {hasActiveFilters ? (
             <button type="button" className="tch-v2__btn tch-v2__btn--ghost" onClick={clearFilters}>
-              Clear filters
+              {t("common.clearFilters")}
             </button>
           ) : null}
           <Link href="/admin/subjects/assign" className="tch-v2__btn tch-v2__btn--ghost">
-            Assign subjects
+            {tn("Assign subjects")}
           </Link>
           <Link href="/admin/teachers/cards" className="tch-v2__btn tch-v2__btn--ghost">
-            ID cards
+            {t("teachersUi.idCards")}
           </Link>
           <button type="button" className="tch-v2__btn tch-v2__btn--primary" onClick={openCreate}>
-            + Add teacher
+            + {t("teachersUi.addTeacher")}
           </button>
         </div>
         <p className="tch-v2__toolbar-meta">
-          {filtered.length} of {people.length} shown
+          {t("teachersUi.ofShown", { shown: filtered.length, total: people.length })}
         </p>
       </div>
 
       {loading ? (
         <div className="tch-v2__loading">
           <span className="tch-v2__spinner" aria-hidden />
-          <p>Loading teachers…</p>
+          <p>{t("teachersUi.loading")}</p>
         </div>
       ) : filtered.length === 0 ? (
         <div className="tch-v2__empty">
           <DashIcon name="teachers" className="dash-icon--lg" />
-          <h3>{people.length === 0 ? "No teachers yet" : "No matches"}</h3>
+          <h3>
+            {people.length === 0 ? t("teachersUi.noTeachersYet") : t("teachersUi.noMatches")}
+          </h3>
           <p>
-            {people.length === 0
-              ? "Add your first teacher, then set homeroom."
-              : "Try different search or filter settings."}
+            {people.length === 0 ? t("teachersUi.noTeachersHint") : t("teachersUi.tryFilters")}
           </p>
           {people.length === 0 ? (
             <button type="button" className="tch-v2__btn tch-v2__btn--primary" onClick={openCreate}>
-              Add teacher
+              {t("teachersUi.addTeacher")}
             </button>
           ) : null}
         </div>
@@ -511,44 +753,46 @@ export function TeachersWorkspace() {
             <table className="tch-v2__table">
               <thead>
                 <tr>
-                  <th>Teacher</th>
-                  <th>Homeroom</th>
-                  <th>Subjects</th>
-                  <th aria-label="Actions" />
+                  <th>{t("teachersUi.colTeacher")}</th>
+                  <th>{t("teachersUi.colHomeroom")}</th>
+                  <th>{t("teachersUi.colSubjects")}</th>
+                  <th aria-label={t("common.actions")} />
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((t) => (
-                  <tr key={t.userId} className="tch-v2__row">
+                {filtered.map((teacher) => (
+                  <tr key={teacher.userId} className="tch-v2__row">
                     <td className="tch-v2__cell tch-v2__cell--teacher">
                       <div className="tch-v2__teacher">
-                        <span className="tch-v2__avatar" aria-hidden>
-                          {initials(displayName(t))}
-                        </span>
+                        <TeacherAvatar teacher={teacher} />
                         <div className="tch-v2__teacher-line">
-                          <strong className="tch-v2__name">{displayName(t)}</strong>
-                          <span className="tch-v2__badge tch-v2__badge--role">{roleLabel(t)}</span>
-                          {t.teacherId ? (
-                            <code className="tch-v2__id" title={t.email}>
-                              {t.teacherId}
+                          <strong className="tch-v2__name">{displayName(teacher)}</strong>
+                          <span className="tch-v2__badge tch-v2__badge--role">
+                            {roleLabel(teacher, t)}
+                          </span>
+                          {teacher.teacherId ? (
+                            <code className="tch-v2__id" title={teacher.email}>
+                              {teacher.teacherId}
                             </code>
                           ) : null}
                         </div>
                       </div>
                     </td>
                     <td className="tch-v2__cell tch-v2__cell--homeroom">
-                      {t.homeroom ? (
+                      {teacher.homeroom ? (
                         <span className="tch-v2__chip tch-v2__chip--homeroom">
-                          {homeroomLine(t.homeroom)}
+                          {homeroomLine(teacher.homeroom)}
                         </span>
                       ) : (
-                        <span className="tch-v2__dash">—</span>
+                        <span className="tch-v2__dash">{emptyDash}</span>
                       )}
                     </td>
                     <td className="tch-v2__cell tch-v2__cell--subjects">
-                      <SubjectsCell teacher={t} />
+                      <SubjectsCell teacher={teacher} emptyDash={emptyDash} />
                     </td>
-                    <td className="tch-v2__cell tch-v2__cell--actions">{renderActions(t)}</td>
+                    <td className="tch-v2__cell tch-v2__cell--actions">
+                      {renderActions(teacher)}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -556,36 +800,36 @@ export function TeachersWorkspace() {
           </div>
 
           <div className="tch-v2__cards tch-v2__mobile-only">
-            {filtered.map((t) => (
-              <article key={t.userId} className="tch-v2__card">
+            {filtered.map((teacher) => (
+              <article key={teacher.userId} className="tch-v2__card">
                 <header className="tch-v2__card-head">
-                  <span className="tch-v2__avatar" aria-hidden>
-                    {initials(displayName(t))}
-                  </span>
+                  <TeacherAvatar teacher={teacher} />
                   <div>
-                    <strong className="tch-v2__name">{displayName(t)}</strong>
-                    <span className="tch-v2__meta">{t.email}</span>
-                    {t.teacherId ? (
-                      <span className="tch-v2__meta">{t.teacherId}</span>
+                    <strong className="tch-v2__name">{displayName(teacher)}</strong>
+                    <span className="tch-v2__meta">{teacher.email}</span>
+                    {teacher.teacherId ? (
+                      <span className="tch-v2__meta">{teacher.teacherId}</span>
                     ) : null}
-                    <span className="tch-v2__badge tch-v2__badge--role">{roleLabel(t)}</span>
+                    <span className="tch-v2__badge tch-v2__badge--role">
+                      {roleLabel(teacher, t)}
+                    </span>
                   </div>
                 </header>
                 <div className="tch-v2__card-block">
-                  <span className="tch-v2__card-label">Homeroom</span>
-                  {t.homeroom ? (
+                  <span className="tch-v2__card-label">{t("teachersUi.colHomeroom")}</span>
+                  {teacher.homeroom ? (
                     <span className="tch-v2__badge tch-v2__badge--homeroom">
-                      {homeroomLine(t.homeroom)}
+                      {homeroomLine(teacher.homeroom)}
                     </span>
                   ) : (
-                    <span className="tch-v2__muted">Not assigned</span>
+                    <span className="tch-v2__muted">{t("teachersUi.notAssigned")}</span>
                   )}
                 </div>
                 <div className="tch-v2__card-block">
-                  <span className="tch-v2__card-label">Subjects</span>
-                  <SubjectsCell teacher={t} />
+                  <span className="tch-v2__card-label">{t("teachersUi.colSubjects")}</span>
+                  <SubjectsCell teacher={teacher} emptyDash={emptyDash} />
                 </div>
-                {renderActions(t, true)}
+                {renderActions(teacher, true)}
               </article>
             ))}
           </div>
@@ -594,7 +838,7 @@ export function TeachersWorkspace() {
 
       {drawerOpen ? (
         <div
-          className="stu-drawer-backdrop"
+          className="tch-drawer-backdrop"
           role="presentation"
           onClick={() => {
             setDrawerOpen(false);
@@ -602,26 +846,25 @@ export function TeachersWorkspace() {
           }}
         >
           <aside
-            className="stu-drawer stu-drawer--wide tch-drawer-panel"
+            className="tch-drawer-shell tch-drawer-shell--wide"
             onClick={(e) => e.stopPropagation()}
             role="dialog"
-            aria-label={editTarget ? "Edit teacher" : "Add teacher"}
+            aria-label={editTarget ? t("teachersUi.drawerEdit") : t("teachersUi.drawerAdd")}
           >
-            <header className="stu-drawer__head">
+            <header className="tch-drawer-shell__head">
               <div>
-                <h2 className="stu-drawer__title">
-                  {editTarget ? "Teacher profile" : "New teacher"}
+                <p className="tch-drawer-shell__eyebrow">{t("teachersUi.chip")}</p>
+                <h2 className="tch-drawer-shell__title">
+                  {editTarget ? t("teachersUi.profileTitle") : t("teachersUi.newTitle")}
                 </h2>
-                <p className="stu-drawer__sub">
-                  {editTarget
-                    ? "Update role and homeroom. Subject classes are listed below."
-                    : "Create the account, then set homeroom."}
+                <p className="tch-drawer-shell__sub">
+                  {editTarget ? t("teachersUi.profileSubEdit") : t("teachersUi.profileSubNew")}
                 </p>
               </div>
               <button
                 type="button"
-                className="stu-drawer__close"
-                aria-label="Close"
+                className="tch-drawer-shell__close"
+                aria-label={t("common.close")}
                 onClick={() => {
                   setDrawerOpen(false);
                   resetForm();
@@ -633,65 +876,152 @@ export function TeachersWorkspace() {
 
             <form
               id="tch-teacher-form"
-              className="stu-drawer__body tch-drawer"
+              className="tch-drawer-shell__form"
               onSubmit={(e) => void onSubmit(e)}
             >
-              {!editTarget ? (
-                <section className="tch-drawer-section">
-                  <h3 className="tch-drawer-section__title">Account</h3>
-                  <label>
-                    First name
-                    <input
-                      value={firstName}
-                      onChange={(e) => setFirstName(e.target.value)}
-                      required
-                      autoComplete="given-name"
-                    />
-                  </label>
-                  <label>
-                    Last name
-                    <input
-                      value={lastName}
-                      onChange={(e) => setLastName(e.target.value)}
-                      required
-                      autoComplete="family-name"
-                    />
-                  </label>
-                  <label>
-                    School email
-                    <input
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                      autoComplete="email"
-                    />
-                  </label>
-                  <label>
-                    Temporary password
-                    <input
-                      type="password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      minLength={8}
-                      placeholder="Min. 8 characters"
-                    />
-                  </label>
-                </section>
-              ) : (
-                <section className="tch-drawer-section tch-drawer-section--readonly">
-                  <h3 className="tch-drawer-section__title">Account</h3>
-                  <p className="tch-drawer-readonly">
-                    <strong>{displayName(editTarget)}</strong>
-                    <span>{editTarget.email}</span>
+              <div className="tch-drawer-shell__body tch-drawer">
+              <section className="tch-drawer-section">
+                <h3 className="tch-drawer-section__title">{t("teachersUi.sectionAccount")}</h3>
+                <label>
+                  {t("teachersUi.firstName")}
+                  <input
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    required
+                    autoComplete="given-name"
+                  />
+                </label>
+                <label>
+                  {t("teachersUi.lastName")}
+                  <input
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    required
+                    autoComplete="family-name"
+                  />
+                </label>
+                <label>
+                  {t("teachersUi.schoolEmail")}
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    autoComplete="email"
+                  />
+                </label>
+                <label>
+                  {editTarget
+                    ? t("teachersUi.newPasswordOptional")
+                    : t("teachersUi.tempPassword")}
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    minLength={editTarget ? undefined : 8}
+                    placeholder={t("teachersUi.minEightChars")}
+                    autoComplete="new-password"
+                  />
+                  {editTarget ? (
+                    <em className="tch-drawer-hint">{t("teachersUi.leaveBlankPassword")}</em>
+                  ) : null}
+                </label>
+                {editTarget?.teacherId ? (
+                  <p className="tch-drawer-hint">
+                    {t("teachersUi.teacherId")}: <strong>{editTarget.teacherId}</strong>
                   </p>
-                </section>
-              )}
+                ) : null}
+              </section>
+
+              {editTarget ? (
+                <AdminStaffPhotoField
+                  userId={editTarget.userId}
+                  photoUrl={editTarget.photoUrl}
+                  onUpdated={(next) => {
+                    setPeople((rows) =>
+                      rows.map((p) => (p.userId === next.userId ? { ...p, ...next } : p)),
+                    );
+                    setEditTarget((prev) =>
+                      prev && prev.userId === next.userId ? { ...prev, ...next } : prev,
+                    );
+                  }}
+                  onToast={setToast}
+                  onError={setError}
+                />
+              ) : null}
 
               <section className="tch-drawer-section">
-                <h3 className="tch-drawer-section__title">Portal role</h3>
+                <h3 className="tch-drawer-section__title">{t("teachersUi.sectionIdCard")}</h3>
+                <p className="tch-meta">{t("teachersUi.idCardMeta")}</p>
                 <label>
-                  Role template
+                  {t("teachersUi.phone")}
+                  <input
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    autoComplete="tel"
+                    placeholder={t("teachersUi.phonePlaceholder")}
+                  />
+                </label>
+                <label>
+                  {t("teachersUi.sex")}
+                  <select
+                    value={gender}
+                    onChange={(e) =>
+                      setGender(e.target.value as "" | "MALE" | "FEMALE" | "OTHER")
+                    }
+                  >
+                    <option value="">{t("teachersUi.select")}</option>
+                    <option value="MALE">{t("teachersUi.male")}</option>
+                    <option value="FEMALE">{t("teachersUi.female")}</option>
+                    <option value="OTHER">{t("teachersUi.other")}</option>
+                  </select>
+                </label>
+                <label>
+                  {t("teachersUi.dateOfBirth")}
+                  <input
+                    type="date"
+                    value={dateOfBirth}
+                    onChange={(e) => setDateOfBirth(e.target.value)}
+                  />
+                </label>
+                <label>
+                  {t("teachersUi.bloodType")}
+                  <input
+                    value={bloodType}
+                    onChange={(e) => setBloodType(e.target.value)}
+                    placeholder={t("teachersUi.bloodPlaceholder")}
+                  />
+                </label>
+                <label>
+                  {t("teachersUi.address")}
+                  <input
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    autoComplete="street-address"
+                  />
+                </label>
+                <label>
+                  {t("teachersUi.emergencyName")}
+                  <input
+                    value={emergencyContactName}
+                    onChange={(e) => setEmergencyContactName(e.target.value)}
+                  />
+                </label>
+                <label>
+                  {t("teachersUi.emergencyPhone")}
+                  <input
+                    type="tel"
+                    value={emergencyContactPhone}
+                    onChange={(e) => setEmergencyContactPhone(e.target.value)}
+                  />
+                </label>
+              </section>
+
+              <section className="tch-drawer-section">
+                <h3 className="tch-drawer-section__title">{t("teachersUi.sectionPortalRole")}</h3>
+                <label>
+                  {t("teachersUi.roleTemplate")}
                   <select
                     value={roleTemplateSlug}
                     onChange={(e) => setRoleTemplateSlug(e.target.value)}
@@ -711,7 +1041,7 @@ export function TeachersWorkspace() {
 
               <section className="tch-drawer-section">
                 <div className="tch-drawer-section__head">
-                  <h3 className="tch-drawer-section__title">Homeroom class</h3>
+                  <h3 className="tch-drawer-section__title">{t("teachersUi.sectionHomeroom")}</h3>
                   <label className="tch-toggle">
                     <input
                       type="checkbox"
@@ -724,13 +1054,13 @@ export function TeachersWorkspace() {
                         }
                       }}
                     />
-                    <span>Has homeroom</span>
+                    <span>{t("teachersUi.hasHomeroom")}</span>
                   </label>
                 </div>
                 {hasHomeroom ? (
                   <>
                     <label>
-                      Grade
+                      {t("teachersUi.grade")}
                       <select
                         value={homeroomGradeId}
                         onChange={(e) => {
@@ -740,7 +1070,7 @@ export function TeachersWorkspace() {
                         }}
                         required
                       >
-                        <option value="">Select grade</option>
+                        <option value="">{t("teachersUi.selectGrade")}</option>
                         {grades.map((g) => (
                           <option key={g.id} value={g.id}>
                             {g.name}
@@ -750,13 +1080,13 @@ export function TeachersWorkspace() {
                     </label>
                     {homeroomGrade && homeroomGrade.sections.length > 0 ? (
                       <label>
-                        Section
+                        {t("teachersUi.section")}
                         <select
                           value={homeroomSectionId}
                           onChange={(e) => setHomeroomSectionId(e.target.value)}
                           required
                         >
-                          <option value="">Select section</option>
+                          <option value="">{t("teachersUi.selectSection")}</option>
                           {homeroomGrade.sections.map((s) => (
                             <option key={s.id} value={s.id}>
                               {s.name}
@@ -767,25 +1097,25 @@ export function TeachersWorkspace() {
                     ) : null}
                   </>
                 ) : (
-                  <p className="tch-meta">
-                    Homeroom is the class this teacher leads daily (one grade &amp; section).
-                  </p>
+                  <p className="tch-meta">{t("teachersUi.homeroomMeta")}</p>
                 )}
               </section>
 
               {editTarget ? (
                 <section className="tch-drawer-section tch-drawer-section--slots">
                   <div className="tch-drawer-section__head">
-                    <h3 className="tch-drawer-section__title">Subjects teaching</h3>
+                    <h3 className="tch-drawer-section__title">
+                      {t("teachersUi.sectionSubjectsTeaching")}
+                    </h3>
                     <Link
                       href={assignSubjectsHref(editTarget, grades)}
                       className="tch-drawer-section__link"
                     >
-                      Assign subjects
+                      {tn("Assign subjects")}
                     </Link>
                   </div>
                   {editTarget.teachingSlots.length === 0 ? (
-                    <p className="tch-meta">No subjects assigned yet.</p>
+                    <p className="tch-meta">{t("teachersUi.noSubjectsYet")}</p>
                   ) : (
                     <ul className="tch-drawer-slots">
                       {editTarget.teachingSlots.map((slot, i) => (
@@ -803,8 +1133,9 @@ export function TeachersWorkspace() {
                   )}
                 </section>
               ) : null}
+              </div>
 
-              <footer className="tch-drawer__foot">
+              <footer className="tch-drawer-shell__foot">
                 <button
                   type="button"
                   className="att-btn att-btn--ghost"
@@ -813,10 +1144,14 @@ export function TeachersWorkspace() {
                     resetForm();
                   }}
                 >
-                  Cancel
+                  {t("common.cancel")}
                 </button>
                 <button type="submit" className="att-btn att-btn--primary" disabled={busy}>
-                  {busy ? "Saving…" : editTarget ? "Save homeroom" : "Create teacher"}
+                  {busy
+                    ? t("common.saving")
+                    : editTarget
+                      ? t("teachersUi.saveTeacher")
+                      : t("teachersUi.createTeacher")}
                 </button>
               </footer>
             </form>

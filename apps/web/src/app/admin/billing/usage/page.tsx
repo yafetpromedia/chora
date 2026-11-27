@@ -9,6 +9,7 @@ import { SchoolBillingShell } from "@/components/school-billing/school-billing-s
 import { UsageMeters } from "@/components/school-billing/usage-meters";
 import { AUTH_ROLE_KEY, AUTH_TOKEN_KEY } from "@/lib/auth";
 import { getSchoolSubscription, type SubscriptionStatus } from "@/lib/api";
+import { useLocale } from "@/components/i18n/locale-provider";
 
 function seatPct(used: number, limit: number | null) {
   if (limit == null || limit <= 0) return null;
@@ -17,6 +18,7 @@ function seatPct(used: number, limit: number | null) {
 
 export default function SchoolUsagePage() {
   const router = useRouter();
+  const { t, tp } = useLocale();
   const [subscription, setSubscription] = useState<SubscriptionStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -30,7 +32,9 @@ export default function SchoolUsagePage() {
     }
     void getSchoolSubscription()
       .then(setSubscription)
-      .catch((e) => setError(e instanceof Error ? e.message : "Could not load usage"))
+      .catch((e) =>
+        setError(e instanceof Error ? e.message : t("adminBillingPageUi.loadUsageFailed")),
+      )
       .finally(() => setLoading(false));
   }, [router]);
 
@@ -47,35 +51,37 @@ export default function SchoolUsagePage() {
   }, [subscription]);
 
   return (
-    <DashboardPage role="admin" title="Usage">
+    <DashboardPage role="admin" title={tp("Usage")}>
       <SchoolBillingShell
-        title="Seat usage"
+        title={t("adminBillingPageUi.titleUsage")}
         subtitle={
           subscription
-            ? `Track students, teachers, and admins against your ${subscription.planLabel} plan limits.`
-            : "Monitor capacity across your school workspace."
+            ? t("adminBillingPageUi.subUsage", { plan: subscription.planLabel })
+            : t("adminBillingPageUi.subUsageDefault")
         }
         stats={
           subscription
             ? [
                 {
-                  label: "Students",
+                  label: t("usageMetersUi.students"),
                   value: `${subscription.usage.students}${subscription.limits.students != null ? ` / ${subscription.limits.students}` : ""}`,
                   hint:
                     seatPct(subscription.usage.students, subscription.limits.students) != null
-                      ? `${seatPct(subscription.usage.students, subscription.limits.students)}% used`
-                      : "Unlimited",
+                      ? t("adminBillingPageUi.percentUsed", {
+                          pct: seatPct(subscription.usage.students, subscription.limits.students)!,
+                        })
+                      : t("adminBillingPageUi.unlimited"),
                 },
                 {
-                  label: "Teachers",
+                  label: t("usageMetersUi.teachers"),
                   value: `${subscription.usage.teachers}${subscription.limits.teachers != null ? ` / ${subscription.limits.teachers}` : ""}`,
                 },
                 {
-                  label: "Admins",
+                  label: t("usageMetersUi.admins"),
                   value: `${subscription.usage.admins}${subscription.limits.admins != null ? ` / ${subscription.limits.admins}` : ""}`,
                 },
                 {
-                  label: "Plan",
+                  label: t("adminBillingPageUi.statPlan"),
                   value: subscription.planLabel,
                 },
               ]
@@ -89,11 +95,11 @@ export default function SchoolUsagePage() {
         error={error}
         onDismissError={() => setError("")}
         loading={loading}
-        loadingLabel="Loading usage…"
+        loadingLabel={t("adminBillingPageUi.loadingUsage")}
       >
         {anyOver ? (
           <p className="sb-v2__warn-banner" role="alert">
-            You are over the limit on one or more seat types. Upgrade your plan to add more users.
+            {t("adminBillingPageUi.overLimitWarn")}
           </p>
         ) : null}
 
@@ -101,22 +107,20 @@ export default function SchoolUsagePage() {
           <article className="sb-v2__card">
             <div className="sb-v2__card-head">
               <div>
-                <h3 className="sb-v2__card-title">Capacity breakdown</h3>
-                <p className="sb-v2__card-sub">
-                  Live counts from your school directory against plan limits.
-                </p>
+                <h3 className="sb-v2__card-title">{t("adminBillingPageUi.capacityTitle")}</h3>
+                <p className="sb-v2__card-sub">{t("adminBillingPageUi.capacitySub")}</p>
               </div>
             </div>
             <UsageMeters subscription={subscription} />
             <div className="sb-v2__actions" style={{ marginTop: "1rem" }}>
               <Link href="/admin/billing/plans" className="sb-v2__btn sb-v2__btn--primary">
-                View plans & upgrade
+                {t("adminBillingPageUi.viewPlansUpgrade")}
               </Link>
               <Link href="/admin/students" className="sb-v2__btn">
-                Manage students
+                {t("adminBillingPageUi.manageStudents")}
               </Link>
               <Link href="/admin/teachers" className="sb-v2__btn">
-                Manage teachers
+                {t("adminBillingPageUi.manageTeachers")}
               </Link>
             </div>
           </article>

@@ -8,12 +8,7 @@ import {
   type LibrarySection,
 } from "@/components/library/library-hub";
 import { AUTH_ROLE_KEY, AUTH_TOKEN_KEY } from "@/lib/auth";
-
-const SUBTITLES: Record<LibrarySection, string> = {
-  main: "Browse books, notes, exams, and videos from your teachers",
-  progress: "Continue reading and manage your saved books",
-  ai: "Summarize, quiz, and translate your library materials",
-};
+import { useLocale } from "@/components/i18n/locale-provider";
 
 type Props = {
   section: LibrarySection;
@@ -21,6 +16,13 @@ type Props = {
 
 export function StudentLibraryPage({ section }: Props) {
   const router = useRouter();
+  const { t } = useLocale();
+  const subtitle =
+    section === "main"
+      ? t("pages.studentLibrary.subtitleMain")
+      : section === "progress"
+        ? t("pages.studentLibrary.subtitleProgress")
+        : t("pages.studentLibrary.subtitleAi");
 
   useEffect(() => {
     if (!localStorage.getItem(AUTH_TOKEN_KEY)) {
@@ -33,7 +35,7 @@ export function StudentLibraryPage({ section }: Props) {
   }, [router]);
 
   return (
-    <DashboardPage role="student" title="eLibrary" subtitle={SUBTITLES[section]}>
+    <DashboardPage role="student" title={t("pages.studentLibrary.title")} subtitle={subtitle}>
       <LibraryHubView role="student" librarySection={section} />
     </DashboardPage>
   );

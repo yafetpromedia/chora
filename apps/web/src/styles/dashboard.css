@@ -188,6 +188,13 @@
   font-size: 1rem;
   background: var(--brand-surface);
   margin-bottom: 0.75rem;
+  color: var(--brand-teal-dark);
+}
+
+.dash-stat-icon svg,
+.dash-empty-icon svg {
+  width: 1.15rem;
+  height: 1.15rem;
 }
 
 .dash-stat-label {
@@ -3693,7 +3700,7 @@
 
 .dash-notify-row .dash-notify-item {
   border-bottom: 0;
-  padding-right: 2.4rem;
+  padding-right: 5.5rem;
 }
 
 .dash-notify-row .dash-notify-action {
@@ -3701,10 +3708,33 @@
   padding-right: 2.4rem;
 }
 
-.dash-notify-dismiss {
+.dash-notify-actions {
   position: absolute;
-  top: 0.45rem;
-  right: 0.45rem;
+  top: 0.4rem;
+  right: 0.4rem;
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.dash-notify-mark {
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--brand-teal-dark);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  padding: 0.28rem 0.5rem;
+  cursor: pointer;
+}
+
+.dash-notify-mark:hover {
+  background: rgba(42, 111, 111, 0.1);
+}
+
+.dash-notify-dismiss {
   width: 1.6rem;
   height: 1.6rem;
   border: 0;

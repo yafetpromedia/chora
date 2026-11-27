@@ -1,15 +1,16 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import {
-  SupportTicketCategory,
-  SupportTicketStatus,
-} from '@prisma/client';
+import { Injectable, NotFoundException, Optional } from '@nestjs/common';
+import { SupportTicketCategory, SupportTicketStatus } from '@prisma/client';
+import { EmailService } from '../email/email.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateSupportTicketDto } from './dto/create-support-ticket.dto';
 import { UpdateSupportTicketDto } from './dto/update-support-ticket.dto';
 
 @Injectable()
 export class SupportService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly email?: EmailService,
+  ) {}
 
   private readonly ticketInclude = {
     school: {
@@ -45,6 +46,20 @@ export class SupportService {
       },
       include: this.ticketInclude,
     });
+    if (ticket.createdBy.email) {
+      await this.email?.enqueueSafe({
+        to: ticket.createdBy.email,
+        schoolId,
+        category: 'support_confirmation',
+        templateId: 'support_confirmation',
+        idempotencyKey: `support:${ticket.id}`,
+        vars: {
+          firstName: ticket.createdBy.firstName,
+          title: ticket.subject,
+          schoolName: ticket.school.name,
+        },
+      });
+    }
     return this.serialize(ticket);
   }
 
@@ -124,9 +139,7 @@ export class SupportService {
       where: { id },
       data: {
         ...(dto.status ? { status: dto.status } : {}),
-        ...(dto.platformNote !== undefined
-          ? { platformNote: nextNote }
-          : {}),
+        ...(dto.platformNote !== undefined ? { platformNote: nextNote } : {}),
         resolvedAt: resolved ? new Date() : null,
       },
       include: this.ticketInclude,
@@ -155,37 +168,35 @@ export class SupportService {
     return this.serialize(ticket);
   }
 
-  private serialize(
-    ticket: {
+  private serialize(ticket: {
+    id: string;
+    schoolId: string;
+    createdById: string;
+    subject: string;
+    body: string;
+    category: SupportTicketCategory;
+    status: SupportTicketStatus;
+    platformNote: string | null;
+    resolvedAt: Date | null;
+    createdAt: Date;
+    updatedAt: Date;
+    school: {
       id: string;
-      schoolId: string;
-      createdById: string;
-      subject: string;
-      body: string;
-      category: SupportTicketCategory;
-      status: SupportTicketStatus;
-      platformNote: string | null;
-      resolvedAt: Date | null;
-      createdAt: Date;
-      updatedAt: Date;
-      school: {
-        id: string;
-        name: string;
-        slug: string;
-        joinCode: string;
-        email: string | null;
-        phone: string | null;
-        status: string;
-      };
-      createdBy: {
-        id: string;
-        firstName: string;
-        lastName: string;
-        email: string;
-        role: string;
-      };
-    },
-  ) {
+      name: string;
+      slug: string;
+      joinCode: string;
+      email: string | null;
+      phone: string | null;
+      status: string;
+    };
+    createdBy: {
+      id: string;
+      firstName: string;
+      lastName: string;
+      email: string;
+      role: string;
+    };
+  }) {
     return {
       id: ticket.id,
       schoolId: ticket.schoolId,

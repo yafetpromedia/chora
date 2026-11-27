@@ -11,16 +11,33 @@ export type TeacherAssignment = {
   isHomeroom: boolean;
 };
 
+export type TeacherGender = "MALE" | "FEMALE" | "OTHER";
+export type TeacherPhotoReviewStatus = "NONE" | "PENDING" | "REJECTED";
+
 export type TeacherRecord = {
   userId: string;
   teacherId: string | null;
   email: string;
+  phone: string | null;
   name: string;
   firstName: string;
   lastName: string;
   portalRole: string;
   roleTemplateSlug: string | null;
   roleTemplateName: string | null;
+  photoUrl: string | null;
+  pendingPhotoUrl: string | null;
+  photoReviewStatus: TeacherPhotoReviewStatus;
+  photoSubmittedAt: string | null;
+  photoReviewedAt: string | null;
+  photoReviewNote: string | null;
+  hasPendingPhoto: boolean;
+  gender: TeacherGender | null;
+  dateOfBirth: string | null;
+  bloodType: string | null;
+  address: string | null;
+  emergencyContactName: string | null;
+  emergencyContactPhone: string | null;
   canTakeAttendance: boolean;
   homeroom: {
     gradeId: string;
@@ -231,6 +248,16 @@ export async function setStaffPermissionGrants(
   );
 }
 
+export type TeacherPersonalPayload = {
+  phone?: string | null;
+  gender?: TeacherGender | null;
+  dateOfBirth?: string | null;
+  bloodType?: string | null;
+  address?: string | null;
+  emergencyContactName?: string | null;
+  emergencyContactPhone?: string | null;
+};
+
 export async function createTeacher(body: {
   email: string;
   firstName: string;
@@ -239,13 +266,17 @@ export async function createTeacher(body: {
   roleTemplateSlug: string;
   homeroomGradeId?: string;
   homeroomSectionId?: string;
-}) {
+} & TeacherPersonalPayload) {
   return apiPost<TeacherRecord>("/schools/teachers", body);
 }
 
 export async function updateTeacher(
   userId: string,
   body: {
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+    password?: string;
     roleTemplateSlug?: string;
     homeroomGradeId?: string | null;
     homeroomSectionId?: string | null;
@@ -255,11 +286,129 @@ export async function updateTeacher(
       subjectId?: string;
       isHomeroom?: boolean;
     }[];
-  },
+  } & TeacherPersonalPayload,
 ) {
   return apiPatch<TeacherRecord>(`/schools/teachers/${userId}`, body);
 }
 
 export async function deleteTeacher(userId: string) {
   return apiDelete<{ removed: true; userId: string }>(`/schools/teachers/${userId}`);
+}
+
+export type TeacherPhotoStatus = {
+  photoUrl: string | null;
+  pendingPhotoUrl: string | null;
+  photoReviewStatus: TeacherPhotoReviewStatus;
+  photoSubmittedAt: string | null;
+  photoReviewedAt: string | null;
+  photoReviewNote: string | null;
+  hasPendingPhoto: boolean;
+};
+
+export type TeacherPhotoRequest = {
+  userId: string;
+  teacherId: string | null;
+  name: string;
+  email: string;
+  photoUrl: string | null;
+  pendingPhotoUrl: string | null;
+  photoSubmittedAt: string | null;
+};
+
+export async function submitMyTeacherPhoto(photoUrl: string) {
+  return apiPost<TeacherPhotoStatus>("/schools/teachers/me/photo", { photoUrl });
+}
+
+export async function cancelMyPendingTeacherPhoto() {
+  return apiDelete<TeacherPhotoStatus>("/schools/teachers/me/photo/pending");
+}
+
+export async function listTeacherPhotoRequests() {
+  return apiFetch<TeacherPhotoRequest[]>("/schools/teachers/photo-requests");
+}
+
+export async function reviewTeacherPhoto(
+  userId: string,
+  body: { action: "approve" | "reject"; note?: string },
+) {
+  return apiPatch<TeacherRecord>(
+    `/schools/teachers/${encodeURIComponent(userId)}/photo/review`,
+    body,
+  );
+}
+
+export async function adminSetTeacherPhoto(userId: string, photoUrl: string) {
+  return apiPatch<TeacherRecord>(
+    `/schools/teachers/${encodeURIComponent(userId)}/photo`,
+    { photoUrl },
+  );
+}
+
+export async function adminClearTeacherPhoto(userId: string) {
+  return apiDelete<TeacherRecord>(
+    `/schools/teachers/${encodeURIComponent(userId)}/photo`,
+  );
+}
+
+export type HomeroomStudent = {
+  studentProfileId: string;
+  name: string;
+  firstName: string;
+  lastName: string;
+  studentId: string | null;
+  photoUrl: string | null;
+  phone: string | null;
+  cardCode: string | null;
+  gender: string | null;
+  dateOfBirth: string | null;
+  grade: string;
+  section: string | null;
+  group: string | null;
+  attendance: {
+    presentDays: number;
+    markedDays: number;
+    rate: number | null;
+  };
+  results: {
+    publishedScores: number;
+    averagePercent: number | null;
+  };
+  classwork: {
+    submitted: number;
+    graded: number;
+    pending: number;
+  };
+  library: {
+    resources: number;
+    avgProgress: number | null;
+  };
+  behaviorNotes: number;
+};
+
+export type HomeroomStudentsPayload = {
+  homeroom: {
+    gradeId: string;
+    gradeName: string;
+    sectionId: string | null;
+    sectionName: string | null;
+  };
+  groups: string[];
+  students: HomeroomStudent[];
+};
+
+export async function listMyHomeroomStudents() {
+  return apiFetch<HomeroomStudentsPayload>("/schools/teachers/me/students");
+}
+
+export async function setHomeroomStudentGroup(
+  studentProfileId: string,
+  group: string | null,
+) {
+  return apiPatch<{
+    studentProfileId: string;
+    name: string;
+    group: string | null;
+  }>(`/schools/teachers/me/students/${encodeURIComponent(studentProfileId)}/group`, {
+    group,
+  });
 }

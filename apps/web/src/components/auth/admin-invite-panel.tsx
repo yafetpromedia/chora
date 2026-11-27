@@ -1,16 +1,21 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useLocale } from "@/components/i18n/locale-provider";
 import { createSchoolInvite, listSchoolInvites, type SchoolInvite } from "@/lib/api";
 import { AppToast } from "@/components/ui/app-toast";
 
-const ROLES = [
-  { value: "teacher" as const, label: "Teachers" },
-  { value: "student" as const, label: "Students" },
-  { value: "parent" as const, label: "Parents" },
-];
-
 export function AdminInvitePanel() {
+  const { t } = useLocale();
+  const roles = useMemo(
+    () =>
+      [
+        { value: "teacher" as const, label: t("adminInviteUi.roleTeachers") },
+        { value: "student" as const, label: t("adminInviteUi.roleStudents") },
+        { value: "parent" as const, label: t("adminInviteUi.roleParents") },
+      ] as const,
+    [t],
+  );
   const [role, setRole] = useState<"teacher" | "student" | "parent">("teacher");
   const [label, setLabel] = useState("");
   const [invites, setInvites] = useState<SchoolInvite[]>([]);
@@ -18,18 +23,20 @@ export function AdminInvitePanel() {
   const [error, setError] = useState("");
   const [copied, setCopied] = useState<string | null>(null);
 
-  const loadInvites = useCallback(async () => {
-    try {
-      const data = await listSchoolInvites();
-      setInvites(data);
-    } catch {
-      /* ignore on first load */
-    }
-  }, []);
-
   useEffect(() => {
-    void loadInvites();
-  }, [loadInvites]);
+    let cancelled = false;
+    void (async () => {
+      try {
+        const data = await listSchoolInvites();
+        if (!cancelled) setInvites(data);
+      } catch {
+        /* ignore on first load */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function onCreate(event: FormEvent) {
     event.preventDefault();
@@ -46,7 +53,11 @@ export function AdminInvitePanel() {
       setCopied(created.inviteUrl);
       window.setTimeout(() => setCopied(null), 3000);
     } catch (createError) {
-      setError(createError instanceof Error ? createError.message : "Could not create invite");
+      setError(
+        createError instanceof Error
+          ? createError.message
+          : t("adminInviteUi.createFailed"),
+      );
     } finally {
       setLoading(false);
     }
@@ -58,20 +69,27 @@ export function AdminInvitePanel() {
     window.setTimeout(() => setCopied(null), 2000);
   }
 
+  function roleLabelFor(value: string) {
+    const found = roles.find((r) => r.value === value);
+    return found?.label ?? value;
+  }
+
   return (
     <section className="dash-panel" style={{ marginBottom: "1.5rem" }}>
       <div className="dash-panel-head">
-        <h2 className="dash-panel-title">Invitation links</h2>
-        <span className="dash-panel-badge">{invites.length} active</span>
+        <h2 className="dash-panel-title">{t("adminInviteUi.title")}</h2>
+        <span className="dash-panel-badge">
+          {t("adminInviteUi.activeCount", { count: invites.length })}
+        </span>
       </div>
       <p style={{ margin: "0 0 1rem", fontSize: "0.875rem", color: "var(--brand-muted)" }}>
-        Share a link so teachers, students, or parents join your school — no school code needed.
+        {t("adminInviteUi.intro")}
       </p>
 
       <form onSubmit={onCreate} className="dash-invite-form">
         <div className="auth-input-wrap">
           <label className="auth-input-label" htmlFor="invite-role">
-            Invite as
+            {t("adminInviteUi.inviteAs")}
           </label>
           <select
             id="invite-role"
@@ -80,7 +98,7 @@ export function AdminInvitePanel() {
             value={role}
             onChange={(e) => setRole(e.target.value as typeof role)}
           >
-            {ROLES.map((r) => (
+            {roles.map((r) => (
               <option key={r.value} value={r.value}>
                 {r.label}
               </option>
@@ -89,25 +107,25 @@ export function AdminInvitePanel() {
         </div>
         <div className="auth-input-wrap">
           <label className="auth-input-label" htmlFor="invite-label">
-            Label (optional)
+            {t("adminInviteUi.labelOptional")}
           </label>
           <input
             id="invite-label"
             className="auth-input"
             style={{ paddingLeft: "1rem" }}
-            placeholder="e.g. Grade 8 teachers"
+            placeholder={t("adminInviteUi.labelPh")}
             value={label}
             onChange={(e) => setLabel(e.target.value)}
           />
         </div>
         <button type="submit" className="dash-btn-primary" disabled={loading}>
-          {loading ? "Creating…" : "Create link"}
+          {loading ? t("adminInviteUi.creating") : t("adminInviteUi.createLink")}
         </button>
       </form>
 
       <AppToast message={error} tone="error" onDismiss={() => setError("")} />
       <AppToast
-        message={copied ? "Link copied to clipboard" : ""}
+        message={copied ? t("adminInviteUi.linkCopied") : ""}
         tone="success"
         onDismiss={() => setCopied(null)}
       />
@@ -117,15 +135,21 @@ export function AdminInvitePanel() {
           {invites.map((invite) => (
             <div key={invite.id} className="dash-invite-row">
               <div>
-                <span style={{ fontWeight: 700, textTransform: "capitalize", color: "var(--lite-black)" }}>
-                  {invite.role}
+                <span style={{ fontWeight: 700, color: "var(--lite-black)" }}>
+                  {roleLabelFor(invite.role)}
                 </span>
                 {invite.label ? (
-                  <span style={{ marginLeft: "0.5rem", color: "var(--brand-muted)" }}>· {invite.label}</span>
+                  <span style={{ marginLeft: "0.5rem", color: "var(--brand-muted)" }}>
+                    · {invite.label}
+                  </span>
                 ) : null}
                 <p style={{ margin: "0.25rem 0 0", fontSize: "0.75rem", color: "var(--brand-muted)" }}>
-                  {invite.useCount}
-                  {invite.maxUses ? ` / ${invite.maxUses}` : ""} uses
+                  {t("adminInviteUi.uses", {
+                    used: invite.useCount,
+                    max: invite.maxUses
+                      ? t("adminInviteUi.usesMax", { max: invite.maxUses })
+                      : "",
+                  })}
                 </p>
               </div>
               <button
@@ -133,14 +157,16 @@ export function AdminInvitePanel() {
                 className="dash-copy-btn"
                 onClick={() => copyLink(invite.inviteUrl)}
               >
-                {copied === invite.inviteUrl ? "Copied!" : "Copy link"}
+                {copied === invite.inviteUrl
+                  ? t("adminInviteUi.copied")
+                  : t("adminInviteUi.copyLink")}
               </button>
             </div>
           ))}
         </div>
       ) : (
         <div className="dash-empty" style={{ padding: "1.5rem 1rem" }}>
-          <p>No invitation links yet. Create one above to get started.</p>
+          <p>{t("adminInviteUi.empty")}</p>
         </div>
       )}
     </section>

@@ -18,6 +18,7 @@ import {
   type SupportTicketCategory,
 } from "@/lib/support-tickets";
 import { BRAND_NAME } from "@/lib/brand";
+import { useLocale } from "@/components/i18n/locale-provider";
 
 function formatDate(iso: string) {
   try {
@@ -40,6 +41,7 @@ function statusTone(status: SupportTicket["status"]): "default" | "live" | "mute
 }
 
 export default function AdminSupportPage() {
+  const { t } = useLocale();
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -56,12 +58,22 @@ export default function AdminSupportPage() {
   }
 
   useEffect(() => {
-    setLoading(true);
-    void refresh()
-      .catch((err) =>
-        setError(err instanceof Error ? err.message : "Failed to load tickets"),
-      )
-      .finally(() => setLoading(false));
+    let cancelled = false;
+    void listSchoolSupportTickets()
+      .then((data) => {
+        if (!cancelled) setTickets(data);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : t("adminSupportUi.loadFailed"));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const stats = useMemo(() => {
@@ -102,7 +114,7 @@ export default function AdminSupportPage() {
       setSelectedId(created.id);
       await refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to send report");
+      setError(err instanceof Error ? err.message : t("adminSupportUi.sendFailed"));
     } finally {
       setBusy(false);
     }
@@ -112,8 +124,8 @@ export default function AdminSupportPage() {
     <DashboardPage role="admin" title="Support">
       <div className="sup-v2">
         <AcademicsHero
-          title="Report an issue"
-          subtitle={`Send billing, technical, or account problems to the ${BRAND_NAME} tenant control center. Track replies and status here.`}
+          title={t("adminSupportUi.heroTitle")}
+          subtitle={t("adminSupportUi.heroSub", { brand: BRAND_NAME })}
           stats={[
             { label: "Reports", value: loading ? "—" : stats.total },
             { label: "Open", value: loading ? "—" : stats.open },
@@ -125,8 +137,8 @@ export default function AdminSupportPage() {
           ]}
           badges={
             <>
-              <AcademicsBadge variant="live">Control center</AcademicsBadge>
-              <AcademicsBadge variant="muted">School admin</AcademicsBadge>
+              <AcademicsBadge variant="live">{t("adminSupportUi.badgeControl")}</AcademicsBadge>
+              <AcademicsBadge variant="muted">{t("adminSupportUi.badgeAdmin")}</AcademicsBadge>
             </>
           }
         />
@@ -145,10 +157,8 @@ export default function AdminSupportPage() {
                 <DashIcon name="support" className="dash-icon--sm" />
               </span>
               <div>
-                <h2 className="sup-v2__card-title">New report</h2>
-                <p className="sup-v2__card-sub">
-                  Describe the problem clearly so platform support can act fast.
-                </p>
+                <h2 className="sup-v2__card-title">{t("adminSupportUi.newReport")}</h2>
+                <p className="sup-v2__card-sub">{t("adminSupportUi.newReportSub")}</p>
               </div>
             </header>
 

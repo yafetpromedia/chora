@@ -18,9 +18,9 @@ export const PRODUCT_DOCS_META = {
 } as const;
 
 export const PRODUCT_DOCS_BENEFITS = [
-  "Attendance, results & yearly reports",
-  "HR, leave & payroll workflows",
-  "Roles, portals & implementation",
+  "QR results, attendance & yearly reports",
+  "Chapa fees, Fayeda Connect & multilingual UI",
+  "HR, payroll, roles & implementation",
 ] as const;
 
 /** Resolve platform-uploaded or static docs URL for the marketing site. */

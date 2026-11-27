@@ -4,6 +4,7 @@ import { motion, useReducedMotion, useScroll, useTransform } from "framer-motion
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { BRAND_LOGO_SRC, BRAND_NAME } from "@/lib/brand";
+import { useLocale } from "@/components/i18n/locale-provider";
 
 export function AnimatedNav({ children }: { children: ReactNode }) {
   const { scrollY } = useScroll();
@@ -26,14 +27,27 @@ export function AnimatedNav({ children }: { children: ReactNode }) {
 }
 
 export function NavLinks() {
+  const { t } = useLocale();
   return (
     <nav className="hidden gap-8 text-sm font-semibold md:flex">
-      <Link href="/demo" className="nav-link">Demo</Link>
-      <a href="#features" className="nav-link">Product</a>
-      <a href="#app" className="nav-link">Mobile app</a>
-      <a href="#portals" className="nav-link">Portals</a>
-      <a href="#pricing" className="nav-link">Pricing</a>
-      <a href="#faq" className="nav-link">FAQ</a>
+      <Link href="/demo" className="nav-link">
+        {t("landing.demo")}
+      </Link>
+      <a href="#features" className="nav-link">
+        {t("landing.product")}
+      </a>
+      <a href="#app" className="nav-link">
+        {t("landing.mobileApp")}
+      </a>
+      <a href="#portals" className="nav-link">
+        {t("landing.portals")}
+      </a>
+      <a href="#pricing" className="nav-link">
+        {t("landing.pricing")}
+      </a>
+      <a href="#faq" className="nav-link">
+        {t("landing.faq")}
+      </a>
     </nav>
   );
 }

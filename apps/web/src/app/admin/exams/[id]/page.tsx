@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useClientSnapshot } from "@/lib/use-client-snapshot";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { DashboardPage } from "@/components/dashboard/dashboard-page";
@@ -24,6 +25,7 @@ import {
   type ExamSchedule,
   type ExamScheduleDayInput,
 } from "@/lib/exam-schedule";
+import { useLocale } from "@/components/i18n/locale-provider";
 
 type DraftSlot = {
   key: string;
@@ -94,8 +96,12 @@ export default function AdminExamScheduleDetailPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const id = params.id;
+  const { t, tp } = useLocale();
 
-  const [canEdit, setCanEdit] = useState(false);
+  const canEdit = useClientSnapshot(
+    () => hasPermission(Permission.TIMETABLE_MANAGE),
+    false,
+  );
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -109,10 +115,6 @@ export default function AdminExamScheduleDetailPage() {
   const [shiftLabel, setShiftLabel] = useState("");
   const [tab, setTab] = useState<"edit" | "board" | "seating">("edit");
   const [printTarget, setPrintTarget] = useState<"board" | "seating">("board");
-
-  useEffect(() => {
-    setCanEdit(hasPermission(Permission.TIMETABLE_MANAGE));
-  }, []);
 
   useEffect(() => {
     if (
@@ -138,7 +140,7 @@ export default function AdminExamScheduleDetailPage() {
         setSubjects(sub);
         setSchoolName(settings?.name ?? "");
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Could not load schedule");
+        setError(err instanceof Error ? err.message : t("adminExamDetailUi.loadFailed"));
       } finally {
         setLoading(false);
       }
@@ -187,7 +189,7 @@ export default function AdminExamScheduleDetailPage() {
         key: newKey(),
         examDate: new Date().toISOString().slice(0, 10),
         isStudyDay: true,
-        studyNote: "Off day for study",
+        studyNote: t("adminExamDetailUi.studyNotePlaceholder"),
         defaultStartTime: "",
         defaultEndTime: "",
         slots: [],
@@ -262,9 +264,9 @@ export default function AdminExamScheduleDetailPage() {
       setTitle(meta.title);
       setShiftLabel(meta.shiftLabel ?? "");
       setDays(scheduleToDraft(full));
-      setSaved("Exam schedule saved.");
+      setSaved(t("adminExamDetailUi.saved"));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Save failed");
+      setError(err instanceof Error ? err.message : t("adminExamDetailUi.saveFailed"));
     } finally {
       setBusy(false);
     }
@@ -287,10 +289,12 @@ export default function AdminExamScheduleDetailPage() {
       setShiftLabel(full.shiftLabel ?? "");
       setDays(scheduleToDraft(full));
       setSaved(
-        updated.status === "PUBLISHED" ? "Schedule published." : "Moved back to draft.",
+        updated.status === "PUBLISHED"
+          ? t("adminExamDetailUi.published")
+          : t("adminExamDetailUi.movedDraft"),
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not update status");
+      setError(err instanceof Error ? err.message : t("adminExamDetailUi.statusFailed"));
     } finally {
       setBusy(false);
     }
@@ -320,19 +324,19 @@ export default function AdminExamScheduleDetailPage() {
 
   if (loading) {
     return (
-      <DashboardPage role="admin" title="Exam schedule">
-        <div className="ex-loading">Loading…</div>
+      <DashboardPage role="admin" title={tp("Exam schedule")}>
+        <div className="ex-loading">{t("common.loading")}</div>
       </DashboardPage>
     );
   }
 
   if (!schedule) {
     return (
-      <DashboardPage role="admin" title="Exam schedule">
+      <DashboardPage role="admin" title={tp("Exam schedule")}>
         <div className="ex-empty">
-          <h3>Schedule not found</h3>
+          <h3>{t("adminExamDetailUi.notFoundTitle")}</h3>
           <Link href="/admin/exams" className="ex-btn ex-btn--primary">
-            Back to list
+            {t("adminExamDetailUi.backToList")}
           </Link>
         </div>
       </DashboardPage>
@@ -340,46 +344,46 @@ export default function AdminExamScheduleDetailPage() {
   }
 
   return (
-    <DashboardPage role="admin" title="Exam schedule">
+    <DashboardPage role="admin" title={tp("Exam schedule")}>
       <div className="ex-page">
         <AppToast message={error} tone="error" onDismiss={() => setError("")} />
         <AppToast message={saved} tone="success" onDismiss={() => setSaved("")} />
 
         <div className="ex-detail-bar no-print">
           <Link href="/admin/exams" className="ex-btn ex-btn--ghost">
-            ← All schedules
+            {t("adminExamDetailUi.allSchedules")}
           </Link>
-          <div className="ex-detail-bar__tabs" role="group" aria-label="View">
+          <div className="ex-detail-bar__tabs" role="group" aria-label={t("adminExamDetailUi.viewAria")}>
             <button
               type="button"
               className={`ex-tab${tab === "edit" ? " is-active" : ""}`}
               onClick={() => setTab("edit")}
             >
-              Edit
+              {t("adminExamDetailUi.tabEdit")}
             </button>
             <button
               type="button"
               className={`ex-tab${tab === "board" ? " is-active" : ""}`}
               onClick={() => setTab("board")}
             >
-              Board
+              {t("adminExamDetailUi.tabBoard")}
             </button>
             <button
               type="button"
               className={`ex-tab${tab === "seating" ? " is-active" : ""}`}
               onClick={() => setTab("seating")}
             >
-              Seating
+              {t("adminExamDetailUi.tabSeating")}
             </button>
           </div>
           <div className="ex-detail-bar__actions">
             {tab === "seating" ? (
               <button type="button" className="ex-btn ex-btn--ghost" onClick={printSeating}>
-                Print lists
+                {t("adminExamDetailUi.printLists")}
               </button>
             ) : (
               <button type="button" className="ex-btn ex-btn--ghost" onClick={printBoard}>
-                Print board
+                {t("adminExamDetailUi.printBoard")}
               </button>
             )}
             {canEdit && tab !== "seating" ? (
@@ -392,7 +396,9 @@ export default function AdminExamScheduleDetailPage() {
                     void onPublish(schedule.status === "PUBLISHED" ? "DRAFT" : "PUBLISHED")
                   }
                 >
-                  {schedule.status === "PUBLISHED" ? "Unpublish" : "Publish"}
+                  {schedule.status === "PUBLISHED"
+                    ? t("adminExamDetailUi.unpublish")
+                    : t("adminExamDetailUi.publish")}
                 </button>
                 <button
                   type="button"
@@ -400,7 +406,7 @@ export default function AdminExamScheduleDetailPage() {
                   disabled={busy}
                   onClick={() => void onSave()}
                 >
-                  {busy ? "Saving…" : "Save"}
+                  {busy ? t("common.saving") : t("common.save")}
                 </button>
               </>
             ) : null}
@@ -411,7 +417,7 @@ export default function AdminExamScheduleDetailPage() {
           <div className="ex-editor no-print">
             <section className="ex-editor__meta">
               <label className="ex-field">
-                Title
+                {t("adminExamDetailUi.fieldTitle")}
                 <input
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
@@ -419,11 +425,11 @@ export default function AdminExamScheduleDetailPage() {
                 />
               </label>
               <label className="ex-field">
-                Shift
+                {t("adminExamDetailUi.fieldShift")}
                 <input
                   value={shiftLabel}
                   onChange={(e) => setShiftLabel(e.target.value)}
-                  placeholder="Optional"
+                  placeholder={t("adminExamDetailUi.optional")}
                   disabled={!canEdit}
                 />
               </label>
@@ -431,7 +437,9 @@ export default function AdminExamScheduleDetailPage() {
                 <span
                   className={`ex-pill ${schedule.status === "PUBLISHED" ? "ex-pill--live" : ""}`}
                 >
-                  {schedule.status === "PUBLISHED" ? "Published" : "Draft"}
+                  {schedule.status === "PUBLISHED"
+                    ? t("adminExamsUi.statusPublished")
+                    : t("adminExamsUi.statusDraft")}
                 </span>
                 <span className="ex-editor__year">{schedule.academicYear.name}</span>
               </div>
@@ -440,10 +448,10 @@ export default function AdminExamScheduleDetailPage() {
             {canEdit ? (
               <div className="ex-editor__tools">
                 <button type="button" className="ex-btn ex-btn--primary" onClick={addDay}>
-                  + Exam day
+                  {t("adminExamDetailUi.addExamDay")}
                 </button>
                 <button type="button" className="ex-btn ex-btn--ghost" onClick={addStudyDay}>
-                  + Study day
+                  {t("adminExamDetailUi.addStudyDay")}
                 </button>
               </div>
             ) : null}
@@ -451,7 +459,7 @@ export default function AdminExamScheduleDetailPage() {
             <div className="ex-days">
               {days.length === 0 ? (
                 <div className="ex-empty ex-empty--compact">
-                  <p>No days yet. Add an exam day or a study day.</p>
+                  <p>{t("adminExamDetailUi.emptyDays")}</p>
                 </div>
               ) : (
                 days.map((day, index) => (
@@ -462,7 +470,7 @@ export default function AdminExamScheduleDetailPage() {
                     <header className="ex-day__head">
                       <span className="ex-day__num">{index + 1}</span>
                       <label className="ex-field ex-field--inline">
-                        Date
+                        {t("adminExamDetailUi.dayDate")}
                         <input
                           type="date"
                           value={day.examDate}
@@ -479,7 +487,7 @@ export default function AdminExamScheduleDetailPage() {
                             updateDay(day.key, { isStudyDay: e.target.checked })
                           }
                         />
-                        Study day
+                        {t("adminExamDetailUi.studyDay")}
                       </label>
                       {canEdit ? (
                         <button
@@ -487,26 +495,26 @@ export default function AdminExamScheduleDetailPage() {
                           className="ex-day__remove"
                           onClick={() => removeDay(day.key)}
                         >
-                          Remove
+                          {t("adminExamDetailUi.remove")}
                         </button>
                       ) : null}
                     </header>
 
                     {day.isStudyDay ? (
                       <label className="ex-field">
-                        Note
+                        {t("adminExamDetailUi.note")}
                         <input
                           value={day.studyNote}
                           disabled={!canEdit}
                           onChange={(e) => updateDay(day.key, { studyNote: e.target.value })}
-                          placeholder="Off day for study"
+                          placeholder={t("adminExamDetailUi.studyNotePlaceholder")}
                         />
                       </label>
                     ) : (
                       <>
                         <div className="ex-day__times">
                           <label className="ex-field ex-field--inline">
-                            Default start
+                            {t("adminExamDetailUi.defaultStart")}
                             <input
                               type="time"
                               value={day.defaultStartTime}
@@ -517,7 +525,7 @@ export default function AdminExamScheduleDetailPage() {
                             />
                           </label>
                           <label className="ex-field ex-field--inline">
-                            Default end
+                            {t("adminExamDetailUi.defaultEnd")}
                             <input
                               type="time"
                               value={day.defaultEndTime}
@@ -535,7 +543,7 @@ export default function AdminExamScheduleDetailPage() {
                               <select
                                 value={slot.gradeId}
                                 disabled={!canEdit}
-                                aria-label="Grade"
+                                aria-label={t("adminExamDetailUi.gradeAria")}
                                 onChange={(e) =>
                                   updateSlot(day.key, slot.key, { gradeId: e.target.value })
                                 }
@@ -549,7 +557,7 @@ export default function AdminExamScheduleDetailPage() {
                               <select
                                 value={slot.subjectId}
                                 disabled={!canEdit}
-                                aria-label="Subject"
+                                aria-label={t("adminExamDetailUi.subjectAria")}
                                 onChange={(e) => {
                                   const sub = subjects.find((s) => s.id === e.target.value);
                                   updateSlot(day.key, slot.key, {
@@ -558,7 +566,7 @@ export default function AdminExamScheduleDetailPage() {
                                   });
                                 }}
                               >
-                                <option value="">Custom / pick</option>
+                                <option value="">{t("adminExamDetailUi.customPick")}</option>
                                 {subjects.map((s) => (
                                   <option key={s.id} value={s.id}>
                                     {s.name}
@@ -568,8 +576,8 @@ export default function AdminExamScheduleDetailPage() {
                               <input
                                 value={slot.subjectLabel}
                                 disabled={!canEdit}
-                                placeholder="Subject label"
-                                aria-label="Subject label"
+                                placeholder={t("adminExamDetailUi.subjectLabel")}
+                                aria-label={t("adminExamDetailUi.subjectLabel")}
                                 onChange={(e) =>
                                   updateSlot(day.key, slot.key, {
                                     subjectLabel: e.target.value,
@@ -580,7 +588,7 @@ export default function AdminExamScheduleDetailPage() {
                                 type="time"
                                 value={slot.startTime}
                                 disabled={!canEdit}
-                                aria-label="Start"
+                                aria-label={t("adminExamDetailUi.startAria")}
                                 onChange={(e) =>
                                   updateSlot(day.key, slot.key, { startTime: e.target.value })
                                 }
@@ -589,7 +597,7 @@ export default function AdminExamScheduleDetailPage() {
                                 type="time"
                                 value={slot.endTime}
                                 disabled={!canEdit}
-                                aria-label="End"
+                                aria-label={t("adminExamDetailUi.endAria")}
                                 onChange={(e) =>
                                   updateSlot(day.key, slot.key, { endTime: e.target.value })
                                 }
@@ -612,7 +620,7 @@ export default function AdminExamScheduleDetailPage() {
                             className="ex-btn ex-btn--ghost"
                             onClick={() => addSlot(day.key)}
                           >
-                            + Add subject
+                            {t("adminExamDetailUi.addSubject")}
                           </button>
                         ) : null}
                       </>

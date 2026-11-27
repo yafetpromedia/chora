@@ -26,10 +26,7 @@ export class PlatformAiController {
   }
 
   @Post('ai/chat')
-  chat(
-    @Body() dto: AiChatDto,
-    @CurrentPlatformUser() user: PlatformAuthUser,
-  ) {
+  chat(@Body() dto: AiChatDto, @CurrentPlatformUser() user: PlatformAuthUser) {
     return this.ai.platformChat(dto.messages, dto.pageContext, user);
   }
 }

@@ -32,6 +32,9 @@ export function persistAuthSession(response: LoginResponse) {
   if (response.school?.joinCode) {
     localStorage.setItem(AUTH_SCHOOL_JOIN_CODE_KEY, response.school.joinCode);
   }
+  if (response.school?.name) {
+    localStorage.setItem(AUTH_SCHOOL_NAME_KEY, response.school.name);
+  }
   if (response.school) {
     persistSchoolBrand({
       name: response.school.name,
@@ -45,6 +48,7 @@ export function persistAuthSession(response: LoginResponse) {
 
 export function saveSchoolInfo(school: SchoolInfo) {
   localStorage.setItem(AUTH_SCHOOL_JOIN_CODE_KEY, school.joinCode);
+  localStorage.setItem(AUTH_SCHOOL_NAME_KEY, school.name);
   persistSchoolBrand({
     name: school.name,
     logoUrl: school.logoUrl ?? null,

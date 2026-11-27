@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { useLocale } from "@/components/i18n/locale-provider";
 import { fileToHeroDataUrl } from "@/lib/student-photo";
 import { AppToast } from "@/components/ui/app-toast";
 
@@ -11,6 +12,7 @@ type Props = {
 };
 
 export function LandingHeroUpload({ value, onChange, disabled }: Props) {
+  const { t } = useLocale();
   const inputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState("");
 
@@ -21,7 +23,7 @@ export function LandingHeroUpload({ value, onChange, disabled }: Props) {
       const dataUrl = await fileToHeroDataUrl(file);
       onChange(dataUrl);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Invalid image");
+      setError(err instanceof Error ? err.message : t("platformUi.invalidImage"));
     }
   }
 
@@ -30,10 +32,9 @@ export function LandingHeroUpload({ value, onChange, disabled }: Props) {
 
   return (
     <div className="cfg-logo-upload">
-      <p className="cfg-logo-upload__label">Landing hero image</p>
+      <p className="cfg-logo-upload__label">{t("platformUi.heroLabel")}</p>
       <p className="cfg-section__lead" style={{ marginTop: 0 }}>
-        Shown on the public homepage and school registration screens. Leave empty
-        for the branded gradient background.
+        {t("platformUi.heroLead")}
       </p>
 
       <div
@@ -64,7 +65,7 @@ export function LandingHeroUpload({ value, onChange, disabled }: Props) {
             disabled={disabled}
             onClick={() => inputRef.current?.click()}
           >
-            {isCustom ? "Upload new" : "Upload image"}
+            {isCustom ? t("platformUi.heroUploadNew") : t("platformUi.heroUploadImage")}
           </button>
           {isCustom ? (
             <button
@@ -73,7 +74,7 @@ export function LandingHeroUpload({ value, onChange, disabled }: Props) {
               disabled={disabled}
               onClick={() => onChange("")}
             >
-              Remove image
+              {t("platformUi.heroRemove")}
             </button>
           ) : null}
           <input
@@ -88,12 +89,12 @@ export function LandingHeroUpload({ value, onChange, disabled }: Props) {
       </div>
 
       <label className="cfg-field" style={{ marginTop: "1rem" }}>
-        <span>Or paste image URL</span>
+        <span>{t("platformUi.heroPasteUrl")}</span>
         <input
           value={value}
           onChange={(e) => onChange(e.target.value)}
           disabled={disabled}
-          placeholder="https://cdn.example.com/hero.jpg"
+          placeholder={t("platformUi.heroUrlPh")}
         />
       </label>
 

@@ -50,6 +50,7 @@ export function canAccessPlatformSection(
     case "messages":
     case "permissions":
     case "settings":
+    case "email":
     case "curriculum":
     case "subjects":
     case "library":

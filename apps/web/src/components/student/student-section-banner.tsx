@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 type Stat = {
   value: string | number;
   label: string;
@@ -9,7 +11,7 @@ type Props = {
   subtitle: string;
   stats?: Stat[];
   tone?: "progress" | "ai" | "results";
-  icon?: string;
+  icon?: ReactNode;
 };
 
 export function StudentSectionBanner({

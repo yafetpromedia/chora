@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { AttendanceStatus, PaymentStatus } from '@prisma/client';
+import { isWeekendDay } from '../common/school-calendar.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { FinanceService } from '../finance/finance.service';
 import { TeacherDashboardService } from '../teachers/teacher-dashboard.service';
@@ -27,6 +28,7 @@ export class SchoolDayDashboardService {
     });
 
     const [
+      schoolCalendar,
       currentTerm,
       totalStudents,
       todayRecords,
@@ -34,6 +36,10 @@ export class SchoolDayDashboardService {
       teachersTotal,
       classSubjects,
     ] = await Promise.all([
+      this.prisma.school.findUnique({
+        where: { id: schoolId },
+        select: { weekendDays: true },
+      }),
       this.prisma.academicTerm.findFirst({
         where: { schoolId, isCurrent: true },
         select: { id: true, name: true },
@@ -56,6 +62,12 @@ export class SchoolDayDashboardService {
       }),
     ]);
 
+    const todayIsWeekend = isWeekendDay(
+      today,
+      schoolCalendar?.weekendDays,
+      true,
+    );
+
     const markedStudentIds = new Set(
       todayRecords.map((r) => r.studentProfileId),
     );
@@ -72,7 +84,10 @@ export class SchoolDayDashboardService {
         ? Math.round((presentToday / totalStudents) * 100)
         : null;
 
-    const classBuckets = new Map<string, { gradeId: string; sectionId: string | null }>();
+    const classBuckets = new Map<
+      string,
+      { gradeId: string; sectionId: string | null }
+    >();
     for (const cs of classSubjects) {
       const key = `${cs.gradeId}:${cs.sectionId ?? ''}`;
       if (!classBuckets.has(key)) {
@@ -111,7 +126,12 @@ export class SchoolDayDashboardService {
       financeSummary = null;
     }
 
-    const alerts: { type: string; label: string; count: number; href: string }[] = [];
+    const alerts: {
+      type: string;
+      label: string;
+      count: number;
+      href: string;
+    }[] = [];
     if (pendingPayments > 0) {
       alerts.push({
         type: 'finance',
@@ -120,7 +140,8 @@ export class SchoolDayDashboardService {
         href: '/admin/finance',
       });
     }
-    if (totalStudents > markedStudentIds.size) {
+    // Weekends are not school days — do not flag unmarked attendance.
+    if (!todayIsWeekend && totalStudents > markedStudentIds.size) {
       alerts.push({
         type: 'attendance',
         label: 'Students not marked today',
@@ -139,7 +160,7 @@ export class SchoolDayDashboardService {
     const staffMarked = await this.prisma.staffAttendanceRecord.count({
       where: { schoolId, date: today },
     });
-    if (staffEligible > staffMarked) {
+    if (!todayIsWeekend && staffEligible > staffMarked) {
       alerts.push({
         type: 'staff_attendance',
         label: 'Staff not marked today',
@@ -250,8 +271,7 @@ export class SchoolDayDashboardService {
           if (scores.length > 0) {
             const pct =
               scores.reduce(
-                (s, sc) =>
-                  s + (sc.score / sc.assessment.maxScore) * 100,
+                (s, sc) => s + (sc.score / sc.assessment.maxScore) * 100,
                 0,
               ) / scores.length;
             overallAverage = Math.round(pct * 10) / 10;

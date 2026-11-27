@@ -67,4 +67,24 @@ export class NotificationsService {
     });
     return { updated: result.count };
   }
+
+  async deleteStaffNotification(notificationId: string, userId: string) {
+    const result = await this.prisma.staffNotification.deleteMany({
+      where: { id: notificationId, userId },
+    });
+    if (result.count === 0) {
+      throw new NotFoundException('Notification not found');
+    }
+    return { ok: true, deleted: true };
+  }
+
+  async deleteParentNotification(notificationId: string, parentId: string) {
+    const result = await this.prisma.parentNotification.deleteMany({
+      where: { id: notificationId, parentId },
+    });
+    if (result.count === 0) {
+      throw new NotFoundException('Notification not found');
+    }
+    return { ok: true, deleted: true };
+  }
 }

@@ -33,7 +33,11 @@ export class ClassworkService {
     private readonly templates: AssessmentTemplatesService,
   ) {}
 
-  async listTeacherClassSubjects(schoolId: string, userId: string, role: string) {
+  async listTeacherClassSubjects(
+    schoolId: string,
+    userId: string,
+    role: string,
+  ) {
     const currentYear = await this.prisma.academicYear.findFirst({
       where: { schoolId, isCurrent: true },
       select: { id: true },
@@ -75,9 +79,18 @@ export class ClassworkService {
     type?: ClassworkType,
   ) {
     if (classSubjectId) {
-      await this.assertCanManageClassSubject(schoolId, userId, role, classSubjectId);
+      await this.assertCanManageClassSubject(
+        schoolId,
+        userId,
+        role,
+        classSubjectId,
+      );
     }
-    const subjects = await this.listTeacherClassSubjects(schoolId, userId, role);
+    const subjects = await this.listTeacherClassSubjects(
+      schoolId,
+      userId,
+      role,
+    );
     const subjectIds = classSubjectId
       ? [classSubjectId]
       : subjects.map((s) => s.id);
@@ -105,11 +118,7 @@ export class ClassworkService {
     return rows.map((r) => this.formatAssignment(r));
   }
 
-  async listForStudent(
-    schoolId: string,
-    userId: string,
-    type?: ClassworkType,
-  ) {
+  async listForStudent(schoolId: string, userId: string, type?: ClassworkType) {
     const profile = await this.prisma.studentProfile.findFirst({
       where: { schoolId, userId },
       select: { id: true, gradeId: true, sectionId: true },
@@ -211,7 +220,11 @@ export class ClassworkService {
     };
   }
 
-  async getOneForStudent(schoolId: string, userId: string, assignmentId: string) {
+  async getOneForStudent(
+    schoolId: string,
+    userId: string,
+    assignmentId: string,
+  ) {
     const list = await this.listForStudent(schoolId, userId);
     const row = list.find((a) => a.id === assignmentId);
     if (!row) {
@@ -334,7 +347,11 @@ export class ClassworkService {
         _count: { select: { submissions: true } },
       },
     });
-    await this.seedSubmissionsForAssignment(row.id, row.classSubjectId, schoolId);
+    await this.seedSubmissionsForAssignment(
+      row.id,
+      row.classSubjectId,
+      schoolId,
+    );
     return this.formatAssignment(row);
   }
 
@@ -375,7 +392,9 @@ export class ClassworkService {
       include: {
         studentProfile: {
           include: {
-            user: { select: { firstName: true, lastName: true, externalRef: true } },
+            user: {
+              select: { firstName: true, lastName: true, externalRef: true },
+            },
             grade: { select: { name: true } },
             section: { select: { name: true } },
           },
@@ -386,7 +405,8 @@ export class ClassworkService {
     return rows.map((s) => ({
       id: s.id,
       studentProfileId: s.studentProfileId,
-      studentName: `${s.studentProfile.user.firstName} ${s.studentProfile.user.lastName}`.trim(),
+      studentName:
+        `${s.studentProfile.user.firstName} ${s.studentProfile.user.lastName}`.trim(),
       studentId: s.studentProfile.user.externalRef,
       grade: s.studentProfile.grade.name,
       section: s.studentProfile.section?.name ?? null,
@@ -423,9 +443,7 @@ export class ClassworkService {
     if (!submission) {
       throw new NotFoundException('Submission not found');
     }
-    if (
-      submission.status === ClassworkSubmissionStatus.PENDING
-    ) {
+    if (submission.status === ClassworkSubmissionStatus.PENDING) {
       throw new BadRequestException('Student has not submitted yet');
     }
     if (dto.score > assignment.maxScore) {
@@ -497,8 +515,7 @@ export class ClassworkService {
     if (!assignment) throw new NotFoundException('Assignment not available');
 
     const now = new Date();
-    const isLate =
-      assignment.dueAt != null && now > assignment.dueAt;
+    const isLate = assignment.dueAt != null && now > assignment.dueAt;
     let fileUrl: string | undefined;
     let fileName: string | undefined;
     if (file) {
@@ -632,11 +649,7 @@ export class ClassworkService {
         userId,
         role,
       );
-      this.teacherScope.assertCanAccessClass(
-        scopes,
-        cs.gradeId,
-        cs.sectionId,
-      );
+      this.teacherScope.assertCanAccessClass(scopes, cs.gradeId, cs.sectionId);
       return;
     }
     throw new ForbiddenException('Access denied');

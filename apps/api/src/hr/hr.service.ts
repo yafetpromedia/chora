@@ -83,7 +83,9 @@ export class HrService {
   }
 
   async listDepartments(schoolId: string) {
-    const existing = await this.prisma.hrDepartment.count({ where: { schoolId } });
+    const existing = await this.prisma.hrDepartment.count({
+      where: { schoolId },
+    });
     if (existing === 0) await this.ensureOrgDefaults(schoolId);
     return this.prisma.hrDepartment.findMany({
       where: { schoolId },
@@ -117,7 +119,9 @@ export class HrService {
   }
 
   async listPositions(schoolId: string) {
-    const existing = await this.prisma.hrPosition.count({ where: { schoolId } });
+    const existing = await this.prisma.hrPosition.count({
+      where: { schoolId },
+    });
     if (existing === 0) await this.ensureOrgDefaults(schoolId);
     return this.prisma.hrPosition.findMany({
       where: { schoolId },
@@ -220,11 +224,7 @@ export class HrService {
     return users.map((u) => this.formatEmployee(u, !!opts.revealBank));
   }
 
-  async getEmployee(
-    schoolId: string,
-    userId: string,
-    revealBank = false,
-  ) {
+  async getEmployee(schoolId: string, userId: string, revealBank = false) {
     const user = await this.prisma.user.findFirst({
       where: {
         id: userId,
@@ -304,50 +304,56 @@ export class HrService {
       emergencyName: dto.emergencyName ?? existing?.emergencyName ?? null,
       emergencyPhone: dto.emergencyPhone ?? existing?.emergencyPhone ?? null,
       employmentType:
-        dto.employmentType ?? existing?.employmentType ?? EmploymentType.FULL_TIME,
+        dto.employmentType ??
+        existing?.employmentType ??
+        EmploymentType.FULL_TIME,
       employmentStatus:
         dto.employmentStatus ??
         existing?.employmentStatus ??
         EmploymentStatus.ACTIVE,
       hrDepartmentId:
         dto.hrDepartmentId === undefined
-          ? existing?.hrDepartmentId ?? null
+          ? (existing?.hrDepartmentId ?? null)
           : dto.hrDepartmentId,
       hrPositionId:
         dto.hrPositionId === undefined
-          ? existing?.hrPositionId ?? null
+          ? (existing?.hrPositionId ?? null)
           : dto.hrPositionId,
       supervisorUserId:
         dto.supervisorUserId === undefined
-          ? existing?.supervisorUserId ?? null
+          ? (existing?.supervisorUserId ?? null)
           : dto.supervisorUserId,
       hireDate:
         dto.hireDate === undefined
-          ? existing?.hireDate ?? null
+          ? (existing?.hireDate ?? null)
           : parseDate(dto.hireDate),
       contractStart:
         dto.contractStart === undefined
-          ? existing?.contractStart ?? null
+          ? (existing?.contractStart ?? null)
           : parseDate(dto.contractStart),
       contractEnd:
         dto.contractEnd === undefined
-          ? existing?.contractEnd ?? null
+          ? (existing?.contractEnd ?? null)
           : parseDate(dto.contractEnd),
       photoUrl:
-        dto.photoUrl === undefined ? existing?.photoUrl ?? null : dto.photoUrl,
+        dto.photoUrl === undefined
+          ? (existing?.photoUrl ?? null)
+          : dto.photoUrl,
       bankName:
-        dto.bankName === undefined ? existing?.bankName ?? null : dto.bankName,
+        dto.bankName === undefined
+          ? (existing?.bankName ?? null)
+          : dto.bankName,
       bankAccountHolder:
         dto.bankAccountHolder === undefined
-          ? existing?.bankAccountHolder ?? null
+          ? (existing?.bankAccountHolder ?? null)
           : dto.bankAccountHolder,
       bankAccountNumber:
         dto.bankAccountNumber === undefined
-          ? existing?.bankAccountNumber ?? null
+          ? (existing?.bankAccountNumber ?? null)
           : encryptBankAccount(dto.bankAccountNumber),
     };
 
-    const profile = await this.prisma.$transaction(async (tx) => {
+    await this.prisma.$transaction(async (tx) => {
       const row = await tx.employeeProfile.upsert({
         where: { userId },
         create: data,
@@ -415,7 +421,9 @@ export class HrService {
   }
 
   private async nextEmployeeCode(schoolId: string) {
-    const count = await this.prisma.employeeProfile.count({ where: { schoolId } });
+    const count = await this.prisma.employeeProfile.count({
+      where: { schoolId },
+    });
     return `EMP-${String(count + 1).padStart(4, '0')}`;
   }
 
@@ -428,7 +436,8 @@ export class HrService {
       },
       select: { id: true },
     });
-    if (!row) throw new BadRequestException('Supervisor must belong to this school');
+    if (!row)
+      throw new BadRequestException('Supervisor must belong to this school');
   }
 
   private async assertDept(schoolId: string, id: string) {

@@ -4,17 +4,19 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { BrandMark } from "@/components/brand-mark";
+import { LanguageSwitcher } from "@/components/i18n/language-switcher";
+import { useLocale } from "@/components/i18n/locale-provider";
 import { BRAND_NAME } from "@/lib/brand";
 
 const HOME_LINKS = [
-  { href: "#hero", id: "hero", label: "Home" },
-  { href: "#explore", id: "explore", label: "Explore" },
-  { href: "#features", id: "features", label: "Product" },
-  { href: "#connect", id: "connect", label: "Connect" },
-  { href: "#app", id: "app", label: "Mobile app" },
-  { href: "#portals", id: "portals", label: "Portals" },
-  { href: "#pricing", id: "pricing", label: "Pricing" },
-  { href: "#faq", id: "faq", label: "FAQ" },
+  { href: "#hero", id: "hero", msg: "landing.home" },
+  { href: "#explore", id: "explore", msg: "landing.explore" },
+  { href: "#features", id: "features", msg: "landing.product" },
+  { href: "#connect", id: "connect", msg: "landing.connect" },
+  { href: "#app", id: "app", msg: "landing.mobileApp" },
+  { href: "#portals", id: "portals", msg: "landing.portals" },
+  { href: "#pricing", id: "pricing", msg: "landing.pricing" },
+  { href: "#faq", id: "faq", msg: "landing.faq" },
 ] as const;
 
 const SECTION_IDS = [
@@ -34,19 +36,17 @@ function resolveHref(href: string, onHome: boolean) {
 }
 
 export function LandingNav() {
+  const { t } = useLocale();
   const pathname = usePathname();
   const onHome = pathname === "/";
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-  const [overHero, setOverHero] = useState(onHome);
+  const [overHeroState, setOverHero] = useState(onHome);
+  const overHero = onHome && overHeroState;
   const [active, setActive] = useState("hero");
 
   useEffect(() => {
-    if (!onHome) {
-      setOverHero(false);
-      setActive("");
-      return;
-    }
+    if (!onHome) return;
 
     const update = () => {
       const y = window.scrollY;
@@ -130,33 +130,34 @@ export function LandingNav() {
               if (href.startsWith("/")) {
                 return (
                   <Link key={l.href} href={href} {...shared}>
-                    {l.label}
-                    {isConnect ? <span className="lp3-nav__link-soon">Soon</span> : null}
+                    {t(l.msg)}
+                    {isConnect ? <span className="lp3-nav__link-soon">{t("landing.soon")}</span> : null}
                   </Link>
                 );
               }
 
               return (
                 <a key={l.href} href={href} {...shared}>
-                  {l.label}
-                  {isConnect ? <span className="lp3-nav__link-soon">Soon</span> : null}
+                  {t(l.msg)}
+                  {isConnect ? <span className="lp3-nav__link-soon">{t("landing.soon")}</span> : null}
                 </a>
               );
             })}
           </nav>
 
           <div className="lp3-nav__actions">
+            <LanguageSwitcher compact />
             <Link href="/login" className="lp3-nav__signin">
-              Sign in
+              {t("landing.signIn")}
             </Link>
             <Link href="/register" className="lp3-btn lp3-btn--primary lp3-btn--sm">
-              Start free trial
+              {t("landing.startTrial")}
             </Link>
             <button
               type="button"
               className="lp3-nav__menu-btn"
               aria-expanded={open}
-              aria-label={open ? "Close menu" : "Open menu"}
+              aria-label={open ? t("common.close") : t("common.openMenu")}
               onClick={() => setOpen((v) => !v)}
             >
               <span />
@@ -172,10 +173,10 @@ export function LandingNav() {
           <button
             type="button"
             className="lp3-nav__mobile-backdrop"
-            aria-label="Close menu"
+            aria-label={t("common.close")}
             onClick={() => setOpen(false)}
           />
-          <div className="lp3-nav__mobile" role="dialog" aria-label="Menu">
+          <div className="lp3-nav__mobile" role="dialog" aria-label={t("common.openMenu")}>
             <div className="lp3-nav__mobile-links">
               {HOME_LINKS.map((l) => {
                 const href = resolveHref(l.href, onHome);
@@ -191,8 +192,8 @@ export function LandingNav() {
                       className={className}
                       onClick={() => setOpen(false)}
                     >
-                      {l.label}
-                      {isConnect ? <span className="lp3-nav__link-soon">Soon</span> : null}
+                      {t(l.msg)}
+                      {isConnect ? <span className="lp3-nav__link-soon">{t("landing.soon")}</span> : null}
                     </Link>
                   );
                 }
@@ -204,13 +205,13 @@ export function LandingNav() {
                     className={className}
                     onClick={() => setOpen(false)}
                   >
-                    {l.label}
-                    {isConnect ? <span className="lp3-nav__link-soon">Soon</span> : null}
+                    {t(l.msg)}
+                    {isConnect ? <span className="lp3-nav__link-soon">{t("landing.soon")}</span> : null}
                   </a>
                 );
               })}
               <Link href="/login" className="lp3-nav__mobile-link" onClick={() => setOpen(false)}>
-                Sign in
+                {t("landing.signIn")}
               </Link>
             </div>
             <Link
@@ -218,7 +219,7 @@ export function LandingNav() {
               className="lp3-btn lp3-btn--primary lp3-btn--block"
               onClick={() => setOpen(false)}
             >
-              Start free trial
+              {t("landing.startTrial")}
             </Link>
           </div>
         </>

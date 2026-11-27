@@ -181,10 +181,7 @@ export class StudentRecordsController {
 
   @Post(':id/records/graduation')
   @RequirePermissions(SchoolPermission.STUDENTS_EDIT)
-  graduate(
-    @CurrentUser() user: AuthUser,
-    @Param('id') id: string,
-  ) {
+  graduate(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.records.executeGraduation(user.schoolId, id, user.id);
   }
 

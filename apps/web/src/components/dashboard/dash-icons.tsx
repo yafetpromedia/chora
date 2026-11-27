@@ -44,7 +44,10 @@ export type DashIconName =
   | "mail"
   | "message"
   | "support"
-  | "eye";
+  | "eye"
+  | "sparkle"
+  | "upload"
+  | "id-card";
 
 export function DashIcon({ name, className }: { name: DashIconName; className?: string }) {
   const p = { ...base, className: className ?? "dash-icon" };
@@ -297,6 +300,30 @@ export function DashIcon({ name, className }: { name: DashIconName; className?: 
         <svg {...p}>
           <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" />
           <circle cx="12" cy="12" r="3" />
+        </svg>
+      );
+    case "sparkle":
+      return (
+        <svg {...p}>
+          <path d="M12 3l1.6 4.9L18.5 9.5l-4.9 1.6L12 16l-1.6-4.9L5.5 9.5l4.9-1.6L12 3z" />
+          <path d="M19 14l.7 2.1L22 17l-2.3.7L19 20l-.7-2.3L16 17l2.3-.9L19 14z" />
+          <path d="M5 15l.6 1.8L7.5 17.5 5.6 18.1 5 20l-.6-1.9L2.5 17.5l1.9-.7L5 15z" />
+        </svg>
+      );
+    case "upload":
+      return (
+        <svg {...p}>
+          <path d="M12 16V5" />
+          <polyline points="7 10 12 5 17 10" />
+          <path d="M4 19h16" />
+        </svg>
+      );
+    case "id-card":
+      return (
+        <svg {...p}>
+          <rect x="2" y="5" width="20" height="14" rx="2" />
+          <circle cx="8" cy="12" r="2" />
+          <path d="M14 10h4M14 14h4" />
         </svg>
       );
     default:

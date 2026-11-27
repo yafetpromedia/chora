@@ -1,6 +1,28 @@
 import { apiFetch, apiPatch, type SchoolType } from "@/lib/api";
 import type { AttendanceMode } from "@/lib/attendance";
 
+export type Weekday =
+  | "MONDAY"
+  | "TUESDAY"
+  | "WEDNESDAY"
+  | "THURSDAY"
+  | "FRIDAY"
+  | "SATURDAY"
+  | "SUNDAY";
+
+export const WEEKDAY_OPTIONS: { value: Weekday; label: string; short: string }[] =
+  [
+    { value: "MONDAY", label: "Monday", short: "Mon" },
+    { value: "TUESDAY", label: "Tuesday", short: "Tue" },
+    { value: "WEDNESDAY", label: "Wednesday", short: "Wed" },
+    { value: "THURSDAY", label: "Thursday", short: "Thu" },
+    { value: "FRIDAY", label: "Friday", short: "Fri" },
+    { value: "SATURDAY", label: "Saturday", short: "Sat" },
+    { value: "SUNDAY", label: "Sunday", short: "Sun" },
+  ];
+
+export const DEFAULT_WEEKEND_DAYS: Weekday[] = ["SATURDAY", "SUNDAY"];
+
 export type SchoolSettings = {
   id: string;
   name: string;
@@ -21,6 +43,8 @@ export type SchoolSettings = {
   setupComplete: boolean;
   gradePreset: string | null;
   attendanceMode: AttendanceMode;
+  /** Days with no school — attendance is not expected / not marked. */
+  weekendDays: Weekday[];
   status: string;
   bankName: string | null;
   bankAccountHolder: string | null;
@@ -50,6 +74,7 @@ export type UpdateSchoolSettingsPayload = {
   name?: string;
   schoolType?: SchoolType;
   address?: string;
+  postalBox?: string;
   email?: string;
   phone?: string;
   country?: string;
@@ -60,6 +85,7 @@ export type UpdateSchoolSettingsPayload = {
   accentColor?: string | null;
   accentDeep?: string | null;
   attendanceMode?: AttendanceMode;
+  weekendDays?: Weekday[];
   bankName?: string;
   bankAccountHolder?: string;
   bankAccountNumber?: string;

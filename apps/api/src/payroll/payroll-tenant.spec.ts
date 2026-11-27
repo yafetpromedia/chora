@@ -53,7 +53,9 @@ describe('payroll / HR tenant isolation contracts', () => {
 
   it('binds payroll run / payslip / payment / export to school', () => {
     expect(runLookup('school-a', 'run-1').schoolId).toBe('school-a');
-    expect(snapshotPaymentLookup('school-a', 'snap-1').schoolId).toBe('school-a');
+    expect(snapshotPaymentLookup('school-a', 'snap-1').schoolId).toBe(
+      'school-a',
+    );
     expect(exportRunLookup('school-a', 'run-1').schoolId).toBe('school-a');
     expect({ id: 'payslip-1', schoolId: 'school-a' }.schoolId).not.toBe(
       'school-b',

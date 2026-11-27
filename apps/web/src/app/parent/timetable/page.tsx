@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DashboardPage } from "@/components/dashboard/dashboard-page";
+import { useLocale } from "@/components/i18n/locale-provider";
 import { ParentChildBar } from "@/components/parent/parent-child-bar";
 import { TimetablePortalView } from "@/components/timetable/timetable-portal-view";
 import { useParentChild } from "@/hooks/use-parent-child";
@@ -11,6 +12,7 @@ import { getMyTimetableToday, getMyTimetableWeek, type Weekday } from "@/lib/tim
 
 export default function ParentTimetablePage() {
   const router = useRouter();
+  const { t } = useLocale();
   const { children, selectedId, selectChild, loading: childrenLoading, error: childrenError } =
     useParentChild();
   const [loading, setLoading] = useState(true);
@@ -67,16 +69,16 @@ export default function ParentTimetablePage() {
   return (
     <DashboardPage
       role="parent"
-      title="Timetable"
-      subtitle="Today’s classes and the full school week"
+      title={t("pages.parentTimetable.title")}
+      subtitle={t("pages.parentTimetable.subtitle")}
     >
       <div className="par-portal-stack">
         <ParentChildBar
-          children={children}
+          options={children}
           selectedId={selectedId}
           onChange={selectChild}
           loading={childrenLoading}
-          label="Child"
+          label={t("common.child")}
         />
         {childrenError ? (
           <p className="stu-res__alert stu-res__alert--error">{childrenError}</p>
@@ -91,13 +93,13 @@ export default function ParentTimetablePage() {
           showStudent={children.length > 1}
           heroSub={
             selectedChild
-              ? `Schedule for ${selectedChild.name}.`
-              : "See what your children have on today and this week."
+              ? t("timetableUi.parentHeroWithChild", { name: selectedChild.name })
+              : t("timetableUi.parentHeroDefault")
           }
           todayEmptyMessage={
             selectedChild
-              ? `No classes scheduled today for ${selectedChild.name}.`
-              : "No classes scheduled today for your children."
+              ? t("timetableUi.parentEmptyWithChild", { name: selectedChild.name })
+              : t("timetableUi.parentEmptyDefault")
           }
         />
       </div>

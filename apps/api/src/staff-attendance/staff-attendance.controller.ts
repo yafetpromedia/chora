@@ -71,12 +71,7 @@ export class StaffAttendanceController {
     @Query('from') from?: string,
     @Query('to') to?: string,
   ) {
-    return this.staffAttendance.getMeSummary(
-      user.schoolId,
-      user.id,
-      from,
-      to,
-    );
+    return this.staffAttendance.getMeSummary(user.schoolId, user.id, from, to);
   }
 
   @Get('me/history')
@@ -87,12 +82,7 @@ export class StaffAttendanceController {
     @Query('from') from?: string,
     @Query('to') to?: string,
   ) {
-    return this.staffAttendance.getHistory(
-      user.schoolId,
-      user.id,
-      from,
-      to,
-    );
+    return this.staffAttendance.getHistory(user.schoolId, user.id, from, to);
   }
 
   @Get('me/qr')
@@ -134,10 +124,7 @@ export class StaffAttendanceController {
   @Get('summary')
   @Roles('admin', 'staff')
   @RequirePermissions(SchoolPermission.STAFF_ATTENDANCE_ANALYTICS)
-  summary(
-    @CurrentUser() user: AuthUser,
-    @Query('date') date?: string,
-  ) {
+  summary(@CurrentUser() user: AuthUser, @Query('date') date?: string) {
     return this.staffAttendance.summary(user.schoolId, date);
   }
 
@@ -182,12 +169,7 @@ export class StaffAttendanceController {
     @Query('from') from?: string,
     @Query('to') to?: string,
   ) {
-    return this.staffAttendance.getHistory(
-      user.schoolId,
-      userId,
-      from,
-      to,
-    );
+    return this.staffAttendance.getHistory(user.schoolId, userId, from, to);
   }
 
   @Get('records/:id')
@@ -221,10 +203,7 @@ export class StaffAttendanceController {
   @Put('manual')
   @Roles('admin', 'staff')
   @RequirePermissions(SchoolPermission.STAFF_ATTENDANCE_MANAGE)
-  manual(
-    @CurrentUser() user: AuthUser,
-    @Body() dto: ManualStaffAttendanceDto,
-  ) {
+  manual(@CurrentUser() user: AuthUser, @Body() dto: ManualStaffAttendanceDto) {
     return this.staffAttendance.upsertManual(user.schoolId, user.id, dto);
   }
 
@@ -235,11 +214,7 @@ export class StaffAttendanceController {
     @CurrentUser() user: AuthUser,
     @Body() dto: BulkMarkUnmarkedDto,
   ) {
-    return this.staffAttendance.bulkMarkUnmarked(
-      user.schoolId,
-      user.id,
-      dto,
-    );
+    return this.staffAttendance.bulkMarkUnmarked(user.schoolId, user.id, dto);
   }
 
   @Patch('records/:id')

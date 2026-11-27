@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { useLocale } from "@/components/i18n/locale-provider";
 import { fileToPhotoDataUrl } from "@/lib/student-photo";
 import { AppToast } from "@/components/ui/app-toast";
 
@@ -17,6 +18,7 @@ export function SchoolSignatureUpload({
   onChange,
   onLabelChange,
 }: Props) {
+  const { t } = useLocale();
   const inputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState("");
 
@@ -27,19 +29,18 @@ export function SchoolSignatureUpload({
       const dataUrl = await fileToPhotoDataUrl(file);
       onChange(dataUrl);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Invalid image");
+      setError(err instanceof Error ? err.message : t("schoolBrandUploadUi.invalidImage"));
     }
   }
 
   const preview = value.trim() || null;
-  const displayLabel = label.trim() || "Authorized signature";
+  const displayLabel = label.trim() || t("schoolBrandUploadUi.defaultSigLabel");
 
   return (
     <div className="cfg-logo-upload cfg-sig-upload">
-      <p className="cfg-logo-upload__label">Authorized signature</p>
+      <p className="cfg-logo-upload__label">{t("schoolBrandUploadUi.signatureLabel")}</p>
       <p className="cfg-section__lead" style={{ marginTop: 0 }}>
-        Printed on student and staff ID cards and on report cards (Director sign
-        block). Use a clear PNG or JPEG of the wet-ink or stamped signature.
+        {t("schoolBrandUploadUi.signatureLead")}
       </p>
 
       <div className="cfg-logo-upload__row">
@@ -48,7 +49,7 @@ export function SchoolSignatureUpload({
             // eslint-disable-next-line @next/next/no-img-element
             <img src={preview} alt="" />
           ) : (
-            <span className="cfg-logo-upload__placeholder">No signature</span>
+            <span className="cfg-logo-upload__placeholder">{t("schoolBrandUploadUi.noSignature")}</span>
           )}
         </div>
         <div className="cfg-logo-upload__actions">
@@ -57,11 +58,11 @@ export function SchoolSignatureUpload({
             className="cfg-btn cfg-btn--ghost"
             onClick={() => inputRef.current?.click()}
           >
-            {preview ? "Upload new" : "Upload image"}
+            {preview ? t("schoolBrandUploadUi.uploadNew") : t("schoolBrandUploadUi.uploadImage")}
           </button>
           {preview ? (
             <button type="button" className="cfg-btn cfg-btn--ghost" onClick={() => onChange("")}>
-              Remove
+              {t("common.remove")}
             </button>
           ) : null}
           <input
@@ -75,26 +76,26 @@ export function SchoolSignatureUpload({
       </div>
 
       <label className="cfg-field" style={{ marginTop: "1rem" }}>
-        <span>Label under signature</span>
+        <span>{t("schoolBrandUploadUi.labelUnderSig")}</span>
         <input
           value={label}
           onChange={(e) => onLabelChange(e.target.value)}
-          placeholder="Director"
+          placeholder={t("schoolBrandUploadUi.directorPh")}
         />
       </label>
 
       <label className="cfg-field" style={{ marginTop: "0.75rem" }}>
-        <span>Or paste image URL</span>
+        <span>{t("schoolBrandUploadUi.pasteUrl")}</span>
         <input
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          placeholder="https://yourschool.edu/signature.png"
+          placeholder={t("schoolBrandUploadUi.signatureUrlPh")}
         />
       </label>
 
       {preview ? (
         <p className="cfg-hint" style={{ marginTop: "0.75rem" }}>
-          Preview label: {displayLabel}
+          {t("schoolBrandUploadUi.previewLabel", { label: displayLabel })}
         </p>
       ) : null}
 

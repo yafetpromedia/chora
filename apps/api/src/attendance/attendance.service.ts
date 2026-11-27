@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import {
   AttendanceMode,
@@ -18,6 +19,7 @@ import { CreateAttendancePermissionDto } from './dto/create-attendance-permissio
 import { ReviewAttendancePermissionDto } from './dto/review-attendance-permission.dto';
 import { ScanAttendanceDto } from './dto/scan-attendance.dto';
 import { parseCardScanPayload } from '../students/student-card.util';
+import { EmailService } from '../email/email.service';
 import { TeacherScopeService } from '../teachers/teacher-scope.service';
 
 function parseDateOnly(date: string): Date {
@@ -40,6 +42,7 @@ export class AttendanceService {
     private readonly prisma: PrismaService,
     private readonly subscriptionsService: SubscriptionsService,
     private readonly teacherScope: TeacherScopeService,
+    @Optional() private readonly email?: EmailService,
   ) {}
 
   private async assertClassAccess(
@@ -161,7 +164,9 @@ export class AttendanceService {
       throw new BadRequestException('This school uses daily attendance only');
     }
     if (!isDaily && !dto.subject?.trim()) {
-      throw new BadRequestException('Subject is required for period attendance');
+      throw new BadRequestException(
+        'Subject is required for period attendance',
+      );
     }
 
     const day = parseDateOnly(dto.date);
@@ -183,7 +188,9 @@ export class AttendanceService {
     });
 
     if (validStudents.length !== profileIds.length) {
-      throw new BadRequestException('One or more students are invalid for this class');
+      throw new BadRequestException(
+        'One or more students are invalid for this class',
+      );
     }
 
     const studentMap = new Map(validStudents.map((s) => [s.id, s]));
@@ -192,7 +199,7 @@ export class AttendanceService {
       dto.records.map((entry) => {
         const reason =
           entry.status === AttendanceStatus.absent && entry.reason
-            ? (entry.reason as AttendanceReason)
+            ? entry.reason
             : null;
 
         return this.prisma.attendanceRecord.upsert({
@@ -209,15 +216,15 @@ export class AttendanceService {
             studentProfileId: entry.studentProfileId,
             date: day,
             periodNumber,
-            subject: isDaily ? null : dto.subject?.trim() ?? null,
-            status: entry.status as AttendanceStatus,
+            subject: isDaily ? null : (dto.subject?.trim() ?? null),
+            status: entry.status,
             reason,
             recordedBy,
           },
           update: {
-            status: entry.status as AttendanceStatus,
+            status: entry.status,
             reason,
-            subject: isDaily ? null : dto.subject?.trim() ?? null,
+            subject: isDaily ? null : (dto.subject?.trim() ?? null),
             recordedBy,
           },
         });
@@ -230,7 +237,7 @@ export class AttendanceService {
     ];
 
     for (const entry of dto.records) {
-      if (!alertStatuses.includes(entry.status as AttendanceStatus)) {
+      if (!alertStatuses.includes(entry.status)) {
         continue;
       }
       const student = studentMap.get(entry.studentProfileId);
@@ -246,7 +253,9 @@ export class AttendanceService {
 
       const title = `${student.user.firstName} was ${statusLabel} today`;
       const body = `Date: ${dateLabel}\nGrade: ${gradeSection}${
-        !isDaily && dto.subject ? `\nClass: Period ${periodNumber} — ${dto.subject}` : ''
+        !isDaily && dto.subject
+          ? `\nClass: Period ${periodNumber} — ${dto.subject}`
+          : ''
       }`;
 
       const parentIds = [...new Set(student.parents.map((p) => p.parentId))];
@@ -261,6 +270,27 @@ export class AttendanceService {
           body,
         })),
       });
+
+      const late = entry.status === AttendanceStatus.late;
+      try {
+        await this.email?.notifyParents({
+          schoolId,
+          preference: late ? 'lateEnabled' : 'absenceEnabled',
+          category: late ? 'student_late' : 'student_absence',
+          templateId: late ? 'student_late' : 'student_absence',
+          messages: parentIds.map((parentId) => ({
+            parentId,
+            idempotencyKey: `attendance:${schoolId}:${student.id}:${dto.date}:${periodNumber}:${entry.status}:${parentId}`,
+            vars: {
+              childName: student.user.firstName,
+              dateLabel,
+              gradeSection,
+            },
+          })),
+        });
+      } catch {
+        // In-app attendance notice is already stored.
+      }
     }
 
     return { saved: dto.records.length, date: dto.date, periodNumber };
@@ -424,7 +454,7 @@ export class AttendanceService {
     };
     for (const r of records) {
       if (r.status in counts) {
-        counts[r.status as keyof typeof counts] += 1;
+        counts[r.status] += 1;
       }
     }
     const total = records.length;
@@ -442,7 +472,7 @@ export class AttendanceService {
       rate,
       counts,
       total,
-      recent: records.slice(0, 30).map((r) => ({
+      recent: records.slice(0, 120).map((r) => ({
         id: r.id,
         date: r.date,
         status: r.status,
@@ -588,8 +618,7 @@ export class AttendanceService {
       .filter((b) => b.marked > 0)
       .map((b) => ({
         label: b.label,
-        rate:
-          b.enrolled > 0 ? Math.round((b.present / b.enrolled) * 100) : 0,
+        rate: b.enrolled > 0 ? Math.round((b.present / b.enrolled) * 100) : 0,
         marked: b.marked,
       }));
 
@@ -628,11 +657,13 @@ export class AttendanceService {
           },
         },
       },
-      orderBy: [{ date: 'asc' }, { studentProfile: { user: { firstName: 'asc' } } }],
+      orderBy: [
+        { date: 'asc' },
+        { studentProfile: { user: { firstName: 'asc' } } },
+      ],
     });
 
-    const header =
-      'Date,Student,Grade,Section,Status,Reason\n';
+    const header = 'Date,Student,Grade,Section,Status,Reason\n';
     const rows = records
       .map((r) => {
         const name = `${r.studentProfile.user.firstName} ${r.studentProfile.user.lastName}`;
@@ -677,10 +708,12 @@ export class AttendanceService {
       reviewedAt: row.reviewedAt,
       createdAt: row.createdAt,
       studentProfileId: row.studentProfile.id,
-      studentName: `${row.studentProfile.user.firstName} ${row.studentProfile.user.lastName}`.trim(),
+      studentName:
+        `${row.studentProfile.user.firstName} ${row.studentProfile.user.lastName}`.trim(),
       gradeName: row.studentProfile.grade.name,
       sectionName: row.studentProfile.section?.name ?? null,
-      requestedBy: `${row.requester.firstName} ${row.requester.lastName}`.trim(),
+      requestedBy:
+        `${row.requester.firstName} ${row.requester.lastName}`.trim(),
       requestedByRole: row.requester.role,
     };
   }
@@ -730,7 +763,9 @@ export class AttendanceService {
       await this.assertParentStudentAccess(userId, dto.studentProfileId);
       studentProfileId = dto.studentProfileId;
     } else {
-      throw new BadRequestException('Only students or parents can submit requests');
+      throw new BadRequestException(
+        'Only students or parents can submit requests',
+      );
     }
 
     const profile = await this.prisma.studentProfile.findFirst({
@@ -920,12 +955,16 @@ export class AttendanceService {
               section: { select: { name: true } },
             },
           },
-          requester: { select: { firstName: true, lastName: true, role: true } },
+          requester: {
+            select: { firstName: true, lastName: true, role: true },
+          },
         },
       });
 
       if (dto.status === AttendancePermissionStatus.APPROVED) {
-        const markStatus = this.attendanceStatusForPermissionType(existing.type);
+        const markStatus = this.attendanceStatusForPermissionType(
+          existing.type,
+        );
         const reason =
           markStatus === AttendanceStatus.absent
             ? (existing.reason ?? AttendanceReason.other)

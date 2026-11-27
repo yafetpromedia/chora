@@ -3,18 +3,19 @@
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import QRCode from "qrcode";
+import { useLocale } from "@/components/i18n/locale-provider";
 import { Reveal } from "@/components/motion/reveal";
 import { AppStoreBadges } from "@/components/landing/app-store-badges";
 import { EtbAmount } from "@/components/billing/etb-amount";
 import { BrandMark } from "@/components/brand-mark";
 import { BRAND_NAME } from "@/lib/brand";
 
-const PERKS = [
-  "Real-time attendance alerts for parents",
-  "Digital campus ID with QR check-in",
-  "Fees, yearly reports, and notices in one feed",
-  "Same login as web — school code + username",
-];
+const PERK_KEYS = [
+  "landing.perkQr",
+  "landing.perkLang",
+  "landing.perkChapa",
+  "landing.perkFeed",
+] as const;
 
 /** Matches the Everest Youth Academy sample ID card in the product demo. */
 const DEMO_CAMPUS_ID = {
@@ -99,21 +100,22 @@ function PhoneFrame({
 }
 
 export function LandingAppSection() {
+  const { t } = useLocale();
+
   return (
     <section id="app" className="lp3-app">
       <div className="lp3-container">
         <Reveal>
           <div className="lp3-app__panel">
             <div className="lp3-app__copy">
-              <span className="lp3-eyebrow">Mobile app</span>
-              <h2 className="lp3-heading">{BRAND_NAME} on iOS &amp; Android</h2>
-              <p className="lp3-lead">
-                Parents and students stay connected between school and home. Download from Google
-                Play or the App Store — free for every family linked to your school.
-              </p>
+              <span className="lp3-eyebrow">{t("landing.mobileApp")}</span>
+              <h2 className="lp3-heading">
+                {t("landing.appTitle", { brand: BRAND_NAME })}
+              </h2>
+              <p className="lp3-lead">{t("landing.appLead")}</p>
               <ul className="lp3-app__list">
-                {PERKS.map((item) => (
-                  <li key={item}>{item}</li>
+                {PERK_KEYS.map((key) => (
+                  <li key={key}>{t(key)}</li>
                 ))}
               </ul>
               <AppStoreBadges variant="dark" className="lp3-app__stores" />
@@ -123,9 +125,15 @@ export function LandingAppSection() {
               <div className="lp3-app__phones-glow" />
               <div className="lp3-app__phones-ring" />
 
-              <div className="lp3-app__chip lp3-app__chip--attendance">Present · 8:04 AM</div>
+              <div className="lp3-app__chip lp3-app__chip--attendance">
+                {t("landing.chipPresent", {
+                  status: t("common.present"),
+                  time: "8:04 AM",
+                })}
+              </div>
               <div className="lp3-app__chip lp3-app__chip--fee">
-                <EtbAmount amount={2400} maximumFractionDigits={0} symbolSize={11} /> due
+                <EtbAmount amount={2400} maximumFractionDigits={0} symbolSize={11} />{" "}
+                {t("landing.feeDue")}
               </div>
 
               <PhoneFrame variant="back">
@@ -133,7 +141,7 @@ export function LandingAppSection() {
                   <header className="lp3-phone__app-head">
                     <BrandMark />
                     <div>
-                      <strong>Campus ID</strong>
+                      <strong>{t("dash.campusId")}</strong>
                       <em>{DEMO_CAMPUS_ID.school}</em>
                     </div>
                   </header>
@@ -150,7 +158,11 @@ export function LandingAppSection() {
                     </div>
                     <div className="lp3-phone__id-meta">
                       <span>{DEMO_CAMPUS_ID.studentId}</span>
-                      <span>Valid {DEMO_CAMPUS_ID.academicYear}</span>
+                      <span>
+                        {t("landing.validYear", {
+                          year: DEMO_CAMPUS_ID.academicYear,
+                        })}
+                      </span>
                     </div>
                     <LandingMockQr />
                   </div>
@@ -162,42 +174,46 @@ export function LandingAppSection() {
                   <header className="lp3-phone__app-head lp3-phone__app-head--row">
                     <BrandMark />
                     <div>
-                      <strong>Parent</strong>
+                      <strong>{t("landing.parentView")}</strong>
                       <em>{DEMO_CAMPUS_ID.school}</em>
                     </div>
                   </header>
                   <div className="lp3-phone__hero">
                     <div className="lp3-phone__hero-top">
-                      <p>Today</p>
-                      <span className="lp3-phone__badge">Live</span>
+                      <p>{t("dash.today")}</p>
+                      <span className="lp3-phone__badge">{t("dash.live")}</span>
                     </div>
-                    <h4>Present</h4>
-                    <span className="lp3-phone__hero-time">Checked in 8:04 AM</span>
+                    <h4>{t("common.present")}</h4>
+                    <span className="lp3-phone__hero-time">
+                      {t("landing.checkedIn", { time: "8:04 AM" })}
+                    </span>
                   </div>
                   <div className="lp3-phone__feed">
                     <div className="lp3-phone__feed-item">
                       <span className="lp3-phone__feed-dot lp3-phone__feed-dot--teal" />
                       <div>
-                        <strong>Attendance marked</strong>
-                        <em>Period 1 · On time</em>
+                        <strong>{t("landing.attendanceMarked")}</strong>
+                        <em>{t("landing.periodOnTime")}</em>
                       </div>
                     </div>
                     <div className="lp3-phone__feed-item">
                       <span className="lp3-phone__feed-dot lp3-phone__feed-dot--amber" />
                       <div>
-                        <strong>Fee reminder</strong>
-                        <em>Term 2 balance due</em>
+                        <strong>{t("landing.feeReminder")}</strong>
+                        <em>{t("landing.term2Balance")}</em>
                       </div>
                     </div>
                   </div>
                   <div className="lp3-phone__tiles">
                     <div>
-                      <span>Fees</span>
-                      <strong><EtbAmount amount={2400} maximumFractionDigits={0} symbolSize={11} /></strong>
+                      <span>{t("dash.fees")}</span>
+                      <strong>
+                        <EtbAmount amount={2400} maximumFractionDigits={0} symbolSize={11} />
+                      </strong>
                     </div>
                     <div>
-                      <span>Results</span>
-                      <strong>Term 2</strong>
+                      <span>{t("dash.results")}</span>
+                      <strong>{t("landing.term2")}</strong>
                     </div>
                   </div>
                 </div>

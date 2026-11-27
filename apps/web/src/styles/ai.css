@@ -115,8 +115,18 @@
 }
 
 .ai-chat__fab-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-size: 1.05rem;
   line-height: 1;
+}
+
+.ai-chat__fab-icon svg,
+.ai-chat__msg-avatar svg,
+.ai-chat__empty-hero svg {
+  width: 1.1rem;
+  height: 1.1rem;
 }
 
 .ai-chat__panel {

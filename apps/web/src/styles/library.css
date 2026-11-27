@@ -63,6 +63,14 @@
   min-width: 0;
 }
 
+.lib-hero--day {
+  border: 1px solid rgba(22, 117, 109, 0.14);
+  background:
+    radial-gradient(ellipse 70% 80% at 100% 0%, rgba(22, 117, 109, 0.14), transparent 55%),
+    linear-gradient(145deg, #0b2f2e 0%, #123f3d 48%, #0f3533 100%);
+  box-shadow: 0 12px 36px rgba(8, 40, 39, 0.18);
+}
+
 @media (min-width: 900px) {
   .lib-hero {
     grid-template-columns: 1fr auto;
@@ -154,6 +162,13 @@
   backdrop-filter: blur(6px);
 }
 
+.lib-hero--day .lib-stat {
+  padding: 0.65rem 0.7rem;
+  border-radius: 0.85rem;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
 .lib-stat__value {
   display: block;
   font-size: 1.25rem;
@@ -179,6 +194,11 @@
   padding: 1.1rem 1.15rem;
   box-shadow: 0 2px 16px rgba(42, 111, 111, 0.06);
   min-width: 0;
+}
+
+.tch-lib .lib-card {
+  border-radius: 1.05rem;
+  box-shadow: 0 4px 18px rgba(30, 74, 74, 0.06);
 }
 
 .lib-card--search {
@@ -624,13 +644,33 @@
 }
 
 .lib-ai-panel--focus {
-  padding: 1.35rem 1.4rem 1.45rem;
+  padding: 1.35rem 1.4rem 1.5rem;
   border-radius: 1.15rem;
   border: 1px solid rgba(13, 148, 136, 0.14);
   background:
     radial-gradient(circle at top right, rgba(13, 148, 136, 0.08), transparent 42%),
     #fff;
   box-shadow: 0 16px 40px rgba(30, 74, 74, 0.08);
+}
+
+.tch-lib .lib-ai-panel--focus {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 1.25rem 1.3rem 1.4rem;
+}
+
+.tch-lib .lib-ai-form {
+  gap: 1rem;
+}
+
+.tch-lib .lib-ai-actions--pick {
+  margin-top: 0.15rem;
+}
+
+.tch-lib .lib-ai-form__footer {
+  margin-top: 0.15rem;
+  padding-top: 0.15rem;
 }
 
 .lib-ai-panel__head {
@@ -664,6 +704,11 @@
   background: rgba(13, 148, 136, 0.1);
   border: 1px solid rgba(13, 148, 136, 0.16);
   flex-shrink: 0;
+}
+
+.lib-ai-panel__icon svg {
+  width: 1.1rem;
+  height: 1.1rem;
 }
 
 .lib-ai-panel__title {
@@ -744,16 +789,23 @@
 
 .lib-ai-actions {
   display: grid;
+  gap: 0.6rem;
+}
+
+.lib-ai-actions--pick {
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.5rem;
+  align-items: stretch;
 }
 
 .lib-ai-action {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 0.15rem;
-  padding: 0.7rem 0.75rem;
+  justify-content: center;
+  gap: 0.2rem;
+  min-height: 4.35rem;
+  height: 100%;
+  padding: 0.75rem 0.85rem;
   border-radius: 0.8rem;
   border: 1px solid var(--brand-border);
   background: #fff;
@@ -773,13 +825,15 @@
 }
 
 .lib-ai-action strong {
-  font-size: 0.82rem;
+  font-size: 0.84rem;
+  line-height: 1.2;
 }
 
 .lib-ai-action span {
   font-size: 0.72rem;
   color: var(--brand-muted);
   font-weight: 500;
+  line-height: 1.35;
 }
 
 .lib-ai-action--active {
@@ -865,10 +919,13 @@
   aspect-ratio: 16 / 10;
 }
 
-@media (max-width: 640px) {
-  .lib-ai-actions {
+@media (max-width: 720px) {
+  .lib-ai-actions--pick {
     grid-template-columns: 1fr;
   }
+}
+
+@media (max-width: 640px) {
 
   .lib-search {
     flex-direction: column;

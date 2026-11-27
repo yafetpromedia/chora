@@ -5,13 +5,16 @@ import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
 import {
   RegisterVisualPanel,
-  TRIAL_HIGHLIGHTS,
+  useTrialHighlights,
 } from "@/components/auth/register-visual-panel";
 import { useLandingHeroImage } from "@/hooks/use-landing-hero-image";
 import { BrandMark } from "@/components/brand-mark";
+import { LanguageSwitcher } from "@/components/i18n/language-switcher";
+import { useLocale } from "@/components/i18n/locale-provider";
 import { BRAND_NAME } from "@/lib/brand";
 
-const STEPS = ["School", "Admin"] as const;
+const STEP_KEYS = ["register.school", "register.admin"] as const;
+const STEPS_COUNT = STEP_KEYS.length;
 
 type RegisterShellProps = {
   children: ReactNode;
@@ -26,8 +29,10 @@ export function RegisterShell({
   error,
   activeStep,
 }: RegisterShellProps) {
+  const { t } = useLocale();
+  const trialHighlights = useTrialHighlights();
   const reduce = useReducedMotion();
-  const progress = ((activeStep + 1) / STEPS.length) * 100;
+  const progress = ((activeStep + 1) / STEPS_COUNT) * 100;
   const heroSrc = useLandingHeroImage();
 
   return (
@@ -41,15 +46,18 @@ export function RegisterShell({
               <BrandMark className="logo-mark reg-top__logo" />
               <span>{BRAND_NAME}</span>
             </Link>
-            <Link href="/login" className="reg-top__link">
-              Sign in
-            </Link>
+            <div className="reg-top__actions">
+              <LanguageSwitcher compact />
+              <Link href="/login" className="reg-top__link">
+                {t("register.signIn")}
+              </Link>
+            </div>
           </header>
 
           <div className="reg-mobile-banner" aria-hidden>
             {heroSrc ? <img src={heroSrc} alt="" /> : null}
             <div className="reg-mobile-banner__tint" />
-            <p>Free 14-day trial</p>
+            <p>{t("register.freeTrial")}</p>
           </div>
 
           <motion.main
@@ -59,29 +67,27 @@ export function RegisterShell({
             transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
           >
             <div className="reg-hero">
-              <p className="reg-hero__eyebrow">
-                Free 14-day trial · No credit card
-              </p>
+              <p className="reg-hero__eyebrow">{t("register.freeTrialEyebrow")}</p>
               <h1 className="reg-hero__title">
-                Create your <span>school workspace</span>
+                {t("register.createTitle")} <span>{t("register.createAccent")}</span>
               </h1>
-              <p className="reg-hero__sub">
-                Two short steps. Add staff and students from the dashboard after
-                you launch.
-              </p>
-              <ul className="reg-trial-features" aria-label="Included in the free trial">
-                {TRIAL_HIGHLIGHTS.map((item) => (
+              <p className="reg-hero__sub">{t("register.createSub")}</p>
+              <ul
+                className="reg-trial-features"
+                aria-label={t("register.trialFeaturesAria")}
+              >
+                {trialHighlights.map((item) => (
                   <li key={item.title}>{item.title}</li>
                 ))}
               </ul>
             </div>
 
-            <div className="reg-progress" aria-label="Registration progress">
+            <div className="reg-progress" aria-label={t("register.progressAria")}>
               <div className="reg-progress__meta">
                 <span>
-                  Step {activeStep + 1} of {STEPS.length}
+                  {t("register.stepOf", { current: activeStep + 1, total: STEPS_COUNT })}
                 </span>
-                <strong>{STEPS[activeStep]}</strong>
+                <strong>{t(STEP_KEYS[activeStep])}</strong>
               </div>
               <div className="reg-progress__track">
                 <motion.div
@@ -91,9 +97,9 @@ export function RegisterShell({
                 />
               </div>
               <ol className="reg-progress__steps">
-                {STEPS.map((label, index) => (
+                {STEP_KEYS.map((key, index) => (
                   <li
-                    key={label}
+                    key={key}
                     className={
                       index === activeStep
                         ? "is-active"
@@ -103,7 +109,7 @@ export function RegisterShell({
                     }
                     aria-current={index === activeStep ? "step" : undefined}
                   >
-                    {label}
+                    {t(key)}
                   </li>
                 ))}
               </ol>
@@ -130,10 +136,11 @@ export function RegisterShell({
 }
 
 export function RegisterFooterLinks() {
+  const { t } = useLocale();
   return (
     <p className="reg-footer__line">
-      Already have a workspace?{" "}
-      <Link href="/login">Sign in</Link>
+      {t("register.alreadyWorkspace")}{" "}
+      <Link href="/login">{t("register.signIn")}</Link>
     </p>
   );
 }

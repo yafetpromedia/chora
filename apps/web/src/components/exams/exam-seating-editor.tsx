@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useLocale } from "@/components/i18n/locale-provider";
 import { ExamSeatingPrint } from "@/components/exams/exam-seating-print";
 import { AppConfirmDialog } from "@/components/ui/app-confirm-dialog";
 import type { GradeWithSections } from "@/lib/api";
@@ -54,12 +55,14 @@ export function ExamSeatingEditor({
   onSaved,
   onRequestPrint,
 }: Props) {
+  const { t } = useLocale();
   const [loading, setLoading] = useState(true);
+  const defaultTitle = t("examSeatingUi.defaultSeatingTitle");
   const [busy, setBusy] = useState(false);
   const [plans, setPlans] = useState<ExamSeatingPlanListItem[]>([]);
   const [selectedId, setSelectedId] = useState("");
   const [plan, setPlan] = useState<ExamSeatingPlan | null>(null);
-  const [title, setTitle] = useState("Exam seating");
+  const [title, setTitle] = useState(defaultTitle);
   const [notes, setNotes] = useState("");
   const [sourceGradeIds, setSourceGradeIds] = useState<string[]>([]);
   const [rooms, setRooms] = useState<RoomDraft[]>([
@@ -77,10 +80,13 @@ export function ExamSeatingEditor({
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    void loadList()
+    queueMicrotask(() => {
+      if (!cancelled) setLoading(true);
+    });
+    void listExamSeatingPlans(scheduleId)
       .then(async (rows) => {
         if (cancelled) return;
+        setPlans(rows);
         if (rows[0]) {
           setSelectedId(rows[0].id);
           const full = await getExamSeatingPlan(scheduleId, rows[0].id);
@@ -90,7 +96,9 @@ export function ExamSeatingEditor({
       })
       .catch((err) => {
         if (!cancelled) {
-          onError(err instanceof Error ? err.message : "Could not load seating");
+          onError(
+            err instanceof Error ? err.message : t("examSeatingUi.loadSeatingFailed"),
+          );
         }
       })
       .finally(() => {
@@ -99,7 +107,7 @@ export function ExamSeatingEditor({
     return () => {
       cancelled = true;
     };
-  }, [scheduleId, loadList, onError]);
+  }, [scheduleId, onError]);
 
   function applyPlan(full: ExamSeatingPlan) {
     setPlan(full);
@@ -128,7 +136,7 @@ export function ExamSeatingEditor({
       const full = await getExamSeatingPlan(scheduleId, id);
       applyPlan(full);
     } catch (err) {
-      onError(err instanceof Error ? err.message : "Could not load plan");
+      onError(err instanceof Error ? err.message : t("examSeatingUi.loadPlanFailed"));
     } finally {
       setBusy(false);
     }
@@ -137,7 +145,7 @@ export function ExamSeatingEditor({
   function startNew() {
     setPlan(null);
     setSelectedId("");
-    setTitle("Exam seating");
+    setTitle(defaultTitle);
     setNotes("");
     setSourceGradeIds(grades.slice(0, 2).map((g) => g.id));
     setRooms([emptyRoom(), emptyRoom(), emptyRoom()]);
@@ -175,7 +183,7 @@ export function ExamSeatingEditor({
     onError("");
     try {
       const body = {
-        title: title.trim() || "Exam seating",
+        title: title.trim() || defaultTitle,
         notes: notes.trim() || null,
         sourceGradeIds,
         rooms: roomPayload(),
@@ -185,9 +193,13 @@ export function ExamSeatingEditor({
         : await createExamSeatingPlan(scheduleId, body);
       applyPlan(full);
       await loadList();
-      onSaved(plan ? "Seating re-distributed." : "Seating list generated.");
+      onSaved(
+        plan
+          ? t("examSeatingUi.seatingRedistributed")
+          : t("examSeatingUi.seatingGenerated"),
+      );
     } catch (err) {
-      onError(err instanceof Error ? err.message : "Could not generate seating");
+      onError(err instanceof Error ? err.message : t("examSeatingUi.generateFailed"));
     } finally {
       setBusy(false);
     }
@@ -207,33 +219,38 @@ export function ExamSeatingEditor({
       } else {
         startNew();
       }
-      onSaved("Seating plan deleted.");
+      onSaved(t("examSeatingUi.seatingDeleted"));
     } catch (err) {
-      onError(err instanceof Error ? err.message : "Could not delete plan");
+      onError(err instanceof Error ? err.message : t("examSeatingUi.deleteFailed"));
     } finally {
       setBusy(false);
     }
   }
 
   if (loading) {
-    return <p className="muted">Loading seating…</p>;
+    return <p className="muted">{t("examSeatingUi.loadingSeating")}</p>;
   }
 
   return (
     <div className="ex-seat">
       <div className="ex-seat__toolbar no-print">
         <label className="ex-portal__pick">
-          <span>Plan</span>
+          <span>{t("examSeatingUi.plan")}</span>
           <select
             value={selectedId}
             onChange={(e) => void selectPlan(e.target.value)}
             disabled={busy}
           >
-            <option value="">New plan…</option>
+            <option value="">{t("examSeatingUi.newPlanOption")}</option>
             {plans.map((p) => (
               <option key={p.id} value={p.id}>
-                {p.title} ({p.rooms.reduce((n, r) => n + (r._count?.assignments ?? 0), 0)}{" "}
-                students)
+                {p.title} ·{" "}
+                {t("examSeatingUi.studentsCount", {
+                  count: p.rooms.reduce(
+                    (n, r) => n + (r._count?.assignments ?? 0),
+                    0,
+                  ),
+                })}
               </option>
             ))}
           </select>
@@ -246,7 +263,7 @@ export function ExamSeatingEditor({
               disabled={busy}
               onClick={startNew}
             >
-              New
+              {t("examSeatingUi.new")}
             </button>
           ) : null}
           {plan ? (
@@ -256,7 +273,7 @@ export function ExamSeatingEditor({
               disabled={!plan}
               onClick={onRequestPrint}
             >
-              Print lists
+              {t("examSeatingUi.printLists")}
             </button>
           ) : null}
           {canEdit && plan ? (
@@ -266,7 +283,7 @@ export function ExamSeatingEditor({
               disabled={busy}
               onClick={() => setDeleteOpen(true)}
             >
-              Delete
+              {t("common.delete")}
             </button>
           ) : null}
         </div>
@@ -274,7 +291,7 @@ export function ExamSeatingEditor({
 
       <div className="ex-seat__form no-print">
         <label className="ex-field">
-          Title
+          {t("examSeatingUi.title")}
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
@@ -282,17 +299,17 @@ export function ExamSeatingEditor({
           />
         </label>
         <label className="ex-field">
-          Notes
+          {t("examSeatingUi.notes")}
           <input
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            placeholder="Optional"
+            placeholder={t("examSeatingUi.optional")}
             disabled={!canEdit || busy}
           />
         </label>
 
         <fieldset className="ex-seat__grades">
-          <legend>Source grades</legend>
+          <legend>{t("examSeatingUi.sourceGrades")}</legend>
           <div className="ex-seat__grade-grid">
             {grades.map((g) => (
               <label key={g.id} className="ex-seat__grade">
@@ -310,7 +327,7 @@ export function ExamSeatingEditor({
 
         <div className="ex-seat__rooms">
           <div className="ex-seat__rooms-head">
-            <h3>Exam rooms</h3>
+            <h3>{t("examSeatingUi.examRooms")}</h3>
             {canEdit ? (
               <button
                 type="button"
@@ -318,32 +335,34 @@ export function ExamSeatingEditor({
                 disabled={busy}
                 onClick={addRoom}
               >
-                + Room
+                {t("examSeatingUi.addRoom")}
               </button>
             ) : null}
           </div>
           {rooms.map((room, idx) => (
             <div key={room.key} className="ex-seat__room-row">
               <label className="ex-field">
-                Name
+                {t("examSeatingUi.roomName")}
                 <input
                   value={room.name}
-                  placeholder={`e.g. Room ${idx + 1}`}
+                  placeholder={t("examSeatingUi.roomNamePlaceholder", {
+                    n: idx + 1,
+                  })}
                   onChange={(e) => updateRoom(room.key, { name: e.target.value })}
                   disabled={!canEdit || busy}
                 />
               </label>
               <label className="ex-field">
-                Ref
+                {t("examSeatingUi.roomRef")}
                 <input
                   value={room.roomRef}
-                  placeholder="R 23-27"
+                  placeholder={t("examSeatingUi.roomRefPlaceholder")}
                   onChange={(e) => updateRoom(room.key, { roomRef: e.target.value })}
                   disabled={!canEdit || busy}
                 />
               </label>
               <label className="ex-field ex-field--narrow">
-                Capacity
+                {t("examSeatingUi.capacity")}
                 <input
                   type="number"
                   min={1}
@@ -358,7 +377,7 @@ export function ExamSeatingEditor({
                   className="ex-slot__remove"
                   disabled={busy || rooms.length <= 1}
                   onClick={() => removeRoom(room.key)}
-                  aria-label="Remove room"
+                  aria-label={t("examSeatingUi.removeRoomAria")}
                 >
                   ×
                 </button>
@@ -375,10 +394,10 @@ export function ExamSeatingEditor({
             onClick={() => void onGenerate()}
           >
             {busy
-              ? "Working…"
+              ? t("examSeatingUi.working")
               : plan
-                ? "Re-distribute"
-                : "Generate seating lists"}
+                ? t("examSeatingUi.redistribute")
+                : t("examSeatingUi.generateSeating")}
           </button>
         ) : null}
       </div>
@@ -386,17 +405,15 @@ export function ExamSeatingEditor({
       {plan ? (
         <ExamSeatingPrint plan={plan} schoolName={schoolName} />
       ) : (
-        <p className="ex-portal__empty no-print">
-          Select source grades and rooms, then generate mixed A–Z exam hall lists.
-        </p>
+        <p className="ex-portal__empty no-print">{t("examSeatingUi.seatingEmpty")}</p>
       )}
 
       <AppConfirmDialog
         open={deleteOpen}
         tone="danger"
-        title="Delete seating plan?"
-        message="This removes the generated room lists. Class placements are not changed."
-        confirmLabel="Delete"
+        title={t("examSeatingUi.deleteSeatingTitle")}
+        message={t("examSeatingUi.deleteSeatingMessage")}
+        confirmLabel={t("common.delete")}
         busy={busy}
         onConfirm={() => void confirmDelete()}
         onCancel={() => !busy && setDeleteOpen(false)}

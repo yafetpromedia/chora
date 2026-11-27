@@ -1,7 +1,7 @@
 import {
   ConflictException,
   Injectable,
-  OnModuleInit,
+  Optional,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
@@ -9,42 +9,55 @@ import { ConfigService } from '@nestjs/config';
 import { hashSync, compare } from 'bcrypt';
 import { PlatformAuthUser } from '../common/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
+import { EmailService } from '../email/email.service';
 import { PlatformAccessService } from './platform-access.service';
 
 @Injectable()
-export class PlatformAuthService implements OnModuleInit {
+export class PlatformAuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly platformAccess: PlatformAccessService,
+    @Optional() private readonly email?: EmailService,
   ) {}
 
-  async onModuleInit() {
-    // Optional bootstrap only when explicitly configured — never hardcode credentials.
-    const email = this.configService.get<string>('PLATFORM_OWNER_EMAIL')?.trim().toLowerCase();
+  /**
+   * Explicit operator bootstrap only — never called from Nest startup.
+   * Use scripts/runtime-bootstrap.mjs with CHORA_ALLOW_RUNTIME_BOOTSTRAP=1.
+   */
+  async ensurePlatformOwnerFromEnv() {
+    const email = this.configService
+      .get<string>('PLATFORM_OWNER_EMAIL')
+      ?.trim()
+      .toLowerCase();
     const password = this.configService.get<string>('PLATFORM_OWNER_PASSWORD');
     if (!email || !password) {
-      return;
+      return { created: false, reason: 'missing_env' as const };
     }
 
     const existing = await this.prisma.platformUser.findUnique({
       where: { email },
     });
     if (existing) {
-      return;
+      return { created: false, reason: 'already_exists' as const };
     }
 
     await this.prisma.platformUser.create({
       data: {
         email,
         passwordHash: hashSync(password, 10),
-        firstName: this.configService.get<string>('PLATFORM_OWNER_FIRST_NAME')?.trim() || 'Platform',
-        lastName: this.configService.get<string>('PLATFORM_OWNER_LAST_NAME')?.trim() || 'Owner',
+        firstName:
+          this.configService.get<string>('PLATFORM_OWNER_FIRST_NAME')?.trim() ||
+          'Platform',
+        lastName:
+          this.configService.get<string>('PLATFORM_OWNER_LAST_NAME')?.trim() ||
+          'Owner',
         role: 'OWNER',
         isActive: true,
       },
     });
+    return { created: true, reason: 'created' as const };
   }
 
   async login(email: string, password: string) {
@@ -148,6 +161,16 @@ export class PlatformAuthService implements OnModuleInit {
       await this.prisma.platformUser.update({
         where: { id: row.id },
         data,
+      });
+    }
+
+    if (dto.newPassword) {
+      await this.email?.enqueueSafe({
+        to: row.email,
+        category: 'password_change',
+        templateId: 'password_change',
+        idempotencyKey: `platform-password:${row.id}:${Date.now()}`,
+        vars: { firstName: data.firstName ?? row.firstName },
       });
     }
 

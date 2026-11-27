@@ -19,111 +19,107 @@ import {
   IconFinance,
   IconGrades,
   IconHr,
+  IconIdCard,
+  IconLanguage,
   IconLibrary,
   IconSecurity,
   IconTimetable,
   IconYearlyReport,
 } from "@/components/feature-icons";
 import { useLandingHeroImage } from "@/hooks/use-landing-hero-image";
-import type { ReactNode } from "react";
+import { useLocale } from "@/components/i18n/locale-provider";
+import { useMemo, type ReactNode } from "react";
 
-const STEPS = [
-  {
-    n: "01",
-    title: "Create your school",
-    desc: "Register in minutes, pick your grade structure, and upload your logo.",
-  },
-  {
-    n: "02",
-    title: "Invite your community",
-    desc: "Share join codes or invite links for teachers, students, and parents.",
-  },
-  {
-    n: "03",
-    title: "Run daily operations",
-    desc: "Mark attendance, publish report cards, approve leave, and run payroll.",
-  },
-];
-
-const FEATURES: {
-  title: string;
-  desc: string;
+const FEATURE_KEYS: {
+  titleKey: string;
+  descKey: string;
   icon: ReactNode;
   wide?: boolean;
   tone?: string;
 }[] = [
   {
-    title: "Attendance parents trust",
-    desc: "Daily or period roll call, QR campus cards, staff check-in, and a concern inbox when a mark needs review.",
+    titleKey: "features.attendanceTitle",
+    descKey: "features.attendanceDesc",
     icon: <IconAttendance />,
     wide: true,
     tone: "attendance",
   },
   {
-    title: "Results & report cards",
-    desc: "Assessment templates, teacher score sheets, approvals, and printable term report cards.",
+    titleKey: "features.qrTitle",
+    descKey: "features.qrDesc",
+    icon: <IconIdCard />,
+    tone: "grades",
+  },
+  {
+    titleKey: "features.resultsTitle",
+    descKey: "features.resultsDesc",
     icon: <IconGrades />,
     tone: "grades",
   },
   {
-    title: "Yearly report cards",
-    desc: "A full-year booklet in your school branding, with a QR families can scan to verify.",
+    titleKey: "features.yearlyTitle",
+    descKey: "features.yearlyDesc",
     icon: <IconYearlyReport />,
     tone: "yearly",
   },
   {
-    title: "Fees in ETB",
-    desc: "Fee schedules, partial payments, parent submissions, and finance exports.",
+    titleKey: "features.chapaTitle",
+    descKey: "features.chapaDesc",
     icon: <IconFinance />,
     tone: "finance",
   },
   {
-    title: "HR, leave & payroll",
-    desc: "Employee profiles, leave approvals, and payslips your finance team can run in ETB.",
+    titleKey: "features.langTitle",
+    descKey: "features.langDesc",
+    icon: <IconLanguage />,
+    tone: "announce",
+  },
+  {
+    titleKey: "features.fayedaTitle",
+    descKey: "features.fayedaDesc",
+    icon: <IconSecurity />,
+    tone: "security",
+  },
+  {
+    titleKey: "features.hrTitle",
+    descKey: "features.hrDesc",
     icon: <IconHr />,
     tone: "hr",
   },
   {
-    title: "eLibrary & AI study help",
-    desc: "Upload resources, track reading progress, and let students summarize lessons with AI.",
+    titleKey: "features.libraryTitle",
+    descKey: "features.libraryDesc",
     icon: <IconLibrary />,
     tone: "library",
   },
   {
-    title: "Timetable & classwork",
-    desc: "Auto-generate timetables, assign subjects, and publish worksheets to classes.",
+    titleKey: "features.timetableTitle",
+    descKey: "features.timetableDesc",
     icon: <IconTimetable />,
     tone: "timetable",
   },
   {
-    title: "Announcements",
-    desc: "School-wide updates land on admin, teacher, student, and parent dashboards.",
+    titleKey: "features.announceTitle",
+    descKey: "features.announceDesc",
     icon: <IconAnnouncements />,
     tone: "announce",
   },
   {
-    title: "Staff & permissions",
-    desc: "Registrar, finance, and teachers each see only what their role needs.",
+    titleKey: "features.staffTitle",
+    descKey: "features.staffDesc",
     icon: <IconAdmin />,
     tone: "admin",
   },
-  {
-    title: "Secure multi-tenant",
-    desc: "Every school is isolated with JWT auth, audit trails, and role templates.",
-    icon: <IconSecurity />,
-    wide: true,
-    tone: "security",
-  },
 ];
 
-const PORTALS = [
+const PORTAL_KEYS = [
   {
     n: "01",
     role: "Admin",
     glyph: "AD",
-    tagline: "School operations",
-    highlights: ["Enrollment", "Payroll", "Reports"],
-    desc: "Enrollment, HR and payroll, academics setup, and school-wide reports",
+    taglineKey: "portals.adminTag",
+    highlightKeys: ["portals.adminH1", "portals.adminH2", "portals.adminH3"],
+    descKey: "portals.adminDesc",
     href: "/login",
     tone: "admin",
     icon: <IconAdmin />,
@@ -132,9 +128,9 @@ const PORTALS = [
     n: "02",
     role: "Teacher",
     glyph: "TC",
-    tagline: "Classroom daily",
-    highlights: ["Attendance", "Concerns", "Grades"],
-    desc: "Attendance, concern reviews, grades, classwork, and payslips",
+    taglineKey: "portals.teacherTag",
+    highlightKeys: ["portals.teacherH1", "portals.teacherH2", "portals.teacherH3"],
+    descKey: "portals.teacherDesc",
     href: "/login",
     tone: "teacher",
     icon: <IconTimetable />,
@@ -143,9 +139,9 @@ const PORTALS = [
     n: "03",
     role: "Student",
     glyph: "ST",
-    tagline: "Campus life",
-    highlights: ["Campus ID", "Results", "Fees"],
-    desc: "Campus ID, term and yearly results, assignments, fees, and digital library",
+    taglineKey: "portals.studentTag",
+    highlightKeys: ["portals.studentH1", "portals.studentH2", "portals.studentH3"],
+    descKey: "portals.studentDesc",
     href: "/login",
     tone: "student",
     icon: <IconGrades />,
@@ -154,17 +150,47 @@ const PORTALS = [
     n: "04",
     role: "Parent",
     glyph: "PR",
-    tagline: "Family updates",
-    highlights: ["Attendance", "Reports", "Payments"],
-    desc: "Child attendance, yearly report cards, fee payments, and school notices",
+    taglineKey: "portals.parentTag",
+    highlightKeys: ["portals.parentH1", "portals.parentH2", "portals.parentH3"],
+    descKey: "portals.parentDesc",
     href: "/login",
     tone: "parent",
     icon: <IconAttendance />,
   },
-];
+] as const;
 
 export function LandingPage() {
+  const { t, tn } = useLocale();
   const heroSrc = useLandingHeroImage();
+  const steps = useMemo(
+    () => [
+      { n: "01", title: t("landing.step1Title"), desc: t("landing.step1Desc") },
+      { n: "02", title: t("landing.step2Title"), desc: t("landing.step2Desc") },
+      { n: "03", title: t("landing.step3Title"), desc: t("landing.step3Desc") },
+    ],
+    [t],
+  );
+
+  const features = useMemo(
+    () =>
+      FEATURE_KEYS.map((f) => ({
+        ...f,
+        title: t(f.titleKey),
+        desc: t(f.descKey),
+      })),
+    [t],
+  );
+
+  const portals = useMemo(
+    () =>
+      PORTAL_KEYS.map((p) => ({
+        ...p,
+        tagline: t(p.taglineKey),
+        desc: t(p.descKey),
+        highlights: p.highlightKeys.map((key) => t(key)),
+      })),
+    [t],
+  );
 
   return (
     <div className="lp3">
@@ -179,19 +205,16 @@ export function LandingPage() {
           <div className="lp3-container lp3-hero__grid">
             <div className="lp3-hero__copy">
               <h1 className="lp3-hero__title">
-                Run your campus in{" "}
-                <span className="lp3-hero__title-accent">one place</span>
+                {t("landing.heroTitleBefore")}{" "}
+                <span className="lp3-hero__title-accent">{t("landing.heroTitleAccent")}</span>
               </h1>
-              <p className="lp3-hero__lead">
-                Attendance, yearly report cards, fees, payroll, and parent updates — without
-                spreadsheets or chat groups.
-              </p>
+              <p className="lp3-hero__lead">{t("landing.heroLead")}</p>
               <div className="lp3-hero__actions">
                 <Link href="/register" className="lp3-btn lp3-btn--primary">
-                  Start free trial
+                  {t("landing.startTrial")}
                 </Link>
                 <Link href="/login" className="lp3-btn lp3-btn--ghost">
-                  Sign in
+                  {t("landing.signIn")}
                 </Link>
               </div>
             </div>
@@ -204,16 +227,13 @@ export function LandingPage() {
           <div className="lp3-container">
             <Reveal>
               <div className="lp3-section__head lp3-section__head--center">
-                <span className="lp3-eyebrow">How it works</span>
-                <h2 className="lp3-heading">Live in days, not months</h2>
-                <p className="lp3-lead">
-                  Most schools register, import students, and invite staff in the same week they sign
-                  up.
-                </p>
+                <span className="lp3-eyebrow">{t("landing.howEyebrow")}</span>
+                <h2 className="lp3-heading">{t("landing.howTitle")}</h2>
+                <p className="lp3-lead">{t("landing.howLead")}</p>
               </div>
             </Reveal>
             <Stagger className="lp3-steps">
-              {STEPS.map((step) => (
+              {steps.map((step) => (
                 <StaggerItem key={step.n}>
                   <article className="lp3-step">
                     <span className="lp3-step__n">{step.n}</span>
@@ -230,17 +250,14 @@ export function LandingPage() {
           <div className="lp3-container">
             <Reveal>
               <div className="lp3-section__head">
-                <span className="lp3-eyebrow">Platform</span>
-                <h2 className="lp3-heading">Everything your registrar already juggles</h2>
-                <p className="lp3-lead">
-                  Not a bloated ERP — the modules your office, teachers, and finance team open every
-                  morning.
-                </p>
+                <span className="lp3-eyebrow">{t("landing.platformEyebrow")}</span>
+                <h2 className="lp3-heading">{t("landing.platformTitle")}</h2>
+                <p className="lp3-lead">{t("landing.platformLead")}</p>
               </div>
             </Reveal>
             <Stagger className="lp3-bento">
-              {FEATURES.map((f) => (
-                <StaggerItem key={f.title}>
+              {features.map((f) => (
+                <StaggerItem key={f.titleKey}>
                   <article
                     className={`lp3-bento__card${f.wide ? " lp3-bento__card--wide" : ""}${f.tone ? ` lp3-bento__card--${f.tone}` : ""}`}
                   >
@@ -262,16 +279,13 @@ export function LandingPage() {
           <div className="lp3-container">
             <Reveal>
               <div className="lp3-section__head">
-                <span className="lp3-eyebrow">Portals</span>
-                <h2 className="lp3-heading">Four roles. One student record.</h2>
-                <p className="lp3-lead">
-                  When a teacher marks attendance or a parent pays a fee, everyone sees the same
-                  source of truth.
-                </p>
+                <span className="lp3-eyebrow">{t("landing.portalsEyebrow")}</span>
+                <h2 className="lp3-heading">{t("landing.portalsTitle")}</h2>
+                <p className="lp3-lead">{t("landing.portalsLead")}</p>
               </div>
             </Reveal>
             <Stagger className="lp3-portals">
-              {PORTALS.map((p) => (
+              {portals.map((p) => (
                 <StaggerItem key={p.role}>
                   <Link href={p.href} className={`lp3-portal lp3-portal--${p.tone}`}>
                     <div className="lp3-portal__glow" aria-hidden />
@@ -291,14 +305,14 @@ export function LandingPage() {
                     </div>
                     <span className="lp3-portal__n">{p.n}</span>
                     <p className="lp3-portal__tagline">{p.tagline}</p>
-                    <h3>{p.role}</h3>
+                    <h3>{tn(p.role)}</h3>
                     <p className="lp3-portal__desc">{p.desc}</p>
                     <ul className="lp3-portal__highlights">
                       {p.highlights.map((item) => (
                         <li key={item}>{item}</li>
                       ))}
                     </ul>
-                    <span className="lp3-portal__link">Sign in to portal</span>
+                    <span className="lp3-portal__link">{t("landing.signInPortal")}</span>
                   </Link>
                 </StaggerItem>
               ))}
@@ -310,12 +324,9 @@ export function LandingPage() {
           <div className="lp3-container">
             <Reveal>
               <div className="lp3-section__head lp3-section__head--center">
-                <span className="lp3-eyebrow">Pricing</span>
-                <h2 className="lp3-heading">Plans that scale from one campus to a chain</h2>
-                <p className="lp3-lead">
-                  Try every core module on trial. Upgrade when you are ready — pay monthly or annually
-                  in USD or ETB.
-                </p>
+                <span className="lp3-eyebrow">{t("landing.pricingEyebrow")}</span>
+                <h2 className="lp3-heading">{t("landing.pricingTitle")}</h2>
+                <p className="lp3-lead">{t("landing.pricingLead")}</p>
               </div>
             </Reveal>
             <Reveal>
@@ -335,23 +346,20 @@ export function LandingPage() {
             <Reveal>
               <div className="lp3-cta__panel">
                 <div className="lp3-cta__copy">
-                  <span className="lp3-cta__chip">Get started today</span>
-                  <h2>Your school deserves software that feels as organized as you are</h2>
-                  <p>
-                    Create your campus, import students, invite teachers, and share the mobile app
-                    with families — all before the next term starts.
-                  </p>
+                  <span className="lp3-cta__chip">{t("landing.ctaChip")}</span>
+                  <h2>{t("landing.ctaTitle")}</h2>
+                  <p>{t("landing.ctaBody")}</p>
                   <div className="lp3-cta__actions">
                     <Link href="/register" className="lp3-btn lp3-btn--primary">
-                      Start free trial
+                      {t("landing.startTrial")}
                     </Link>
                     <Link href="/login" className="lp3-btn lp3-btn--ghost lp3-btn--on-dark">
-                      Sign in
+                      {t("landing.signIn")}
                     </Link>
                   </div>
                 </div>
                 <div className="lp3-cta__app">
-                  <p>Download {BRAND_NAME}</p>
+                  <p>{t("landing.download", { brand: BRAND_NAME })}</p>
                   <AppStoreBadges variant="dark" layout="stack" />
                 </div>
               </div>

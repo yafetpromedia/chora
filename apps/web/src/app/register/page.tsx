@@ -23,13 +23,14 @@ import {
   clearPendingSchoolWelcome,
   type PendingSchoolWelcome,
 } from "@/lib/school-welcome";
+import { useLocale } from "@/components/i18n/locale-provider";
 
-const SCHOOL_TYPES: { value: SchoolType; label: string }[] = [
-  { value: "KINDERGARTEN", label: "Kindergarten" },
-  { value: "PRIMARY", label: "Primary" },
-  { value: "SECONDARY", label: "Secondary" },
-  { value: "PREPARATORY", label: "Preparatory" },
-  { value: "MIXED", label: "Mixed (K–12)" },
+const SCHOOL_TYPES: { value: SchoolType; labelKey: string }[] = [
+  { value: "KINDERGARTEN", labelKey: "register.kindergarten" },
+  { value: "PRIMARY", labelKey: "register.primary" },
+  { value: "SECONDARY", labelKey: "register.secondary" },
+  { value: "PREPARATORY", labelKey: "register.preparatory" },
+  { value: "MIXED", labelKey: "register.mixed" },
 ];
 
 const COUNTRIES = [
@@ -43,6 +44,7 @@ const COUNTRIES = [
 ] as const;
 
 export default function RegisterSchoolPage() {
+  const { t } = useLocale();
   const router = useRouter();
   const reduce = useReducedMotion();
   const [step, setStep] = useState(0);
@@ -71,8 +73,10 @@ export default function RegisterSchoolPage() {
   }, []);
 
   useEffect(() => {
-    const pending = readPendingSchoolWelcome();
-    if (pending) setWelcome(pending);
+    void (async () => {
+      const pending = readPendingSchoolWelcome();
+      if (pending) setWelcome(pending);
+    })();
   }, []);
 
   function validateStep(index: number): string | null {
@@ -176,17 +180,15 @@ export default function RegisterSchoolPage() {
             >
               <header className="reg-form__head">
                 <h2 id="reg-school" className="reg-form__title">
-                  School details
+                  {t("register.schoolDetails")}
                 </h2>
-                <p className="reg-form__lead">
-                  Tell us about the school. You can edit contact info later.
-                </p>
+                <p className="reg-form__lead">{t("register.schoolDetailsLead")}</p>
               </header>
               <div className="reg-form__grid">
                 <div className="reg-form__full">
                   <AuthInput
                     id="school-name"
-                    label="School name"
+                    label={t("register.schoolName")}
                     icon="none"
                     variant="login"
                     placeholder="Bright Side International School"
@@ -197,7 +199,7 @@ export default function RegisterSchoolPage() {
                 </div>
                 <div className="reg-field">
                   <label className="auth-input-label" htmlFor="curriculum-package">
-                    Starter package
+                    {t("register.starterPackage")}
                   </label>
                   <select
                     id="curriculum-package"
@@ -218,7 +220,7 @@ export default function RegisterSchoolPage() {
                 </div>
                 <div className="reg-field">
                   <label className="auth-input-label" htmlFor="school-type">
-                    School type
+                    {t("register.schoolType")}
                   </label>
                   <select
                     id="school-type"
@@ -226,9 +228,9 @@ export default function RegisterSchoolPage() {
                     value={schoolType}
                     onChange={(e) => setSchoolType(e.target.value as SchoolType)}
                   >
-                    {SCHOOL_TYPES.map((t) => (
-                      <option key={t.value} value={t.value}>
-                        {t.label}
+                    {SCHOOL_TYPES.map((st) => (
+                      <option key={st.value} value={st.value}>
+                        {t(st.labelKey)}
                       </option>
                     ))}
                   </select>
@@ -236,7 +238,7 @@ export default function RegisterSchoolPage() {
                 <div className="reg-form__full">
                   <AuthInput
                     id="school-address"
-                    label="Address"
+                    label={t("register.address")}
                     icon="none"
                     variant="login"
                     placeholder="Bole, Addis Ababa"
@@ -246,7 +248,7 @@ export default function RegisterSchoolPage() {
                 </div>
                 <AuthInput
                   id="school-contact-email"
-                  label="School email"
+                  label={t("register.schoolEmail")}
                   type="email"
                   icon="email"
                   variant="login"
@@ -256,7 +258,7 @@ export default function RegisterSchoolPage() {
                 />
                 <AuthInput
                   id="school-phone"
-                  label="Phone"
+                  label={t("register.phone")}
                   icon="none"
                   variant="login"
                   autoComplete="tel"
@@ -266,7 +268,7 @@ export default function RegisterSchoolPage() {
                 />
                 <div className="reg-field reg-form__full">
                   <label className="auth-input-label" htmlFor="school-country">
-                    Country
+                    {t("register.country")}
                   </label>
                   <select
                     id="school-country"
@@ -295,16 +297,14 @@ export default function RegisterSchoolPage() {
             >
               <header className="reg-form__head">
                 <h2 id="reg-admin" className="reg-form__title">
-                  Admin login
+                  {t("register.adminLogin")}
                 </h2>
-                <p className="reg-form__lead">
-                  This is how you&apos;ll sign in to manage the school.
-                </p>
+                <p className="reg-form__lead">{t("register.adminLoginLead")}</p>
               </header>
               <div className="reg-form__grid">
                 <AuthInput
                   id="admin-first"
-                  label="First name"
+                  label={t("register.firstName")}
                   icon="none"
                   variant="login"
                   autoComplete="given-name"
@@ -315,7 +315,7 @@ export default function RegisterSchoolPage() {
                 />
                 <AuthInput
                   id="admin-last"
-                  label="Last name"
+                  label={t("register.lastName")}
                   icon="none"
                   variant="login"
                   autoComplete="family-name"
@@ -326,7 +326,7 @@ export default function RegisterSchoolPage() {
                 />
                 <AuthInput
                   id="admin-username"
-                  label="Username"
+                  label={t("register.username")}
                   icon="none"
                   variant="login"
                   autoComplete="username"
@@ -337,7 +337,7 @@ export default function RegisterSchoolPage() {
                 />
                 <AuthInput
                   id="admin-email"
-                  label="Email (optional)"
+                  label={t("register.emailOptional")}
                   type="email"
                   icon="email"
                   variant="login"
@@ -349,7 +349,7 @@ export default function RegisterSchoolPage() {
                 <div className="reg-form__full">
                   <AuthInput
                     id="school-password"
-                    label="Password"
+                    label={t("register.password")}
                     type="password"
                     icon="password"
                     variant="login"
@@ -374,21 +374,21 @@ export default function RegisterSchoolPage() {
               onClick={goBack}
               disabled={loading}
             >
-              ← Back
+              ← {t("register.back")}
             </button>
           ) : (
             <span className="reg-form__spacer" aria-hidden />
           )}
           {step === 0 ? (
             <button type="submit" className="reg-form__next">
-              Continue →
+              {t("register.next")} →
             </button>
           ) : (
             <AuthSubmitButton
               variant="page"
               loading={loading}
-              loadingLabel="Creating school…"
-              label="Create workspace"
+              loadingLabel={t("register.creating")}
+              label={t("register.createWorkspace")}
             />
           )}
         </div>

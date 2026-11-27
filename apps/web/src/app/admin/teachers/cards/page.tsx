@@ -46,7 +46,22 @@ export default function TeacherCardsPage() {
       router.replace("/login");
       return;
     }
-    void load();
+    let cancelled = false;
+    void listTeacherIdCards()
+      .then((list) => {
+        if (!cancelled) setCards(list);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Could not load cards");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [router]);
 
   async function onBackfill() {
@@ -66,7 +81,7 @@ export default function TeacherCardsPage() {
   }
 
   return (
-    <DashboardPage role="admin" title="Teacher ID cards" eyebrow="Staff">
+    <DashboardPage role="admin" title="Staff ID cards" eyebrow="Teachers">
       <div className="idcards-page">
         <AppToast message={error} tone="error" onDismiss={() => setError("")} />
         <AppToast message={message} tone="success" onDismiss={() => setMessage("")} />
@@ -81,7 +96,7 @@ export default function TeacherCardsPage() {
             disabled={busy}
             onClick={() => void onBackfill()}
           >
-            Generate missing TCH IDs / cards
+            Generate missing staff IDs / cards
           </button>
           <button type="button" className="att-btn att-btn--ghost" onClick={() => void load()}>
             Refresh
@@ -104,16 +119,16 @@ export default function TeacherCardsPage() {
         </div>
 
         {loading ? (
-          <p className="setup-hint">Loading teacher cards…</p>
+          <p className="setup-hint">Loading staff cards…</p>
         ) : cards.length === 0 ? (
           <p className="setup-hint">
-            No teacher cards yet. Add teachers, then run &quot;Generate missing TCH IDs /
+            No staff cards yet. Add teachers, then run &quot;Generate missing staff IDs /
             cards&quot;.
           </p>
         ) : (
           <>
             <p className="idcards-count-hint">
-              <strong>{cards.length}</strong> faculty card{cards.length === 1 ? "" : "s"}.
+              <strong>{cards.length}</strong> staff card{cards.length === 1 ? "" : "s"}.
               {cards.length > PREVIEW_LIMIT
                 ? ` Showing ${PREVIEW_LIMIT} previews — use Print all for every card.`
                 : null}

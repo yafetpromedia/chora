@@ -2,7 +2,9 @@
 
 import { useEffect, useId, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { useLocale } from "@/components/i18n/locale-provider";
 import { BRAND_NAME } from "@/lib/brand";
+import { useHydrated } from "@/lib/use-client-snapshot";
 
 type Variant = "light" | "dark";
 type StoreKind = "play" | "apple";
@@ -67,13 +69,10 @@ function ComingSoonDialog({
   store: StoreKind | null;
   onClose: () => void;
 }) {
+  const { t } = useLocale();
   const titleId = useId();
   const descId = useId();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const mounted = useHydrated();
 
   useEffect(() => {
     if (!open) return;
@@ -91,14 +90,15 @@ function ComingSoonDialog({
 
   if (!mounted || !open || !store) return null;
 
-  const storeName = store === "play" ? "Google Play" : "App Store";
+  const storeName =
+    store === "play" ? t("appStoreBadges.googlePlay") : t("appStoreBadges.appStore");
 
   return createPortal(
     <div className="lp3-soon" role="presentation">
       <button
         type="button"
         className="lp3-soon__backdrop"
-        aria-label="Close"
+        aria-label={t("appStoreBadges.close")}
         onClick={onClose}
       />
       <div
@@ -111,23 +111,23 @@ function ComingSoonDialog({
         <div className="lp3-soon__mark" aria-hidden>
           {store === "play" ? <PlayIcon /> : <AppleLogoMark />}
         </div>
-        <p className="lp3-soon__eyebrow">{BRAND_NAME} mobile</p>
+        <p className="lp3-soon__eyebrow">
+          {t("appStoreBadges.mobileEyebrow", { brand: BRAND_NAME })}
+        </p>
         <h2 id={titleId} className="lp3-soon__title">
-          Coming soon
+          {t("appStoreBadges.comingSoon")}
         </h2>
         <p id={descId} className="lp3-soon__body">
-          The {BRAND_NAME} app for {storeName} is almost ready. Families and staff can
-          keep using the web portal with the same school code and login until
-          launch.
+          {t("appStoreBadges.body", { brand: BRAND_NAME, store: storeName })}
         </p>
         <ul className="lp3-soon__list">
-          <li>Attendance, results, and fees on the go</li>
-          <li>Same account as the school web portal</li>
-          <li>Free for families linked to your school</li>
+          <li>{t("appStoreBadges.bullet1")}</li>
+          <li>{t("appStoreBadges.bullet2")}</li>
+          <li>{t("appStoreBadges.bullet3")}</li>
         </ul>
         <div className="lp3-soon__actions">
           <button type="button" className="lp3-soon__btn" onClick={onClose}>
-            Got it
+            {t("appStoreBadges.gotIt")}
           </button>
         </div>
       </div>
@@ -145,6 +145,7 @@ export function AppStoreBadges({
   className?: string;
   layout?: "row" | "stack";
 }) {
+  const { t } = useLocale();
   const [store, setStore] = useState<StoreKind | null>(null);
 
   return (
@@ -155,15 +156,15 @@ export function AppStoreBadges({
         }`}
       >
         <StoreButton
-          label="Get it on"
-          title="Google Play"
+          label={t("appStoreBadges.getItOn")}
+          title={t("appStoreBadges.googlePlay")}
           icon={<PlayIcon />}
           variant={variant}
           onClick={() => setStore("play")}
         />
         <StoreButton
-          label="Download on the"
-          title="App Store"
+          label={t("appStoreBadges.downloadOnThe")}
+          title={t("appStoreBadges.appStore")}
           icon={<AppleLogoMark />}
           variant={variant}
           onClick={() => setStore("apple")}

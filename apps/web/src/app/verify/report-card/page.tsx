@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { BrandMark } from "@/components/brand-mark";
 import { BRAND_NAME, BRAND_NAME_AM } from "@/lib/brand";
 import { getApiBaseUrl } from "@/lib/api";
+import { useLocale } from "@/components/i18n/locale-provider";
 
 type VerifyResult = {
   valid: boolean;
@@ -22,6 +23,7 @@ type VerifyResult = {
 };
 
 function VerifyInner() {
+  const { t } = useLocale();
   const searchParams = useSearchParams();
   const token = searchParams.get("t") ?? "";
   const [data, setData] = useState<VerifyResult | null>(null);
@@ -29,26 +31,31 @@ function VerifyInner() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!token) {
-      setError("This verification link is incomplete.");
-      setLoading(false);
-      return;
-    }
-    void fetch(
-      `${getApiBaseUrl()}/public/report-cards/verify?t=${encodeURIComponent(token)}`,
-    )
-      .then(async (res) => {
+    let cancelled = false;
+    void (async () => {
+      if (!token) {
+        setError(t("verifyReportCardUi.incomplete"));
+        setLoading(false);
+        return;
+      }
+      try {
+        const res = await fetch(
+          `${getApiBaseUrl()}/public/report-cards/verify?t=${encodeURIComponent(token)}`,
+        );
         if (!res.ok) throw new Error("invalid");
-        return (await res.json()) as VerifyResult;
-      })
-      .then((json) => {
+        const json = (await res.json()) as VerifyResult;
+        if (cancelled) return;
         setData(json);
         setLoading(false);
-      })
-      .catch(() => {
-        setError("This report card could not be verified. The link may be invalid.");
+      } catch {
+        if (cancelled) return;
+        setError(t("verifyReportCardUi.invalid"));
         setLoading(false);
-      });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [token]);
 
   return (
@@ -168,7 +175,7 @@ function VerifyInner() {
       `}</style>
 
       {loading ? (
-        <p className="rc-verify-loading">Verifying report card…</p>
+        <p className="rc-verify-loading">{t("verifyReportCardUi.loading")}</p>
       ) : error ? (
         <div className="rc-verify-card">
           <div className="rc-verify-card__head">

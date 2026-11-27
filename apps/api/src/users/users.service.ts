@@ -2,7 +2,6 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
-  OnModuleInit,
 } from '@nestjs/common';
 import { hashSync } from 'bcrypt';
 import { randomBytes } from 'crypto';
@@ -36,16 +35,11 @@ const DEFAULT_TEMPLATE_BY_ROLE: Record<string, string> = {
 };
 
 @Injectable()
-export class UsersService implements OnModuleInit {
+export class UsersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly permissionsService: PermissionsService,
   ) {}
-
-  async onModuleInit() {
-    // Intentionally empty: do not auto-create demo school users or passwords.
-    // Users are created through invites, admin provisioning, and auth flows.
-  }
 
   private async ensureTeacherProfile(userId: string, schoolId: string) {
     await this.prisma.teacherProfile.upsert({
@@ -99,7 +93,7 @@ export class UsersService implements OnModuleInit {
         take: 2,
       });
       if (matches.length === 1) {
-        return this.toUserRecord(matches[0]!);
+        return this.toUserRecord(matches[0]);
       }
       if (matches.length > 1) {
         throw new BadRequestException(
@@ -191,6 +185,7 @@ export class UsersService implements OnModuleInit {
   async createUser(input: {
     username: string;
     email?: string;
+    phone?: string | null;
     password?: string;
     firstName: string;
     lastName: string;
@@ -230,8 +225,7 @@ export class UsersService implements OnModuleInit {
     }
 
     const email = (
-      input.email?.trim() ||
-      buildContactEmail(joinCode, username)
+      input.email?.trim() || buildContactEmail(joinCode, username)
     ).toLowerCase();
 
     const existingEmail = await this.findByEmail(email);
@@ -259,7 +253,9 @@ export class UsersService implements OnModuleInit {
     }
 
     const template = roleTemplateId
-      ? await this.prisma.roleTemplate.findUnique({ where: { id: roleTemplateId } })
+      ? await this.prisma.roleTemplate.findUnique({
+          where: { id: roleTemplateId },
+        })
       : null;
 
     const passwordHash = hashSync(
@@ -267,11 +263,14 @@ export class UsersService implements OnModuleInit {
       10,
     );
 
+    const phone = input.phone?.trim() || null;
+
     const user = await this.prisma.user.create({
       data: {
         id: `u_${randomBytes(8).toString('hex')}`,
         username,
         email,
+        phone,
         firstName: input.firstName,
         lastName: input.lastName,
         role: template?.portalRole ?? input.role,
@@ -289,26 +288,6 @@ export class UsersService implements OnModuleInit {
     return this.toUserRecord(user);
   }
 
-  private makeUserSeed(
-    id: string,
-    schoolId: string,
-    role: UserRole,
-    username: string,
-    email: string,
-    passwordHash: string,
-  ) {
-    return {
-      id,
-      schoolId,
-      role: role,
-      username: normalizeUsername(username),
-      email,
-      firstName: role,
-      lastName: 'user',
-      passwordHash,
-    };
-  }
-
   private toUserRecord(user: {
     id: string;
     schoolId: string;
@@ -323,7 +302,7 @@ export class UsersService implements OnModuleInit {
     return {
       id: user.id,
       schoolId: user.schoolId,
-      role: user.role as UserRole,
+      role: user.role,
       roleTemplateId: user.roleTemplateId,
       username: user.username,
       email: user.email,

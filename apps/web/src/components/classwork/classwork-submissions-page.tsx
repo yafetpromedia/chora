@@ -72,14 +72,34 @@ export function ClassworkSubmissionsPage({ mode, assignmentId }: Props) {
   }, [assignmentId, mode, singular]);
 
   useEffect(() => {
-    setLoading(true);
-    setError("");
-    void load()
-      .catch((err) =>
-        setError(err instanceof Error ? err.message : "Load failed"),
-      )
-      .finally(() => setLoading(false));
-  }, [load]);
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setLoading(true);
+      setError("");
+    });
+    void Promise.all([
+      getTeacherAssignment(assignmentId),
+      listSubmissions(assignmentId),
+    ])
+      .then(([row, rows]) => {
+        if (cancelled) return;
+        if (row.type !== mode) {
+          throw new Error(`This ${singular} was not found.`);
+        }
+        setAssignment(row);
+        setSubmissions(rows);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : "Load failed");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [assignmentId, mode, singular]);
 
   function retryLoad() {
     setError("");

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useLocale } from "@/components/i18n/locale-provider";
 import type { AdmissionApplication, AdmissionCycle } from "@/lib/admissions";
 import type { ParentRecord } from "@/lib/parents";
 import type { StudentRecord } from "@/lib/api";
@@ -15,17 +16,25 @@ export type RegistrarMetrics = {
 
 const PIPELINE_STATUSES = ["APPLIED", "SCORED", "PLACED", "ACCEPTED"] as const;
 
-const STATUS_LABELS: Record<string, string> = {
-  APPLIED: "Applied",
-  SCORED: "Scored",
-  PLACED: "Placed",
-  ACCEPTED: "Accepted",
-  ENROLLED: "Enrolled",
-  REJECTED: "Rejected",
-  WITHDRAWN: "Withdrawn",
-};
+function useAdmissionStatusLabels() {
+  const { t } = useLocale();
+  return (status: string) => {
+    const keys: Record<string, string> = {
+      APPLIED: "admissionsUi.applied",
+      SCORED: "admissionsUi.statusScored",
+      PLACED: "admissionsUi.statusPlaced",
+      ACCEPTED: "admissionsUi.accepted",
+      ENROLLED: "admissionsUi.statusEnrolled",
+      REJECTED: "admissionsUi.rejected",
+      WITHDRAWN: "admissionsUi.withdrawn",
+    };
+    const key = keys[status];
+    return key ? t(key) : status;
+  };
+}
 
 function EnrollmentByGrade({ students }: { students: StudentRecord[] }) {
+  const { t } = useLocale();
   const byGrade = new Map<string, number>();
   for (const s of students) {
     const label = s.section ? `${s.grade.name} · ${s.section.name}` : s.grade.name;
@@ -39,7 +48,7 @@ function EnrollmentByGrade({ students }: { students: StudentRecord[] }) {
   const max = Math.max(1, ...rows.map((r) => r.count));
 
   if (rows.length === 0) {
-    return <p className="da-chart__empty">No students enrolled yet.</p>;
+    return <p className="da-chart__empty">{t("staffDash.noStudentsEnrolled")}</p>;
   }
 
   return (
@@ -66,8 +75,14 @@ function EnrollmentByGrade({ students }: { students: StudentRecord[] }) {
 }
 
 function AdmissionsPipeline({ applications }: { applications: AdmissionApplication[] }) {
+  const { t } = useLocale();
+  const statusLabel = useAdmissionStatusLabels();
+
   const counts = Object.fromEntries(
-    Object.keys(STATUS_LABELS).map((s) => [s, 0]),
+    ["APPLIED", "SCORED", "PLACED", "ACCEPTED", "ENROLLED", "REJECTED", "WITHDRAWN"].map((s) => [
+      s,
+      0,
+    ]),
   ) as Record<string, number>;
 
   for (const app of applications) {
@@ -84,7 +99,7 @@ function AdmissionsPipeline({ applications }: { applications: AdmissionApplicati
   const max = Math.max(1, ...rows.map((r) => r.count));
 
   if (applications.length === 0) {
-    return <p className="da-chart__empty">No applications this cycle.</p>;
+    return <p className="da-chart__empty">{t("staffDash.noApplicationsThisCycle")}</p>;
   }
 
   return (
@@ -92,7 +107,7 @@ function AdmissionsPipeline({ applications }: { applications: AdmissionApplicati
       {rows.map((row) => (
         <li key={row.status}>
           <div className="da-enroll__head">
-            <span>{STATUS_LABELS[row.status]}</span>
+            <span>{statusLabel(row.status)}</span>
             <strong>{row.count}</strong>
           </div>
           <div className="da-enroll__track">
@@ -117,6 +132,7 @@ function ParentLinkageRing({
   linked: number;
   total: number;
 }) {
+  const { t } = useLocale();
   const pct = total > 0 ? Math.round((linked / total) * 100) : 0;
   const deg = (pct / 100) * 360;
   const unlinked = total - linked;
@@ -132,20 +148,22 @@ function ParentLinkageRing({
       >
         <div className="da-finance__ring-inner">
           <span className="da-finance__pct">{pct}%</span>
-          <span className="da-finance__pct-label">linked</span>
+          <span className="da-finance__pct-label">{t("staffDash.linkedLabel")}</span>
         </div>
       </div>
       <ul className="da-finance__legend">
         <li>
           <span className="da-finance__dot da-finance__dot--collected" />
-          Linked <strong>{linked}</strong>
+          {t("staffDash.linkedLabel")} <strong>{linked}</strong>
         </li>
         <li>
           <span className="da-finance__dot da-finance__dot--outstanding" />
-          Unlinked <strong>{unlinked}</strong>
+          {t("staffDash.unlinked")} <strong>{unlinked}</strong>
         </li>
         <li className="da-finance__meta">
-          {total} students on roll
+          {total === 1
+            ? t("staffDash.oneStudentOnRoll")
+            : t("staffDash.studentsOnRollPlural", { count: total })}
         </li>
       </ul>
     </div>
@@ -153,6 +171,9 @@ function ParentLinkageRing({
 }
 
 function RecentApplications({ applications }: { applications: AdmissionApplication[] }) {
+  const { t } = useLocale();
+  const statusLabel = useAdmissionStatusLabels();
+
   const recent = [...applications]
     .filter((a) => a.status !== "ENROLLED")
     .sort((a, b) => new Date(b.appliedAt).getTime() - new Date(a.appliedAt).getTime())
@@ -161,7 +182,7 @@ function RecentApplications({ applications }: { applications: AdmissionApplicati
   if (recent.length === 0) {
     return (
       <div className="da-feed-empty">
-        <p>No open applications.</p>
+        <p>{t("staffDash.noOpenApplications")}</p>
       </div>
     );
   }
@@ -175,7 +196,7 @@ function RecentApplications({ applications }: { applications: AdmissionApplicati
               {app.firstName} {app.lastName}
             </p>
             <p className="reg-recent__meta">
-              {STATUS_LABELS[app.status]}
+              {statusLabel(app.status)}
               {app.targetGrade ? ` · ${app.targetGrade.name}` : ""}
             </p>
           </div>
@@ -193,6 +214,7 @@ type Props = {
 };
 
 export function RegistrarAnalyticsSection({ metrics }: Props) {
+  const { t } = useLocale();
   const { students, parents, applications } = metrics;
 
   const linkedIds = new Set(parents.flatMap((p) => p.children.map((c) => c.profileId)));
@@ -203,19 +225,22 @@ export function RegistrarAnalyticsSection({ metrics }: Props) {
     PIPELINE_STATUSES.includes(a.status as (typeof PIPELINE_STATUSES)[number]),
   ).length;
 
+  const rollSub =
+    students.length === 1
+      ? t("staffDash.oneStudentOnRoll")
+      : t("staffDash.studentsOnRollPlural", { count: students.length });
+
   return (
-    <section className="da-analytics" aria-label="Registrar analytics">
+    <section className="da-analytics" aria-label={t("staffDash.registrarAnalyticsAria")}>
       <div className="da-analytics__grid">
         <article className="da-card da-card--span2">
           <header className="da-card__head">
             <div>
-              <h2 className="da-card__title">Enrollment by class</h2>
-              <p className="da-card__sub">
-                {students.length} student{students.length === 1 ? "" : "s"} on roll
-              </p>
+              <h2 className="da-card__title">{t("staffDash.enrollmentByClass")}</h2>
+              <p className="da-card__sub">{rollSub}</p>
             </div>
             <Link href="/admin/students" className="da-card__link">
-              Student roster <DashIcon name="chevron" className="dash-icon--xs" />
+              {t("staffDash.studentRoster")} <DashIcon name="chevron" className="dash-icon--xs" />
             </Link>
           </header>
           <EnrollmentByGrade students={students} />
@@ -224,11 +249,11 @@ export function RegistrarAnalyticsSection({ metrics }: Props) {
         <article className="da-card">
           <header className="da-card__head">
             <div>
-              <h2 className="da-card__title">Parent portal</h2>
-              <p className="da-card__sub">Family account linkage</p>
+              <h2 className="da-card__title">{t("staffDash.parentPortal")}</h2>
+              <p className="da-card__sub">{t("staffDash.familyAccountLinkage")}</p>
             </div>
             <Link href="/admin/parents" className="da-card__link">
-              Parents <DashIcon name="chevron" className="dash-icon--xs" />
+              {t("adminDash.parents")} <DashIcon name="chevron" className="dash-icon--xs" />
             </Link>
           </header>
           <ParentLinkageRing linked={linkedStudents} total={students.length} />
@@ -237,14 +262,14 @@ export function RegistrarAnalyticsSection({ metrics }: Props) {
         <article className="da-card da-card--span2">
           <header className="da-card__head">
             <div>
-              <h2 className="da-card__title">Admissions pipeline</h2>
+              <h2 className="da-card__title">{t("staffDash.admissionsPipeline")}</h2>
               <p className="da-card__sub">
-                {openCycle ? openCycle.name : "No cycle"}
-                {pipelineCount > 0 ? ` · ${pipelineCount} in progress` : ""}
+                {openCycle ? openCycle.name : t("staffDash.noCycle")}
+                {pipelineCount > 0 ? t("staffDash.inProgress", { count: pipelineCount }) : ""}
               </p>
             </div>
             <Link href="/admin/admissions" className="da-card__link">
-              Admissions <DashIcon name="chevron" className="dash-icon--xs" />
+              {t("staffDash.admissions")} <DashIcon name="chevron" className="dash-icon--xs" />
             </Link>
           </header>
           <AdmissionsPipeline applications={applications} />
@@ -253,8 +278,8 @@ export function RegistrarAnalyticsSection({ metrics }: Props) {
         <article className="da-card">
           <header className="da-card__head">
             <div>
-              <h2 className="da-card__title">Recent applications</h2>
-              <p className="da-card__sub">Awaiting action</p>
+              <h2 className="da-card__title">{t("staffDash.recentApplications")}</h2>
+              <p className="da-card__sub">{t("staffDash.awaitingAction")}</p>
             </div>
           </header>
           <RecentApplications applications={applications} />

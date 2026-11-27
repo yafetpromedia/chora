@@ -8,7 +8,9 @@ import {
   verifyFayedaCode,
   type FayedaVerifiedProfile,
 } from "@/lib/fayeda";
+import { useLocale } from "@/components/i18n/locale-provider";
 import { StudentPhotoUpload } from "@/components/students/student-photo-upload";
+import type { AppLocale } from "@/lib/i18n";
 
 type FayedaStep = "idle" | "code-sent" | "verified";
 
@@ -22,9 +24,13 @@ function fullName(p: FayedaVerifiedProfile) {
   return [p.firstName, p.middleName, p.lastName].filter(Boolean).join(" ");
 }
 
-function formatDob(iso: string) {
+function localeTag(locale: AppLocale) {
+  return locale === "am" ? "am-ET" : "en-ET";
+}
+
+function formatDob(iso: string, locale: AppLocale) {
   try {
-    return new Date(iso).toLocaleDateString("en-ET", {
+    return new Date(iso).toLocaleDateString(localeTag(locale), {
       year: "numeric",
       month: "short",
       day: "numeric",
@@ -53,6 +59,7 @@ function toDateInputValue(iso: string) {
 }
 
 export function StudentRegisterDrawer({ grades, onClose, onSuccess }: Props) {
+  const { t, locale } = useLocale();
   const [firstName, setFirstName] = useState("");
   const [middleName, setMiddleName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -154,7 +161,7 @@ export function StudentRegisterDrawer({ grades, onClose, onSuccess }: Props) {
   async function onSendFayedaCode() {
     const id = fayedaId.replace(/\D/g, "");
     if (id.length !== 12 && id.length !== 16) {
-      setError("Enter a valid FAN (16 digits) or FCN (12 digits)");
+      setError(t("studentRegisterUi.invalidFanFcn"));
       return;
     }
     setFayedaBusy(true);
@@ -165,7 +172,7 @@ export function StudentRegisterDrawer({ grades, onClose, onSuccess }: Props) {
       setFayedaMaskedPhone(result.maskedPhone);
       setFayedaStep("code-sent");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not send verification code");
+      setError(err instanceof Error ? err.message : t("studentRegisterUi.sendCodeFailed"));
     } finally {
       setFayedaBusy(false);
     }
@@ -180,7 +187,7 @@ export function StudentRegisterDrawer({ grades, onClose, onSuccess }: Props) {
       applyFayedaProfile(profile);
       setFayedaStep("verified");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Verification failed");
+      setError(err instanceof Error ? err.message : t("studentRegisterUi.verifyFailed"));
     } finally {
       setFayedaBusy(false);
     }
@@ -214,7 +221,7 @@ export function StudentRegisterDrawer({ grades, onClose, onSuccess }: Props) {
       onSuccess(result);
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not add student");
+      setError(err instanceof Error ? err.message : t("studentRegisterUi.enrollFailed"));
     } finally {
       setLoading(false);
     }
@@ -227,14 +234,16 @@ export function StudentRegisterDrawer({ grades, onClose, onSuccess }: Props) {
         <header className="stu-drawer__head">
           <div>
             <h2 id="register-title" className="stu-drawer__title">
-              Register student
+              {t("studentsUi.registerStudent")}
             </h2>
-            <p className="stu-drawer__sub">
-              Student ID and portal password are assigned on enroll. Enter ID number, parents, sex,
-              age, and class.
-            </p>
+            <p className="stu-drawer__sub">{t("studentRegisterUi.drawerSub")}</p>
           </div>
-          <button type="button" className="stu-drawer__close" onClick={onClose} aria-label="Close">
+          <button
+            type="button"
+            className="stu-drawer__close"
+            onClick={onClose}
+            aria-label={t("common.close")}
+          >
             ×
           </button>
         </header>
@@ -245,8 +254,10 @@ export function StudentRegisterDrawer({ grades, onClose, onSuccess }: Props) {
           {!manualMode ? (
             <section className="fayeda-panel">
               <div className="fayeda-panel__head">
-                <span className="fayeda-panel__badge">Fayeda</span>
-                <h3 className="fayeda-panel__title">Verify identity (optional)</h3>
+                <span className="fayeda-panel__badge">{t("studentsUi.fayeda")}</span>
+                <h3 className="fayeda-panel__title">
+                  {t("studentRegisterUi.verifyIdentityOptional")}
+                </h3>
               </div>
 
               {fayedaStep === "verified" && fayedaProfile ? (
@@ -262,28 +273,28 @@ export function StudentRegisterDrawer({ grades, onClose, onSuccess }: Props) {
                     <p className="fayeda-profile__name">{fullName(fayedaProfile)}</p>
                     <dl className="fayeda-profile__meta">
                       <div>
-                        <dt>FAN / FCN</dt>
+                        <dt>{t("studentRegisterUi.fanOrFcn")}</dt>
                         <dd>{fayedaProfile.fan || fayedaProfile.fcn}</dd>
                       </div>
                       <div>
-                        <dt>Date of birth</dt>
-                        <dd>{formatDob(fayedaProfile.dateOfBirth)}</dd>
+                        <dt>{t("admissionRegisterUi.dateOfBirth")}</dt>
+                        <dd>{formatDob(fayedaProfile.dateOfBirth, locale)}</dd>
                       </div>
                     </dl>
                     <button type="button" className="fayeda-panel__link" onClick={resetFayeda}>
-                      Change student
+                      {t("studentRegisterUi.changeStudent")}
                     </button>
                   </div>
                 </div>
               ) : fayedaStep === "idle" ? (
                 <>
                   <label className="fayeda-panel__label" htmlFor="reg-fayeda-id">
-                    FAN or FCN
+                    {t("studentRegisterUi.fanOrFcn")}
                   </label>
                   <input
                     id="reg-fayeda-id"
                     className="auth-input auth-input--login auth-input--login-plain fayeda-panel__input"
-                    placeholder="16-digit FAN or 12-digit FCN"
+                    placeholder={t("studentRegisterUi.fanFcnPlaceholder")}
                     inputMode="numeric"
                     value={fayedaId}
                     onChange={(e) => setFayedaId(e.target.value.replace(/\D/g, ""))}
@@ -295,17 +306,17 @@ export function StudentRegisterDrawer({ grades, onClose, onSuccess }: Props) {
                     disabled={fayedaBusy || fayedaId.length < 12}
                     onClick={() => void onSendFayedaCode()}
                   >
-                    {fayedaBusy ? "Sending…" : "Send code"}
+                    {fayedaBusy ? t("studentRegisterUi.sending") : t("studentRegisterUi.sendCode")}
                   </button>
                 </>
               ) : (
                 <>
                   <p className="fayeda-panel__sent">
-                    Code sent to <strong>{fayedaMaskedPhone}</strong>
+                    {t("studentRegisterUi.codeSentTo", { phone: fayedaMaskedPhone })}
                   </p>
                   <input
                     className="auth-input auth-input--login auth-input--login-plain fayeda-panel__input"
-                    placeholder="6-digit code (demo: 123456)"
+                    placeholder={t("studentRegisterUi.codePlaceholder")}
                     inputMode="numeric"
                     maxLength={6}
                     value={fayedaCode}
@@ -317,7 +328,7 @@ export function StudentRegisterDrawer({ grades, onClose, onSuccess }: Props) {
                     disabled={fayedaBusy || fayedaCode.length !== 6}
                     onClick={() => void onVerifyFayedaCode()}
                   >
-                    {fayedaBusy ? "Verifying…" : "Verify"}
+                    {fayedaBusy ? t("studentRegisterUi.verifying") : t("studentRegisterUi.verify")}
                   </button>
                 </>
               )}
@@ -330,7 +341,7 @@ export function StudentRegisterDrawer({ grades, onClose, onSuccess }: Props) {
                   setManualMode(true);
                 }}
               >
-                Enter manually instead
+                {t("studentRegisterUi.enterManually")}
               </button>
             </section>
           ) : (
@@ -340,22 +351,26 @@ export function StudentRegisterDrawer({ grades, onClose, onSuccess }: Props) {
               style={{ color: "var(--brand-teal-dark)" }}
               onClick={() => setManualMode(false)}
             >
-              ← Use Fayeda verification
+              {t("studentRegisterUi.useFayedaVerification")}
             </button>
           )}
 
           <form id="register-form" onSubmit={onSubmit} className="stu-register-section">
-            <h3>Student information</h3>
+            <h3>{t("studentRegisterUi.sectionStudentInfo")}</h3>
 
             <StudentPhotoUpload
               value={photoUrl}
               onChange={setPhotoUrl}
-              label={fayedaProfile?.photoUrl ? "Photo (from Fayeda — upload to replace)" : "Student photo"}
+              label={
+                fayedaProfile?.photoUrl
+                  ? t("studentRegisterUi.photoFromFayeda")
+                  : t("studentRegisterUi.photoDefault")
+              }
             />
 
             <div className="stu-field-row">
               <div className="stu-field">
-                <label htmlFor="reg-fn">First name</label>
+                <label htmlFor="reg-fn">{t("profile.firstName")}</label>
                 <input
                   id="reg-fn"
                   value={firstName}
@@ -365,12 +380,12 @@ export function StudentRegisterDrawer({ grades, onClose, onSuccess }: Props) {
                 />
               </div>
               <div className="stu-field">
-                <label htmlFor="reg-middle">Middle name</label>
+                <label htmlFor="reg-middle">{t("admissionRegisterUi.middleName")}</label>
                 <input
                   id="reg-middle"
                   value={middleName}
                   onChange={(e) => setMiddleName(e.target.value)}
-                  placeholder="Optional"
+                  placeholder={t("landing.optional")}
                   readOnly={identityLocked && Boolean(fayedaProfile?.middleName)}
                 />
               </div>
@@ -378,7 +393,7 @@ export function StudentRegisterDrawer({ grades, onClose, onSuccess }: Props) {
 
             <div className="stu-field-row">
               <div className="stu-field">
-                <label htmlFor="reg-ln">Last name</label>
+                <label htmlFor="reg-ln">{t("profile.lastName")}</label>
                 <input
                   id="reg-ln"
                   value={lastName}
@@ -388,49 +403,45 @@ export function StudentRegisterDrawer({ grades, onClose, onSuccess }: Props) {
                 />
               </div>
               <div className="stu-field">
-                <label htmlFor="reg-id-number">FAN or FCN</label>
+                <label htmlFor="reg-id-number">{t("studentRegisterUi.fanOrFcn")}</label>
                 <input
                   id="reg-id-number"
                   value={idNumber}
                   onChange={(e) => setIdNumber(e.target.value)}
-                  placeholder="16-digit FAN or 12-digit FCN"
+                  placeholder={t("studentRegisterUi.fanFcnPlaceholder")}
                   readOnly={identityLocked && Boolean(fayedaProfile?.fcn)}
                   required
                 />
               </div>
             </div>
-            <p className="stu-field-hint">
-              School student ID (e.g. STU-K7H3NP2M) is generated randomly on enroll.
-            </p>
+            <p className="stu-field-hint">{t("studentRegisterUi.schoolIdHint")}</p>
 
             <div className="stu-field">
-              <label htmlFor="reg-phone">Student phone</label>
+              <label htmlFor="reg-phone">{t("studentRegisterUi.studentPhone")}</label>
               <input
                 id="reg-phone"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                placeholder="0911… (optional)"
+                placeholder={t("studentRegisterUi.phoneOptionalPlaceholder")}
               />
             </div>
 
             <div className="stu-field">
-              <label htmlFor="reg-address">Home address</label>
+              <label htmlFor="reg-address">{t("studentRegisterUi.homeAddress")}</label>
               <textarea
                 id="reg-address"
                 className="stu-textarea"
                 rows={2}
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
-                placeholder="House no., street, woreda, city…"
+                placeholder={t("studentRegisterUi.addressPlaceholder")}
               />
-              <p className="stu-field-hint">
-                Printed on the student ID card. Edit freely — Fayeda may pre-fill woreda/zone/region.
-              </p>
+              <p className="stu-field-hint">{t("studentRegisterUi.addressHint")}</p>
             </div>
 
             <div className="stu-field-row">
               <div className="stu-field">
-                <label htmlFor="reg-gender">Sex</label>
+                <label htmlFor="reg-gender">{t("teachersUi.sex")}</label>
                 <select
                   id="reg-gender"
                   value={gender}
@@ -438,14 +449,14 @@ export function StudentRegisterDrawer({ grades, onClose, onSuccess }: Props) {
                   required
                   disabled={identityLocked && Boolean(fayedaProfile?.gender)}
                 >
-                  <option value="">Select</option>
-                  <option value="MALE">Male</option>
-                  <option value="FEMALE">Female</option>
-                  <option value="OTHER">Other</option>
+                  <option value="">{t("teachersUi.select")}</option>
+                  <option value="MALE">{t("studentsUi.male")}</option>
+                  <option value="FEMALE">{t("studentsUi.female")}</option>
+                  <option value="OTHER">{t("studentsUi.other")}</option>
                 </select>
               </div>
               <div className="stu-field">
-                <label htmlFor="reg-dob">Date of birth</label>
+                <label htmlFor="reg-dob">{t("admissionRegisterUi.dateOfBirth")}</label>
                 <input
                   id="reg-dob"
                   type="date"
@@ -455,50 +466,50 @@ export function StudentRegisterDrawer({ grades, onClose, onSuccess }: Props) {
                   readOnly={identityLocked && Boolean(fayedaProfile?.dateOfBirth)}
                 />
                 {age != null ? (
-                  <p className="stu-field-hint">Age: {age} years</p>
+                  <p className="stu-field-hint">
+                    {t("studentRegisterUi.ageYears", { age })}
+                  </p>
                 ) : null}
               </div>
             </div>
 
             <div className="stu-field">
-              <label htmlFor="reg-blood">Blood type</label>
+              <label htmlFor="reg-blood">{t("studentAcademicRecordUi.bloodType")}</label>
               <select
                 id="reg-blood"
                 value={bloodType}
                 onChange={(e) => setBloodType(e.target.value)}
               >
-                <option value="">Optional — select blood group</option>
+                <option value="">{t("studentRegisterUi.bloodOptionalSelect")}</option>
                 {["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"].map((bg) => (
                   <option key={bg} value={bg}>
                     {bg}
                   </option>
                 ))}
               </select>
-              <p className="stu-field-hint">
-                Saved to the health record and shown on the student ID card.
-              </p>
+              <p className="stu-field-hint">{t("studentRegisterUi.bloodHint")}</p>
             </div>
 
-            <h3>Parents / guardians</h3>
+            <h3>{t("studentRegisterUi.sectionParentsGuardians")}</h3>
 
             <div className="stu-field-row">
               <div className="stu-field">
-                <label htmlFor="reg-father">Father full name</label>
+                <label htmlFor="reg-father">{t("studentRegisterUi.fatherFullName")}</label>
                 <input
                   id="reg-father"
                   value={fatherName}
                   onChange={(e) => setFatherName(e.target.value)}
-                  placeholder="Full legal name"
+                  placeholder={t("studentRegisterUi.fullLegalNamePlaceholder")}
                   required
                 />
               </div>
               <div className="stu-field">
-                <label htmlFor="reg-father-phone">Father phone</label>
+                <label htmlFor="reg-father-phone">{t("studentRegisterUi.fatherPhone")}</label>
                 <input
                   id="reg-father-phone"
                   value={fatherPhone}
                   onChange={(e) => setFatherPhone(e.target.value)}
-                  placeholder="0911…"
+                  placeholder={t("studentRegisterUi.phoneFatherPlaceholder")}
                   required
                 />
               </div>
@@ -506,31 +517,31 @@ export function StudentRegisterDrawer({ grades, onClose, onSuccess }: Props) {
 
             <div className="stu-field-row">
               <div className="stu-field">
-                <label htmlFor="reg-mother">Mother full name</label>
+                <label htmlFor="reg-mother">{t("studentRegisterUi.motherFullName")}</label>
                 <input
                   id="reg-mother"
                   value={motherName}
                   onChange={(e) => setMotherName(e.target.value)}
-                  placeholder="Full legal name"
+                  placeholder={t("studentRegisterUi.fullLegalNamePlaceholder")}
                   required
                 />
               </div>
               <div className="stu-field">
-                <label htmlFor="reg-mother-phone">Mother phone</label>
+                <label htmlFor="reg-mother-phone">{t("studentRegisterUi.motherPhone")}</label>
                 <input
                   id="reg-mother-phone"
                   value={motherPhone}
                   onChange={(e) => setMotherPhone(e.target.value)}
-                  placeholder="0912…"
+                  placeholder={t("studentRegisterUi.phoneMotherPlaceholder")}
                   required
                 />
               </div>
             </div>
 
-            <h3>Class assignment</h3>
+            <h3>{t("studentRegisterUi.sectionClassAssignment")}</h3>
 
             <div className="stu-field">
-              <label htmlFor="reg-grade">Grade</label>
+              <label htmlFor="reg-grade">{t("teachersUi.grade")}</label>
               <select
                 id="reg-grade"
                 value={gradeId}
@@ -550,13 +561,13 @@ export function StudentRegisterDrawer({ grades, onClose, onSuccess }: Props) {
 
             {selectedGrade && selectedGrade.sections.length > 0 ? (
               <div className="stu-field">
-                <label htmlFor="reg-section">Section</label>
+                <label htmlFor="reg-section">{t("teachersUi.section")}</label>
                 <select
                   id="reg-section"
                   value={sectionId}
                   onChange={(e) => setSectionId(e.target.value)}
                 >
-                  <option value="">No section</option>
+                  <option value="">{t("studentRegisterUi.noSection")}</option>
                   {selectedGrade.sections.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.name}
@@ -570,7 +581,7 @@ export function StudentRegisterDrawer({ grades, onClose, onSuccess }: Props) {
 
         <footer className="stu-drawer__foot">
           <button type="button" className="stu-btn stu-btn--ghost" onClick={onClose}>
-            Cancel
+            {t("common.cancel")}
           </button>
           <button
             type="submit"
@@ -578,7 +589,7 @@ export function StudentRegisterDrawer({ grades, onClose, onSuccess }: Props) {
             className="stu-btn stu-btn--primary"
             disabled={loading || !canSubmit}
           >
-            {loading ? "Enrolling…" : "Enroll student"}
+            {loading ? t("studentRegisterUi.enrolling") : t("studentRegisterUi.enrollStudent")}
           </button>
         </footer>
       </aside>

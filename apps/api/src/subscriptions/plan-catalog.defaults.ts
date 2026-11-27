@@ -26,11 +26,7 @@ export const DEFAULT_PLAN_CATALOG: PlanCatalogRow[] = [
     adminsLimit: 1,
     usdMonthly: 0,
     etbMonthly: 0,
-    features: [
-      'All modules included',
-      'Up to 50 students',
-      'Email support',
-    ],
+    features: ['All modules included', 'Up to 50 students', 'Email support'],
     trialDays: 14,
     sortOrder: 0,
     isListed: false,

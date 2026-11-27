@@ -7,17 +7,7 @@ import {
   PERMISSION_MODULE_KEY_SET,
   type PermissionModule,
 } from "@/lib/permissions";
-
-const CATEGORY_LABELS: Record<string, string> = {
-  school: "School",
-  students: "Students",
-  admissions: "Admissions",
-  teachers: "Staff",
-  attendance: "Attendance",
-  results: "Results",
-  finance: "Finance",
-  comms: "Communications",
-};
+import { useLocale } from "@/components/i18n/locale-provider";
 
 const CATEGORY_ORDER = [
   "school",
@@ -29,6 +19,17 @@ const CATEGORY_ORDER = [
   "finance",
   "comms",
 ];
+
+const CATEGORY_KEYS: Record<string, string> = {
+  school: "staffPermissionsUi.catSchool",
+  students: "staffPermissionsUi.catStudents",
+  admissions: "staffPermissionsUi.catAdmissions",
+  teachers: "staffPermissionsUi.catTeachers",
+  attendance: "staffPermissionsUi.catAttendance",
+  results: "staffPermissionsUi.catResults",
+  finance: "staffPermissionsUi.catFinance",
+  comms: "staffPermissionsUi.catComms",
+};
 
 type Props = {
   detail: StaffPermissionsDetail;
@@ -57,6 +58,7 @@ export function StaffPermissionsDrawer({
   onClose,
   onSave,
 }: Props) {
+  const { t, tn } = useLocale();
   const [query, setQuery] = useState("");
 
   function moduleEnabled(module: PermissionModule) {
@@ -106,10 +108,10 @@ export function StaffPermissionsDrawer({
 
     return CATEGORY_ORDER.filter((c) => map.has(c)).map((cat) => ({
       id: cat,
-      label: CATEGORY_LABELS[cat] ?? cat,
+      label: CATEGORY_KEYS[cat] ? t(CATEGORY_KEYS[cat]) : cat,
       items: map.get(cat)!,
     }));
-  }, [catalog, query]);
+  }, [catalog, query, t]);
 
   const enabledCount = useMemo(
     () => catalog.filter((item) => draft[item.key] === true).length,
@@ -128,7 +130,9 @@ export function StaffPermissionsDrawer({
   }, [catalog, draft, detail.templatePermissions]);
 
   const roleLabel =
-    detail.roleTemplateName ?? detail.roleTemplateSlug?.replace(/_/g, " ") ?? "Staff";
+    detail.roleTemplateName ??
+    detail.roleTemplateSlug?.replace(/_/g, " ") ??
+    t("adminStaffUi.defaultStaff");
 
   return (
     <>
@@ -146,13 +150,18 @@ export function StaffPermissionsDrawer({
             </span>
             <div>
               <h2 id="perm-drawer-title" className="stu-drawer__title">
-                Permissions
+                {t("staffPermissionsUi.title")}
               </h2>
               <p className="stu-drawer__sub">{detail.name}</p>
-              <span className="perm-drawer__role">{roleLabel}</span>
+              <span className="perm-drawer__role">{tn(roleLabel)}</span>
             </div>
           </div>
-          <button type="button" className="stu-drawer__close" onClick={onClose} aria-label="Close">
+          <button
+            type="button"
+            className="stu-drawer__close"
+            onClick={onClose}
+            aria-label={t("common.close")}
+          >
             ×
           </button>
         </header>
@@ -161,30 +170,29 @@ export function StaffPermissionsDrawer({
           <div className="perm-drawer__stats">
             <div className="perm-stat">
               <span className="perm-stat__value">{enabledCount}</span>
-              <span className="perm-stat__label">Enabled</span>
+              <span className="perm-stat__label">{t("staffPermissionsUi.enabled")}</span>
             </div>
             <div className="perm-stat">
               <span className="perm-stat__value">{templateCount}</span>
-              <span className="perm-stat__label">From role</span>
+              <span className="perm-stat__label">{t("staffPermissionsUi.fromRole")}</span>
             </div>
             <div className="perm-stat">
               <span className="perm-stat__value">{customCount}</span>
-              <span className="perm-stat__label">Custom</span>
+              <span className="perm-stat__label">{t("staffPermissionsUi.custom")}</span>
             </div>
           </div>
 
-          <p className="perm-drawer__hint">
-            Toggle access beyond the role template. Changes apply when you save.
-          </p>
+          <p className="perm-drawer__hint">{t("staffPermissionsUi.hint")}</p>
 
           {visibleModules.length > 0 ? (
-            <section className="perm-modules" aria-label="Module access">
-              <h3 className="perm-modules__title">Module access</h3>
+            <section className="perm-modules" aria-label={t("staffPermissionsUi.moduleAccessAria")}>
+              <h3 className="perm-modules__title">{t("staffPermissionsUi.moduleAccessTitle")}</h3>
               <ul className="perm-modules__list">
                 {visibleModules.map((module) => {
                   const checked = moduleEnabled(module);
                   const fromTemplate = moduleFromTemplate(module);
                   const isCustom = moduleIsCustom(module);
+                  const moduleLabel = tn(module.label);
 
                   return (
                     <li
@@ -192,17 +200,21 @@ export function StaffPermissionsDrawer({
                       className={`perm-module${checked ? " perm-module--on" : ""}`}
                     >
                       <div className="perm-module__text">
-                        <span className="perm-module__label">{module.label}</span>
-                        <span className="perm-module__desc">{module.description}</span>
+                        <span className="perm-module__label">{moduleLabel}</span>
+                        <span className="perm-module__desc">{tn(module.description)}</span>
                         <div className="perm-module__meta">
                           {fromTemplate ? (
-                            <span className="perm-badge perm-badge--template">Role</span>
+                            <span className="perm-badge perm-badge--template">
+                              {t("staffPermissionsUi.badgeRole")}
+                            </span>
                           ) : null}
                           {isCustom ? (
-                            <span className="perm-badge perm-badge--custom">Custom</span>
+                            <span className="perm-badge perm-badge--custom">
+                              {t("staffPermissionsUi.badgeCustom")}
+                            </span>
                           ) : null}
                           <span className="perm-module__state">
-                            {checked ? "On" : "Off"}
+                            {checked ? t("staffPermissionsUi.on") : t("staffPermissionsUi.off")}
                           </span>
                         </div>
                       </div>
@@ -211,7 +223,9 @@ export function StaffPermissionsDrawer({
                           type="checkbox"
                           role="switch"
                           checked={checked}
-                          aria-label={`${module.label} access`}
+                          aria-label={t("staffPermissionsUi.moduleAccessAriaLabel", {
+                            label: moduleLabel,
+                          })}
                           onChange={(e) => setModuleEnabled(module, e.target.checked)}
                         />
                         <span className="perm-toggle__track" aria-hidden />
@@ -228,14 +242,14 @@ export function StaffPermissionsDrawer({
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search permissions…"
-              aria-label="Search permissions"
+              placeholder={t("staffPermissionsUi.searchPlaceholder")}
+              aria-label={t("staffPermissionsUi.searchAria")}
             />
           </div>
 
           <div className="perm-drawer__groups">
             {grouped.length === 0 ? (
-              <p className="perm-drawer__empty">No permissions match your search.</p>
+              <p className="perm-drawer__empty">{t("staffPermissionsUi.emptySearch")}</p>
             ) : (
               grouped.map((group) => (
                 <section key={group.id} className="perm-group">
@@ -249,18 +263,22 @@ export function StaffPermissionsDrawer({
                       return (
                         <li key={item.key} className="perm-item">
                           <div className="perm-item__text">
-                            <span className="perm-item__label">{item.label}</span>
+                            <span className="perm-item__label">{tn(item.label)}</span>
                             {item.description ? (
-                              <span className="perm-item__desc">{item.description}</span>
+                              <span className="perm-item__desc">{tn(item.description)}</span>
                             ) : null}
                             <span className="perm-item__key">{item.key}</span>
                           </div>
                           <div className="perm-item__aside">
                             {fromTemplate ? (
-                              <span className="perm-badge perm-badge--template">Role</span>
+                              <span className="perm-badge perm-badge--template">
+                                {t("staffPermissionsUi.badgeRole")}
+                              </span>
                             ) : null}
                             {isCustom ? (
-                              <span className="perm-badge perm-badge--custom">Custom</span>
+                              <span className="perm-badge perm-badge--custom">
+                                {t("staffPermissionsUi.badgeCustom")}
+                              </span>
                             ) : null}
                             <label className="perm-toggle">
                               <input
@@ -284,7 +302,7 @@ export function StaffPermissionsDrawer({
 
         <footer className="stu-drawer__foot perm-drawer__foot">
           <button type="button" className="stu-btn stu-btn--ghost" onClick={onClose}>
-            Cancel
+            {t("common.cancel")}
           </button>
           <button
             type="button"
@@ -292,7 +310,7 @@ export function StaffPermissionsDrawer({
             disabled={busy}
             onClick={onSave}
           >
-            {busy ? "Saving…" : "Save permissions"}
+            {busy ? t("staffPermissionsUi.saving") : t("staffPermissionsUi.savePermissions")}
           </button>
         </footer>
       </aside>

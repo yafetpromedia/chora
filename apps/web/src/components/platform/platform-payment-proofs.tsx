@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DashIcon } from "@/components/dashboard/dash-icons";
 import { AppToast } from "@/components/ui/app-toast";
+import { useLocale } from "@/components/i18n/locale-provider";
 import { handlePlatformAuthFailure } from "@/lib/platform-auth";
 import {
   listPlatformPaymentProofs,
@@ -12,22 +13,9 @@ import {
   type PlatformPaymentProofStatus,
 } from "@/lib/platform-billing";
 
-const FILTERS: { id: PlatformPaymentProofStatus | "ALL"; label: string }[] = [
-  { id: "PENDING", label: "Pending" },
-  { id: "ALL", label: "All" },
-  { id: "CONFIRMED", label: "Confirmed" },
-  { id: "REJECTED", label: "Rejected" },
-];
-
 function formatMoney(usd: number, etb: number) {
   if (etb > 0) return `${etb.toLocaleString()} ETB`;
   return `$${usd.toLocaleString()}`;
-}
-
-function methodLabel(method: string) {
-  if (method === "TELEBIRR") return "Telebirr";
-  if (method === "BANK_TRANSFER") return "Bank transfer";
-  return method;
 }
 
 type Props = {
@@ -35,7 +23,19 @@ type Props = {
 };
 
 export function PlatformPaymentProofs({ onReviewed }: Props) {
+  const { t, locale } = useLocale();
   const router = useRouter();
+  const FILTERS: { id: PlatformPaymentProofStatus | "ALL"; label: string }[] = [
+    { id: "PENDING", label: t("platformUi.proofPending") },
+    { id: "ALL", label: t("common.all") },
+    { id: "CONFIRMED", label: t("platformUi.proofConfirmed") },
+    { id: "REJECTED", label: t("platformUi.proofRejected") },
+  ];
+  function methodLabel(method: string) {
+    if (method === "TELEBIRR") return t("platformUi.proofTelebirr");
+    if (method === "BANK_TRANSFER") return t("platformUi.proofBank");
+    return method;
+  }
   const [rows, setRows] = useState<PlatformPaymentProofReview[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -65,10 +65,12 @@ export function PlatformPaymentProofs({ onReviewed }: Props) {
   }, [filter]);
 
   useEffect(() => {
-    setLoading(true);
-    void load()
-      .catch((e) => fail(e, "Failed to load payment receipts"))
-      .finally(() => setLoading(false));
+    queueMicrotask(() => {
+      setLoading(true);
+      void load()
+        .catch((e) => fail(e, t("platformUi.proofErrLoad")))
+        .finally(() => setLoading(false));
+    });
   }, [load, router]);
 
   const pendingCount = useMemo(
@@ -90,7 +92,7 @@ export function PlatformPaymentProofs({ onReviewed }: Props) {
       await load();
       onReviewed?.();
     } catch (err) {
-      fail(err, "Could not review receipt");
+      fail(err, t("platformUi.proofErrReview"));
     } finally {
       setBusyId("");
     }
@@ -100,10 +102,9 @@ export function PlatformPaymentProofs({ onReviewed }: Props) {
     <section className="plat-billing-v2__panel" style={{ marginTop: "1.25rem" }}>
       <div className="plat-billing-v2__panel-head" style={{ marginBottom: "0.85rem" }}>
         <div>
-          <h3 className="plat-billing-v2__panel-title">Payment receipts</h3>
+          <h3 className="plat-billing-v2__panel-title">{t("platformUi.proofTitle")}</h3>
           <p className="plat-billing-v2__panel-hint">
-            Screenshots schools upload when they pay an invoice. Confirm to mark
-            the invoice paid, or reject so they can resubmit.
+            {t("platformUi.proofSub")}
           </p>
         </div>
         {filter === "PENDING" && pendingCount > 0 ? (
@@ -133,24 +134,23 @@ export function PlatformPaymentProofs({ onReviewed }: Props) {
       </div>
 
       {loading ? (
-        <p className="plat-billing-v2__muted">Loading receipts…</p>
+        <p className="plat-billing-v2__muted">{t("platformUi.proofLoading")}</p>
       ) : rows.length === 0 ? (
         <p className="plat-billing-v2__muted">
-          No payment receipts in this filter yet. Schools submit them from School
-          Admin → Billing after paying.
+          {t("platformUi.proofEmpty")}
         </p>
       ) : (
         <div className="plat-subjects-v2__table-wrap">
           <table className="plat-subjects-v2__table">
             <thead>
               <tr>
-                <th>School</th>
-                <th>Invoice</th>
-                <th>Method</th>
-                <th>Txn / ref</th>
-                <th>Submitted</th>
-                <th>Status</th>
-                <th aria-label="Actions" />
+                <th>{t("platformUi.proofColSchool")}</th>
+                <th>{t("platformUi.proofColInvoice")}</th>
+                <th>{t("platformUi.proofColMethod")}</th>
+                <th>{t("platformUi.proofColTxn")}</th>
+                <th>{t("platformUi.proofColSubmitted")}</th>
+                <th>{t("platformUi.proofColStatus")}</th>
+                <th aria-label={t("common.actions")} />
               </tr>
             </thead>
             <tbody>
@@ -175,7 +175,7 @@ export function PlatformPaymentProofs({ onReviewed }: Props) {
                     </code>
                   </td>
                   <td className="plat-billing-v2__muted">
-                    {new Date(row.createdAt).toLocaleString()}
+                    {new Date(row.createdAt).toLocaleString(locale === "am" ? "am-ET" : undefined)}
                   </td>
                   <td>
                     <span
@@ -200,7 +200,7 @@ export function PlatformPaymentProofs({ onReviewed }: Props) {
                       }}
                     >
                       <DashIcon name="fees" className="dash-icon--xs" />
-                      View receipt
+                      {t("platformUi.proofView")}
                     </button>
                   </td>
                 </tr>
@@ -220,7 +220,7 @@ export function PlatformPaymentProofs({ onReviewed }: Props) {
             className="plat-billing-v2__panel"
             role="dialog"
             aria-modal="true"
-            aria-label="Payment receipt"
+            aria-label={t("platformUi.proofReceipt")}
             style={{
               maxWidth: "36rem",
               width: "min(36rem, calc(100vw - 2rem))",
@@ -254,7 +254,7 @@ export function PlatformPaymentProofs({ onReviewed }: Props) {
                 className="plat-btn plat-btn--ghost plat-btn--xs"
                 onClick={() => setPreview(null)}
               >
-                Close
+                {t("common.close")}
               </button>
             </div>
 
@@ -273,11 +273,11 @@ export function PlatformPaymentProofs({ onReviewed }: Props) {
             {preview.status === "PENDING" ? (
               <div style={{ marginTop: "0.85rem" }}>
                 <label className="plat-field">
-                  <span>Review note (optional)</span>
+                  <span>{t("platformUi.proofReviewNote")}</span>
                   <input
                     value={note}
                     onChange={(e) => setNote(e.target.value)}
-                    placeholder="e.g. Amount matches Telebirr SMS"
+                    placeholder={t("platformUi.proofNotePh")}
                   />
                 </label>
                 <div
@@ -290,7 +290,7 @@ export function PlatformPaymentProofs({ onReviewed }: Props) {
                     disabled={busyId === preview.id}
                     onClick={() => void review(preview.id, "REJECTED")}
                   >
-                    Reject
+                    {t("platformUi.proofReject")}
                   </button>
                   <button
                     type="button"
@@ -298,7 +298,7 @@ export function PlatformPaymentProofs({ onReviewed }: Props) {
                     disabled={busyId === preview.id}
                     onClick={() => void review(preview.id, "CONFIRMED")}
                   >
-                    {busyId === preview.id ? "Saving…" : "Confirm & mark paid"}
+                    {busyId === preview.id ? t("platformUi.saving") : t("platformUi.proofConfirmPaid")}
                   </button>
                 </div>
               </div>

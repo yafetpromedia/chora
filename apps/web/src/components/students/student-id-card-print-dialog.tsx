@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useLocale } from "@/components/i18n/locale-provider";
 import type { GradeWithSections } from "@/lib/api";
 import {
   BULK_PRINT_BATCH_SIZE,
@@ -27,25 +28,36 @@ export function StudentIdCardPrintDialog({
   initialGradeId = "",
   initialSectionId = "",
 }: Props) {
+  const { t } = useLocale();
   const [gradeId, setGradeId] = useState(initialGradeId);
   const [sectionId, setSectionId] = useState(initialSectionId);
   const [style, setStyle] = useState<IdCardPrintStyle>("full");
   const [duplex, setDuplex] = useState(true);
   const [perPage, setPerPage] = useState<BulkPrintLayout>("6");
   const [count, setCount] = useState<number | null>(null);
-  const [countLoading, setCountLoading] = useState(false);
+  const [countLoading, setCountLoading] = useState(open);
 
   const selectedGrade = grades.find((g) => g.id === gradeId);
 
-  useEffect(() => {
-    if (!open) return;
-    setGradeId(initialGradeId);
-    setSectionId(initialSectionId);
-  }, [open, initialGradeId, initialSectionId]);
+  const initialKey = open ? `${initialGradeId}|${initialSectionId}` : "";
+  const [prevInitialKey, setPrevInitialKey] = useState(initialKey);
+  if (initialKey !== prevInitialKey) {
+    setPrevInitialKey(initialKey);
+    if (open) {
+      setGradeId(initialGradeId);
+      setSectionId(initialSectionId);
+    }
+  }
+
+  const countKey = open ? `${gradeId}|${sectionId}` : "";
+  const [prevCountKey, setPrevCountKey] = useState(countKey);
+  if (countKey !== prevCountKey) {
+    setPrevCountKey(countKey);
+    if (open) setCountLoading(true);
+  }
 
   useEffect(() => {
     if (!open) return;
-    setCountLoading(true);
     void countStudentIdCards({
       gradeId: gradeId || undefined,
       sectionId: sectionId || undefined,
@@ -98,12 +110,22 @@ export function StudentIdCardPrintDialog({
 
   return (
     <>
-      <button type="button" className="sid-modal-backdrop" aria-label="Close" onClick={onClose} />
+      <button
+        type="button"
+        className="sid-modal-backdrop"
+        aria-label={t("common.close")}
+        onClick={onClose}
+      />
       <div className="sid-print-dialog" role="dialog" aria-labelledby="sid-print-dialog-title">
         <header className="sid-print-dialog__head">
-          <h2 id="sid-print-dialog-title">Print ID cards</h2>
-          <p>Choose who to print — works for large schools (2,000+ students in batches).</p>
-          <button type="button" className="sid-modal__close" onClick={onClose} aria-label="Close">
+          <h2 id="sid-print-dialog-title">{t("studentIdCardPrintUi.title")}</h2>
+          <p>{t("studentIdCardPrintUi.sub")}</p>
+          <button
+            type="button"
+            className="sid-modal__close"
+            onClick={onClose}
+            aria-label={t("common.close")}
+          >
             ×
           </button>
         </header>
@@ -111,7 +133,7 @@ export function StudentIdCardPrintDialog({
         <div className="sid-print-dialog__body">
           <div className="sid-print-dialog__filters">
             <div className="att-field">
-              <span>Grade</span>
+              <span>{t("studentIdCardPrintUi.grade")}</span>
               <select
                 value={gradeId}
                 onChange={(e) => {
@@ -119,7 +141,7 @@ export function StudentIdCardPrintDialog({
                   setSectionId("");
                 }}
               >
-                <option value="">All grades</option>
+                <option value="">{t("studentIdCardPrintUi.allGrades")}</option>
                 {grades.map((g) => (
                   <option key={g.id} value={g.id}>
                     {g.name}
@@ -129,9 +151,9 @@ export function StudentIdCardPrintDialog({
             </div>
             {selectedGrade && selectedGrade.sections.length > 0 ? (
               <div className="att-field">
-                <span>Section</span>
+                <span>{t("studentIdCardPrintUi.section")}</span>
                 <select value={sectionId} onChange={(e) => setSectionId(e.target.value)}>
-                  <option value="">All sections in grade</option>
+                  <option value="">{t("studentIdCardPrintUi.allSectionsInGrade")}</option>
                   {selectedGrade.sections.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.name}
@@ -141,24 +163,24 @@ export function StudentIdCardPrintDialog({
               </div>
             ) : null}
             <div className="att-field">
-              <span>Print style</span>
+              <span>{t("studentIdCardPrintUi.printStyle")}</span>
               <select
                 value={style}
                 onChange={(e) => setStyle(e.target.value as IdCardPrintStyle)}
               >
-                <option value="full">Full card (matches preview)</option>
-                <option value="sheet">Mini sheets (6–8 per page, large schools)</option>
+                <option value="full">{t("studentIdCardPrintUi.styleFull")}</option>
+                <option value="sheet">{t("studentIdCardPrintUi.styleSheet")}</option>
               </select>
             </div>
             {style === "sheet" ? (
               <div className="att-field">
-                <span>Cards per page</span>
+                <span>{t("studentIdCardPrintUi.cardsPerPage")}</span>
                 <select
                   value={perPage}
                   onChange={(e) => setPerPage(e.target.value as BulkPrintLayout)}
                 >
-                  <option value="6">6 per page</option>
-                  <option value="8">8 per page</option>
+                  <option value="6">{t("studentIdCardPrintUi.perPage6")}</option>
+                  <option value="8">{t("studentIdCardPrintUi.perPage8")}</option>
                 </select>
               </div>
             ) : null}
@@ -166,21 +188,25 @@ export function StudentIdCardPrintDialog({
 
           <label className="sid-modal__toggle sid-print-dialog__toggle">
             <input type="checkbox" checked={duplex} onChange={(e) => setDuplex(e.target.checked)} />
-            Include card backs (QR for attendance)
+            {t("studentIdCardPrintUi.includeBacks")}
           </label>
 
           <div className="sid-print-dialog__summary">
             {countLoading ? (
-              <p>Counting students…</p>
+              <p>{t("studentIdCardPrintUi.counting")}</p>
             ) : count == null ? (
-              <p>Could not load student count.</p>
+              <p>{t("studentIdCardPrintUi.countFailed")}</p>
             ) : count === 0 ? (
-              <p>No students match this filter.</p>
+              <p>{t("studentIdCardPrintUi.noMatch")}</p>
             ) : (
               <>
                 <p>
-                  <strong>{count.toLocaleString()}</strong> card{count === 1 ? "" : "s"} will be
-                  prepared
+                  {t(
+                    count === 1
+                      ? "studentIdCardPrintUi.prepared"
+                      : "studentIdCardPrintUi.preparedPlural",
+                    { count: count.toLocaleString() },
+                  )}
                   {gradeId && selectedGrade ? ` · ${selectedGrade.name}` : ""}
                   {sectionId && selectedGrade
                     ? ` · ${selectedGrade.sections.find((s) => s.id === sectionId)?.name ?? ""}`
@@ -188,19 +214,22 @@ export function StudentIdCardPrintDialog({
                 </p>
                 {batchCount > 1 ? (
                   <p className="sid-print-dialog__meta">
-                    Loaded in batches of {BULK_PRINT_BATCH_SIZE} for speed (
-                    {batchCount} batch{batchCount === 1 ? "" : "es"}).
+                    {t(
+                      batchCount === 1
+                        ? "studentIdCardPrintUi.batchMeta"
+                        : "studentIdCardPrintUi.batchMetaPlural",
+                      { size: BULK_PRINT_BATCH_SIZE, batches: batchCount },
+                    )}
                   </p>
                 ) : null}
                 {needsGrade ? (
                   <p className="sid-print-dialog__warn">
-                    Select a <strong>grade</strong> before printing {count.toLocaleString()}{" "}
-                    students at once.
+                    {t("studentIdCardPrintUi.pickGradeWarn", {
+                      count: count.toLocaleString(),
+                    })}
                   </p>
                 ) : count > BULK_PRINT_WARN_ALL && !duplex ? null : count > 1200 ? (
-                  <p className="sid-print-dialog__warn">
-                    Large job — prefer PDF in the print dialog. Allow a minute to prepare QR codes.
-                  </p>
+                  <p className="sid-print-dialog__warn">{t("studentIdCardPrintUi.largeJobWarn")}</p>
                 ) : null}
               </>
             )}
@@ -209,7 +238,7 @@ export function StudentIdCardPrintDialog({
 
         <footer className="sid-print-dialog__foot">
           <button type="button" className="att-btn att-btn--ghost" onClick={onClose}>
-            Cancel
+            {t("common.cancel")}
           </button>
           <button
             type="button"
@@ -217,7 +246,7 @@ export function StudentIdCardPrintDialog({
             disabled={!count || needsGrade}
             onClick={() => startPrint(false)}
           >
-            Print batch 1
+            {t("studentIdCardPrintUi.printBatch1")}
           </button>
           <button
             type="button"
@@ -225,7 +254,7 @@ export function StudentIdCardPrintDialog({
             disabled={!count || needsGrade}
             onClick={() => startPrint(true)}
           >
-            Prepare all & print
+            {t("studentIdCardPrintUi.prepareAll")}
           </button>
         </footer>
       </div>

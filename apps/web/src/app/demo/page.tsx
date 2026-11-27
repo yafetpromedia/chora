@@ -9,6 +9,13 @@ export const metadata: Metadata = {
   title: `See ${BRAND_NAME} in Action`,
   description:
     "Watch how Chora connects school administration, teaching, student learning, and parents in one platform.",
+  alternates: { canonical: "/demo" },
+  openGraph: {
+    title: `See ${BRAND_NAME} in Action`,
+    description:
+      "Watch how Chora connects school administration, teaching, student learning, and parents in one platform.",
+    url: "/demo",
+  },
 };
 
 export default function DemoPage() {

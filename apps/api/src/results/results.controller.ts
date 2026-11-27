@@ -27,7 +27,10 @@ import { AcademicsService } from './academics.service';
 import { AssessmentTemplatesService } from './assessment-templates.service';
 import { ResultWorkflowService } from './result-workflow.service';
 import { CreateAcademicYearDto } from '../finance/dto/create-academic-year.dto';
-import { AssignTemplateToClassSubjectDto, AssignTemplateToGradeDto } from './dto/assign-template.dto';
+import {
+  AssignTemplateToClassSubjectDto,
+  AssignTemplateToGradeDto,
+} from './dto/assign-template.dto';
 import { BulkScoresDto } from './dto/bulk-scores.dto';
 import { CreateAssessmentTemplateDto } from './dto/create-assessment-template.dto';
 import { UpdateAssessmentTemplateDto } from './dto/update-assessment-template.dto';
@@ -36,6 +39,7 @@ import { SaveStudentSubjectMatrixDto } from './dto/save-student-subject-matrix.d
 import { CreateAssessmentDto } from './dto/create-assessment.dto';
 import { CreateClassSubjectDto } from './dto/create-class-subject.dto';
 import { CreateSubjectDto } from './dto/create-subject.dto';
+import { UpdateSubjectDto } from './dto/update-subject.dto';
 import { CreateTermDto } from './dto/create-term.dto';
 import { UpdateTermDto } from './dto/update-term.dto';
 import { UpdateClassSubjectDto } from './dto/update-class-subject.dto';
@@ -181,10 +185,7 @@ export class ResultsController {
   /** @deprecated legacy */
   @Post()
   @Roles('teacher', 'admin')
-  upsertLegacy(
-    @Body() dto: UpsertResultDto,
-    @CurrentUser() user: AuthUser,
-  ) {
+  upsertLegacy(@Body() dto: UpsertResultDto, @CurrentUser() user: AuthUser) {
     return this.resultsService.upsert(dto, user.schoolId, user.id);
   }
 
@@ -195,10 +196,7 @@ export class ResultsController {
     @Query('studentId') studentId: string,
     @CurrentUser() user: AuthUser,
   ) {
-    const id =
-      user.role === 'student'
-        ? user.id
-        : studentId;
+    const id = user.role === 'student' ? user.id : studentId;
     return this.resultsService.listByStudent(id, user.schoolId);
   }
 
@@ -455,7 +453,9 @@ export class ResultsController {
   @Post('academic-years/ensure-current')
   @Roles('admin', 'staff')
   async ensureCurrentAcademicYear(@CurrentUser() user: AuthUser) {
-    const year = await this.academicYearsService.ensureCurrentYear(user.schoolId);
+    const year = await this.academicYearsService.ensureCurrentYear(
+      user.schoolId,
+    );
     return { year };
   }
 
@@ -525,9 +525,15 @@ export class ResultsController {
   updateSubject(
     @CurrentUser() user: AuthUser,
     @Param('id') id: string,
-    @Body() dto: { name?: string },
+    @Body() dto: UpdateSubjectDto,
   ) {
     return this.academicsService.updateSubject(user.schoolId, id, dto);
+  }
+
+  @Delete('subjects/:id')
+  @Roles('admin')
+  deleteSubject(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.academicsService.deleteSubject(user.schoolId, id);
   }
 
   @Get('class-subjects')

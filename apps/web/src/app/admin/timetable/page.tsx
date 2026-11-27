@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useClientSnapshot } from "@/lib/use-client-snapshot";
 import { useRouter } from "next/navigation";
 import { DashIcon } from "@/components/dashboard/dash-icons";
 import { DashboardPage } from "@/components/dashboard/dashboard-page";
@@ -28,6 +29,7 @@ import {
 } from "@/lib/timetable";
 import { AUTH_ROLE_KEY, AUTH_TOKEN_KEY, isSchoolWorkspaceRole } from "@/lib/auth";
 import { hasPermission, Permission } from "@/lib/permissions";
+import { useLocale } from "@/components/i18n/locale-provider";
 
 type ViewMode = "overview" | "stack" | "edit";
 
@@ -98,8 +100,12 @@ function printTimetableBoard() {
 }
 
 export default function AdminTimetablePage() {
+  const { t, tp, tn } = useLocale();
   const router = useRouter();
-  const [canEdit, setCanEdit] = useState(false);
+  const canEdit = useClientSnapshot(
+    () => hasPermission(Permission.TIMETABLE_MANAGE),
+    false,
+  );
 
   const [grades, setGrades] = useState<GradeWithSections[]>([]);
   const [academicYearId, setAcademicYearId] = useState("");
@@ -147,18 +153,26 @@ export default function AdminTimetablePage() {
     [filteredClasses],
   );
 
-  const loadPeriods = useCallback(async () => {
-    if (!academicYearId) return;
+  const fetchPeriods = useCallback(async () => {
+    if (!academicYearId) return null;
     await ensureTimetable(academicYearId);
     const rows = await listTimetablePeriods(academicYearId);
-    setPeriods(
-      rows.map((p) => ({
-        number: p.number,
-        label: p.label,
-        startTime: p.startTime ?? "",
-        endTime: p.endTime ?? "",
-      })),
-    );
+    return rows.map((p) => ({
+      number: p.number,
+      label: p.label,
+      startTime: p.startTime ?? "",
+      endTime: p.endTime ?? "",
+    }));
+  }, [academicYearId]);
+
+  const loadPeriods = useCallback(async () => {
+    const next = await fetchPeriods();
+    if (next) setPeriods(next);
+  }, [fetchPeriods]);
+
+  const fetchOverview = useCallback(async () => {
+    await ensureTimetable(academicYearId);
+    return getTimetableOverview(academicYearId);
   }, [academicYearId]);
 
   const loadOverview = useCallback(async () => {
@@ -166,47 +180,47 @@ export default function AdminTimetablePage() {
     setBusy(true);
     setError("");
     try {
-      await ensureTimetable(academicYearId);
-      const data = await getTimetableOverview(academicYearId);
+      const data = await fetchOverview();
       setOverview(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load overview");
+      setError(err instanceof Error ? err.message : t("adminTimetableUi.loadOverviewFailed"));
     } finally {
       setBusy(false);
     }
-  }, [academicYearId]);
+  }, [academicYearId, fetchOverview]);
+
+  const fetchGrid = useCallback(async () => {
+    await ensureTimetable(academicYearId);
+    const data = await getTimetableGrid(
+      academicYearId,
+      gradeId,
+      sectionId || undefined,
+    );
+    const next: Record<string, CellDraft> = {};
+    for (const e of data.entries) {
+      next[cellKey(e.weekday, e.period.number)] = {
+        subjectId: e.subject.id,
+        teacherUserId: e.teacher?.userId ?? "",
+        roomName: e.room?.name ?? "",
+      };
+    }
+    return { data, cells: next };
+  }, [academicYearId, gradeId, sectionId]);
 
   const loadGrid = useCallback(async () => {
     if (!academicYearId || !gradeId) return;
     setBusy(true);
     setError("");
     try {
-      await ensureTimetable(academicYearId);
-      const data = await getTimetableGrid(
-        academicYearId,
-        gradeId,
-        sectionId || undefined,
-      );
+      const { data, cells: next } = await fetchGrid();
       setGrid(data);
-      const next: Record<string, CellDraft> = {};
-      for (const e of data.entries) {
-        next[cellKey(e.weekday, e.period.number)] = {
-          subjectId: e.subject.id,
-          teacherUserId: e.teacher?.userId ?? "",
-          roomName: e.room?.name ?? "",
-        };
-      }
       setCells(next);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load timetable");
+      setError(err instanceof Error ? err.message : t("adminTimetableUi.loadTimetableFailed"));
     } finally {
       setBusy(false);
     }
-  }, [academicYearId, gradeId, sectionId]);
-
-  useEffect(() => {
-    setCanEdit(hasPermission(Permission.TIMETABLE_MANAGE));
-  }, []);
+  }, [academicYearId, gradeId, fetchGrid]);
 
   useEffect(() => {
     if (
@@ -221,22 +235,64 @@ export default function AdminTimetablePage() {
         setGrades(g);
         setAcademicYearId(year.id);
       })
-      .catch((err) => setError(err instanceof Error ? err.message : "Load failed"))
+      .catch((err) => setError(err instanceof Error ? err.message : t("adminTimetableUi.loadFailed")))
       .finally(() => setLoading(false));
   }, [router]);
 
   useEffect(() => {
     if (!academicYearId || loading) return;
-    void loadPeriods().catch((err) =>
-      setError(err instanceof Error ? err.message : "Could not load periods"),
-    );
-    void loadOverview();
-  }, [academicYearId, loading, loadPeriods, loadOverview]);
+    let cancelled = false;
+    void fetchPeriods()
+      .then((next) => {
+        if (!cancelled && next) setPeriods(next);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : t("adminTimetableUi.loadPeriodsFailed"));
+        }
+      });
+    void (async () => {
+      setBusy(true);
+      setError("");
+      try {
+        const data = await fetchOverview();
+        if (!cancelled) setOverview(data);
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : t("adminTimetableUi.loadOverviewFailed"));
+        }
+      } finally {
+        setBusy(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [academicYearId, loading, fetchPeriods, fetchOverview]);
 
   useEffect(() => {
     if (viewMode !== "edit" || !academicYearId || !gradeId || loading) return;
-    void loadGrid();
-  }, [viewMode, academicYearId, gradeId, sectionId, loading, loadGrid]);
+    let cancelled = false;
+    void (async () => {
+      setBusy(true);
+      setError("");
+      try {
+        const { data, cells: next } = await fetchGrid();
+        if (cancelled) return;
+        setGrid(data);
+        setCells(next);
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : t("adminTimetableUi.loadTimetableFailed"));
+        }
+      } finally {
+        setBusy(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [viewMode, academicYearId, gradeId, sectionId, loading, fetchGrid]);
 
   useEffect(() => {
     if (viewMode !== "stack" || !academicYearId || loading) return;
@@ -254,7 +310,7 @@ export default function AdminTimetablePage() {
         if (!cancelled) setStackData(data);
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Could not load class grids");
+          setError(err instanceof Error ? err.message : t("adminTimetableUi.loadGridsFailed"));
           setStackData(null);
         }
       } finally {
@@ -347,7 +403,7 @@ export default function AdminTimetablePage() {
         ...prev,
         {
           number: nextNumber,
-          label: `Period ${nextNumber}`,
+          label: t("adminTimetableUi.periodDefault", { n: nextNumber }),
           startTime: "",
           endTime: "",
         },
@@ -373,7 +429,7 @@ export default function AdminTimetablePage() {
     try {
       const normalized = periods.map((p, index) => ({
         number: index + 1,
-        label: p.label.trim() || `Period ${index + 1}`,
+        label: p.label.trim() || t("adminTimetableUi.periodDefault", { n: index + 1 }),
         startTime: p.startTime.trim() || null,
         endTime: p.endTime.trim() || null,
         sortOrder: index,
@@ -390,12 +446,12 @@ export default function AdminTimetablePage() {
           endTime: p.endTime ?? "",
         })),
       );
-      setSaved("Bell schedule updated.");
+      setSaved(t("adminTimetableUi.bellSaved"));
       await loadOverview();
       if (viewMode === "edit") await loadGrid();
       if (viewMode === "stack") setStackRefresh((n) => n + 1);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not save periods");
+      setError(err instanceof Error ? err.message : t("adminTimetableUi.savePeriodsFailed"));
     } finally {
       setBusy(false);
     }
@@ -404,7 +460,7 @@ export default function AdminTimetablePage() {
   function onSavePeriods() {
     if (!canEdit || !academicYearId) return;
     if (periods.length === 0) {
-      setError("Keep at least one period in the bell schedule.");
+      setError(t("adminTimetableUi.minOnePeriod"));
       return;
     }
     const prevCount = overview?.periodsCount ?? grid?.periods.length ?? periods.length;
@@ -420,21 +476,19 @@ export default function AdminTimetablePage() {
 
     let scopeGradeId: string | undefined;
     let scopeSectionId: string | undefined;
-    let scopeLabel = "the whole school";
+    let scopeLabel = t("adminTimetableUi.scopeWholeSchool");
 
     if (generateScope === "class") {
       if (viewMode === "edit" && gradeId) {
         scopeGradeId = gradeId;
         scopeSectionId = sectionId || undefined;
-        scopeLabel = classLabel || "this class";
+        scopeLabel = classLabel || t("adminTimetableUi.scopeThisClass");
       } else if (filterGradeId && filteredClasses.length === 1) {
         scopeGradeId = filteredClasses[0].gradeId;
         scopeSectionId = filteredClasses[0].sectionId ?? undefined;
         scopeLabel = classTitle(filteredClasses[0]);
       } else {
-        setError(
-          "Pick a class (open it, or filter to one class) before generating for this class only.",
-        );
+        setError(t("adminTimetableUi.pickClassFirst"));
         return;
       }
     }
@@ -461,9 +515,13 @@ export default function AdminTimetablePage() {
           ? { gradeId: action.scopeGradeId, sectionId: action.scopeSectionId }
           : {}),
       });
-      let message = `Scheduled ${result.placed} of ${result.totalLessons} lessons across ${result.classesProcessed} classes.`;
+      let message = t("adminTimetableUi.generatePlaced", {
+        placed: result.placed,
+        total: result.totalLessons,
+        classes: result.classesProcessed,
+      });
       if (result.unplaced.length > 0) {
-        message += ` ${result.unplaced.length} could not be placed — add periods or reduce clashes.`;
+        message += ` ${t("adminTimetableUi.generateUnplacedSuffix", { count: result.unplaced.length })}`;
       }
       setSaved(message);
       if (result.unplaced.length > 0) {
@@ -482,7 +540,7 @@ export default function AdminTimetablePage() {
       if (viewMode === "edit") await loadGrid();
       if (viewMode === "stack") setStackRefresh((n) => n + 1);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Auto-generate failed");
+      setError(err instanceof Error ? err.message : t("adminTimetableUi.generateFailed"));
     } finally {
       setBusy(false);
     }
@@ -520,18 +578,18 @@ export default function AdminTimetablePage() {
         sectionId: sectionId || undefined,
         entries,
       });
-      setSaved(`Timetable saved for ${classLabel}.`);
+      setSaved(t("adminTimetableUi.savedForClass", { class: classLabel }));
       await loadGrid();
       await loadOverview();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Save failed");
+      setError(err instanceof Error ? err.message : t("adminTimetableUi.saveFailed"));
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <DashboardPage role="admin" title="Timetable">
+    <DashboardPage role="admin" title={tp("Timetable")}>
       <div className="tt-admin">
         <AppToast message={error} tone="error" onDismiss={() => setError("")} />
         <AppToast message={saved} tone="success" onDismiss={() => setSaved("")} />
@@ -540,12 +598,14 @@ export default function AdminTimetablePage() {
           tone="warning"
           title={
             confirm?.type === "generate"
-              ? `Auto-generate for ${confirm.scopeLabel}?`
-              : "Auto-generate timetable?"
+              ? t("adminTimetableUi.confirmGenerateTitle", {
+                  scope: confirm.scopeLabel,
+                })
+              : t("adminTimetableUi.confirmGenerateDefault")
           }
-          message="This replaces existing entries in that scope. Teachers will not be double-booked in the same period."
-          confirmLabel="Generate timetable"
-          cancelLabel="Cancel"
+          message={t("adminTimetableUi.confirmGenerateMsg")}
+          confirmLabel={t("adminTimetableUi.generateTimetable")}
+          cancelLabel={t("common.cancel")}
           busy={busy}
           onCancel={() => {
             if (busy) return;
@@ -558,10 +618,10 @@ export default function AdminTimetablePage() {
         <AppConfirmDialog
           open={confirm?.type === "trim-periods"}
           tone="danger"
-          title="Remove periods?"
-          message="Removing periods deletes all scheduled lessons in those slots for every class."
-          confirmLabel="Remove periods"
-          cancelLabel="Keep schedule"
+          title={t("adminTimetableUi.removePeriodsTitle")}
+          message={t("adminTimetableUi.removePeriodsMsg")}
+          confirmLabel={t("adminTimetableUi.removePeriods")}
+          cancelLabel={t("adminTimetableUi.keepSchedule")}
           busy={busy}
           onCancel={() => {
             if (busy) return;
@@ -578,48 +638,47 @@ export default function AdminTimetablePage() {
           <div className="tt-admin__hero-inner">
             <div className="tt-admin__hero-main">
               <h2 className="tt-admin__hero-title">
-                {viewMode === "edit" ? "Edit class timetable" : "School timetable"}
+                {viewMode === "edit" ? t("adminTimetableUi.heroEdit") : t("adminTimetableUi.heroSchool")}
               </h2>
               <p className="tt-admin__hero-sub">
                 {viewMode === "edit" ? (
                   <>
-                    One <strong>subject per period</strong> for this class. Doubles use two separate
-                    periods.{" "}
+                    {t("adminTimetableUi.editSubBefore")}{" "}
+                    <strong>{t("adminTimetableUi.editSubStrong")}</strong>{" "}
+                    {t("adminTimetableUi.editSubAfter")}{" "}
                     <button
                       type="button"
                       className="tt-admin__hero-link"
                       onClick={() => canEdit && setPeriodsOpen(true)}
                       disabled={!canEdit}
                     >
-                      Manage periods
+                      {t("adminTimetableUi.managePeriods")}
                     </button>
                     .
                   </>
                 ) : viewMode === "stack" ? (
                   <>
-                    Whole-school board like a wall timetable: classes across, days and periods down.
-                    Click a class header or subject to edit.{" "}
+                    {t("adminTimetableUi.stackSub")}{" "}
                     <button
                       type="button"
                       className="tt-admin__hero-link"
                       onClick={() => canEdit && setPeriodsOpen(true)}
                       disabled={!canEdit}
                     >
-                      Manage periods
+                      {t("adminTimetableUi.managePeriods")}
                     </button>
                     .
                   </>
                 ) : (
                   <>
-                    Fill status for every grade and section. Open a class to edit, or switch to Board
-                    for the wall-chart view.{" "}
+                    {t("adminTimetableUi.overviewSub")}{" "}
                     <button
                       type="button"
                       className="tt-admin__hero-link"
                       onClick={() => canEdit && setPeriodsOpen(true)}
                       disabled={!canEdit}
                     >
-                      Manage periods
+                      {t("adminTimetableUi.managePeriods")}
                     </button>
                     .
                   </>
@@ -630,12 +689,14 @@ export default function AdminTimetablePage() {
                   <span className="tt-admin__badge">{classLabel}</span>
                 ) : (
                   <span className="tt-admin__badge">
-                    {filteredClasses.length} class{filteredClasses.length === 1 ? "" : "es"}
+                    {filteredClasses.length === 1
+                      ? t("adminTimetableUi.classCount", { count: filteredClasses.length })
+                      : t("adminTimetableUi.classCountPlural", { count: filteredClasses.length })}
                   </span>
                 )}
                 {canEdit ? (
                   <span className="tt-admin__badge tt-admin__badge--muted">
-                    {generateScope === "school" ? "Whole school generate" : "This class only"}
+                    {generateScope === "school" ? t("adminTimetableUi.wholeSchoolGen") : t("adminTimetableUi.thisClassOnly")}
                   </span>
                 ) : null}
               </div>
@@ -643,19 +704,19 @@ export default function AdminTimetablePage() {
             <div className="tt-admin__hero-stats">
               <div className="tt-admin__stat">
                 <strong>{loading ? "—" : periodCount}</strong>
-                <span>Periods</span>
+                <span>{t("adminTimetableUi.statPeriods")}</span>
               </div>
               <div className="tt-admin__stat">
                 <strong>{loading ? "—" : weekdays.length}</strong>
-                <span>Days</span>
+                <span>{t("adminTimetableUi.statDays")}</span>
               </div>
               <div className="tt-admin__stat">
                 <strong>{loading || (!overview && !grid) ? "—" : heroScheduled}</strong>
-                <span>Scheduled</span>
+                <span>{t("adminTimetableUi.statScheduled")}</span>
               </div>
               <div className="tt-admin__stat tt-admin__stat--accent">
                 <strong>{loading || (!overview && !grid) ? "—" : heroOpen}</strong>
-                <span>Open slots</span>
+                <span>{t("adminTimetableUi.statOpenSlots")}</span>
               </div>
             </div>
           </div>
@@ -668,23 +729,23 @@ export default function AdminTimetablePage() {
               className="tt-admin__btn tt-admin__btn--ghost"
               onClick={backToOverview}
             >
-              ← All classes
+              {t("adminTimetableUi.allClasses")}
             </button>
           ) : (
-            <div className="tt-admin__mode-toggle" role="group" aria-label="Timetable view">
+            <div className="tt-admin__mode-toggle" role="group" aria-label={t("adminTimetableUi.viewModeAria")}>
               <button
                 type="button"
                 className={`tt-admin__mode-btn${viewMode === "stack" ? " is-active" : ""}`}
                 onClick={() => setViewMode("stack")}
               >
-                Board
+                {t("adminTimetableUi.board")}
               </button>
               <button
                 type="button"
                 className={`tt-admin__mode-btn${viewMode === "overview" ? " is-active" : ""}`}
                 onClick={() => setViewMode("overview")}
               >
-                Classes
+                {t("adminTimetableUi.classes")}
               </button>
             </div>
           )}
@@ -698,9 +759,9 @@ export default function AdminTimetablePage() {
                   setFilterGradeId(e.target.value);
                   setFilterSectionId("");
                 }}
-                aria-label="Filter grade"
+                aria-label={t("adminTimetableUi.filterGrade")}
               >
-                <option value="">All grades</option>
+                <option value="">{t("adminTimetableUi.allGrades")}</option>
                 {grades.map((g) => (
                   <option key={g.id} value={g.id}>
                     {g.name}
@@ -711,10 +772,10 @@ export default function AdminTimetablePage() {
                 className="tt-admin__filter"
                 value={filterSectionId}
                 onChange={(e) => setFilterSectionId(e.target.value)}
-                aria-label="Filter section"
+                aria-label={t("adminTimetableUi.filterSection")}
                 disabled={!filterGrade || filterGrade.sections.length === 0}
               >
-                <option value="">All sections</option>
+                <option value="">{t("adminTimetableUi.allSections")}</option>
                 {(filterGrade?.sections ?? []).map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.name}
@@ -732,7 +793,7 @@ export default function AdminTimetablePage() {
                   const g = grades.find((x) => x.id === e.target.value);
                   setSectionId(g?.sections[0]?.id ?? "");
                 }}
-                aria-label="Grade"
+                aria-label={t("adminTimetableUi.grade")}
               >
                 {grades.map((g) => (
                   <option key={g.id} value={g.id}>
@@ -745,7 +806,7 @@ export default function AdminTimetablePage() {
                   className="tt-admin__filter"
                   value={sectionId}
                   onChange={(e) => setSectionId(e.target.value)}
-                  aria-label="Section"
+                  aria-label={t("adminTimetableUi.section")}
                 >
                   {selectedGrade.sections.map((s) => (
                     <option key={s.id} value={s.id}>
@@ -762,10 +823,10 @@ export default function AdminTimetablePage() {
               className="tt-admin__filter"
               value={generateScope}
               onChange={(e) => setGenerateScope(e.target.value as "school" | "class")}
-              aria-label="Auto-generate scope"
+              aria-label={t("adminTimetableUi.generateScopeAria")}
             >
-              <option value="school">Whole school</option>
-              <option value="class">This class only</option>
+              <option value="school">{t("adminTimetableUi.wholeSchool")}</option>
+              <option value="class">{t("adminTimetableUi.thisClassOnly")}</option>
             </select>
           ) : null}
 
@@ -777,7 +838,7 @@ export default function AdminTimetablePage() {
                 disabled={stackLoading || !stackData}
                 onClick={() => printTimetableBoard()}
               >
-                Print board
+                {t("adminTimetableUi.printBoard")}
               </button>
             ) : null}
             {canEdit ? (
@@ -788,7 +849,7 @@ export default function AdminTimetablePage() {
                 onClick={() => requestAutoGenerate()}
               >
                 <DashIcon name="calendar" className="dash-icon--sm" />
-                {busy ? "Working…" : "Auto-generate"}
+                {busy ? t("adminTimetableUi.working") : t("adminTimetableUi.autoGenerate")}
               </button>
             ) : null}
             {canEdit ? (
@@ -796,9 +857,7 @@ export default function AdminTimetablePage() {
                 type="button"
                 className="tt-admin__btn tt-admin__btn--ghost"
                 onClick={() => setPeriodsOpen(true)}
-              >
-                Manage periods
-              </button>
+              >{t("adminTimetableUi.managePeriods")}</button>
             ) : null}
             {canEdit && viewMode === "edit" ? (
               <button
@@ -807,7 +866,7 @@ export default function AdminTimetablePage() {
                 disabled={busy || !gradeId}
                 onClick={() => void onSave()}
               >
-                {busy ? "Saving…" : "Save timetable"}
+                {busy ? t("common.saving") : t("adminTimetableUi.saveTimetable")}
               </button>
             ) : null}
           </div>
@@ -832,10 +891,10 @@ export default function AdminTimetablePage() {
                   </span>
                   <div>
                     <h2 id="tt-periods-title" className="stu-drawer__title">
-                      Bell schedule
+                      {t("adminTimetableUi.bellSchedule")}
                     </h2>
                     <p className="stu-drawer__sub">
-                      Periods apply to every class. Add labels and optional start/end times.
+                      {t("adminTimetableUi.bellSub")}
                     </p>
                   </div>
                 </div>
@@ -843,7 +902,7 @@ export default function AdminTimetablePage() {
                   type="button"
                   className="stu-drawer__close"
                   onClick={() => setPeriodsOpen(false)}
-                  aria-label="Close"
+                  aria-label={t("adminTimetableUi.close")}
                 >
                   ×
                 </button>
@@ -852,28 +911,28 @@ export default function AdminTimetablePage() {
               <div className="tt-periods-drawer__stats">
                 <div className="tt-periods-drawer__stat">
                   <strong>{periods.length}</strong>
-                  <span>Periods</span>
+                  <span>{t("adminTimetableUi.statPeriods")}</span>
                 </div>
                 <div className="tt-periods-drawer__stat">
                   <strong>{timedPeriodCount}</strong>
-                  <span>With times</span>
+                  <span>{t("adminTimetableUi.withTimes")}</span>
                 </div>
                 <div className="tt-periods-drawer__stat tt-periods-drawer__stat--accent">
                   <strong>{Math.max(periods.length - timedPeriodCount, 0)}</strong>
-                  <span>Untimed</span>
+                  <span>{t("adminTimetableUi.untimed")}</span>
                 </div>
               </div>
 
               <div className="stu-drawer__body tt-periods-drawer__body">
                 {periods.length === 0 ? (
                   <div className="tt-periods-drawer__empty">
-                    <p>No periods yet.</p>
+                    <p>{t("adminTimetableUi.noPeriodsYet")}</p>
                     <button
                       type="button"
                       className="tt-admin__btn tt-admin__btn--primary"
                       onClick={addPeriod}
                     >
-                      + Add first period
+                      {t("adminTimetableUi.addFirstPeriod")}
                     </button>
                   </div>
                 ) : (
@@ -886,8 +945,8 @@ export default function AdminTimetablePage() {
                             className="tt-periods-drawer__label"
                             value={p.label}
                             onChange={(e) => updatePeriod(p.number, { label: e.target.value })}
-                            placeholder={`Period ${index + 1}`}
-                            aria-label={`Period ${index + 1} label`}
+                            placeholder={t("adminTimetableUi.periodLabelPh", { n: index + 1 })}
+                            aria-label={t("adminTimetableUi.periodLabelAria", { n: index + 1 })}
                           />
                           <div className="tt-periods-drawer__times">
                             <input
@@ -896,16 +955,16 @@ export default function AdminTimetablePage() {
                               onChange={(e) =>
                                 updatePeriod(p.number, { startTime: e.target.value })
                               }
-                              aria-label={`Period ${index + 1} start`}
+                              aria-label={t("adminTimetableUi.periodStartAria", { n: index + 1 })}
                             />
-                            <span className="tt-periods-drawer__times-sep">to</span>
+                            <span className="tt-periods-drawer__times-sep">{t("adminTimetableUi.to")}</span>
                             <input
                               type="time"
                               value={p.endTime}
                               onChange={(e) =>
                                 updatePeriod(p.number, { endTime: e.target.value })
                               }
-                              aria-label={`Period ${index + 1} end`}
+                              aria-label={t("adminTimetableUi.periodEndAria", { n: index + 1 })}
                             />
                           </div>
                         </div>
@@ -914,7 +973,7 @@ export default function AdminTimetablePage() {
                           className="tt-periods-drawer__remove"
                           disabled={periods.length <= 1}
                           onClick={() => removePeriod(p.number)}
-                          aria-label={`Remove period ${index + 1}`}
+                          aria-label={t("adminTimetableUi.removePeriodAria", { n: index + 1 })}
                         >
                           ×
                         </button>
@@ -928,7 +987,7 @@ export default function AdminTimetablePage() {
                     className="tt-periods-drawer__add"
                     onClick={addPeriod}
                   >
-                    + Add period
+                    {t("adminTimetableUi.addPeriod")}
                   </button>
                 ) : null}
               </div>
@@ -939,7 +998,7 @@ export default function AdminTimetablePage() {
                   className="tt-admin__btn tt-admin__btn--ghost"
                   onClick={() => setPeriodsOpen(false)}
                 >
-                  Cancel
+                  {t("common.cancel")}
                 </button>
                 <button
                   type="button"
@@ -947,7 +1006,7 @@ export default function AdminTimetablePage() {
                   disabled={busy || periods.length === 0}
                   onClick={() => void onSavePeriods()}
                 >
-                  {busy ? "Saving…" : "Save schedule"}
+                  {busy ? t("common.saving") : t("adminTimetableUi.saveSchedule")}
                 </button>
               </footer>
             </aside>
@@ -957,12 +1016,12 @@ export default function AdminTimetablePage() {
         {loading || (busy && !overview && viewMode !== "edit") ? (
           <div className="tt-admin__loading">
             <span className="tt-admin__loading-spinner" aria-hidden />
-            <p>Loading timetable…</p>
+            <p>{t("adminTimetableUi.loadingTimetable")}</p>
           </div>
         ) : viewMode === "overview" ? (
           filteredClasses.length === 0 ? (
             <div className="tt-admin__empty">
-              <p>No classes match these filters.</p>
+              <p>{t("adminTimetableUi.noClassesFilter")}</p>
             </div>
           ) : (
             <div className="tt-class-grid">
@@ -984,11 +1043,11 @@ export default function AdminTimetablePage() {
           stackLoading ? (
             <div className="tt-admin__loading">
               <span className="tt-admin__loading-spinner" aria-hidden />
-              <p>Loading school board…</p>
+              <p>{t("adminTimetableUi.loadingBoard")}</p>
             </div>
           ) : stackClasses.length === 0 ? (
             <div className="tt-admin__empty">
-              <p>No classes match these filters.</p>
+              <p>{t("adminTimetableUi.noClassesFilter")}</p>
             </div>
           ) : stackData ? (
             <TimetableMasterBoard
@@ -1002,14 +1061,14 @@ export default function AdminTimetablePage() {
         ) : busy && !grid ? (
           <div className="tt-admin__loading">
             <span className="tt-admin__loading-spinner" aria-hidden />
-            <p>Loading timetable…</p>
+            <p>{t("adminTimetableUi.loadingTimetable")}</p>
           </div>
         ) : grid && weekdayLabels ? (
           <div className="tt-admin__grid-wrap">
             <table className="tt-admin__grid">
               <thead>
                 <tr>
-                  <th className="tt-admin__grid-corner">Period</th>
+                  <th className="tt-admin__grid-corner">{t("adminTimetableUi.periodHeader")}</th>
                   {weekdays.map((d) => (
                     <th key={d}>{weekdayLabels[d]}</th>
                   ))}
@@ -1028,7 +1087,7 @@ export default function AdminTimetablePage() {
                         <span className="tt-admin__grid-period-time">{period.startTime}</span>
                       ) : (
                         <span className="tt-admin__grid-period-time tt-admin__grid-period-time--muted">
-                          One subject slot
+                          {t("adminTimetableUi.oneSubjectSlot")}
                         </span>
                       )}
                     </th>
@@ -1049,14 +1108,14 @@ export default function AdminTimetablePage() {
                             className="tt-admin__cell-input"
                             value={cell.subjectId}
                             disabled={!canEdit}
-                            aria-label={`${weekdayLabels[weekday]} ${period.label} subject`}
+                            aria-label={`${weekdayLabels[weekday]} ${period.label} ${t("adminTimetableUi.subject")}`}
                             onChange={(e) =>
                               setCell(weekday, period.number, {
                                 subjectId: e.target.value,
                               })
                             }
                           >
-                            <option value="">Subject</option>
+                            <option value="">{t("adminTimetableUi.subject")}</option>
                             {grid.subjects.map((s) => (
                               <option key={s.id} value={s.id}>
                                 {s.name}
@@ -1067,27 +1126,27 @@ export default function AdminTimetablePage() {
                             className="tt-admin__cell-input"
                             value={cell.teacherUserId}
                             disabled={!canEdit || !cell.subjectId}
-                            aria-label={`${weekdayLabels[weekday]} ${period.label} teacher`}
+                            aria-label={`${weekdayLabels[weekday]} ${period.label} ${t("adminTimetableUi.teacher")}`}
                             onChange={(e) =>
                               setCell(weekday, period.number, {
                                 teacherUserId: e.target.value,
                               })
                             }
                           >
-                            <option value="">Teacher</option>
-                            {grid.teachers.map((t) => (
-                              <option key={t.userId} value={t.userId}>
-                                {t.name}
+                            <option value="">{t("adminTimetableUi.teacher")}</option>
+                            {grid.teachers.map((teacherRow) => (
+                              <option key={teacherRow.userId} value={teacherRow.userId}>
+                                {teacherRow.name}
                               </option>
                             ))}
                           </select>
                           <input
                             className="tt-admin__cell-input"
                             type="text"
-                            placeholder="Room"
+                            placeholder={t("adminTimetableUi.roomPh")}
                             value={cell.roomName}
                             disabled={!canEdit || !cell.subjectId}
-                            aria-label={`${weekdayLabels[weekday]} ${period.label} room`}
+                            aria-label={`${weekdayLabels[weekday]} ${period.label} ${t("adminTimetableUi.roomPh")}`}
                             onChange={(e) =>
                               setCell(weekday, period.number, {
                                 roomName: e.target.value,

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useLocale } from "@/components/i18n/locale-provider";
 import { AppToast } from "@/components/ui/app-toast";
 import { hasPermission, Permission } from "@/lib/permissions";
 import {
@@ -13,14 +14,10 @@ import {
   type LeaveType,
 } from "@/lib/leave";
 
-const STATUS_LABEL: Record<LeaveRequest["status"], string> = {
-  pending: "Pending",
-  approved: "Approved",
-  rejected: "Rejected",
-  cancelled: "Cancelled",
-};
+const STATUS_KEYS = ["pending", "approved", "rejected", "cancelled"] as const;
 
 export function LeaveWorkspace() {
+  const { t } = useLocale();
   const canApprove = hasPermission(Permission.LEAVE_APPROVE);
   const canRequest = hasPermission(Permission.LEAVE_REQUEST);
   const [types, setTypes] = useState<LeaveType[]>([]);
@@ -35,19 +32,23 @@ export function LeaveWorkspace() {
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
 
+  function statusLabel(s: LeaveRequest["status"]) {
+    return t(`leaveUi.status_${s}`);
+  }
+
   async function load() {
     setLoading(true);
     setError("");
     try {
-      const [t, r] = await Promise.all([
+      const [typeRows, requestRows] = await Promise.all([
         listLeaveTypes(),
         listLeaveRequests({ status: status || undefined }),
       ]);
-      setTypes(t);
-      setRows(r);
-      if (!leaveTypeId && t[0]) setLeaveTypeId(t[0].id);
+      setTypes(typeRows);
+      setRows(requestRows);
+      if (!leaveTypeId && typeRows[0]) setLeaveTypeId(typeRows[0].id);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load leave");
+      setError(err instanceof Error ? err.message : t("leaveUi.loadFailed"));
     } finally {
       setLoading(false);
     }
@@ -70,11 +71,11 @@ export function LeaveWorkspace() {
         endDate,
         reason,
       });
-      setToast("Leave request submitted");
+      setToast(t("leaveUi.submitted"));
       setReason("");
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not submit");
+      setError(err instanceof Error ? err.message : t("leaveUi.submitFailed"));
     } finally {
       setBusy(false);
     }
@@ -83,15 +84,17 @@ export function LeaveWorkspace() {
   async function onReview(id: string, next: "approved" | "rejected") {
     const note =
       next === "rejected"
-        ? window.prompt("Rejection reason (optional)") ?? undefined
+        ? window.prompt(t("leaveUi.rejectionPrompt")) ?? undefined
         : undefined;
     setBusy(true);
     try {
       await reviewLeaveRequest(id, { status: next, reviewNote: note });
-      setToast(next === "approved" ? "Leave approved" : "Leave rejected");
+      setToast(
+        next === "approved" ? t("leaveUi.approved") : t("leaveUi.rejected"),
+      );
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Review failed");
+      setError(err instanceof Error ? err.message : t("leaveUi.reviewFailed"));
     } finally {
       setBusy(false);
     }
@@ -115,29 +118,26 @@ export function LeaveWorkspace() {
         <div className="tch-v2__hero-glow" aria-hidden />
         <div className="tch-v2__hero-inner">
           <div className="tch-v2__hero-main">
-            <span className="tch-v2__chip">People</span>
-            <h2 className="tch-v2__hero-title">Leave</h2>
-            <p className="tch-v2__hero-sub">
-              Request and approve staff leave. Approved leave marks attendance
-              as on leave automatically.
-            </p>
+            <span className="tch-v2__chip">{t("leaveUi.chip")}</span>
+            <h2 className="tch-v2__hero-title">{t("leaveUi.title")}</h2>
+            <p className="tch-v2__hero-sub">{t("leaveUi.heroSub")}</p>
           </div>
           <div className="tch-v2__hero-stats">
             <div className="tch-v2__stat">
               <strong>{loading ? "—" : rows.length}</strong>
-              <span>Requests</span>
+              <span>{t("leaveUi.statRequests")}</span>
             </div>
             <div className="tch-v2__stat">
               <strong>{loading ? "—" : pendingCount}</strong>
-              <span>Pending</span>
+              <span>{t("leaveUi.statPending")}</span>
             </div>
             <div className="tch-v2__stat">
               <strong>{loading ? "—" : approvedCount}</strong>
-              <span>Approved</span>
+              <span>{t("leaveUi.statApproved")}</span>
             </div>
             <div className="tch-v2__stat tch-v2__stat--accent">
               <strong>{types.length}</strong>
-              <span>Types</span>
+              <span>{t("leaveUi.statTypes")}</span>
             </div>
           </div>
         </div>
@@ -146,21 +146,21 @@ export function LeaveWorkspace() {
       {canRequest ? (
         <form className="sa-toolbar" onSubmit={(e) => void onCreate(e)}>
           <label className="sa-field">
-            <span>Type</span>
+            <span>{t("leaveUi.type")}</span>
             <select
               value={leaveTypeId}
               onChange={(e) => setLeaveTypeId(e.target.value)}
               required
             >
-              {types.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
+              {types.map((typeRow) => (
+                <option key={typeRow.id} value={typeRow.id}>
+                  {typeRow.name}
                 </option>
               ))}
             </select>
           </label>
           <label className="sa-field">
-            <span>Start</span>
+            <span>{t("leaveUi.start")}</span>
             <input
               type="date"
               value={startDate}
@@ -169,7 +169,7 @@ export function LeaveWorkspace() {
             />
           </label>
           <label className="sa-field">
-            <span>End</span>
+            <span>{t("leaveUi.end")}</span>
             <input
               type="date"
               value={endDate}
@@ -178,7 +178,7 @@ export function LeaveWorkspace() {
             />
           </label>
           <label className="sa-field sa-field--grow">
-            <span>Reason</span>
+            <span>{t("leaveUi.reason")}</span>
             <input
               value={reason}
               onChange={(e) => setReason(e.target.value)}
@@ -187,19 +187,19 @@ export function LeaveWorkspace() {
             />
           </label>
           <button type="submit" className="sa-btn sa-btn--primary" disabled={busy}>
-            Request leave
+            {t("leaveUi.requestLeave")}
           </button>
         </form>
       ) : null}
 
       <div className="sa-toolbar">
         <label className="sa-field">
-          <span>Status</span>
+          <span>{t("leaveUi.status")}</span>
           <select value={status} onChange={(e) => setStatus(e.target.value)}>
-            <option value="">All</option>
-            {Object.entries(STATUS_LABEL).map(([k, v]) => (
+            <option value="">{t("common.all")}</option>
+            {STATUS_KEYS.map((k) => (
               <option key={k} value={k}>
-                {v}
+                {statusLabel(k)}
               </option>
             ))}
           </select>
@@ -210,26 +210,26 @@ export function LeaveWorkspace() {
         <table className="sa-table">
           <thead>
             <tr>
-              <th>Employee</th>
-              <th>Type</th>
-              <th>Dates</th>
-              <th>Days</th>
-              <th>Status</th>
-              <th>Reason</th>
-              <th>Actions</th>
+              <th>{t("leaveUi.colEmployee")}</th>
+              <th>{t("leaveUi.colType")}</th>
+              <th>{t("leaveUi.colDates")}</th>
+              <th>{t("leaveUi.colDays")}</th>
+              <th>{t("leaveUi.colStatus")}</th>
+              <th>{t("leaveUi.colReason")}</th>
+              <th>{t("leaveUi.colActions")}</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
                 <td colSpan={7} className="sa-empty">
-                  Loading…
+                  {t("common.loading")}
                 </td>
               </tr>
             ) : !rows.length ? (
               <tr>
                 <td colSpan={7} className="sa-empty">
-                  No leave requests.
+                  {t("leaveUi.noRequests")}
                 </td>
               </tr>
             ) : (
@@ -248,7 +248,7 @@ export function LeaveWorkspace() {
                   <td>{r.days}</td>
                   <td>
                     <span className={`sa-badge sa-badge--${r.status}`}>
-                      {STATUS_LABEL[r.status]}
+                      {statusLabel(r.status)}
                     </span>
                   </td>
                   <td>{r.reason}</td>
@@ -262,7 +262,7 @@ export function LeaveWorkspace() {
                             disabled={busy}
                             onClick={() => void onReview(r.id, "approved")}
                           >
-                            Approve
+                            {t("leaveUi.approve")}
                           </button>
                           <button
                             type="button"
@@ -270,7 +270,7 @@ export function LeaveWorkspace() {
                             disabled={busy}
                             onClick={() => void onReview(r.id, "rejected")}
                           >
-                            Reject
+                            {t("leaveUi.reject")}
                           </button>
                         </>
                       ) : null}
@@ -283,19 +283,19 @@ export function LeaveWorkspace() {
                           onClick={() =>
                             void cancelLeaveRequest(r.id)
                               .then(() => {
-                                setToast("Leave cancelled");
+                                setToast(t("leaveUi.cancelled"));
                                 return load();
                               })
                               .catch((err) =>
                                 setError(
                                   err instanceof Error
                                     ? err.message
-                                    : "Cancel failed",
+                                    : t("leaveUi.cancelFailed"),
                                 ),
                               )
                           }
                         >
-                          Cancel
+                          {t("leaveUi.cancel")}
                         </button>
                       )}
                     </div>

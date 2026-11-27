@@ -1,44 +1,71 @@
 "use client";
 
 import { motion, useReducedMotion } from "framer-motion";
+import { useMemo } from "react";
 import { useLandingHeroImage } from "@/hooks/use-landing-hero-image";
+import { useLocale } from "@/components/i18n/locale-provider";
 
-const STEP_COPY = [
+const STEP_KEYS = [
   {
-    eyebrow: "Step 1 · School",
-    title: "Your campus, ready in minutes",
-    body: "We set up grades, sections, and an Ethiopian curriculum package as soon as you continue.",
+    eyebrowKey: "auth.regVisualStep1Eyebrow",
+    titleKey: "auth.regVisualStep1Title",
+    bodyKey: "auth.regVisualStep1Body",
   },
   {
-    eyebrow: "Step 2 · Admin",
-    title: "Your secure admin login",
-    body: "Create the account you’ll use to manage attendance, report cards, leave, and payroll.",
+    eyebrowKey: "auth.regVisualStep2Eyebrow",
+    titleKey: "auth.regVisualStep2Title",
+    bodyKey: "auth.regVisualStep2Body",
   },
 ] as const;
 
-export const TRIAL_HIGHLIGHTS = [
+const TRIAL_HIGHLIGHT_KEYS = [
   {
-    title: "Attendance concerns",
-    desc: "Review a mark before it stays on the record",
+    titleKey: "auth.trialConcernTitle",
+    descKey: "auth.trialConcernDesc",
   },
   {
-    title: "Yearly report cards",
-    desc: "Print the full year and let families verify it",
+    titleKey: "features.yearlyTitle",
+    descKey: "auth.trialYearlyShortDesc",
   },
   {
-    title: "HR, leave & payroll",
-    desc: "Staff check-in, leave approvals, and payslips",
+    titleKey: "features.hrTitle",
+    descKey: "auth.trialHrShortDesc",
   },
 ] as const;
+
+export function useTrialHighlights() {
+  const { t } = useLocale();
+  return useMemo(
+    () =>
+      TRIAL_HIGHLIGHT_KEYS.map((item) => ({
+        title: t(item.titleKey),
+        desc: t(item.descKey),
+      })),
+    [t],
+  );
+}
 
 type Props = {
   activeStep: number;
 };
 
 export function RegisterVisualPanel({ activeStep }: Props) {
+  const { t } = useLocale();
   const reduce = useReducedMotion();
-  const copy = STEP_COPY[activeStep] ?? STEP_COPY[0];
   const heroSrc = useLandingHeroImage();
+  const trialHighlights = useTrialHighlights();
+
+  const stepCopy = useMemo(
+    () =>
+      STEP_KEYS.map((step) => ({
+        eyebrow: t(step.eyebrowKey),
+        title: t(step.titleKey),
+        body: t(step.bodyKey),
+      })),
+    [t],
+  );
+
+  const copy = stepCopy[activeStep] ?? stepCopy[0];
 
   return (
     <div className="reg-visual reg-visual--photo">
@@ -63,7 +90,7 @@ export function RegisterVisualPanel({ activeStep }: Props) {
         </motion.div>
 
         <ul className="reg-visual__features">
-          {TRIAL_HIGHLIGHTS.map((item) => (
+          {trialHighlights.map((item) => (
             <li key={item.title}>
               <strong>{item.title}</strong>
               <span>{item.desc}</span>

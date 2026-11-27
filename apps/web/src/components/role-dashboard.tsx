@@ -32,33 +32,40 @@ import { getStaffWorkspaceTitle } from "@/lib/staff-workspace";
 import { listLibraryResources, type LibraryResource } from "@/lib/library";
 import { readSchoolBrand } from "@/lib/school-brand";
 import { BRAND_NAME } from "@/lib/brand";
+import { DashIcon, type DashIconName } from "@/components/dashboard/dash-icons";
+import { useLocale } from "@/components/i18n/locale-provider";
+import type { AppLocale } from "@/lib/i18n";
 
 type Props = {
   role: UserRole;
 };
 
 type StatConfig = {
-  label: string;
-  icon: string;
+  labelKey: string;
+  icon: DashIconName;
 };
 
 const STAT_LABELS: Record<string, StatConfig> = {
-  schoolId: { label: "School ID", icon: "🏫" },
-  announcements: { label: "Announcements", icon: "📢" },
-  unreadNotifications: { label: "Unread", icon: "🔔" },
-  activeUsers: { label: "Active users", icon: "👥" },
-  totalTeachers: { label: "Teachers", icon: "👨‍🏫" },
-  classesToday: { label: "Classes today", icon: "📅" },
-  pendingGrades: { label: "Pending grades", icon: "📝" },
-  attendanceRate: { label: "Attendance", icon: "✓" },
-  upcomingAssignments: { label: "Assignments", icon: "📚" },
-  children: { label: "Children", icon: "👨‍👩‍👧" },
-  alerts: { label: "Alerts", icon: "⚠️" },
+  schoolId: { labelKey: "dash.schoolId", icon: "building" },
+  announcements: { labelKey: "dash.announcements", icon: "announcements" },
+  unreadNotifications: { labelKey: "dash.unread", icon: "alert" },
+  activeUsers: { labelKey: "dash.activeUsers", icon: "users" },
+  totalTeachers: { labelKey: "dash.teachersStat", icon: "teachers" },
+  classesToday: { labelKey: "dash.classesToday", icon: "calendar" },
+  pendingGrades: { labelKey: "dash.pendingGrades", icon: "results" },
+  attendanceRate: { labelKey: "dash.attendance", icon: "attendance" },
+  upcomingAssignments: { labelKey: "dash.assignments", icon: "assign" },
+  children: { labelKey: "dash.children", icon: "students" },
+  alerts: { labelKey: "dash.alerts", icon: "alert" },
 };
 
-function formatDate(iso: string) {
+function localeTag(locale: AppLocale) {
+  return locale === "am" ? "am-ET" : undefined;
+}
+
+function formatDate(iso: string, locale: AppLocale) {
   try {
-    return new Date(iso).toLocaleDateString(undefined, {
+    return new Date(iso).toLocaleDateString(localeTag(locale), {
       month: "short",
       day: "numeric",
       year: "numeric",
@@ -66,6 +73,15 @@ function formatDate(iso: string) {
   } catch {
     return iso;
   }
+}
+
+function attendanceStatusLabel(status: string, t: (key: string) => string) {
+  const s = status.toUpperCase();
+  if (s === "PRESENT") return t("common.present");
+  if (s === "ABSENT") return t("common.absent");
+  if (s === "LATE") return t("common.late");
+  if (s === "EXCUSED") return t("common.excused");
+  return status.charAt(0).toUpperCase() + status.slice(1);
 }
 
 function formatStatValue(key: string, value: string | number) {
@@ -76,7 +92,8 @@ function formatStatValue(key: string, value: string | number) {
 }
 
 export function RoleDashboard({ role }: Props) {
-  const [workspaceRole, setWorkspaceRole] = useState<UserRole>(() => {
+  const { t, locale } = useLocale();
+  const [workspaceRole] = useState<UserRole>(() => {
     if (typeof window === "undefined") return role;
     return (localStorage.getItem(AUTH_ROLE_KEY) as UserRole | null) ?? role;
   });
@@ -102,24 +119,22 @@ export function RoleDashboard({ role }: Props) {
   const [adminAnalytics, setAdminAnalytics] = useState<AdminAnalyticsOverview | null>(null);
   const router = useRouter();
 
-  useEffect(() => {
-    const stored = localStorage.getItem(AUTH_ROLE_KEY) as UserRole | null;
-    if (stored && stored !== workspaceRole) setWorkspaceRole(stored);
-  }, [workspaceRole]);
-
   const stats = useMemo(() => {
     if (!dashboard) return [];
     return Object.entries(dashboard)
       .filter(([key]) => key !== "day")
-      .map(([key, value]) => ({
-      key,
-      value,
-      ...(STAT_LABELS[key] ?? {
-        label: key.replace(/([A-Z])/g, " $1").replace(/^./, (s) => s.toUpperCase()),
-        icon: "•",
-      }),
-    }));
-  }, [dashboard]);
+      .map(([key, value]) => {
+        const config = STAT_LABELS[key];
+        return {
+          key,
+          value,
+          label: config
+            ? t(config.labelKey)
+            : key.replace(/([A-Z])/g, " $1").replace(/^./, (s) => s.toUpperCase()),
+          icon: (config?.icon ?? "overview") as DashIconName,
+        };
+      });
+  }, [dashboard, t]);
 
   useEffect(() => {
     const load = async () => {
@@ -237,7 +252,7 @@ export function RoleDashboard({ role }: Props) {
     return (
       <div className="dash-loading dash-loading--pro">
         <span className="dash-loading-spinner" aria-hidden />
-        <p>Loading your workspace…</p>
+        <p>{t("dash.loadingWorkspace")}</p>
       </div>
     );
   }
@@ -246,7 +261,7 @@ export function RoleDashboard({ role }: Props) {
 
   if (canViewAdminDashboard) {
     return (
-      <DashboardShell role={workspaceRole} title="Dashboard">
+      <DashboardShell role={workspaceRole} title={t("dash.dashboardTitle")}>
         <AdminDashboard
           schoolName={schoolName}
           subscription={subscription}
@@ -289,8 +304,8 @@ export function RoleDashboard({ role }: Props) {
       <div className="co-page co-page__body">
       <section className="dash-welcome dash-welcome--modern">
         <div>
-          <p className="dash-welcome-eyebrow">Welcome back</p>
-          <h2>Your classroom at a glance</h2>
+          <p className="dash-welcome-eyebrow">{t("dash.welcomeBack")}</p>
+          <h2>{t("dash.classroomGlance")}</h2>
         </div>
       </section>
 
@@ -299,11 +314,11 @@ export function RoleDashboard({ role }: Props) {
       ) : null}
 
       {stats.length > 0 ? (
-        <section className="dash-stats dash-stats--modern" aria-label="Key metrics">
+        <section className="dash-stats dash-stats--modern" aria-label={t("dash.keyMetrics")}>
           {stats.map((stat) => (
             <article key={stat.key} className="dash-stat dash-stat--modern">
               <div className="dash-stat-icon" aria-hidden>
-                {stat.icon}
+                <DashIcon name={stat.icon} className="dash-icon--sm" />
               </div>
               <p className="dash-stat-label">{stat.label}</p>
               <p className="dash-stat-value">{formatStatValue(stat.key, stat.value)}</p>
@@ -315,17 +330,21 @@ export function RoleDashboard({ role }: Props) {
       <section className="dash-grid-2">
         <article className="dash-panel dash-panel--flat">
           <div className="dash-panel-head">
-            <h2 className="dash-panel-title">Attendance</h2>
+            <h2 className="dash-panel-title">{t("dash.attendance")}</h2>
             {attendanceAnalytics ? (
               <span className="dash-panel-badge">
                 {attendanceAnalytics.todayRate != null
-                  ? `${attendanceAnalytics.todayRate}% today`
-                  : "Today"}
+                  ? t("dash.rateToday", { rate: attendanceAnalytics.todayRate })
+                  : t("dash.today")}
               </span>
             ) : attendanceSummary ? (
-              <span className="dash-panel-badge">{attendanceSummary.rate}% rate</span>
+              <span className="dash-panel-badge">
+                {t("dash.ratePct", { rate: attendanceSummary.rate })}
+              </span>
             ) : (
-              <span className="dash-panel-badge">{attendance.length} records</span>
+              <span className="dash-panel-badge">
+                {t("dash.recordsCount", { count: attendance.length })}
+              </span>
             )}
           </div>
 
@@ -335,19 +354,19 @@ export function RoleDashboard({ role }: Props) {
                 <span className="att-stat-value">
                   {attendanceAnalytics.todayRate != null ? `${attendanceAnalytics.todayRate}%` : "—"}
                 </span>
-                <span className="att-stat-label">Today</span>
+                <span className="att-stat-label">{t("dash.today")}</span>
               </div>
               <div className="att-stat">
                 <span className="att-stat-value">{attendanceAnalytics.markedToday}</span>
-                <span className="att-stat-label">Marked</span>
+                <span className="att-stat-label">{t("dash.marked")}</span>
               </div>
               <div className="att-stat">
                 <span className="att-stat-value">{attendanceAnalytics.absentToday}</span>
-                <span className="att-stat-label">Absent</span>
+                <span className="att-stat-label">{t("common.absent")}</span>
               </div>
               <div className="att-stat">
                 <span className="att-stat-value">{attendanceAnalytics.totalStudents}</span>
-                <span className="att-stat-label">Students</span>
+                <span className="att-stat-label">{t("dash.students")}</span>
               </div>
             </div>
           ) : attendanceSummary ? (
@@ -358,20 +377,26 @@ export function RoleDashboard({ role }: Props) {
                 {attendanceSummary.student.section ? `-${attendanceSummary.student.section}` : ""}
               </p>
               <ul className="att-summary-counts">
-                <li>Present: {attendanceSummary.counts.present}</li>
-                <li>Absent: {attendanceSummary.counts.absent}</li>
-                <li>Late: {attendanceSummary.counts.late}</li>
-                <li>Excused: {attendanceSummary.counts.excused}</li>
+                <li>
+                  {t("dash.presentCount", { count: attendanceSummary.counts.present })}
+                </li>
+                <li>
+                  {t("dash.absentCount", { count: attendanceSummary.counts.absent })}
+                </li>
+                <li>{t("dash.lateCount", { count: attendanceSummary.counts.late })}</li>
+                <li>
+                  {t("dash.excusedCount", { count: attendanceSummary.counts.excused })}
+                </li>
               </ul>
             </div>
           ) : attendance.length === 0 ? (
             <div className="dash-empty">
               <div className="dash-empty-icon" aria-hidden>
-                📋
+                <DashIcon name="attendance" />
               </div>
-              <p>No attendance records yet.</p>
+              <p>{t("dash.noAttendanceRecords")}</p>
               <Link href="/teacher/attendance" className="dash-link-btn">
-                Mark attendance
+                {t("dash.markAttendance")}
               </Link>
             </div>
           ) : (
@@ -379,10 +404,10 @@ export function RoleDashboard({ role }: Props) {
               {attendance.map((row) => (
                 <li key={row.id} className="dash-list-item">
                   <div>
-                    <p className="dash-list-title">{row.status}</p>
-                    <p className="dash-list-meta">{formatDate(row.date)}</p>
+                    <p className="dash-list-title">{attendanceStatusLabel(row.status, t)}</p>
+                    <p className="dash-list-meta">{formatDate(row.date, locale)}</p>
                   </div>
-                  <span className="dash-tag">{row.status}</span>
+                  <span className="dash-tag">{attendanceStatusLabel(row.status, t)}</span>
                 </li>
               ))}
             </ul>
@@ -391,18 +416,20 @@ export function RoleDashboard({ role }: Props) {
 
         <article className="dash-panel dash-panel--flat">
           <div className="dash-panel-head">
-            <h2 className="dash-panel-title">Results</h2>
-            <span className="dash-panel-badge">{results.length} subjects</span>
+            <h2 className="dash-panel-title">{t("dash.results")}</h2>
+            <span className="dash-panel-badge">
+              {t("dash.subjectsN", { count: results.length })}
+            </span>
           </div>
 
           {results.length === 0 ? (
             <div className="dash-empty">
               <div className="dash-empty-icon" aria-hidden>
-                📊
+                <DashIcon name="results" />
               </div>
-              <p>No results published yet.</p>
+              <p>{t("dash.noResultsYet")}</p>
               <Link href="/teacher/results" className="dash-link-btn">
-                Enter scores
+                {t("dash.enterScores")}
               </Link>
             </div>
           ) : (
@@ -411,7 +438,9 @@ export function RoleDashboard({ role }: Props) {
                 <li key={row.id} className="dash-list-item">
                   <div>
                     <p className="dash-list-title">{row.subject}</p>
-                    <p className="dash-list-meta">Student {row.studentId}</p>
+                    <p className="dash-list-meta">
+                      {t("dash.studentIdLabel", { id: row.studentId })}
+                    </p>
                   </div>
                   <span className="dash-score">{row.score}%</span>
                 </li>
@@ -423,15 +452,17 @@ export function RoleDashboard({ role }: Props) {
 
       <article className="dash-panel dash-panel--flat">
         <div className="dash-panel-head">
-          <h2 className="dash-panel-title">Announcements</h2>
-          <span className="dash-panel-badge">{announcements.length} total</span>
+          <h2 className="dash-panel-title">{t("dash.announcements")}</h2>
+          <span className="dash-panel-badge">
+            {t("dash.announcementsTotal", { count: announcements.length })}
+          </span>
         </div>
         {announcements.length === 0 ? (
           <div className="dash-empty">
             <div className="dash-empty-icon" aria-hidden>
-              📣
+              <DashIcon name="announcements" />
             </div>
-            <p>No announcements yet.</p>
+            <p>{t("dash.noAnnouncements")}</p>
           </div>
         ) : (
           <ul className="dash-list">
@@ -439,7 +470,7 @@ export function RoleDashboard({ role }: Props) {
               <li key={item.id} className="dash-list-item dash-list-item--stack">
                 <div>
                   <p className="dash-list-title">{item.title}</p>
-                  <p className="dash-list-meta">{formatDate(item.createdAt)}</p>
+                  <p className="dash-list-meta">{formatDate(item.createdAt, locale)}</p>
                   {item.body ? <p className="dash-announce-body">{item.body}</p> : null}
                 </div>
               </li>

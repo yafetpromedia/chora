@@ -1,25 +1,25 @@
 import {
-  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
-  OnModuleInit,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CURRICULUM_PACKAGE_DEFINITIONS } from '../provisioning/curriculum-packages.data';
-import { CreatePlatformSubjectDto, UpdatePlatformSubjectDto } from './dto/platform-subject.dto';
+import {
+  CreatePlatformSubjectDto,
+  UpdatePlatformSubjectDto,
+} from './dto/platform-subject.dto';
 
 @Injectable()
-export class PlatformSubjectsService implements OnModuleInit {
+export class PlatformSubjectsService {
   constructor(private readonly prisma: PrismaService) {}
-
-  async onModuleInit() {
-    await this.syncFromPackageDefinitions();
-  }
 
   /** Seed / refresh master subjects from code-defined packages (idempotent). */
   async syncFromPackageDefinitions() {
-    const seen = new Map<string, { name: string; level?: string; curriculum?: string }>();
+    const seen = new Map<
+      string,
+      { name: string; level?: string; curriculum?: string }
+    >();
 
     for (const pkg of CURRICULUM_PACKAGE_DEFINITIONS) {
       for (const s of pkg.subjects) {
@@ -45,10 +45,7 @@ export class PlatformSubjectsService implements OnModuleInit {
           curriculum: meta.curriculum ?? null,
           sortOrder: order++,
         },
-        update: {
-          name: meta.name,
-          level: meta.level ?? undefined,
-        },
+        update: {},
       });
     }
 
@@ -59,10 +56,11 @@ export class PlatformSubjectsService implements OnModuleInit {
     const platformByCode = await this.prisma.platformSubject.findMany();
     const codeToId = new Map(platformByCode.map((p) => [p.code, p.id]));
 
-    const packageSubjects = await this.prisma.curriculumPackageSubject.findMany();
+    const packageSubjects =
+      await this.prisma.curriculumPackageSubject.findMany();
     for (const row of packageSubjects) {
       const platformId = codeToId.get(row.code);
-      if (platformId && row.platformSubjectId !== platformId) {
+      if (platformId && !row.platformSubjectId) {
         await this.prisma.curriculumPackageSubject.update({
           where: { id: row.id },
           data: { platformSubjectId: platformId },
@@ -136,7 +134,9 @@ export class PlatformSubjectsService implements OnModuleInit {
         ...(dto.curriculum !== undefined
           ? { curriculum: dto.curriculum?.trim() || null }
           : {}),
-        ...(dto.level !== undefined ? { level: dto.level?.trim() || null } : {}),
+        ...(dto.level !== undefined
+          ? { level: dto.level?.trim() || null }
+          : {}),
         ...(dto.gradeMin !== undefined ? { gradeMin: dto.gradeMin } : {}),
         ...(dto.gradeMax !== undefined ? { gradeMax: dto.gradeMax } : {}),
         ...(dto.isArchived !== undefined ? { isArchived: dto.isArchived } : {}),

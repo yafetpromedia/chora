@@ -18,10 +18,7 @@ function canCancelLeave(opts: {
   return opts.isOwner || canManage;
 }
 
-function canCreateForOther(opts: {
-  actorRole: string;
-  permissions: string[];
-}) {
+function canCreateForOther(opts: { actorRole: string; permissions: string[] }) {
   return (
     opts.actorRole === 'admin' ||
     permissionMatches(opts.permissions, ['leave.manage'])

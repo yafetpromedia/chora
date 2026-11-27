@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
 import type { AuthUser } from '../common/auth.types';
@@ -75,6 +83,7 @@ export class SchoolsController {
       accentColor: dto.accentColor,
       accentDeep: dto.accentDeep,
       attendanceMode: dto.attendanceMode,
+      weekendDays: dto.weekendDays,
       bankName: dto.bankName,
       bankAccountHolder: dto.bankAccountHolder,
       bankAccountNumber: dto.bankAccountNumber,

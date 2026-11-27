@@ -1,5 +1,7 @@
-import { AttendanceMode, SchoolType } from '@prisma/client';
+import { AttendanceMode, SchoolType, Weekday } from '@prisma/client';
 import {
+  ArrayUnique,
+  IsArray,
   IsBoolean,
   IsEmail,
   IsEnum,
@@ -60,23 +62,36 @@ export class UpdateSchoolSettingsDto {
   authorizedSignatureLabel?: string;
 
   @ValidateIf((_, v) => v !== null && v !== undefined && v !== '')
-  @Matches(HEX_COLOR, { message: 'primaryColor must be a hex color like #3d9b9b' })
+  @Matches(HEX_COLOR, {
+    message: 'primaryColor must be a hex color like #3d9b9b',
+  })
   @IsOptional()
   primaryColor?: string | null;
 
   @ValidateIf((_, v) => v !== null && v !== undefined && v !== '')
-  @Matches(HEX_COLOR, { message: 'accentColor must be a hex color like #5ec9cf' })
+  @Matches(HEX_COLOR, {
+    message: 'accentColor must be a hex color like #5ec9cf',
+  })
   @IsOptional()
   accentColor?: string | null;
 
   @ValidateIf((_, v) => v !== null && v !== undefined && v !== '')
-  @Matches(HEX_COLOR, { message: 'accentDeep must be a hex color like #0f766e' })
+  @Matches(HEX_COLOR, {
+    message: 'accentDeep must be a hex color like #0f766e',
+  })
   @IsOptional()
   accentDeep?: string | null;
 
   @IsEnum(AttendanceMode)
   @IsOptional()
   attendanceMode?: AttendanceMode;
+
+  /** Days with no school — attendance is not expected. */
+  @IsOptional()
+  @IsArray()
+  @ArrayUnique()
+  @IsEnum(Weekday, { each: true })
+  weekendDays?: Weekday[];
 
   @IsString()
   @IsOptional()

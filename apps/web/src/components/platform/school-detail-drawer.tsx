@@ -3,18 +3,30 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { DashIcon } from "@/components/dashboard/dash-icons";
+import { useLocale } from "@/components/i18n/locale-provider";
 import { AppToast } from "@/components/ui/app-toast";
 import type { PlanType } from "@/lib/api";
 import { platformFetch } from "@/lib/platform-auth";
+import { useHydrated } from "@/lib/use-client-snapshot";
 import { setSchoolPlan } from "@/lib/platform-plans";
 import type { PlatformSchoolDetail, PlatformSchoolRow } from "./platform-types";
 
-const PLAN_OPTIONS: { value: PlanType; label: string }[] = [
-  { value: "TRIAL", label: "Trial" },
-  { value: "STARTER", label: "Starter" },
-  { value: "PROFESSIONAL", label: "Professional" },
-  { value: "ENTERPRISE", label: "Enterprise" },
-];
+const PLAN_VALUES: PlanType[] = ["TRIAL", "STARTER", "PROFESSIONAL", "ENTERPRISE"];
+
+function planOptionLabel(plan: PlanType, translate: (key: string) => string) {
+  if (plan === "TRIAL") return translate("platformUi.planTrial");
+  if (plan === "STARTER") return translate("platformUi.planStarter");
+  if (plan === "PROFESSIONAL") return translate("platformUi.planProfessional");
+  if (plan === "ENTERPRISE") return translate("platformUi.planEnterprise");
+  return plan;
+}
+
+function tenantStatusLabel(status: string, translate: (key: string) => string) {
+  if (status === "ACTIVE") return translate("platformUi.statusActive");
+  if (status === "TRIAL") return translate("platformUi.statusTrial");
+  if (status === "SUSPENDED") return translate("platformUi.statusSuspended");
+  return status;
+}
 
 type Props = {
   school: PlatformSchoolRow | null;
@@ -27,10 +39,10 @@ type Props = {
 
 type Tab = "overview" | "contact" | "billing" | "access";
 
-function formatDate(iso: string | null | undefined) {
+function formatDate(iso: string | null | undefined, locale: string) {
   if (!iso) return "—";
   try {
-    return new Date(iso).toLocaleDateString(undefined, {
+    return new Date(iso).toLocaleDateString(locale === "am" ? "am-ET" : undefined, {
       month: "short",
       day: "numeric",
       year: "numeric",
@@ -64,8 +76,9 @@ export function SchoolDetailDrawer({
   canSuspend,
   canDelete,
 }: Props) {
+  const { t, locale } = useLocale();
   const [detail, setDetail] = useState<PlatformSchoolDetail | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(school !== null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [tab, setTab] = useState<Tab>("overview");
@@ -76,11 +89,7 @@ export function SchoolDetailDrawer({
   const [planMessage, setPlanMessage] = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState("");
   const [deleting, setDeleting] = useState(false);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const mounted = useHydrated();
 
   useEffect(() => {
     if (!school) return;
@@ -91,30 +100,42 @@ export function SchoolDetailDrawer({
     };
   }, [school]);
 
-  useEffect(() => {
+  // Reset local state when the selected school changes (adjusted during render).
+  const [prevSchool, setPrevSchool] = useState(school);
+  if (school !== prevSchool) {
+    setPrevSchool(school);
     if (!school) {
       setDetail(null);
       setTab("overview");
       setDeleteConfirm("");
-      return;
+    } else {
+      setLoading(true);
+      setError("");
     }
-    setLoading(true);
-    setError("");
+  }
+
+  useEffect(() => {
+    if (!school) return;
     void platformFetch<PlatformSchoolDetail>(`/platform/schools/${school.id}`)
       .then(setDetail)
       .catch((err) =>
-        setError(err instanceof Error ? err.message : "Could not load tenant"),
+        setError(err instanceof Error ? err.message : t("platformUi.errLoadTenant")),
       )
       .finally(() => setLoading(false));
   }, [school]);
 
   const sub = school ? (detail?.subscription ?? school.subscription) : null;
 
-  useEffect(() => {
-    if (!school || !sub?.plan) return;
-    setPlanDraft(sub.plan as PlanType);
-    setPlanActive(sub.isActive ?? true);
-  }, [school, sub?.plan, sub?.isActive]);
+  const planSyncKey =
+    school && sub?.plan ? `${school.id}:${sub.plan}:${String(sub.isActive)}` : null;
+  const [prevPlanSyncKey, setPrevPlanSyncKey] = useState<string | null>(null);
+  if (planSyncKey !== prevPlanSyncKey) {
+    setPrevPlanSyncKey(planSyncKey);
+    if (sub?.plan) {
+      setPlanDraft(sub.plan as PlanType);
+      setPlanActive(sub.isActive ?? true);
+    }
+  }
 
   if (!school || !mounted) return null;
 
@@ -151,9 +172,9 @@ export function SchoolDetailDrawer({
         `/platform/schools/${school.id}`,
       );
       setDetail(refreshed);
-      setPlanMessage("Plan updated for this tenant.");
+      setPlanMessage(t("platformUi.detailPlanUpdated"));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not update plan");
+      setError(err instanceof Error ? err.message : t("platformUi.detailErrPlan"));
     } finally {
       setPlanSaving(false);
     }
@@ -170,7 +191,7 @@ export function SchoolDetailDrawer({
       );
       setDetail(refreshed);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Update failed");
+      setError(err instanceof Error ? err.message : t("platformUi.errUpdateFailed"));
     } finally {
       setBusy(false);
     }
@@ -184,24 +205,24 @@ export function SchoolDetailDrawer({
       await onDelete(school.id);
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not remove tenant");
+      setError(err instanceof Error ? err.message : t("platformUi.errRemoveTenant"));
     } finally {
       setDeleting(false);
     }
   }
 
   const tabs: { id: Tab; label: string }[] = [
-    { id: "overview", label: "Overview" },
-    { id: "contact", label: "Contact" },
-    { id: "billing", label: "Billing" },
-    { id: "access", label: "Access" },
+    { id: "overview", label: t("platformUi.detailTabOverview") },
+    { id: "contact", label: t("platformUi.detailTabContact") },
+    { id: "billing", label: t("platformUi.detailTabBilling") },
+    { id: "access", label: t("platformUi.detailTabAccess") },
   ];
 
   const usageCards = [
-    { key: "student", label: "Students", value: usage.student ?? school.usage.students, icon: "students" as const, tone: "teal" },
-    { key: "teacher", label: "Teachers", value: usage.teacher ?? school.usage.teachers, icon: "teachers" as const, tone: "blue" },
-    { key: "admin", label: "Admins", value: usage.admin ?? school.usage.admins, icon: "settings" as const, tone: "slate" },
-    { key: "parent", label: "Parents", value: usage.parent ?? school.usage.parents, icon: "users" as const, tone: "green" },
+    { key: "student", label: t("platformUi.statStudents"), value: usage.student ?? school.usage.students, icon: "students" as const, tone: "teal" },
+    { key: "teacher", label: t("platformUi.statTeachers"), value: usage.teacher ?? school.usage.teachers, icon: "teachers" as const, tone: "blue" },
+    { key: "admin", label: t("platformUi.statAdmins"), value: usage.admin ?? school.usage.admins, icon: "settings" as const, tone: "slate" },
+    { key: "parent", label: t("platformUi.statParents"), value: usage.parent ?? school.usage.parents, icon: "users" as const, tone: "green" },
   ];
 
   const isSuspended = (detail?.school.status ?? school.status) === "SUSPENDED";
@@ -212,7 +233,7 @@ export function SchoolDetailDrawer({
       <button
         type="button"
         className="stu-drawer-backdrop plat-manage-backdrop"
-        aria-label="Close"
+        aria-label={t("common.close")}
         onClick={onClose}
       />
       <aside
@@ -235,7 +256,7 @@ export function SchoolDetailDrawer({
                 )}
               </span>
               <div className="plat-manage-hero__titles">
-                <p className="plat-manage-hero__eyebrow">Tenant</p>
+                <p className="plat-manage-hero__eyebrow">{t("platformUi.detailTenant")}</p>
                 <h2 id="plat-school-drawer-title" className="plat-manage-hero__title">
                   {school.name}
                 </h2>
@@ -248,7 +269,7 @@ export function SchoolDetailDrawer({
               type="button"
               className="stu-drawer__close plat-manage-close"
               onClick={onClose}
-              aria-label="Close"
+              aria-label={t("common.close")}
             >
               ×
             </button>
@@ -256,41 +277,41 @@ export function SchoolDetailDrawer({
 
           <div className="plat-manage-hero__meta">
             <div className="plat-join-chip">
-              <span className="plat-join-chip__label">Join code</span>
+              <span className="plat-join-chip__label">{t("platformUi.detailJoinCode")}</span>
               <code className="plat-join-chip__code">{school.joinCode}</code>
               <button
                 type="button"
                 className={`plat-join-chip__btn${copied ? " plat-join-chip__btn--done" : ""}`}
                 onClick={() => void copyCode()}
               >
-                {copied ? "Copied" : "Copy"}
+                {copied ? t("common.copied") : t("common.copy")}
               </button>
             </div>
             <div className="plat-manage-chips">
               <span className={`plat-status plat-status--${status}`}>
-                {detail?.school.status ?? school.status}
+                {tenantStatusLabel(detail?.school.status ?? school.status, t)}
               </span>
               {sub?.plan &&
               sub.plan !== (detail?.school.status ?? school.status) ? (
                 <span className="plat-plan-badge">{sub.plan}</span>
               ) : null}
               {sub && !sub.isActive ? (
-                <span className="plat-status plat-status--suspended">Billing off</span>
+                <span className="plat-status plat-status--suspended">{t("platformUi.detailBillingOff")}</span>
               ) : null}
             </div>
           </div>
 
-          <nav className="plat-manage-tabs" role="tablist" aria-label="Tenant sections">
-            {tabs.map((t) => (
+          <nav className="plat-manage-tabs" role="tablist" aria-label={t("platformUi.detailTabsAria")}>
+            {tabs.map((tabItem) => (
               <button
-                key={t.id}
+                key={tabItem.id}
                 type="button"
                 role="tab"
-                aria-selected={tab === t.id}
-                className={`plat-manage-tab${tab === t.id ? " plat-manage-tab--active" : ""}`}
-                onClick={() => setTab(t.id)}
+                aria-selected={tab === tabItem.id}
+                className={`plat-manage-tab${tab === tabItem.id ? " plat-manage-tab--active" : ""}`}
+                onClick={() => setTab(tabItem.id)}
               >
-                {t.label}
+                {tabItem.label}
               </button>
             ))}
           </nav>
@@ -329,34 +350,32 @@ export function SchoolDetailDrawer({
                         <DashIcon name="announcements" className="dash-icon--sm" />
                         <div>
                           <strong>{detail.announcements}</strong>
-                          <span>Announcements</span>
+                          <span>{t("platformUi.detailAnnouncements")}</span>
                         </div>
                       </div>
                       <div className="plat-manage-insight">
                         <DashIcon name="students" className="dash-icon--sm" />
                         <div>
                           <strong>{detail.usage.studentProfiles ?? 0}</strong>
-                          <span>Student profiles</span>
+                          <span>{t("platformUi.detailStudentProfiles")}</span>
                         </div>
                       </div>
                       <div className="plat-manage-insight">
                         <DashIcon name="calendar" className="dash-icon--sm" />
                         <div>
-                          <strong>{formatDate(detail.school.createdAt)}</strong>
-                          <span>Enrolled</span>
+                          <strong>{formatDate(detail.school.createdAt, locale)}</strong>
+                          <span>{t("platformUi.detailEnrolled")}</span>
                         </div>
                       </div>
                     </div>
                   ) : null}
                   <section className="plat-manage-card">
-                    <h3 className="plat-manage-card__title">Setup progress</h3>
+                    <h3 className="plat-manage-card__title">{t("platformUi.detailSetupTitle")}</h3>
                     <div className={`plat-setup-bar${setupDone ? " plat-setup-bar--done" : ""}`}>
                       <div className="plat-setup-bar__fill" style={{ width: setupDone ? "100%" : "45%" }} />
                     </div>
                     <p className="plat-manage-card__hint">
-                      {setupDone
-                        ? "Tenant completed onboarding — admins can use all modules."
-                        : "Tenant is still configuring grades and staff."}
+                      {setupDone ? t("platformUi.detailSetupDone") : t("platformUi.detailSetupPending")}
                     </p>
                   </section>
                 </>
@@ -364,19 +383,19 @@ export function SchoolDetailDrawer({
 
               {tab === "contact" ? (
                 <section className="plat-manage-card">
-                  <h3 className="plat-manage-card__title">Contact & location</h3>
+                  <h3 className="plat-manage-card__title">{t("platformUi.detailContactTitle")}</h3>
                   <ul className="plat-contact-list">
                     <li className="plat-contact-item">
                       <span className="plat-contact-item__icon" aria-hidden>
                         @
                       </span>
                       <div>
-                        <span className="plat-contact-item__label">Email</span>
+                        <span className="plat-contact-item__label">{t("platformUi.detailEmail")}</span>
                         <span className="plat-contact-item__value">{email ?? "—"}</span>
                       </div>
                       {mailLink(email) ? (
                         <a href={mailLink(email)!} className="plat-contact-action">
-                          Email
+                          {t("platformUi.detailEmailAction")}
                         </a>
                       ) : null}
                     </li>
@@ -385,12 +404,12 @@ export function SchoolDetailDrawer({
                         ☎
                       </span>
                       <div>
-                        <span className="plat-contact-item__label">Phone</span>
+                        <span className="plat-contact-item__label">{t("platformUi.detailPhone")}</span>
                         <span className="plat-contact-item__value">{phone ?? "—"}</span>
                       </div>
                       {telLink(phone) ? (
                         <a href={telLink(phone)!} className="plat-contact-action">
-                          Call
+                          {t("platformUi.detailCall")}
                         </a>
                       ) : null}
                     </li>
@@ -399,7 +418,7 @@ export function SchoolDetailDrawer({
                         ⌖
                       </span>
                       <div>
-                        <span className="plat-contact-item__label">Country</span>
+                        <span className="plat-contact-item__label">{t("platformUi.detailCountry")}</span>
                         <span className="plat-contact-item__value">
                           {detail?.school.country ?? "—"}
                         </span>
@@ -413,44 +432,44 @@ export function SchoolDetailDrawer({
                 <section className="plat-manage-card plat-manage-card--billing">
                   <div className="plat-billing-hero">
                     <div>
-                      <p className="plat-billing-hero__label">Current plan</p>
-                      <p className="plat-billing-hero__plan">{sub?.plan ?? "No plan"}</p>
+                      <p className="plat-billing-hero__label">{t("platformUi.detailCurrentPlan")}</p>
+                      <p className="plat-billing-hero__plan">
+                        {sub?.plan ? planOptionLabel(sub.plan as PlanType, t) : t("platformUi.planNone")}
+                      </p>
                     </div>
                     <span
                       className={`plat-status plat-status--${sub?.isActive ? "active" : "suspended"}`}
                     >
-                      {sub?.isActive ? "Billing active" : "Billing inactive"}
+                      {sub?.isActive ? t("platformUi.detailBillingActive") : t("platformUi.detailBillingInactive")}
                     </span>
                   </div>
                   <dl className="plat-billing-facts">
                     <div>
-                      <dt>Trial ends</dt>
-                      <dd>{formatDate(sub?.trialEndsAt)}</dd>
+                      <dt>{t("platformUi.detailTrialEnds")}</dt>
+                      <dd>{formatDate(sub?.trialEndsAt, locale)}</dd>
                     </div>
                     <div>
-                      <dt>Access status</dt>
-                      <dd>{detail?.school.status ?? school.status}</dd>
+                      <dt>{t("platformUi.detailAccessStatus")}</dt>
+                      <dd>{tenantStatusLabel(detail?.school.status ?? school.status, t)}</dd>
                     </div>
                     <div>
-                      <dt>Created</dt>
-                      <dd>{formatDate(detail?.school.createdAt ?? school.createdAt)}</dd>
+                      <dt>{t("platformUi.detailCreated")}</dt>
+                      <dd>{formatDate(detail?.school.createdAt ?? school.createdAt, locale)}</dd>
                     </div>
                   </dl>
                   <div className="plat-school-plan-form">
-                    <h3 className="plat-manage-card__title">Assign plan</h3>
-                    <p className="plat-manage-card__hint">
-                      Override what this tenant is on. Edit catalog prices under Platform → Plans.
-                    </p>
+                    <h3 className="plat-manage-card__title">{t("platformUi.detailAssignPlan")}</h3>
+                    <p className="plat-manage-card__hint">{t("platformUi.detailAssignHint")}</p>
                     <label className="plat-field">
-                      <span>Plan</span>
+                      <span>{t("platformUi.invoicesPlan")}</span>
                       <select
                         className="plat-select"
                         value={planDraft}
                         onChange={(e) => setPlanDraft(e.target.value as PlanType)}
                       >
-                        {PLAN_OPTIONS.map((o) => (
-                          <option key={o.value} value={o.value}>
-                            {o.label}
+                        {PLAN_VALUES.map((value) => (
+                          <option key={value} value={value}>
+                            {planOptionLabel(value, t)}
                           </option>
                         ))}
                       </select>
@@ -461,7 +480,7 @@ export function SchoolDetailDrawer({
                         checked={planActive}
                         onChange={(e) => setPlanActive(e.target.checked)}
                       />
-                      Billing active
+                      {t("platformUi.detailBillingActiveCheck")}
                     </label>
                     <button
                       type="button"
@@ -469,7 +488,7 @@ export function SchoolDetailDrawer({
                       disabled={planSaving || loading}
                       onClick={() => void savePlan()}
                     >
-                      {planSaving ? "Saving…" : "Save plan for tenant"}
+                      {planSaving ? t("common.saving") : t("platformUi.detailSavePlanTenant")}
                     </button>
                     {planMessage ? <p className="plat-plans__ok">{planMessage}</p> : null}
                   </div>
@@ -478,18 +497,16 @@ export function SchoolDetailDrawer({
 
               {tab === "access" ? (
                 <section className="plat-manage-card">
-                  <h3 className="plat-manage-card__title">Tenant access</h3>
-                  <p className="plat-manage-card__hint">
-                    Suspending blocks all tenant logins immediately. Activate to restore access.
-                  </p>
+                  <h3 className="plat-manage-card__title">{t("platformUi.detailAccessTitle")}</h3>
+                  <p className="plat-manage-card__hint">{t("platformUi.detailAccessHint")}</p>
                   <div className={`plat-access-state${isSuspended ? " plat-access-state--off" : ""}`}>
                     <DashIcon name={isSuspended ? "alert" : "attendance"} className="dash-icon--sm" />
                     <div>
-                      <strong>{isSuspended ? "Tenant is suspended" : "Tenant is operational"}</strong>
+                      <strong>
+                        {isSuspended ? t("platformUi.detailSuspended") : t("platformUi.detailOperational")}
+                      </strong>
                       <span>
-                        {isSuspended
-                          ? "Users cannot sign in until you activate."
-                          : "Admins, teachers, and families can sign in."}
+                        {isSuspended ? t("platformUi.detailSuspendedHint") : t("platformUi.detailOperationalHint")}
                       </span>
                     </div>
                   </div>
@@ -502,7 +519,7 @@ export function SchoolDetailDrawer({
                           disabled={busy}
                           onClick={() => void patchStatus("ACTIVE")}
                         >
-                          Activate tenant
+                          {t("platformUi.detailActivateTenant")}
                         </button>
                       ) : (
                         <button
@@ -511,24 +528,19 @@ export function SchoolDetailDrawer({
                           disabled={busy}
                           onClick={() => void patchStatus("SUSPENDED")}
                         >
-                          Suspend tenant
+                          {t("platformUi.detailSuspendTenant")}
                         </button>
                       )}
                     </div>
                   ) : (
-                    <p className="plat-manage-card__hint">
-                      Your role cannot change tenant access. Contact a platform owner.
-                    </p>
+                    <p className="plat-manage-card__hint">{t("platformUi.detailNoAccessPerm")}</p>
                   )}
                   {canDelete ? (
                     <div className="plat-tenant-remove">
-                      <h4>Remove tenant permanently</h4>
-                      <p>
-                        Deletes this workspace, all users, and tenant data. This cannot be undone.
-                        Type <strong>{school.name}</strong> to confirm.
-                      </p>
+                      <h4>{t("platformUi.detailRemoveTitle")}</h4>
+                      <p>{t("platformUi.detailRemoveBody", { name: school.name })}</p>
                       <label className="plat-field">
-                        <span>Confirm tenant name</span>
+                        <span>{t("platformUi.detailConfirmName")}</span>
                         <input
                           value={deleteConfirm}
                           onChange={(e) => setDeleteConfirm(e.target.value)}
@@ -542,7 +554,7 @@ export function SchoolDetailDrawer({
                         disabled={deleting || deleteConfirm !== school.name}
                         onClick={() => void removeTenant()}
                       >
-                        {deleting ? "Removing…" : "Remove tenant permanently"}
+                        {deleting ? t("platformUi.detailRemoving") : t("platformUi.detailRemoveBtn")}
                       </button>
                     </div>
                   ) : null}
@@ -559,7 +571,7 @@ export function SchoolDetailDrawer({
               className="plat-btn plat-btn--ghost"
               onClick={() => setTab("access")}
             >
-              Access controls
+              {t("platformUi.detailAccessControls")}
             </button>
             {!isSuspended ? (
               <button
@@ -568,7 +580,7 @@ export function SchoolDetailDrawer({
                 disabled={busy || loading}
                 onClick={() => void patchStatus("SUSPENDED")}
               >
-                Suspend
+                {t("platformUi.detailSuspend")}
               </button>
             ) : (
               <button
@@ -577,7 +589,7 @@ export function SchoolDetailDrawer({
                 disabled={busy || loading}
                 onClick={() => void patchStatus("ACTIVE")}
               >
-                Activate
+                {t("platformUi.detailActivate")}
               </button>
             )}
           </footer>

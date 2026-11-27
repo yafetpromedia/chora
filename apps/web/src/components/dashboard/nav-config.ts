@@ -29,16 +29,9 @@ export type NavItem = {
 export const DASHBOARD_NAV: NavItem[] = [
   {
     href: "/admin",
-    label: "Overview",
+    label: "Dashboard",
     icon: "overview",
     roles: ["admin", "staff"],
-  },
-  {
-    href: "/admin/students",
-    label: "Students",
-    icon: "students",
-    roles: ["admin", "staff"],
-    permission: Permission.STUDENTS_READ,
   },
   {
     href: "/admin/admissions",
@@ -46,6 +39,13 @@ export const DASHBOARD_NAV: NavItem[] = [
     icon: "students",
     roles: ["admin", "staff"],
     permission: Permission.ADMISSIONS_READ,
+  },
+  {
+    href: "/admin/students",
+    label: "Students",
+    icon: "students",
+    roles: ["admin", "staff"],
+    permission: Permission.STUDENTS_READ,
   },
   {
     href: "/admin/parents",
@@ -172,6 +172,13 @@ export const DASHBOARD_NAV: NavItem[] = [
     ],
   },
   {
+    href: "/admin/scan-id",
+    label: "Scan ID",
+    icon: "students",
+    roles: ["admin", "staff"],
+    module: "attendance",
+  },
+  {
     href: "/admin/staff-attendance",
     label: "Staff Attendance",
     icon: "attendance",
@@ -284,13 +291,27 @@ export const DASHBOARD_NAV: NavItem[] = [
     icon: "profile",
     roles: ["admin", "staff"],
   },
-  { href: "/teacher", label: "Overview", icon: "overview", roles: ["teacher"] },
+  { href: "/teacher", label: "Dashboard", icon: "overview", roles: ["teacher"] },
   {
     href: "/teacher/attendance",
     label: "Attendance",
     icon: "attendance",
     roles: ["teacher"],
     homeroomOnly: true,
+    module: "attendance",
+  },
+  {
+    href: "/teacher/my-students",
+    label: "My Students",
+    icon: "students",
+    roles: ["teacher"],
+    homeroomOnly: true,
+  },
+  {
+    href: "/teacher/scan-id",
+    label: "Scan ID",
+    icon: "id-card",
+    roles: ["teacher"],
     module: "attendance",
   },
   {
@@ -391,7 +412,7 @@ export const DASHBOARD_NAV: NavItem[] = [
   },
   { href: "/teacher/id-card", label: "Staff ID", icon: "students", roles: ["teacher"] },
   { href: "/teacher/profile", label: "Profile", icon: "profile", roles: ["teacher"] },
-  { href: "/parent", label: "Overview", icon: "overview", roles: ["parent"], module: "parent" },
+  { href: "/parent", label: "Dashboard", icon: "overview", roles: ["parent"], module: "parent" },
   {
     href: "/parent/attendance",
     label: "Attendance",
@@ -435,7 +456,7 @@ export const DASHBOARD_NAV: NavItem[] = [
     module: "timetable",
   },
   { href: "/parent/profile", label: "Profile", icon: "profile", roles: ["parent"] },
-  { href: "/student", label: "Overview", icon: "overview", roles: ["student"] },
+  { href: "/student", label: "Dashboard", icon: "overview", roles: ["student"] },
   { href: "/student/id-card", label: "Campus ID", icon: "students", roles: ["student"] },
   {
     href: "/student/attendance",

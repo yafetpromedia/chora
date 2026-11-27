@@ -1,9 +1,7 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { GradePreset } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import {
-  CURRICULUM_PACKAGE_DEFINITIONS,
-} from '../provisioning/curriculum-packages.data';
+import { CURRICULUM_PACKAGE_DEFINITIONS } from '../provisioning/curriculum-packages.data';
 import { DEFAULT_LIBRARY_CATEGORIES } from '../library/library.constants';
 
 const ACADEMIC_STRUCTURES = [
@@ -37,7 +35,12 @@ const PLATFORM_ASSESSMENT_TEMPLATES = [
     components: [
       { name: 'Activity', weightPercent: 10, maxScore: 10, sortOrder: 0 },
       { name: 'Worksheet', weightPercent: 10, maxScore: 10, sortOrder: 1 },
-      { name: 'Class Participation', weightPercent: 10, maxScore: 10, sortOrder: 2 },
+      {
+        name: 'Class Participation',
+        weightPercent: 10,
+        maxScore: 10,
+        sortOrder: 2,
+      },
       { name: 'Mid Exam', weightPercent: 20, maxScore: 20, sortOrder: 3 },
       { name: 'Final Exam', weightPercent: 50, maxScore: 50, sortOrder: 4 },
     ],
@@ -72,12 +75,8 @@ const PLATFORM_ASSESSMENT_TEMPLATES = [
 ];
 
 @Injectable()
-export class PlatformContentSyncService implements OnModuleInit {
+export class PlatformContentSyncService {
   constructor(private readonly prisma: PrismaService) {}
-
-  async onModuleInit() {
-    await this.syncAll();
-  }
 
   async syncAll() {
     await this.syncAcademicStructures();
@@ -99,16 +98,14 @@ export class PlatformContentSyncService implements OnModuleInit {
           gradePreset: s.gradePreset,
           sortOrder: order++,
         },
-        update: {
-          label: s.label,
-          description: s.description,
-          gradePreset: s.gradePreset,
-        },
+        update: {},
       });
     }
   }
 
   async syncLibraryCatalog() {
+    const existingCategoryCount =
+      await this.prisma.platformLibraryCategory.count();
     for (const cat of DEFAULT_LIBRARY_CATEGORIES) {
       await this.prisma.platformLibraryCategory.upsert({
         where: { slug: cat.slug },
@@ -118,13 +115,12 @@ export class PlatformContentSyncService implements OnModuleInit {
           icon: cat.icon ?? null,
           sortOrder: cat.sortOrder,
         },
-        update: {
-          name: cat.name,
-          icon: cat.icon ?? null,
-          sortOrder: cat.sortOrder,
-        },
+        update: {},
       });
     }
+
+    // Do not repopulate resources in an existing catalog.
+    if (existingCategoryCount > 0) return;
 
     const categories = await this.prisma.platformLibraryCategory.findMany();
     const slugToId = new Map(categories.map((c) => [c.slug, c.id]));
@@ -181,11 +177,7 @@ export class PlatformContentSyncService implements OnModuleInit {
           body: t.body,
           sortOrder: order++,
         },
-        update: {
-          name: t.name,
-          channel: t.channel,
-          body: t.body,
-        },
+        update: {},
       });
     }
   }
@@ -193,6 +185,9 @@ export class PlatformContentSyncService implements OnModuleInit {
   async syncAssessmentTemplates() {
     let order = 0;
     for (const def of PLATFORM_ASSESSMENT_TEMPLATES) {
+      const existing = await this.prisma.platformAssessmentTemplate.findUnique({
+        where: { key: def.key },
+      });
       const template = await this.prisma.platformAssessmentTemplate.upsert({
         where: { key: def.key },
         create: {
@@ -203,32 +198,29 @@ export class PlatformContentSyncService implements OnModuleInit {
           gradeMax: def.gradeMax,
           sortOrder: order++,
         },
-        update: {
-          name: def.name,
-          description: def.description,
-          gradeMin: def.gradeMin,
-          gradeMax: def.gradeMax,
-        },
+        update: {},
       });
 
-      await this.prisma.platformAssessmentTemplateComponent.deleteMany({
-        where: { templateId: template.id },
-      });
-      await this.prisma.platformAssessmentTemplateComponent.createMany({
-        data: def.components.map((c) => ({
-          templateId: template.id,
-          name: c.name,
-          weightPercent: c.weightPercent,
-          maxScore: c.maxScore,
-          sortOrder: c.sortOrder,
-        })),
-      });
+      // Existing assessment components may have been edited by an administrator.
+      if (!existing) {
+        await this.prisma.platformAssessmentTemplateComponent.createMany({
+          data: def.components.map((c) => ({
+            templateId: template.id,
+            name: c.name,
+            weightPercent: c.weightPercent,
+            maxScore: c.maxScore,
+            sortOrder: c.sortOrder,
+          })),
+        });
+      }
     }
   }
 
   async linkPackagesToPlatformContent() {
     const structures = await this.prisma.platformAcademicStructure.findMany();
-    const structureByPreset = new Map(structures.map((s) => [s.gradePreset, s.id]));
+    const structureByPreset = new Map(
+      structures.map((s) => [s.gradePreset, s.id]),
+    );
 
     const platformSubjects = await this.prisma.platformSubject.findMany();
     const subjectByCode = new Map(platformSubjects.map((s) => [s.code, s.id]));
@@ -240,12 +232,15 @@ export class PlatformContentSyncService implements OnModuleInit {
       platformLibrary.map((r) => [`${r.category.slug}:${r.title}`, r.id]),
     );
 
-    const platformMessages = await this.prisma.platformMessageTemplate.findMany();
+    const platformMessages =
+      await this.prisma.platformMessageTemplate.findMany();
     const messageByKey = new Map(platformMessages.map((m) => [m.key, m.id]));
 
     const platformAssessments =
       await this.prisma.platformAssessmentTemplate.findMany();
-    const assessmentByKey = new Map(platformAssessments.map((a) => [a.key, a.id]));
+    const assessmentByKey = new Map(
+      platformAssessments.map((a) => [a.key, a.id]),
+    );
 
     for (const def of CURRICULUM_PACKAGE_DEFINITIONS) {
       const pkg = await this.prisma.curriculumPackage.findUnique({
@@ -254,21 +249,22 @@ export class PlatformContentSyncService implements OnModuleInit {
       if (!pkg) continue;
 
       const structureId = def.gradePreset
-        ? structureByPreset.get(def.gradePreset) ?? null
+        ? (structureByPreset.get(def.gradePreset) ?? null)
         : null;
-      if (structureId) {
+      if (structureId && !pkg.academicStructureId) {
         await this.prisma.curriculumPackage.update({
           where: { id: pkg.id },
           data: { academicStructureId: structureId },
         });
       }
 
-      const packageSubjects = await this.prisma.curriculumPackageSubject.findMany({
-        where: { packageId: pkg.id },
-      });
+      const packageSubjects =
+        await this.prisma.curriculumPackageSubject.findMany({
+          where: { packageId: pkg.id },
+        });
       for (const row of packageSubjects) {
         const platformId = subjectByCode.get(row.code);
-        if (platformId && row.platformSubjectId !== platformId) {
+        if (platformId && !row.platformSubjectId) {
           await this.prisma.curriculumPackageSubject.update({
             where: { id: row.id },
             data: { platformSubjectId: platformId },
@@ -276,14 +272,15 @@ export class PlatformContentSyncService implements OnModuleInit {
         }
       }
 
-      const packageLibrary = await this.prisma.curriculumPackageLibraryItem.findMany({
-        where: { packageId: pkg.id },
-      });
+      const packageLibrary =
+        await this.prisma.curriculumPackageLibraryItem.findMany({
+          where: { packageId: pkg.id },
+        });
       for (const row of packageLibrary) {
         const platformId = libraryByTitle.get(
           `${row.categorySlug}:${row.title}`,
         );
-        if (platformId && row.platformLibraryResourceId !== platformId) {
+        if (platformId && !row.platformLibraryResourceId) {
           await this.prisma.curriculumPackageLibraryItem.update({
             where: { id: row.id },
             data: { platformLibraryResourceId: platformId },
@@ -291,12 +288,13 @@ export class PlatformContentSyncService implements OnModuleInit {
         }
       }
 
-      const packageTemplates = await this.prisma.curriculumPackageTemplate.findMany({
-        where: { packageId: pkg.id },
-      });
+      const packageTemplates =
+        await this.prisma.curriculumPackageTemplate.findMany({
+          where: { packageId: pkg.id },
+        });
       for (const row of packageTemplates) {
         const platformId = messageByKey.get(row.key);
-        if (platformId && row.platformMessageTemplateId !== platformId) {
+        if (platformId && !row.platformMessageTemplateId) {
           await this.prisma.curriculumPackageTemplate.update({
             where: { id: row.id },
             data: { platformMessageTemplateId: platformId },
@@ -326,7 +324,7 @@ export class PlatformContentSyncService implements OnModuleInit {
               platformAssessmentTemplateId: platformId,
               sortOrder: sort++,
             },
-            update: { sortOrder: sort++ },
+            update: {},
           });
         }
       }

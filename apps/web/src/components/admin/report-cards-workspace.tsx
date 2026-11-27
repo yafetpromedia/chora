@@ -13,6 +13,7 @@ import {
   ResultsStudentPicker,
   type ResultsStudentOption,
 } from "@/components/results/results-student-picker";
+import { useLocale } from "@/components/i18n/locale-provider";
 import { AppToast } from "@/components/ui/app-toast";
 import type { StudentRecord } from "@/lib/api";
 import { AUTH_TOKEN_KEY } from "@/lib/auth";
@@ -36,6 +37,7 @@ type Props = {
 };
 
 export function ReportCardsWorkspace({ students, onError }: Props) {
+  const { t } = useLocale();
   const [terms, setTerms] = useState<AcademicTerm[]>([]);
   const [loading, setLoading] = useState(true);
   const [termId, setTermId] = useState("");
@@ -58,7 +60,7 @@ export function ReportCardsWorkspace({ students, onError }: Props) {
   );
 
   useEffect(() => {
-    setLoading(true);
+    queueMicrotask(() => setLoading(true));
     void listTerms()
       .then((t) => {
         setTerms(t);
@@ -67,12 +69,14 @@ export function ReportCardsWorkspace({ students, onError }: Props) {
         if (students[0]) setViewStudentId((prev) => prev || students[0].id);
       })
       .catch((err) => {
-        setErr(err instanceof Error ? err.message : "Could not load report cards workspace");
+        setErr(
+          err instanceof Error ? err.message : t("reportCardsUi.loadWorkspaceFailed"),
+        );
       })
       .finally(() => setLoading(false));
-  }, [setErr, students]);
+  }, [setErr, students, t]);
 
-  const currentTerm = terms.find((t) => t.isCurrent) ?? terms.find((t) => t.id === termId);
+  const currentTerm = terms.find((x) => x.isCurrent) ?? terms.find((x) => x.id === termId);
   const selectedStudent = students.find((s) => s.id === viewStudentId);
 
   const studentOptions = useMemo<ResultsStudentOption[]>(
@@ -92,15 +96,15 @@ export function ReportCardsWorkspace({ students, onError }: Props) {
 
   const heroStats = useMemo(
     () => [
-      { label: "Students", value: loading ? "—" : students.length },
-      { label: "Terms", value: loading ? "—" : terms.length },
+      { label: t("reportCardsUi.statStudents"), value: loading ? "—" : students.length },
+      { label: t("reportCardsUi.statTerms"), value: loading ? "—" : terms.length },
       {
-        label: "Ready to print",
-        value: loading ? "—" : report ? "1 loaded" : "—",
+        label: t("reportCardsUi.statReady"),
+        value: loading ? "—" : report ? t("reportCardsUi.loadedOne") : "—",
         accent: !!report,
       },
     ],
-    [loading, students.length, terms.length, report],
+    [loading, students.length, terms.length, report, t],
   );
 
   function onSelectionChange(studentId: string, nextTermId: string) {
@@ -125,7 +129,17 @@ export function ReportCardsWorkspace({ students, onError }: Props) {
 
   useEffect(() => {
     if (!viewStudentId || !termId) return;
-    void refreshPublishStatus(viewStudentId, termId);
+    let cancelled = false;
+    getReportCardPublishStatus(viewStudentId, termId)
+      .then((status) => {
+        if (!cancelled) setPublishStatus(status);
+      })
+      .catch(() => {
+        if (!cancelled) setPublishStatus(null);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [viewStudentId, termId]);
 
   async function onPreviewReport() {
@@ -149,7 +163,7 @@ export function ReportCardsWorkspace({ students, onError }: Props) {
       }
       await refreshPublishStatus(viewStudentId, termId);
     } catch (err) {
-      setErr(err instanceof Error ? err.message : "Could not load report card");
+      setErr(err instanceof Error ? err.message : t("reportCardsUi.loadCardFailed"));
     } finally {
       setPreviewBusy(false);
     }
@@ -162,7 +176,7 @@ export function ReportCardsWorkspace({ students, onError }: Props) {
     }`;
     if (
       !window.confirm(
-        `Publish report cards for ${gradeLabel} in this term?\n\nStudents and parents will be able to open the official report card. This publishes all subject sheets for the class.`,
+        t("reportCardsUi.publishConfirm", { grade: gradeLabel }),
       )
     ) {
       return;
@@ -175,11 +189,15 @@ export function ReportCardsWorkspace({ students, onError }: Props) {
       await refreshPublishStatus(viewStudentId, termId);
       setSuccess(
         result.published > 0
-          ? `Published ${result.published} subject sheet${result.published === 1 ? "" : "s"} for ${gradeLabel}. Families can open the report card now.`
-          : `Report cards already published for ${gradeLabel}.`,
+          ? t("reportCardsUi.publishSuccess", {
+              count: result.published,
+              plural: result.published === 1 ? "" : "s",
+              grade: gradeLabel,
+            })
+          : t("reportCardsUi.publishAlready", { grade: gradeLabel }),
       );
     } catch (err) {
-      setErr(err instanceof Error ? err.message : "Could not publish report cards");
+      setErr(err instanceof Error ? err.message : t("reportCardsUi.publishFailed"));
     } finally {
       setPublishBusy(false);
     }
@@ -188,11 +206,13 @@ export function ReportCardsWorkspace({ students, onError }: Props) {
   return (
     <div className="acad-page acad-page--results rc-v2">
       <AcademicsHero
-        title="Report cards"
+        title={t("reportCardsUi.title")}
         subtitle={
           selectedStudent
-            ? `Preview, comment, and print the official booklet for ${selectedStudent.user.firstName} ${selectedStudent.user.lastName}.`
-            : "Preview student report cards, add teacher comments, and print the official booklet for families."
+            ? t("reportCardsUi.subtitleStudent", {
+                name: `${selectedStudent.user.firstName} ${selectedStudent.user.lastName}`.trim(),
+              })
+            : t("reportCardsUi.subtitleDefault")
         }
         stats={heroStats}
         badges={
@@ -200,7 +220,7 @@ export function ReportCardsWorkspace({ students, onError }: Props) {
             {currentTerm ? (
               <AcademicsBadge variant="live">{currentTerm.name}</AcademicsBadge>
             ) : (
-              <AcademicsBadge variant="muted">No current term</AcademicsBadge>
+              <AcademicsBadge variant="muted">{t("reportCardsUi.noCurrentTerm")}</AcademicsBadge>
             )}
             {selectedStudent ? (
               <span className="rc-v2__hero-badge">
@@ -226,23 +246,23 @@ export function ReportCardsWorkspace({ students, onError }: Props) {
         </div>
         <label className="rc-v2__field">
           <DashIcon name="calendar" className="dash-icon--sm" />
-          <span>Term</span>
+          <span>{t("reportCardsUi.term")}</span>
           <select
             value={termId}
             onChange={(e) => onSelectionChange(viewStudentId, e.target.value)}
             disabled={Boolean(loading || terms.length === 0)}
             autoComplete="off"
           >
-            {terms.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-                {t.isCurrent ? " (current)" : ""}
+            {terms.map((term) => (
+              <option key={term.id} value={term.id}>
+                {term.name}
+                {term.isCurrent ? t("reportCardsUi.currentSuffix") : ""}
               </option>
             ))}
           </select>
         </label>
-        <div className="rc-v2__field rc-v2__field--mode" role="group" aria-label="Report type">
-          <span>Report type</span>
+        <div className="rc-v2__field rc-v2__field--mode" role="group" aria-label={t("reportCardsUi.reportTypeAria")}>
+          <span>{t("reportCardsUi.reportType")}</span>
           <div className="rc-v2__mode-toggle">
             <button
               type="button"
@@ -250,7 +270,7 @@ export function ReportCardsWorkspace({ students, onError }: Props) {
               aria-pressed={printMode === "term"}
               onClick={() => setPrintMode("term")}
             >
-              Term
+              {t("reportCardsUi.modeTerm")}
             </button>
             <button
               type="button"
@@ -258,7 +278,7 @@ export function ReportCardsWorkspace({ students, onError }: Props) {
               aria-pressed={printMode === "annual"}
               onClick={() => setPrintMode("annual")}
             >
-              Yearly
+              {t("reportCardsUi.modeYearly")}
             </button>
           </div>
         </div>
@@ -270,8 +290,11 @@ export function ReportCardsWorkspace({ students, onError }: Props) {
               }`}
             >
               {publishStatus.published
-                ? "Visible to families"
-                : `${publishStatus.publishedCount}/${publishStatus.total} sheets published`}
+                ? t("reportCardsUi.visibleFamilies")
+                : t("reportCardsUi.sheetsPublished", {
+                    published: publishStatus.publishedCount,
+                    total: publishStatus.total,
+                  })}
             </span>
           ) : null}
           <button
@@ -280,7 +303,7 @@ export function ReportCardsWorkspace({ students, onError }: Props) {
             disabled={Boolean(previewBusy || !viewStudentId || !termId)}
             onClick={() => void onPreviewReport()}
           >
-            {previewBusy ? "Loading…" : "Load preview"}
+            {previewBusy ? t("common.loading") : t("reportCardsUi.loadPreview")}
           </button>
           {viewStudentId && termId ? (
             <button
@@ -292,13 +315,13 @@ export function ReportCardsWorkspace({ students, onError }: Props) {
                   publishStatus.published,
               )}
               onClick={() => void onPublishReportCards()}
-              title="Publish all subject sheets for this student's class so families can open the report card"
+              title={t("reportCardsUi.publishTitle")}
             >
               {publishBusy
-                ? "Publishing…"
+                ? t("reportCardsUi.publishing")
                 : publishStatus?.published
-                  ? "Published"
-                  : "Publish to families"}
+                  ? t("reportCardsUi.publishedBtn")
+                  : t("reportCardsUi.publishToFamilies")}
             </button>
           ) : null}
           {viewStudentId && termId ? (
@@ -307,24 +330,24 @@ export function ReportCardsWorkspace({ students, onError }: Props) {
               className="rc-v2__btn rc-v2__btn--ghost"
               onClick={() => openReportCardPrint(viewStudentId, termId, printMode)}
             >
-              Print / PDF
+              {t("reportCardsUi.printPdf")}
             </button>
           ) : null}
         </div>
       </div>
 
       <div className="rc-v2__grid">
-        <section className="rc-v2__card" aria-label="Report card preview">
+        <section className="rc-v2__card" aria-label={t("reportCardsUi.previewAria")}>
           <header className="rc-v2__card-head">
             <span className="rc-v2__card-icon" aria-hidden>
               <DashIcon name="report-card" className="dash-icon--sm" />
             </span>
             <div>
-              <h3 className="rc-v2__card-title">Preview &amp; print</h3>
+              <h3 className="rc-v2__card-title">{t("reportCardsUi.previewTitle")}</h3>
               <p className="rc-v2__card-sub">
                 {printMode === "annual"
-                  ? "Yearly: A4 landscape duplex — left/right columns on each side. Front: grading + cover; back: student info, QR, results. Print with short-edge flip."
-                  : "Term: A4 landscape, front only — each card is half a page so two term reports print on one sheet."}
+                  ? t("reportCardsUi.previewSubAnnual")
+                  : t("reportCardsUi.previewSubTerm")}
               </p>
             </div>
           </header>
@@ -334,17 +357,19 @@ export function ReportCardsWorkspace({ students, onError }: Props) {
               <div className="rc-booklet__toolbar">
                 <p>
                   {printMode === "annual"
-                    ? `A4 landscape duplex · Yearly · ${report.term.academicYear}`
-                    : `A4 landscape · Term · 2 per page · ${report.term.name}`}
+                    ? t("reportCardsUi.bookletAnnualMeta", {
+                        year: report.term.academicYear,
+                      })
+                    : t("reportCardsUi.bookletTermMeta", { term: report.term.name })}
                 </p>
-                <span>Matches the printed card</span>
+                <span>{t("reportCardsUi.matchesPrinted")}</span>
               </div>
 
               {printMode === "term" ? (
-                <div className="rc-term-sheet" aria-label="Term report — two per A4">
-                  <article className="rc-sheet-card rc-sheet-card--half" aria-label="Term report preview">
+                <div className="rc-term-sheet" aria-label={t("reportCardsUi.modeTerm")}>
+                  <article className="rc-sheet-card rc-sheet-card--half" aria-label={t("reportCardsUi.previewAria")}>
                     <div className="rc-sheet-card__corner rc-sheet-card__corner--bl" aria-hidden />
-                    <span className="rc-sheet-card__badge">Term · Front</span>
+                    <span className="rc-sheet-card__badge">{t("reportCardsUi.termFrontBadge")}</span>
 
                     <header className="rc-sheet-card__head">
                       <div className="rc-sheet-card__brand">
@@ -355,8 +380,8 @@ export function ReportCardsWorkspace({ students, onError }: Props) {
                         </div>
                       </div>
                       <div className="rc-sheet-card__title">
-                        <h4>Student Report Card</h4>
-                        <p>{report.term.name} Report</p>
+                        <h4>{t("reportCardsUi.studentReportCard")}</h4>
+                        <p>{t("reportCardsUi.termReport", { term: report.term.name })}</p>
                       </div>
                     </header>
 
@@ -376,14 +401,15 @@ export function ReportCardsWorkspace({ students, onError }: Props) {
 
                     <div className="rc-sheet-card__info rc-sheet-card__info--term">
                       <div>
-                        <span>Student:</span> <strong>{report.student.name}</strong>
+                        <span>{t("reportCardsUi.studentLabel")}</span>{" "}
+                        <strong>{report.student.name}</strong>
                       </div>
                       <div>
-                        <span>ID:</span>{" "}
+                        <span>{t("reportCardsUi.idLabel")}</span>{" "}
                         <strong>{report.student.studentId ?? "—"}</strong>
                       </div>
                       <div>
-                        <span>Grade:</span>{" "}
+                        <span>{t("reportCardsUi.gradeLabel")}</span>{" "}
                         <strong>
                           {report.student.grade}
                           {report.student.section ? ` · ${report.student.section}` : ""}
@@ -395,10 +421,10 @@ export function ReportCardsWorkspace({ students, onError }: Props) {
                       <table>
                         <thead>
                           <tr>
-                            <th>No.</th>
-                            <th>Subject</th>
-                            <th>Score</th>
-                            <th>Grade</th>
+                            <th>{t("reportCardsUi.colNo")}</th>
+                            <th>{t("reportCardsUi.colSubject")}</th>
+                            <th>{t("reportCardsUi.colScore")}</th>
+                            <th>{t("reportCardsUi.colGrade")}</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -418,49 +444,46 @@ export function ReportCardsWorkspace({ students, onError }: Props) {
 
                     <footer className="rc-sheet-card__term-foot">
                       <div>
-                        <em>Average</em>
+                        <em>{t("reportCardsUi.average")}</em>
                         <strong>
                           {report.overallAverage != null ? `${report.overallAverage}%` : "—"}
                           {report.overallLetter ? ` ${report.overallLetter}` : ""}
                         </strong>
                       </div>
                       <div>
-                        <em>Attendance</em>
+                        <em>{t("reportCardsUi.attendance")}</em>
                         <strong>
                           {report.attendance.present}/{report.attendance.total}
                         </strong>
                       </div>
                       <div className="rc-sheet-card__term-sign">
                         <i />
-                        <strong>Signature</strong>
+                        <strong>{t("reportCardsUi.signature")}</strong>
                       </div>
                       <div className="rc-sheet-card__qr rc-sheet-card__qr--sm" aria-hidden>
                         <img src={BRAND_LOGO_SRC} alt="" />
-                        <span>Verify</span>
+                        <span>{t("reportCardsUi.verify")}</span>
                       </div>
                     </footer>
                   </article>
 
-                  <article className="rc-sheet-card rc-sheet-card--half rc-sheet-card--slot" aria-label="Second term slot">
-                    <span className="rc-sheet-card__cut">Cut here</span>
-                    <strong>Reserved for 2nd student</strong>
-                    <p>
-                      This blank half is intentional — one landscape A4 holds two term
-                      reports. Print a second student into this slot, then cut along the dashed line.
-                    </p>
+                  <article className="rc-sheet-card rc-sheet-card--half rc-sheet-card--slot" aria-label={t("reportCardsUi.secondSlotAria")}>
+                    <span className="rc-sheet-card__cut">{t("reportCardsUi.cutHere")}</span>
+                    <strong>{t("reportCardsUi.reservedSecond")}</strong>
+                    <p>{t("reportCardsUi.secondSlotHint")}</p>
                   </article>
                 </div>
               ) : yearlyHtml ? (
                 <iframe
-                  title="Yearly report card preview"
+                  title={t("reportCardsUi.yearlyIframeTitle")}
                   className="rc-v2__yearly-preview"
                   srcDoc={yearlyHtml}
                 />
               ) : (
                 <div className="rc-booklet__pages">
-                  <article className="rc-sheet-card" aria-label="Front page preview">
+                  <article className="rc-sheet-card" aria-label={t("reportCardsUi.previewAria")}>
                     <div className="rc-sheet-card__corner rc-sheet-card__corner--bl" aria-hidden />
-                    <span className="rc-sheet-card__badge">Front</span>
+                    <span className="rc-sheet-card__badge">{t("reportCardsUi.frontBadge")}</span>
 
                     <header className="rc-sheet-card__head">
                       <div className="rc-sheet-card__brand">
@@ -471,8 +494,8 @@ export function ReportCardsWorkspace({ students, onError }: Props) {
                         </div>
                       </div>
                       <div className="rc-sheet-card__title">
-                        <h4>Student Report Card</h4>
-                        <p>Academic Year Report</p>
+                        <h4>{t("reportCardsUi.studentReportCard")}</h4>
+                        <p>{t("reportCardsUi.academicYearReport")}</p>
                       </div>
                     </header>
 
@@ -492,18 +515,19 @@ export function ReportCardsWorkspace({ students, onError }: Props) {
 
                     <div className="rc-sheet-card__info">
                       <div>
-                        <span>Student Name:</span> <strong>{report.student.name}</strong>
+                        <span>{t("reportCardsUi.studentNameLabel")}</span>{" "}
+                        <strong>{report.student.name}</strong>
                       </div>
                       <div>
-                        <span>Academic Year:</span>{" "}
+                        <span>{t("reportCardsUi.academicYearLabel")}</span>{" "}
                         <strong>{report.term.academicYear}</strong>
                       </div>
                       <div>
-                        <span>Student ID:</span>{" "}
+                        <span>{t("reportCardsUi.idLabel")}</span>{" "}
                         <strong>{report.student.studentId ?? "—"}</strong>
                       </div>
                       <div>
-                        <span>Grade:</span>{" "}
+                        <span>{t("reportCardsUi.gradeLabel")}</span>{" "}
                         <strong>
                           {report.student.grade}
                           {report.student.section ? ` · ${report.student.section}` : ""}
@@ -515,10 +539,10 @@ export function ReportCardsWorkspace({ students, onError }: Props) {
                       <table>
                         <thead>
                           <tr>
-                            <th>No.</th>
-                            <th>Subject</th>
-                            <th>Average</th>
-                            <th>Grade</th>
+                            <th>{t("reportCardsUi.colNo")}</th>
+                            <th>{t("reportCardsUi.colSubject")}</th>
+                            <th>{t("reportCardsUi.colAverage")}</th>
+                            <th>{t("reportCardsUi.colGrade")}</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -538,63 +562,63 @@ export function ReportCardsWorkspace({ students, onError }: Props) {
 
                     <footer className="rc-sheet-card__foot">
                       <div className="rc-sheet-card__scale">
-                        <strong>Grading Scale</strong>
-                        <p>A 90–100 · B 80–89 · C 70–79 · D 60–69 · F 0–59</p>
+                        <strong>{t("reportCardsUi.gradingScale")}</strong>
+                        <p>{t("reportCardsUi.gradingScaleBody")}</p>
                       </div>
                       <p className="rc-sheet-card__motto">
-                        Better Students
-                        <em>A Brighter Future</em>
+                        {t("reportCardsUi.mottoLine1")}
+                        <em>{t("reportCardsUi.mottoLine2")}</em>
                       </p>
                     </footer>
                   </article>
 
-                  <article className="rc-sheet-card" aria-label="Back page preview">
+                  <article className="rc-sheet-card" aria-label={t("reportCardsUi.previewAria")}>
                     <div className="rc-sheet-card__corner rc-sheet-card__corner--br" aria-hidden />
-                    <span className="rc-sheet-card__badge">Back</span>
+                    <span className="rc-sheet-card__badge">{t("reportCardsUi.backBadge")}</span>
 
                     <div className="rc-sheet-card__split">
                       <section className="rc-sheet-card__panel">
-                        <h5>Attendance Summary</h5>
+                        <h5>{t("reportCardsUi.attendanceSummary")}</h5>
                         <ul>
                           <li>
-                            <span>Days Present</span>
+                            <span>{t("reportCardsUi.daysPresent")}</span>
                             <strong>{report.attendance.present}</strong>
                           </li>
                           <li>
-                            <span>Days Absent</span>
+                            <span>{t("reportCardsUi.daysAbsent")}</span>
                             <strong>
                               {Math.max(0, report.attendance.total - report.attendance.present)}
                             </strong>
                           </li>
                           <li>
-                            <span>Attendance Rate</span>
+                            <span>{t("reportCardsUi.attendanceRate")}</span>
                             <strong>
                               {report.attendance.rate != null ? `${report.attendance.rate}%` : "—"}
                             </strong>
                           </li>
                           <li>
-                            <span>Total School Days</span>
+                            <span>{t("reportCardsUi.totalSchoolDays")}</span>
                             <strong>{report.attendance.total}</strong>
                           </li>
                         </ul>
                       </section>
                       <section className="rc-sheet-card__panel">
-                        <h5>Conduct / Behavior</h5>
+                        <h5>{t("reportCardsUi.conductTitle")}</h5>
                         <ul>
                           <li>
-                            <span>Discipline</span>
+                            <span>{t("reportCardsUi.discipline")}</span>
                             <strong>—</strong>
                           </li>
                           <li>
-                            <span>Participation</span>
+                            <span>{t("reportCardsUi.participation")}</span>
                             <strong>—</strong>
                           </li>
                           <li>
-                            <span>Attitude</span>
+                            <span>{t("reportCardsUi.attitude")}</span>
                             <strong>—</strong>
                           </li>
                           <li>
-                            <span>Overall</span>
+                            <span>{t("reportCardsUi.overall")}</span>
                             <strong>{report.overallLetter ?? "—"}</strong>
                           </li>
                         </ul>
@@ -603,20 +627,20 @@ export function ReportCardsWorkspace({ students, onError }: Props) {
 
                     <div className="rc-sheet-card__kpis">
                       <div>
-                        <em>Class Rank</em>
+                        <em>{t("reportCardsUi.classRank")}</em>
                         <strong>
                           {report.rank != null ? `${report.rank} / ${report.classSize}` : "—"}
                         </strong>
                       </div>
                       <div>
-                        <em>Overall Average</em>
+                        <em>{t("reportCardsUi.overallAverage")}</em>
                         <strong>
                           {report.overallAverage != null ? `${report.overallAverage}%` : "—"}
                           {report.overallLetter ? ` ${report.overallLetter}` : ""}
                         </strong>
                       </div>
                       <div>
-                        <em>Subjects</em>
+                        <em>{t("reportCardsUi.subjectsCount")}</em>
                         <strong>{report.subjects.length}</strong>
                       </div>
                     </div>
@@ -624,30 +648,30 @@ export function ReportCardsWorkspace({ students, onError }: Props) {
                     <div className="rc-sheet-card__signs">
                       <div>
                         <i />
-                        <strong>Class Teacher</strong>
-                        <span>Signature</span>
+                        <strong>{t("reportCardsUi.classTeacher")}</strong>
+                        <span>{t("reportCardsUi.signature")}</span>
                       </div>
                       <div>
                         <i />
-                        <strong>Principal / Director</strong>
-                        <span>Signature</span>
+                        <strong>{t("reportCardsUi.principalDirector")}</strong>
+                        <span>{t("reportCardsUi.signature")}</span>
                       </div>
                       <div className="rc-sheet-card__qr" aria-hidden>
                         <img src={BRAND_LOGO_SRC} alt="" />
-                        <span>Scan to verify</span>
+                        <span>{t("reportCardsUi.scanVerify")}</span>
                       </div>
                     </div>
 
                     {(report.teacherComment || report.principalComment) && (
                       <section className="rc-sheet-card__remarks">
-                        <h5>General Remarks</h5>
+                        <h5>{t("reportCardsUi.generalRemarks")}</h5>
                         <p>
                           {report.principalComment || report.teacherComment}
                         </p>
                       </section>
                     )}
 
-                    <p className="rc-sheet-card__tagline">Learn | Grow | Succeed</p>
+                    <p className="rc-sheet-card__tagline">{t("reportCardsUi.tagline")}</p>
                   </article>
                 </div>
               )}
@@ -658,12 +682,14 @@ export function ReportCardsWorkspace({ students, onError }: Props) {
                   className="rc-v2__btn rc-v2__btn--primary"
                   onClick={() => openReportCardPrint(viewStudentId, termId, printMode)}
                 >
-                  Open print {printMode === "annual" ? "yearly" : "term"} report
+                  {printMode === "annual"
+                    ? t("reportCardsUi.openPrintYearly")
+                    : t("reportCardsUi.openPrintTerm")}
                 </button>
                 <p>
                   {printMode === "annual"
-                    ? "Print duplex · landscape A4 · short-edge flip · branding from Settings"
-                    : "Print landscape A4 · two term cards per sheet · cut along the dashed line"}
+                    ? t("reportCardsUi.printHintAnnual")
+                    : t("reportCardsUi.printHintTerm")}
                 </p>
               </div>
             </div>
@@ -672,15 +698,15 @@ export function ReportCardsWorkspace({ students, onError }: Props) {
               <span className="rc-v2__empty-icon" aria-hidden>
                 <DashIcon name="report-card" className="dash-icon--lg" />
               </span>
-              <h4>No preview loaded</h4>
-              <p>Choose a student and term above, then load to review before printing.</p>
+              <h4>{t("reportCardsUi.emptyTitle")}</h4>
+              <p>{t("reportCardsUi.emptySub")}</p>
             </div>
           )}
         </section>
 
         <section
           className="rc-v2__card rc-v2__card--comments"
-          aria-label="Report card comments"
+          aria-label={t("reportCardsUi.commentsAria")}
         >
           <ReportCardCommentsPanel
             terms={terms}
@@ -694,9 +720,9 @@ export function ReportCardsWorkspace({ students, onError }: Props) {
       </div>
 
       <p className="rc-v2__footer-hint">
-        Scores must be published before report cards reflect final marks. Manage grading in{" "}
+        {t("reportCardsUi.footerHint")}{" "}
         <Link href="/admin/results" className="rc-v2__text-link">
-          Results
+          {t("reportCardsUi.resultsLink")}
         </Link>
         .
       </p>

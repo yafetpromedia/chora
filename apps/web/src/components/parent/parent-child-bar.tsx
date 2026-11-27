@@ -1,9 +1,13 @@
 "use client";
 
+import { useLocale } from "@/components/i18n/locale-provider";
 import { childClassLabel, type ParentChildOption } from "@/lib/parent-child";
 
 type Props = {
-  children: ParentChildOption[];
+  /** Preferred: list of linked children. */
+  options?: ParentChildOption[];
+  /** @deprecated Use `options` (passing children as a prop trips react/no-children-prop). */
+  children?: ParentChildOption[];
   selectedId: string;
   onChange: (profileId: string) => void;
   label?: string;
@@ -12,18 +16,22 @@ type Props = {
 };
 
 export function ParentChildBar({
-  children: kids,
+  options,
+  children,
   selectedId,
   onChange,
-  label = "Viewing",
+  label,
   loading = false,
   className = "",
 }: Props) {
+  const { t } = useLocale();
+  const barLabel = label ?? t("common.child");
+  const kids = options ?? children ?? [];
   if (loading) {
     return (
       <div className={`par-child-bar par-child-bar--loading ${className}`.trim()}>
         <span className="par-child-bar__spinner" aria-hidden />
-        <span>Loading children…</span>
+        <span>{t("common.loading")}</span>
       </div>
     );
   }
@@ -31,7 +39,7 @@ export function ParentChildBar({
   if (kids.length === 0) {
     return (
       <div className={`par-child-bar par-child-bar--empty ${className}`.trim()}>
-        No children linked to your account. Contact the school office to link a student.
+        {t("parentAttendance.noLinkedHint")}
       </div>
     );
   }
@@ -40,7 +48,7 @@ export function ParentChildBar({
     const only = kids[0];
     return (
       <div className={`par-child-bar par-child-bar--single ${className}`.trim()}>
-        <span className="par-child-bar__label">{label}</span>
+        <span className="par-child-bar__label">{barLabel}</span>
         <strong className="par-child-bar__name">{only.name}</strong>
         <span className="par-child-bar__meta">{childClassLabel(only)}</span>
       </div>
@@ -49,7 +57,7 @@ export function ParentChildBar({
 
   return (
     <label className={`par-child-bar ${className}`.trim()}>
-      <span className="par-child-bar__label">{label}</span>
+      <span className="par-child-bar__label">{barLabel}</span>
       <select
         className="par-child-bar__select"
         value={selectedId}

@@ -14,8 +14,10 @@ import {
   getPlatformInvitePreview,
   type PlatformInvitePreview,
 } from "@/lib/platform-access";
+import { useLocale } from "@/components/i18n/locale-provider";
 
 export default function PlatformInviteAcceptPage() {
+  const { t } = useLocale();
   const params = useParams<{ token: string }>();
   const token = typeof params.token === "string" ? params.token : "";
   const router = useRouter();
@@ -30,29 +32,41 @@ export default function PlatformInviteAcceptPage() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (!token) {
-      setError("Missing invite token");
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    void getPlatformInvitePreview(token)
-      .then(setPreview)
-      .catch((err) =>
-        setError(err instanceof Error ? err.message : "Invite link is invalid"),
-      )
-      .finally(() => setLoading(false));
+    let cancelled = false;
+    void (async () => {
+      if (!token) {
+        setError(t("platformInviteAcceptUi.missingToken"));
+        setLoading(false);
+        return;
+      }
+      setLoading(true);
+      try {
+        const data = await getPlatformInvitePreview(token);
+        if (!cancelled) setPreview(data);
+      } catch (err) {
+        if (!cancelled) {
+          setError(
+            err instanceof Error ? err.message : t("platformInviteAcceptUi.invalidInvite"),
+          );
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [token]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (!token) return;
     if (password.length < 8) {
-      setError("Password must be at least 8 characters");
+      setError(t("platformInviteAcceptUi.passwordMin"));
       return;
     }
     if (password !== confirm) {
-      setError("Passwords do not match");
+      setError(t("platformInviteAcceptUi.passwordsMismatch"));
       return;
     }
     setSubmitting(true);
@@ -61,7 +75,9 @@ export default function PlatformInviteAcceptPage() {
       await acceptPlatformInvite(token, password);
       router.push("/platform/login?invited=1");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not set password");
+      setError(
+        err instanceof Error ? err.message : t("platformInviteAcceptUi.setPasswordFailed"),
+      );
     } finally {
       setSubmitting(false);
     }
@@ -79,7 +95,7 @@ export default function PlatformInviteAcceptPage() {
               <span>{BRAND_NAME}</span>
             </Link>
             <Link href="/platform/login" className="reg-top__link">
-              Platform sign in
+              {t("platformInviteAcceptUi.platformSignIn")}
             </Link>
           </header>
 
@@ -90,14 +106,18 @@ export default function PlatformInviteAcceptPage() {
             transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
           >
             <div className="reg-hero">
-              <p className="reg-hero__eyebrow">Operator invite</p>
+              <p className="reg-hero__eyebrow">{t("platformInviteAcceptUi.eyebrow")}</p>
               <h1 className="reg-hero__title">
-                Set your <span>password</span>
+                {t("platformInviteAcceptUi.titleBefore")}{" "}
+                <span>{t("platformInviteAcceptUi.titleAccent")}</span>
               </h1>
               <p className="reg-hero__sub">
                 {preview
-                  ? `Welcome, ${preview.firstName}. Finish setup for your ${preview.role.toLowerCase()} access.`
-                  : `Accept your ${BRAND_NAME} platform invite.`}
+                  ? t("platformInviteAcceptUi.welcomeRole", {
+                      firstName: preview.firstName,
+                      role: preview.role.toLowerCase(),
+                    })
+                  : t("platformInviteAcceptUi.acceptDefault", { brand: BRAND_NAME })}
               </p>
             </div>
 
@@ -107,12 +127,14 @@ export default function PlatformInviteAcceptPage() {
               </p>
             ) : null}
 
-            {loading ? <p className="reg-hero__sub">Checking invite…</p> : null}
+            {loading ? (
+              <p className="reg-hero__sub">{t("platformInviteAcceptUi.checking")}</p>
+            ) : null}
 
             {!loading && preview ? (
               <div className="reg-card">
                 <p className="reg-hero__sub" style={{ marginBottom: "1rem" }}>
-                  {preview.email} · expires{" "}
+                  {preview.email} · {t("platformInviteAcceptUi.expires")}{" "}
                   {new Date(preview.expiresAt).toLocaleString()}
                 </p>
                 <form onSubmit={(e) => void onSubmit(e)} className="reg-form">
@@ -120,7 +142,7 @@ export default function PlatformInviteAcceptPage() {
                     <div className="reg-form__full">
                       <AuthInput
                         id="invite-password"
-                        label="New password"
+                        label={t("platformInviteAcceptUi.newPassword")}
                         type="password"
                         value={password}
                         onChange={setPassword}
@@ -134,7 +156,7 @@ export default function PlatformInviteAcceptPage() {
                     <div className="reg-form__full">
                       <AuthInput
                         id="invite-password-confirm"
-                        label="Confirm password"
+                        label={t("platformInviteAcceptUi.confirmPassword")}
                         type="password"
                         value={confirm}
                         onChange={setConfirm}
@@ -150,8 +172,8 @@ export default function PlatformInviteAcceptPage() {
                     <AuthSubmitButton
                       variant="page"
                       loading={submitting}
-                      label="Activate account"
-                      loadingLabel="Saving…"
+                      label={t("platformInviteAcceptUi.activate")}
+                      loadingLabel={t("platformInviteAcceptUi.saving")}
                     />
                   </div>
                 </form>
@@ -170,11 +192,11 @@ export default function PlatformInviteAcceptPage() {
             </div>
             <div className="reg-visual__content reg-visual__content--photo">
               <div className="reg-visual__copy">
-                <p className="reg-visual__eyebrow">{BRAND_NAME} platform</p>
-                <h2 className="reg-visual__title">Join the operator team</h2>
-                <p className="reg-visual__body">
-                  Set a password once, then sign in to the platform console.
+                <p className="reg-visual__eyebrow">
+                  {t("platformInviteAcceptUi.platformEyebrow", { brand: BRAND_NAME })}
                 </p>
+                <h2 className="reg-visual__title">{t("platformInviteAcceptUi.visualTitle")}</h2>
+                <p className="reg-visual__body">{t("platformInviteAcceptUi.visualBody")}</p>
               </div>
             </div>
           </div>

@@ -2,8 +2,14 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Optional,
 } from '@nestjs/common';
-import { ExamScheduleStatus, Prisma, StudentRecordStatus } from '@prisma/client';
+import {
+  ExamScheduleStatus,
+  Prisma,
+  StudentRecordStatus,
+} from '@prisma/client';
+import { EmailService } from '../email/email.service';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   CreateExamScheduleDto,
@@ -20,7 +26,10 @@ const dayInclude = {
       grade: { select: { id: true, name: true, sortOrder: true } },
       subject: { select: { id: true, name: true, code: true } },
     },
-    orderBy: [{ grade: { sortOrder: 'asc' as const } }, { sortOrder: 'asc' as const }],
+    orderBy: [
+      { grade: { sortOrder: 'asc' as const } },
+      { sortOrder: 'asc' as const },
+    ],
   },
 } satisfies Prisma.ExamScheduleDayInclude;
 
@@ -35,7 +44,10 @@ const scheduleInclude = {
 
 @Injectable()
 export class ExamSchedulesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly email?: EmailService,
+  ) {}
 
   async list(schoolId: string, academicYearId?: string) {
     return this.prisma.examSchedule.findMany({
@@ -151,7 +163,7 @@ export class ExamSchedulesService {
   }
 
   async update(schoolId: string, id: string, dto: UpdateExamScheduleDto) {
-    await this.get(schoolId, id);
+    const existing = await this.get(schoolId, id);
 
     if (dto.academicTermId) {
       const schedule = await this.prisma.examSchedule.findFirst({
@@ -167,23 +179,53 @@ export class ExamSchedulesService {
       if (!term) throw new NotFoundException('Academic term not found');
     }
 
-    return this.prisma.examSchedule.update({
+    const updated = await this.prisma.examSchedule.update({
       where: { id },
       data: {
         ...(dto.title !== undefined ? { title: dto.title.trim() } : {}),
         ...(dto.shiftLabel !== undefined
           ? { shiftLabel: dto.shiftLabel?.trim() || null }
           : {}),
-        ...(dto.notes !== undefined ? { notes: dto.notes?.trim() || null } : {}),
+        ...(dto.notes !== undefined
+          ? { notes: dto.notes?.trim() || null }
+          : {}),
         ...(dto.academicTermId !== undefined
           ? { academicTermId: dto.academicTermId || null }
           : {}),
-        ...(dto.status !== undefined
-          ? { status: dto.status as ExamScheduleStatus }
-          : {}),
+        ...(dto.status !== undefined ? { status: dto.status } : {}),
       },
       include: scheduleInclude,
     });
+
+    if (
+      existing.status !== ExamScheduleStatus.PUBLISHED &&
+      updated.status === ExamScheduleStatus.PUBLISHED
+    ) {
+      const dates = [...updated.days]
+        .map((day) => day.examDate)
+        .sort((a, b) => a.getTime() - b.getTime());
+      const formatDay = (day: Date) =>
+        day.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      const dateRange =
+        dates.length === 0
+          ? ''
+          : dates.length === 1
+            ? formatDay(dates[0])
+            : `${formatDay(dates[0])} – ${formatDay(dates[dates.length - 1])}`;
+      try {
+        await this.email?.notifySchoolParents({
+          schoolId,
+          preference: 'examinationEnabled',
+          category: 'examination',
+          templateId: 'examination',
+          idempotencyPrefix: `exam-published:${updated.id}`,
+          vars: { title: updated.title, dateRange },
+        });
+      } catch {
+        // The timetable is already published.
+      }
+    }
+    return updated;
   }
 
   async remove(schoolId: string, id: string) {
@@ -229,7 +271,9 @@ export class ExamSchedulesService {
     }
 
     await this.prisma.$transaction(async (tx) => {
-      await tx.examScheduleDay.deleteMany({ where: { scheduleId: id, schoolId } });
+      await tx.examScheduleDay.deleteMany({
+        where: { scheduleId: id, schoolId },
+      });
 
       for (let i = 0; i < dto.days.length; i++) {
         const day = dto.days[i];
@@ -384,8 +428,12 @@ export class ExamSchedulesService {
       await tx.examSeatingPlan.update({
         where: { id: planId },
         data: {
-          ...(dto.title !== undefined ? { title: dto.title.trim() || 'Exam seating' } : {}),
-          ...(dto.notes !== undefined ? { notes: dto.notes?.trim() || null } : {}),
+          ...(dto.title !== undefined
+            ? { title: dto.title.trim() || 'Exam seating' }
+            : {}),
+          ...(dto.notes !== undefined
+            ? { notes: dto.notes?.trim() || null }
+            : {}),
           sourceGradeIds,
           rooms: {
             create: rooms.map((room, i) => ({
@@ -413,7 +461,11 @@ export class ExamSchedulesService {
     });
   }
 
-  async removeSeatingPlan(schoolId: string, scheduleId: string, planId: string) {
+  async removeSeatingPlan(
+    schoolId: string,
+    scheduleId: string,
+    planId: string,
+  ) {
     await this.getSeatingPlan(schoolId, scheduleId, planId);
     await this.prisma.examSeatingPlan.delete({ where: { id: planId } });
     return { ok: true };
@@ -439,7 +491,9 @@ export class ExamSchedulesService {
   }
 
   private async validateSourceGrades(schoolId: string, gradeIds: string[]) {
-    const unique = [...new Set((gradeIds ?? []).map((id) => id.trim()).filter(Boolean))];
+    const unique = [
+      ...new Set((gradeIds ?? []).map((id) => id.trim()).filter(Boolean)),
+    ];
     if (unique.length === 0) {
       throw new BadRequestException('Select at least one source grade');
     }
@@ -476,7 +530,9 @@ export class ExamSchedulesService {
     });
 
     if (students.length === 0) {
-      throw new BadRequestException('No active students in the selected grades');
+      throw new BadRequestException(
+        'No active students in the selected grades',
+      );
     }
 
     const totalCapacity = rooms.reduce((sum, r) => sum + r.capacity, 0);

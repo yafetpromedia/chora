@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
+import { useLocale } from "@/components/i18n/locale-provider";
 import { AppToast } from "@/components/ui/app-toast";
 import { EtbAmount } from "@/components/billing/etb-amount";
 import {
@@ -21,7 +22,27 @@ import { hasPermission, Permission } from "@/lib/permissions";
 
 type Tab = "overview" | "employment" | "compensation" | "attendance" | "leave";
 
+const EMP_TYPES = [
+  "FULL_TIME",
+  "PART_TIME",
+  "CONTRACT",
+  "TEMPORARY",
+  "DAILY",
+  "HOURLY",
+  "INTERNSHIP",
+] as const;
+
+const EMP_STATUSES = [
+  "ACTIVE",
+  "ON_LEAVE",
+  "SUSPENDED",
+  "TERMINATED",
+  "RESIGNED",
+  "RETIRED",
+] as const;
+
 export function EmployeeDetailPanel({ userId }: { userId: string }) {
+  const { t } = useLocale();
   const canManage = hasPermission(Permission.HR_EMPLOYEES_MANAGE);
   const canComp = hasPermission(Permission.PAYROLL_SETTINGS);
   const [tab, setTab] = useState<Tab>("overview");
@@ -36,7 +57,19 @@ export function EmployeeDetailPanel({ userId }: { userId: string }) {
   const [effectiveFrom, setEffectiveFrom] = useState(
     () => new Date().toISOString().slice(0, 10),
   );
-  const [reason, setReason] = useState("Initial package");
+  const [reason, setReason] = useState(t("employeeDetailUi.initialPackage"));
+
+  function empTypeLabel(code: string) {
+    const key = `employeeDetailUi.empType_${code}`;
+    const translated = t(key);
+    return translated === key ? code : translated;
+  }
+
+  function empStatusLabel(code: string) {
+    const key = `employeeDetailUi.empStatus_${code}`;
+    const translated = t(key);
+    return translated === key ? code : translated;
+  }
 
   async function load() {
     setError("");
@@ -53,7 +86,7 @@ export function EmployeeDetailPanel({ userId }: { userId: string }) {
         setComps(await listEmployeeCompensation(userId));
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Load failed");
+      setError(err instanceof Error ? err.message : t("employeeDetailUi.loadFailed"));
     }
   }
 
@@ -75,12 +108,12 @@ export function EmployeeDetailPanel({ userId }: { userId: string }) {
         hrDepartmentId: String(fd.get("hrDepartmentId") || "") || null,
         hrPositionId: String(fd.get("hrPositionId") || "") || null,
         hireDate: String(fd.get("hireDate") || "") || null,
-        reason: String(fd.get("reason") || "Employment update"),
+        reason: String(fd.get("reason") || t("employeeDetailUi.employmentUpdateDefault")),
       });
-      setToast("Employment saved");
+      setToast(t("employeeDetailUi.employmentSaved"));
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Save failed");
+      setError(err instanceof Error ? err.message : t("employeeDetailUi.saveFailed"));
     }
   }
 
@@ -99,16 +132,24 @@ export function EmployeeDetailPanel({ userId }: { userId: string }) {
         effectiveFrom,
         reason,
       });
-      setToast("Compensation package recorded");
+      setToast(t("employeeDetailUi.compensationRecorded"));
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Compensation failed");
+      setError(err instanceof Error ? err.message : t("employeeDetailUi.compensationFailed"));
     }
   }
 
   if (!emp) {
-    return <p className="sa-empty">{error || "Loading…"}</p>;
+    return <p className="sa-empty">{error || t("employeeDetailUi.loading")}</p>;
   }
+
+  const tabs = [
+    ["overview", t("employeeDetailUi.tabOverview")] as const,
+    ["employment", t("employeeDetailUi.tabEmployment")] as const,
+    ["compensation", t("employeeDetailUi.tabCompensation")] as const,
+    ["attendance", t("employeeDetailUi.tabAttendance")] as const,
+    ["leave", t("employeeDetailUi.tabLeave")] as const,
+  ];
 
   return (
     <div className="hr-page">
@@ -119,11 +160,11 @@ export function EmployeeDetailPanel({ userId }: { userId: string }) {
         <div className="tch-v2__hero-glow" aria-hidden />
         <div className="tch-v2__hero-inner">
           <div className="tch-v2__hero-main">
-            <span className="tch-v2__chip">Employee</span>
+            <span className="tch-v2__chip">{t("employeeDetailUi.chipEmployee")}</span>
             <h2 className="tch-v2__hero-title">{emp.name}</h2>
             <p className="tch-v2__hero-sub">
               <Link href="/admin/hr/employees" className="tch-v2__hero-link">
-                Employees
+                {t("employeeDetailUi.employeesLink")}
               </Link>
               {" · "}
               {emp.roleName}
@@ -137,35 +178,39 @@ export function EmployeeDetailPanel({ userId }: { userId: string }) {
           </div>
           <div className="tch-v2__hero-stats">
             <div className="tch-v2__stat">
-              <strong>{emp.profile?.employmentStatus ?? "—"}</strong>
-              <span>Status</span>
+              <strong>
+                {emp.profile?.employmentStatus
+                  ? empStatusLabel(emp.profile.employmentStatus)
+                  : "—"}
+              </strong>
+              <span>{t("employeeDetailUi.statStatus")}</span>
             </div>
             <div className="tch-v2__stat">
-              <strong>{emp.profile?.employmentType ?? "—"}</strong>
-              <span>Type</span>
+              <strong>
+                {emp.profile?.employmentType
+                  ? empTypeLabel(emp.profile.employmentType)
+                  : "—"}
+              </strong>
+              <span>{t("employeeDetailUi.statType")}</span>
             </div>
             <div className="tch-v2__stat">
               <strong>{comps.length}</strong>
-              <span>Packages</span>
+              <span>{t("employeeDetailUi.statPackages")}</span>
             </div>
             <div className="tch-v2__stat tch-v2__stat--accent">
-              <strong>{canManage ? "Edit" : "View"}</strong>
-              <span>Access</span>
+              <strong>
+                {canManage
+                  ? t("employeeDetailUi.accessEdit")
+                  : t("employeeDetailUi.accessView")}
+              </strong>
+              <span>{t("employeeDetailUi.statAccess")}</span>
             </div>
           </div>
         </div>
       </header>
 
-      <nav className="sa-tabs" aria-label="Employee sections">
-        {(
-          [
-            ["overview", "Overview"],
-            ["employment", "Employment"],
-            ["compensation", "Compensation"],
-            ["attendance", "Attendance"],
-            ["leave", "Leave"],
-          ] as const
-        ).map(([id, label]) => (
+      <nav className="sa-tabs" aria-label={t("employeeDetailUi.tabsAria")}>
+        {tabs.map(([id, label]) => (
           <button
             key={id}
             type="button"
@@ -180,14 +225,22 @@ export function EmployeeDetailPanel({ userId }: { userId: string }) {
       {tab === "overview" ? (
         <div className="hr-cards">
           <div className="hr-card">
-            <h3>Contact</h3>
+            <h3>{t("employeeDetailUi.contact")}</h3>
             <p>{emp.email}</p>
-            <p>{emp.phone || "No phone"}</p>
+            <p>{emp.phone || t("employeeDetailUi.noPhone")}</p>
           </div>
           <div className="hr-card">
-            <h3>Employment</h3>
-            <p>{emp.profile?.employmentType ?? "Not set"}</p>
-            <p>{emp.profile?.employmentStatus ?? "—"}</p>
+            <h3>{t("employeeDetailUi.employment")}</h3>
+            <p>
+              {emp.profile?.employmentType
+                ? empTypeLabel(emp.profile.employmentType)
+                : t("employeeDetailUi.notSet")}
+            </p>
+            <p>
+              {emp.profile?.employmentStatus
+                ? empStatusLabel(emp.profile.employmentStatus)
+                : "—"}
+            </p>
             <p>
               {emp.profile?.departmentName ?? "—"} ·{" "}
               {emp.profile?.positionName ?? "—"}
@@ -199,7 +252,7 @@ export function EmployeeDetailPanel({ userId }: { userId: string }) {
       {tab === "employment" ? (
         <form className="hr-form" onSubmit={(e) => void onSaveEmployment(e)}>
           <label className="sa-field">
-            <span>Employee ID</span>
+            <span>{t("employeeDetailUi.employeeId")}</span>
             <input
               name="employeeCode"
               defaultValue={emp.profile?.employeeCode ?? ""}
@@ -207,50 +260,35 @@ export function EmployeeDetailPanel({ userId }: { userId: string }) {
             />
           </label>
           <label className="sa-field">
-            <span>Type</span>
+            <span>{t("employeeDetailUi.type")}</span>
             <select
               name="employmentType"
               defaultValue={emp.profile?.employmentType ?? "FULL_TIME"}
               disabled={!canManage}
             >
-              {[
-                "FULL_TIME",
-                "PART_TIME",
-                "CONTRACT",
-                "TEMPORARY",
-                "DAILY",
-                "HOURLY",
-                "INTERNSHIP",
-              ].map((t) => (
-                <option key={t} value={t}>
-                  {t}
+              {EMP_TYPES.map((type) => (
+                <option key={type} value={type}>
+                  {empTypeLabel(type)}
                 </option>
               ))}
             </select>
           </label>
           <label className="sa-field">
-            <span>Status</span>
+            <span>{t("employeeDetailUi.status")}</span>
             <select
               name="employmentStatus"
               defaultValue={emp.profile?.employmentStatus ?? "ACTIVE"}
               disabled={!canManage}
             >
-              {[
-                "ACTIVE",
-                "ON_LEAVE",
-                "SUSPENDED",
-                "TERMINATED",
-                "RESIGNED",
-                "RETIRED",
-              ].map((t) => (
-                <option key={t} value={t}>
-                  {t}
+              {EMP_STATUSES.map((status) => (
+                <option key={status} value={status}>
+                  {empStatusLabel(status)}
                 </option>
               ))}
             </select>
           </label>
           <label className="sa-field">
-            <span>Department</span>
+            <span>{t("employeeDetailUi.department")}</span>
             <select
               name="hrDepartmentId"
               defaultValue={emp.profile?.hrDepartmentId ?? ""}
@@ -265,7 +303,7 @@ export function EmployeeDetailPanel({ userId }: { userId: string }) {
             </select>
           </label>
           <label className="sa-field">
-            <span>Position</span>
+            <span>{t("employeeDetailUi.position")}</span>
             <select
               name="hrPositionId"
               defaultValue={emp.profile?.hrPositionId ?? ""}
@@ -280,7 +318,7 @@ export function EmployeeDetailPanel({ userId }: { userId: string }) {
             </select>
           </label>
           <label className="sa-field">
-            <span>Hire date</span>
+            <span>{t("employeeDetailUi.hireDate")}</span>
             <input
               type="date"
               name="hireDate"
@@ -289,12 +327,16 @@ export function EmployeeDetailPanel({ userId }: { userId: string }) {
             />
           </label>
           <label className="sa-field sa-field--full">
-            <span>Reason</span>
-            <input name="reason" defaultValue="Employment update" disabled={!canManage} />
+            <span>{t("employeeDetailUi.reason")}</span>
+            <input
+              name="reason"
+              defaultValue={t("employeeDetailUi.employmentUpdateDefault")}
+              disabled={!canManage}
+            />
           </label>
           {canManage ? (
             <button type="submit" className="sa-btn sa-btn--primary">
-              Save employment
+              {t("employeeDetailUi.saveEmployment")}
             </button>
           ) : null}
         </form>
@@ -306,10 +348,10 @@ export function EmployeeDetailPanel({ userId }: { userId: string }) {
             <table className="sa-table sa-table--compact">
               <thead>
                 <tr>
-                  <th>Effective</th>
-                  <th>Frequency</th>
-                  <th>Basic</th>
-                  <th>Reason</th>
+                  <th>{t("employeeDetailUi.tableEffective")}</th>
+                  <th>{t("employeeDetailUi.tableFrequency")}</th>
+                  <th>{t("employeeDetailUi.tableBasic")}</th>
+                  <th>{t("employeeDetailUi.tableReason")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -319,7 +361,7 @@ export function EmployeeDetailPanel({ userId }: { userId: string }) {
                       {String(c.effectiveFrom).slice(0, 10)}
                       {c.effectiveTo
                         ? ` → ${String(c.effectiveTo).slice(0, 10)}`
-                        : " → current"}
+                        : t("employeeDetailUi.effectiveToCurrent")}
                     </td>
                     <td>{c.payFrequency}</td>
                     <td>
@@ -331,27 +373,27 @@ export function EmployeeDetailPanel({ userId }: { userId: string }) {
               </tbody>
             </table>
             {!comps.length ? (
-              <p className="sa-empty">No compensation history yet.</p>
+              <p className="sa-empty">{t("employeeDetailUi.noCompHistory")}</p>
             ) : null}
           </div>
           {canComp ? (
             <form className="hr-form" onSubmit={(e) => void onAddCompensation(e)}>
-              <h3>New salary package</h3>
+              <h3>{t("employeeDetailUi.newSalaryPackage")}</h3>
               <label className="sa-field">
-                <span>Frequency</span>
+                <span>{t("employeeDetailUi.frequency")}</span>
                 <select value={freq} onChange={(e) => setFreq(e.target.value)}>
-                  <option value="MONTHLY">Monthly</option>
-                  <option value="WEEKLY">Weekly</option>
-                  <option value="DAILY">Daily</option>
-                  <option value="HOURLY">Hourly</option>
+                  <option value="MONTHLY">{t("employeeDetailUi.freqMonthly")}</option>
+                  <option value="WEEKLY">{t("employeeDetailUi.freqWeekly")}</option>
+                  <option value="DAILY">{t("employeeDetailUi.freqDaily")}</option>
+                  <option value="HOURLY">{t("employeeDetailUi.freqHourly")}</option>
                 </select>
               </label>
               <label className="sa-field">
-                <span>Amount (ETB)</span>
+                <span>{t("employeeDetailUi.amountEtb")}</span>
                 <input value={basic} onChange={(e) => setBasic(e.target.value)} />
               </label>
               <label className="sa-field">
-                <span>Effective from</span>
+                <span>{t("employeeDetailUi.effectiveFrom")}</span>
                 <input
                   type="date"
                   value={effectiveFrom}
@@ -359,11 +401,13 @@ export function EmployeeDetailPanel({ userId }: { userId: string }) {
                 />
               </label>
               <label className="sa-field sa-field--full">
-                <span>Reason</span>
+                <span>{t("employeeDetailUi.reason")}</span>
                 <input value={reason} onChange={(e) => setReason(e.target.value)} />
               </label>
               <button type="submit" className="sa-btn sa-btn--primary">
-                Record package ({formatCents(Math.round(Number(basic) * 100))} ETB)
+                {t("employeeDetailUi.recordPackage", {
+                  amount: formatCents(Math.round(Number(basic) * 100)),
+                })}
               </button>
             </form>
           ) : null}
@@ -373,8 +417,10 @@ export function EmployeeDetailPanel({ userId }: { userId: string }) {
       {tab === "attendance" ? (
         <div className="hr-card">
           <p>
-            Staff attendance is managed in the existing roll.{" "}
-            <Link href="/admin/staff-attendance">Open Staff Attendance</Link>
+            {t("employeeDetailUi.attendanceBlurb")}{" "}
+            <Link href="/admin/staff-attendance">
+              {t("employeeDetailUi.openStaffAttendance")}
+            </Link>
           </p>
         </div>
       ) : null}
@@ -382,8 +428,8 @@ export function EmployeeDetailPanel({ userId }: { userId: string }) {
       {tab === "leave" ? (
         <div className="hr-card">
           <p>
-            Leave requests live in the leave module.{" "}
-            <Link href="/admin/leave">Open Leave</Link>
+            {t("employeeDetailUi.leaveBlurb")}{" "}
+            <Link href="/admin/leave">{t("employeeDetailUi.openLeave")}</Link>
           </p>
         </div>
       ) : null}

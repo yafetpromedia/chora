@@ -3,6 +3,7 @@
 import Link from "next/link";
 import type { TeacherDashboardAnalytics } from "@/lib/teachers";
 import { DashIcon } from "@/components/dashboard/dash-icons";
+import { useLocale } from "@/components/i18n/locale-provider";
 
 type Props = {
   analytics: TeacherDashboardAnalytics;
@@ -10,21 +11,18 @@ type Props = {
   chartsOnly?: boolean;
 };
 
-function pluralCount(n: number, singular: string, plural?: string) {
-  return `${n} ${n === 1 ? singular : (plural ?? `${singular}s`)}`;
-}
-
 function AttendanceTrendChart({
   trend,
 }: {
   trend: TeacherDashboardAnalytics["attendanceTrend"];
 }) {
+  const { t } = useLocale();
   const maxRate = Math.max(100, ...trend.map((d) => d.rate ?? 0));
   const hasData = trend.some((d) => d.marked > 0);
 
   return (
     <div className="tch-da-chart">
-      <div className="tch-da-chart__bars" role="img" aria-label="Homeroom attendance last 7 days">
+      <div className="tch-da-chart__bars" role="img" aria-label={t("teacherAnalyticsUi.ariaAttTrend")}>
         {trend.map((day) => {
           const h = day.rate != null ? Math.max(8, (day.rate / maxRate) * 100) : 4;
           return (
@@ -35,8 +33,13 @@ function AttendanceTrendChart({
                   style={{ height: `${h}%` }}
                   title={
                     day.rate != null
-                      ? `${day.weekday}: ${day.rate}% (${day.present}/${day.marked})`
-                      : `${day.weekday}: no marks`
+                      ? t("teacherAnalyticsUi.chartDayTitle", {
+                          weekday: day.weekday,
+                          rate: day.rate,
+                          present: day.present,
+                          marked: day.marked,
+                        })
+                      : t("teacherAnalyticsUi.chartDayNoMarks", { weekday: day.weekday })
                   }
                 />
               </div>
@@ -49,7 +52,7 @@ function AttendanceTrendChart({
         })}
       </div>
       {!hasData ? (
-        <p className="tch-da-chart__empty">Mark homeroom attendance to see trends.</p>
+        <p className="tch-da-chart__empty">{t("teacherAnalyticsUi.markAttForTrend")}</p>
       ) : null}
     </div>
   );
@@ -60,6 +63,7 @@ export function TeacherAnalyticsSection({
   showAttendance = false,
   chartsOnly = false,
 }: Props) {
+  const { t } = useLocale();
   const att = analytics.attendanceToday;
   const grade = analytics.grading;
   const cw = analytics.classwork;
@@ -75,10 +79,31 @@ export function TeacherAnalyticsSection({
     return null;
   }
 
+  const subjectHint =
+    analytics.subjectsTeaching === 1
+      ? t("teacherAnalyticsUi.subjectClassOne", { n: analytics.subjectsTeaching })
+      : t("teacherAnalyticsUi.subjectClassMany", { n: analytics.subjectsTeaching });
+
+  const gradingHint =
+    grade.missingScores > 0
+      ? grade.missingScores === 1
+        ? t("teacherAnalyticsUi.scoresMissingOne", { n: grade.missingScores })
+        : t("teacherAnalyticsUi.scoresMissingMany", { n: grade.missingScores })
+      : grade.termName ?? t("teacherAnalyticsUi.setupAcademicTerm");
+
+  const classworkHint =
+    cw.submissionsToGrade > 0
+      ? cw.submissionsToGrade === 1
+        ? t("teacherAnalyticsUi.submissionsReviewOne", { n: cw.submissionsToGrade })
+        : t("teacherAnalyticsUi.submissionsReviewMany", { n: cw.submissionsToGrade })
+      : t("teacherAnalyticsUi.allCaughtUp");
+
   return (
     <section
       className={`tch-stats${chartsOnly ? " tch-stats--insights" : ""}`}
-      aria-label={chartsOnly ? "Workspace insights" : "Workspace summary"}
+      aria-label={
+        chartsOnly ? t("teacherAnalyticsUi.ariaInsights") : t("teacherAnalyticsUi.ariaSummary")
+      }
     >
       {!chartsOnly ? (
       <div className="tch-stats__grid">
@@ -87,11 +112,9 @@ export function TeacherAnalyticsSection({
             <DashIcon name="students" className="dash-icon--sm" />
           </div>
           <div>
-            <p className="tch-stat-card__label">Students</p>
+            <p className="tch-stat-card__label">{t("teacherAnalyticsUi.statStudents")}</p>
             <p className="tch-stat-card__value">{analytics.totalStudents}</p>
-            <p className="tch-stat-card__hint">
-              {pluralCount(analytics.subjectsTeaching, "subject class", "subject classes")}
-            </p>
+            <p className="tch-stat-card__hint">{subjectHint}</p>
           </div>
         </article>
 
@@ -101,12 +124,15 @@ export function TeacherAnalyticsSection({
               <DashIcon name="attendance" className="dash-icon--sm" />
             </div>
             <div>
-              <p className="tch-stat-card__label">Homeroom today</p>
+              <p className="tch-stat-card__label">{t("teacherAnalyticsUi.homeroomToday")}</p>
               <p className="tch-stat-card__value">
                 {att.rate != null ? `${att.rate}%` : "—"}
               </p>
               <p className="tch-stat-card__hint">
-                {att.marked}/{att.total} marked
+                {t("teacherAnalyticsUi.markedRatio", {
+                  marked: att.marked,
+                  total: att.total,
+                })}
               </p>
             </div>
           </article>
@@ -117,13 +143,9 @@ export function TeacherAnalyticsSection({
             <DashIcon name="results" className="dash-icon--sm" />
           </div>
           <div>
-            <p className="tch-stat-card__label">Grading</p>
+            <p className="tch-stat-card__label">{t("teacherAnalyticsUi.grading")}</p>
             <p className="tch-stat-card__value">{gradingLabel}</p>
-            <p className="tch-stat-card__hint">
-              {grade.missingScores > 0
-                ? `${pluralCount(grade.missingScores, "score")} missing`
-                : grade.termName ?? "Set up academic term"}
-            </p>
+            <p className="tch-stat-card__hint">{gradingHint}</p>
           </div>
         </article>
 
@@ -132,13 +154,9 @@ export function TeacherAnalyticsSection({
             <DashIcon name="library" className="dash-icon--sm" />
           </div>
           <div>
-            <p className="tch-stat-card__label">Classwork</p>
+            <p className="tch-stat-card__label">{t("teacherAnalyticsUi.classwork")}</p>
             <p className="tch-stat-card__value">{cw.submissionsToGrade}</p>
-            <p className="tch-stat-card__hint">
-              {cw.submissionsToGrade > 0
-                ? `${pluralCount(cw.submissionsToGrade, "submission")} to review`
-                : "All caught up"}
-            </p>
+            <p className="tch-stat-card__hint">{classworkHint}</p>
           </div>
         </article>
       </div>
@@ -157,8 +175,8 @@ export function TeacherAnalyticsSection({
           {showAttendance ? (
             <article className="tch-panel tch-panel--insight">
               <header className="tch-panel__head">
-                <h3 className="tch-panel__title">Attendance trend</h3>
-                <span className="tch-panel__meta">Last 7 days</span>
+                <h3 className="tch-panel__title">{t("teacherAnalyticsUi.attTrendTitle")}</h3>
+                <span className="tch-panel__meta">{t("teacherAnalyticsUi.last7Days")}</span>
               </header>
               <AttendanceTrendChart trend={analytics.attendanceTrend} />
             </article>
@@ -167,18 +185,21 @@ export function TeacherAnalyticsSection({
           {hasGradingData || (chartsOnly && grade.termName) ? (
             <article className="tch-panel tch-panel--insight">
               <header className="tch-panel__head">
-                <h3 className="tch-panel__title">Grading status</h3>
+                <h3 className="tch-panel__title">{t("teacherAnalyticsUi.gradingStatusTitle")}</h3>
                 <span className="tch-panel__meta">
-                  {grade.termName ?? "No term"}
+                  {grade.termName ?? t("teacherAnalyticsUi.noTerm")}
                   {hasGradingData
-                    ? ` · ${grade.completeAssessments}/${grade.totalAssessments} complete`
+                    ? t("teacherAnalyticsUi.completeOf", {
+                        complete: grade.completeAssessments,
+                        total: grade.totalAssessments,
+                      })
                     : ""}
                 </span>
               </header>
               {hasGradingData ? (
                 <div className="tch-grading-bars">
                   <div className="tch-grading-bars__row">
-                    <span>Complete</span>
+                    <span>{t("teacherAnalyticsUi.complete")}</span>
                     <div className="tch-grading-bars__track">
                       <div
                         className="tch-grading-bars__fill tch-grading-bars__fill--done"
@@ -192,7 +213,7 @@ export function TeacherAnalyticsSection({
                     <strong>{grade.completeAssessments}</strong>
                   </div>
                   <div className="tch-grading-bars__row">
-                    <span>Missing scores</span>
+                    <span>{t("teacherAnalyticsUi.missingScores")}</span>
                     <div className="tch-grading-bars__track">
                       <div
                         className="tch-grading-bars__fill tch-grading-bars__fill--pending"
@@ -209,9 +230,13 @@ export function TeacherAnalyticsSection({
               ) : (
                 <div className="tch-insight-empty">
                   <DashIcon name="results" className="dash-icon--sm" />
-                  <p>No assessments recorded for {grade.termName} yet.</p>
+                  <p>
+                    {t("teacherAnalyticsUi.noAssessmentsYet", {
+                      term: grade.termName ?? "",
+                    })}
+                  </p>
                   <Link href="/teacher/results" className="tch-insight-empty__link">
-                    Open scores
+                    {t("teacherAnalyticsUi.openScores")}
                   </Link>
                 </div>
               )}
@@ -221,16 +246,16 @@ export function TeacherAnalyticsSection({
           {chartsOnly && (cw.published > 0 || cw.draft > 0 || cw.submissionsToGrade > 0) ? (
             <article className="tch-panel tch-panel--insight tch-panel--classwork">
               <header className="tch-panel__head">
-                <h3 className="tch-panel__title">Classwork</h3>
-                <span className="tch-panel__meta">Assignments & worksheets</span>
+                <h3 className="tch-panel__title">{t("teacherAnalyticsUi.classwork")}</h3>
+                <span className="tch-panel__meta">{t("teacherAnalyticsUi.classworkMeta")}</span>
               </header>
               <div className="tch-cw-stats-v4">
                 <div className="tch-cw-stats-v4__row">
-                  <span className="tch-cw-stats-v4__label">Published</span>
+                  <span className="tch-cw-stats-v4__label">{t("teacherAnalyticsUi.published")}</span>
                   <strong className="tch-cw-stats-v4__value">{cw.published}</strong>
                 </div>
                 <div className="tch-cw-stats-v4__row">
-                  <span className="tch-cw-stats-v4__label">Drafts</span>
+                  <span className="tch-cw-stats-v4__label">{t("teacherAnalyticsUi.drafts")}</span>
                   <strong className="tch-cw-stats-v4__value">{cw.draft}</strong>
                 </div>
                 {cw.submissionsToGrade > 0 ? (
@@ -238,12 +263,12 @@ export function TeacherAnalyticsSection({
                     href="/teacher/worksheets"
                     className="tch-cw-stats-v4__row tch-cw-stats-v4__row--accent tch-cw-stats-v4__row--link"
                   >
-                    <span className="tch-cw-stats-v4__label">To review</span>
+                    <span className="tch-cw-stats-v4__label">{t("teacherAnalyticsUi.toReview")}</span>
                     <strong className="tch-cw-stats-v4__value">{cw.submissionsToGrade}</strong>
                   </Link>
                 ) : (
                   <div className="tch-cw-stats-v4__row">
-                    <span className="tch-cw-stats-v4__label">To review</span>
+                    <span className="tch-cw-stats-v4__label">{t("teacherAnalyticsUi.toReview")}</span>
                     <strong className="tch-cw-stats-v4__value">{cw.submissionsToGrade}</strong>
                   </div>
                 )}

@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import QRCode from "qrcode";
+import { DashIcon } from "@/components/dashboard/dash-icons";
+import { useLocale } from "@/components/i18n/locale-provider";
 import { AppToast } from "@/components/ui/app-toast";
 import { hasPermission, Permission } from "@/lib/permissions";
 import {
@@ -12,7 +14,6 @@ import {
   type LeaveType,
 } from "@/lib/leave";
 import {
-  STAFF_ATTENDANCE_STATUS_LABELS,
   formatLateLabel,
   formatWorkedHours,
   getMyStaffAttendanceSummary,
@@ -33,7 +34,17 @@ function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
+const ATT_STATUS_KEYS: Record<StaffAttendanceStatus, string> = {
+  present: "myAttendanceUi.attPresent",
+  late: "myAttendanceUi.attLate",
+  absent: "myAttendanceUi.attAbsent",
+  half_day: "myAttendanceUi.attHalfDay",
+  on_leave: "myAttendanceUi.attOnLeave",
+  excused: "myAttendanceUi.attExcused",
+};
+
 export function MyAttendancePanel() {
+  const { t } = useLocale();
   const canLeave = hasPermission(Permission.LEAVE_REQUEST);
   const [from, setFrom] = useState(monthStart);
   const [to, setTo] = useState(today);
@@ -45,7 +56,7 @@ export function MyAttendancePanel() {
   const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
   const [types, setTypes] = useState<LeaveType[]>([]);
   const [qrPayload, setQrPayload] = useState<string | null>(null);
-  const [qrDataUrl, setQrDataUrl] = useState("");
+  const [qrDataUrlState, setQrDataUrl] = useState("");
   const [leaveTypeId, setLeaveTypeId] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -54,43 +65,65 @@ export function MyAttendancePanel() {
   const [toast, setToast] = useState("");
   const [loading, setLoading] = useState(true);
 
+  function fetchData() {
+    return Promise.all([
+      getMyStaffAttendanceSummary(from, to),
+      listLeaveRequests({ mine: true }).catch(() => []),
+      canLeave ? listLeaveTypes() : Promise.resolve([]),
+      getMyStaffQr().catch(() => null),
+    ]);
+  }
+
+  function applyData([summary, myLeaves, leaveTypes, qr]: Awaited<
+    ReturnType<typeof fetchData>
+  >) {
+    setRate(summary.rate);
+    setCounts(summary.counts);
+    setLateMinutes(summary.lateMinutes);
+    setWorkedMinutes(summary.workedMinutes);
+    setRecent(summary.recent);
+    setLeaves(myLeaves);
+    setTypes(leaveTypes);
+    if (leaveTypes[0]) {
+      setLeaveTypeId((current) => current || leaveTypes[0].id);
+    }
+    setQrPayload(qr?.active ? qr.payload : null);
+  }
+
   async function load() {
     setLoading(true);
     setError("");
     try {
-      const [summary, myLeaves, leaveTypes, qr] = await Promise.all([
-        getMyStaffAttendanceSummary(from, to),
-        listLeaveRequests({ mine: true }).catch(() => []),
-        canLeave ? listLeaveTypes() : Promise.resolve([]),
-        getMyStaffQr().catch(() => null),
-      ]);
-      setRate(summary.rate);
-      setCounts(summary.counts);
-      setLateMinutes(summary.lateMinutes);
-      setWorkedMinutes(summary.workedMinutes);
-      setRecent(summary.recent);
-      setLeaves(myLeaves);
-      setTypes(leaveTypes);
-      if (leaveTypes[0] && !leaveTypeId) setLeaveTypeId(leaveTypes[0].id);
-      setQrPayload(qr?.active ? qr.payload : null);
+      applyData(await fetchData());
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load");
+      setError(err instanceof Error ? err.message : t("myAttendanceUi.loadFailed"));
     } finally {
       setLoading(false);
     }
   }
 
+  const rangeKey = `${from}|${to}`;
+  const [prevRangeKey, setPrevRangeKey] = useState(rangeKey);
+  if (rangeKey !== prevRangeKey) {
+    setPrevRangeKey(rangeKey);
+    setLoading(true);
+    setError("");
+  }
+
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- async load()
-    void load();
+    void fetchData()
+      .then(applyData)
+      .catch((err) =>
+        setError(err instanceof Error ? err.message : t("myAttendanceUi.loadFailed")),
+      )
+      .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [from, to]);
 
+  const qrDataUrl = qrPayload ? qrDataUrlState : "";
+
   useEffect(() => {
-    if (!qrPayload) {
-      setQrDataUrl("");
-      return;
-    }
+    if (!qrPayload) return;
     let cancelled = false;
     void QRCode.toDataURL(qrPayload, {
       width: 220,
@@ -106,154 +139,130 @@ export function MyAttendancePanel() {
   }, [qrPayload]);
 
   return (
-    <div className="sa-page">
+    <div className="sa-page tch-day tch-my-att">
       <AppToast message={error} tone="error" onDismiss={() => setError("")} />
       <AppToast message={toast} tone="success" onDismiss={() => setToast("")} />
 
-      <header className="tch-v2__hero">
-        <div className="tch-v2__hero-glow" aria-hidden />
-        <div className="tch-v2__hero-inner">
-          <div className="tch-v2__hero-main">
-            <span className="tch-v2__chip">My attendance</span>
-            <h2 className="tch-v2__hero-title">My Attendance</h2>
-            <p className="tch-v2__hero-sub">
-              Your personal attendance, worked hours, and leave requests.
-            </p>
+      <header className="tch-day__hero">
+        <div className="tch-day__hero-main">
+          <div className="tch-day__brand">
+            <span className="tch-day__chip">{t("myAttendanceUi.chipStaff")}</span>
+            <span className="tch-day__icon" aria-hidden>
+              <DashIcon name="attendance" className="dash-icon--sm" />
+            </span>
           </div>
-          <div className="tch-v2__hero-stats">
-            <div className="tch-v2__stat">
-              <strong>
-                {loading || rate == null ? "—" : `${rate}%`}
-              </strong>
-              <span>Rate</span>
-            </div>
-            <div className="tch-v2__stat">
-              <strong>{counts.present ?? 0}</strong>
-              <span>Present</span>
-            </div>
-            <div className="tch-v2__stat">
-              <strong>{counts.late ?? 0}</strong>
-              <span>Late</span>
-            </div>
-            <div className="tch-v2__stat tch-v2__stat--accent">
-              <strong>{counts.absent ?? 0}</strong>
-              <span>Absent</span>
-            </div>
+          <h2 className="tch-day__title">{t("myAttendanceUi.title")}</h2>
+          <p className="tch-day__sub">{t("myAttendanceUi.subtitle")}</p>
+        </div>
+        <div className="tch-day__stats" aria-label={t("myAttendanceUi.summaryAria")}>
+          <div className="tch-day__stat">
+            <strong>{loading || rate == null ? "—" : `${rate}%`}</strong>
+            <span>{t("myAttendanceUi.statRate")}</span>
+          </div>
+          <div className="tch-day__stat">
+            <strong>{counts.present ?? 0}</strong>
+            <span>{t("myAttendanceUi.statPresent")}</span>
+          </div>
+          <div className="tch-day__stat">
+            <strong>{counts.late ?? 0}</strong>
+            <span>{t("myAttendanceUi.statLate")}</span>
+          </div>
+          <div className="tch-day__stat tch-day__stat--warn">
+            <strong>{counts.absent ?? 0}</strong>
+            <span>{t("myAttendanceUi.statAbsent")}</span>
           </div>
         </div>
       </header>
 
-      <div className="sa-toolbar">
+      <div className="tch-my-att__toolbar">
         <label className="sa-field">
-          <span>From</span>
+          <span>{t("myAttendanceUi.from")}</span>
           <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
         </label>
         <label className="sa-field">
-          <span>To</span>
+          <span>{t("myAttendanceUi.to")}</span>
           <input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
         </label>
       </div>
 
-      <div className="sa-stats">
-        <div className="sa-stat sa-stat--present">
-          <span className="sa-stat__label">Rate</span>
-          <strong className="sa-stat__value">
-            {loading ? "—" : rate != null ? `${rate}%` : "—"}
-          </strong>
+      <div className="tch-my-att__kpis">
+        <div className="tch-my-att__kpi">
+          <span>{t("myAttendanceUi.leaveDays")}</span>
+          <strong>{counts.on_leave ?? 0}</strong>
         </div>
-        <div className="sa-stat sa-stat--present">
-          <span className="sa-stat__label">Present</span>
-          <strong className="sa-stat__value">{counts.present ?? 0}</strong>
+        <div className="tch-my-att__kpi">
+          <span>{t("myAttendanceUi.worked")}</span>
+          <strong>{formatWorkedHours(workedMinutes)}</strong>
         </div>
-        <div className="sa-stat sa-stat--late">
-          <span className="sa-stat__label">Late</span>
-          <strong className="sa-stat__value">{counts.late ?? 0}</strong>
-        </div>
-        <div className="sa-stat sa-stat--absent">
-          <span className="sa-stat__label">Absent</span>
-          <strong className="sa-stat__value">{counts.absent ?? 0}</strong>
-        </div>
-        <div className="sa-stat sa-stat--leave">
-          <span className="sa-stat__label">Leave</span>
-          <strong className="sa-stat__value">{counts.on_leave ?? 0}</strong>
-        </div>
-        <div className="sa-stat sa-stat--half">
-          <span className="sa-stat__label">Worked</span>
-          <strong className="sa-stat__value">
-            {formatWorkedHours(workedMinutes)}
-          </strong>
+        <div className="tch-my-att__kpi">
+          <span>{t("myAttendanceUi.lateTotal")}</span>
+          <strong>{t("myAttendanceUi.lateMin", { count: lateMinutes })}</strong>
         </div>
       </div>
-      <p className="sa-hours-note">Total late {lateMinutes} min in this range.</p>
 
-      <div className="sa-scan__feed sa-my-qr">
-        <header className="sa-scan__feed-head">
-          <h3>My check-in QR</h3>
-        </header>
+      <section className="tch-my-att__qr">
+        <div className="tch-my-att__qr-copy">
+          <h3>{t("myAttendanceUi.checkInQr")}</h3>
+          <p>{t("myAttendanceUi.qrHint")}</p>
+          {!qrPayload ? (
+            <button
+              type="button"
+              className="tch-day__empty-btn"
+              onClick={() =>
+                void issueMyStaffQr()
+                  .then((q) => {
+                    setQrPayload(q.payload);
+                    setToast(t("myAttendanceUi.qrIssued"));
+                  })
+                  .catch((err) =>
+                    setError(err instanceof Error ? err.message : t("myAttendanceUi.qrFailed")),
+                  )
+              }
+            >
+              {t("myAttendanceUi.generateQr")}
+            </button>
+          ) : (
+            <p className="tch-my-att__code">
+              {t("myAttendanceUi.manualCode")} <code>{qrPayload}</code>
+            </p>
+          )}
+        </div>
         {qrPayload ? (
-          <div className="sa-my-qr__body">
-            <div className="sa-my-qr__frame">
-              {qrDataUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={qrDataUrl}
-                  alt="Staff check-in QR code"
-                  className="sa-my-qr__img"
-                  width={220}
-                  height={220}
-                />
-              ) : (
-                <div className="sa-my-qr__placeholder" aria-hidden>
-                  Generating…
-                </div>
-              )}
-            </div>
-            <div className="sa-my-qr__meta">
-              <p className="sa-my-qr__hint">
-                Show this QR at the gate scanner for check-in / check-out.
-              </p>
-              <p className="sa-hours-note">
-                Manual code: <code>{qrPayload}</code>
-              </p>
-            </div>
+          <div className="tch-my-att__qr-frame">
+            {qrDataUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={qrDataUrl}
+                alt={t("myAttendanceUi.qrAlt")}
+                width={200}
+                height={200}
+              />
+            ) : (
+              <div className="tch-my-att__qr-placeholder" aria-hidden>
+                {t("myAttendanceUi.generatingQr")}
+              </div>
+            )}
           </div>
-        ) : (
-          <button
-            type="button"
-            className="sa-btn sa-btn--primary"
-            onClick={() =>
-              void issueMyStaffQr()
-                .then((q) => {
-                  setQrPayload(q.payload);
-                  setToast("QR issued");
-                })
-                .catch((err) =>
-                  setError(err instanceof Error ? err.message : "QR failed"),
-                )
-            }
-          >
-            Generate my QR
-          </button>
-        )}
-      </div>
+        ) : null}
+      </section>
 
       <div className="sa-table-wrap">
         <table className="sa-table">
           <thead>
             <tr>
-              <th>Date</th>
-              <th>Status</th>
-              <th>In</th>
-              <th>Out</th>
-              <th>Late</th>
-              <th>Worked</th>
+              <th>{t("myAttendanceUi.colDate")}</th>
+              <th>{t("myAttendanceUi.colStatus")}</th>
+              <th>{t("myAttendanceUi.colIn")}</th>
+              <th>{t("myAttendanceUi.colOut")}</th>
+              <th>{t("myAttendanceUi.colLate")}</th>
+              <th>{t("myAttendanceUi.colWorked")}</th>
             </tr>
           </thead>
           <tbody>
             {!recent.length ? (
               <tr>
                 <td colSpan={6} className="sa-empty">
-                  No records in this range.
+                  {t("myAttendanceUi.noRecords")}
                 </td>
               </tr>
             ) : (
@@ -262,11 +271,9 @@ export function MyAttendancePanel() {
                   <td>{r.date}</td>
                   <td>
                     <span className={`sa-badge sa-badge--${r.status}`}>
-                      {
-                        STAFF_ATTENDANCE_STATUS_LABELS[
-                          r.status as StaffAttendanceStatus
-                        ]
-                      }
+                      {t(
+                        ATT_STATUS_KEYS[r.status as StaffAttendanceStatus],
+                      )}
                     </span>
                   </td>
                   <td>{r.checkInLabel || "—"}</td>
@@ -293,31 +300,33 @@ export function MyAttendancePanel() {
                 reason,
               })
                 .then(() => {
-                  setToast("Leave requested");
+                  setToast(t("myAttendanceUi.leaveRequested"));
                   setReason("");
                   return load();
                 })
                 .catch((err) =>
-                  setError(err instanceof Error ? err.message : "Leave failed"),
+                  setError(
+                    err instanceof Error ? err.message : t("myAttendanceUi.leaveFailed"),
+                  ),
                 );
             }}
           >
             <label className="sa-field">
-              <span>Leave type</span>
+              <span>{t("myAttendanceUi.leaveType")}</span>
               <select
                 value={leaveTypeId}
                 onChange={(e) => setLeaveTypeId(e.target.value)}
                 required
               >
-                {types.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
+                {types.map((leave) => (
+                  <option key={leave.id} value={leave.id}>
+                    {leave.name}
                   </option>
                 ))}
               </select>
             </label>
             <label className="sa-field">
-              <span>Start</span>
+              <span>{t("myAttendanceUi.start")}</span>
               <input
                 type="date"
                 value={startDate}
@@ -326,7 +335,7 @@ export function MyAttendancePanel() {
               />
             </label>
             <label className="sa-field">
-              <span>End</span>
+              <span>{t("myAttendanceUi.end")}</span>
               <input
                 type="date"
                 value={endDate}
@@ -335,7 +344,7 @@ export function MyAttendancePanel() {
               />
             </label>
             <label className="sa-field sa-field--grow">
-              <span>Reason</span>
+              <span>{t("myAttendanceUi.reason")}</span>
               <input
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
@@ -344,7 +353,7 @@ export function MyAttendancePanel() {
               />
             </label>
             <button type="submit" className="sa-btn sa-btn--primary">
-              Request leave
+              {t("myAttendanceUi.requestLeave")}
             </button>
           </form>
 
@@ -352,10 +361,10 @@ export function MyAttendancePanel() {
             <table className="sa-table sa-table--compact">
               <thead>
                 <tr>
-                  <th>Type</th>
-                  <th>Dates</th>
-                  <th>Days</th>
-                  <th>Status</th>
+                  <th>{t("myAttendanceUi.colType")}</th>
+                  <th>{t("myAttendanceUi.colDates")}</th>
+                  <th>{t("myAttendanceUi.colDays")}</th>
+                  <th>{t("myAttendanceUi.colStatus")}</th>
                 </tr>
               </thead>
               <tbody>

@@ -23,22 +23,28 @@ import {
 import { listMyScoreUpdates, type StudentScoreUpdate } from "@/lib/results";
 import { readSchoolBrand } from "@/lib/school-brand";
 import { BRAND_NAME } from "@/lib/brand";
+import { useLocale } from "@/components/i18n/locale-provider";
+import type { AppLocale } from "@/lib/i18n";
 
-function attendanceLabel(status: string) {
+function localeTag(locale: AppLocale) {
+  return locale === "am" ? "am-ET" : undefined;
+}
+
+function attendanceLabel(status: string, t: (key: string) => string) {
   const s = status.toUpperCase();
-  if (s === "PRESENT") return { text: "Present", tone: "ok" as const };
-  if (s === "ABSENT") return { text: "Absent", tone: "bad" as const };
-  if (s === "LATE") return { text: "Late", tone: "warn" as const };
-  if (s === "EXCUSED") return { text: "Excused", tone: "ok" as const };
+  if (s === "PRESENT") return { text: t("common.present"), tone: "ok" as const };
+  if (s === "ABSENT") return { text: t("common.absent"), tone: "bad" as const };
+  if (s === "LATE") return { text: t("common.late"), tone: "warn" as const };
+  if (s === "EXCUSED") return { text: t("common.excused"), tone: "ok" as const };
   if (!status || s === "UNKNOWN" || s === "NOT_MARKED") {
-    return { text: "Not marked", tone: "muted" as const };
+    return { text: t("common.notMarked"), tone: "muted" as const };
   }
   return { text: status, tone: "muted" as const };
 }
 
-function formatDate(iso: string) {
+function formatDate(iso: string, locale: AppLocale) {
   try {
-    return new Date(iso).toLocaleDateString(undefined, {
+    return new Date(iso).toLocaleDateString(localeTag(locale), {
       month: "short",
       day: "numeric",
       year: "numeric",
@@ -48,15 +54,21 @@ function formatDate(iso: string) {
   }
 }
 
-function formatWeekday(iso: string) {
+function formatWeekday(iso: string, locale: AppLocale) {
   try {
-    return new Date(iso).toLocaleDateString(undefined, { weekday: "short" });
+    return new Date(iso).toLocaleDateString(localeTag(locale), { weekday: "short" });
   } catch {
     return "";
   }
 }
 
-function statusLabel(status: string) {
+function statusLabel(status: string, t: (key: string) => string) {
+  const s = status.toUpperCase();
+  if (s === "PRESENT") return t("common.present");
+  if (s === "ABSENT") return t("common.absent");
+  if (s === "LATE") return t("common.late");
+  if (s === "EXCUSED") return t("common.excused");
+  if (!status || s === "UNKNOWN" || s === "NOT_MARKED") return t("common.notMarked");
   return status.charAt(0).toUpperCase() + status.slice(1);
 }
 
@@ -87,7 +99,13 @@ function aggregateScoresBySubject(scores: StudentScoreUpdate[]): StudentScoreUpd
   }));
 }
 
-function AttendanceRing({ rate }: { rate: number | null }) {
+function AttendanceRing({
+  rate,
+  attendanceLabel,
+}: {
+  rate: number | null;
+  attendanceLabel: string;
+}) {
   const r = 42;
   const c = 2 * Math.PI * r;
   const value = rate != null ? Math.max(0, Math.min(100, rate)) : 0;
@@ -109,7 +127,7 @@ function AttendanceRing({ rate }: { rate: number | null }) {
       </svg>
       <div className="stu-chart-ring__label">
         <strong>{rate != null ? `${rate}%` : "—"}</strong>
-        <span>Attendance</span>
+        <span>{attendanceLabel}</span>
       </div>
     </div>
   );
@@ -117,16 +135,18 @@ function AttendanceRing({ rate }: { rate: number | null }) {
 
 function AttendanceBreakdown({
   counts,
+  labels,
 }: {
   counts: AttendanceSummary["counts"];
+  labels: { present: string; absent: string; late: string; excused: string };
 }) {
   const total =
     counts.present + counts.absent + counts.late + counts.excused || 1;
   const segments = [
-    { key: "present", label: "Present", value: counts.present, tone: "present" },
-    { key: "absent", label: "Absent", value: counts.absent, tone: "absent" },
-    { key: "late", label: "Late", value: counts.late, tone: "late" },
-    { key: "excused", label: "Excused", value: counts.excused, tone: "excused" },
+    { key: "present", label: labels.present, value: counts.present, tone: "present" },
+    { key: "absent", label: labels.absent, value: counts.absent, tone: "absent" },
+    { key: "late", label: labels.late, value: counts.late, tone: "late" },
+    { key: "excused", label: labels.excused, value: counts.excused, tone: "excused" },
   ];
 
   return (
@@ -155,7 +175,17 @@ function AttendanceBreakdown({
   );
 }
 
-function ScoreBars({ scores }: { scores: StudentScoreUpdate[] }) {
+function ScoreBars({
+  scores,
+  emptyTitle,
+  emptyHint,
+  chartAria,
+}: {
+  scores: StudentScoreUpdate[];
+  emptyTitle: string;
+  emptyHint: string;
+  chartAria: string;
+}) {
   const bySubject = useMemo(() => aggregateScoresBySubject(scores), [scores]);
   const max = Math.max(100, ...bySubject.map((r) => r.percentage), 1);
 
@@ -163,16 +193,14 @@ function ScoreBars({ scores }: { scores: StudentScoreUpdate[] }) {
     return (
       <div className="par-home__empty-block">
         <DashIcon name="results" className="dash-icon--lg" />
-        <p>No officially published scores yet for this child.</p>
-        <p className="par-home__list-meta">
-          You will get an alert when the school publishes results.
-        </p>
+        <p>{emptyTitle}</p>
+        <p className="par-home__list-meta">{emptyHint}</p>
       </div>
     );
   }
 
   return (
-    <div className="stu-chart-bars" role="img" aria-label="Published subject scores">
+    <div className="stu-chart-bars" role="img" aria-label={chartAria}>
       {bySubject.slice(0, 8).map((row) => {
         const h = Math.max(8, Math.round((row.percentage / max) * 100));
         const tone =
@@ -205,6 +233,7 @@ function ScoreBars({ scores }: { scores: StudentScoreUpdate[] }) {
 }
 
 export function ParentDashboard() {
+  const { t, locale } = useLocale();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -254,15 +283,17 @@ export function ParentDashboard() {
   );
 
   useEffect(() => {
-    setMounted(true);
-    setTodayShort(
-      new Date().toLocaleDateString(undefined, {
-        weekday: "short",
-        month: "short",
-        day: "numeric",
-      }),
-    );
-  }, []);
+    queueMicrotask(() => {
+      setMounted(true);
+      setTodayShort(
+        new Date().toLocaleDateString(localeTag(locale), {
+          weekday: "short",
+          month: "short",
+          day: "numeric",
+        }),
+      );
+    });
+  }, [locale]);
 
   useEffect(() => {
     const load = async () => {
@@ -312,14 +343,21 @@ export function ParentDashboard() {
     return (
       <div className="dash-loading dash-loading--pro">
         <span className="dash-loading-spinner" aria-hidden />
-        <p>Loading family dashboard…</p>
+        <p>{t("dash.loadingFamily")}</p>
       </div>
     );
   }
 
   const attToday = selectedChild
-    ? attendanceLabel(selectedChild.attendanceToday)
+    ? attendanceLabel(selectedChild.attendanceToday, t)
     : null;
+
+  const attendanceBreakdownLabels = {
+    present: t("common.present"),
+    absent: t("common.absent"),
+    late: t("common.late"),
+    excused: t("common.excused"),
+  };
   const dueTotal = parentDay?.totalDueCents ?? 0;
   const childHello = firstName(selectedChild?.name);
   const classLabel = selectedChild
@@ -333,7 +371,11 @@ export function ParentDashboard() {
   const recentAttendance = (attendanceSummary?.recent ?? []).slice(0, 3);
 
   return (
-    <DashboardShell role="parent">
+    <DashboardShell
+      role="parent"
+      title={t("pages.parentOverview.title")}
+      subtitle={t("pages.parentOverview.subtitle")}
+    >
       <div className="co-page co-page__body par-home par-home--modern">
         <header className="par-home__hero">
           <div className="par-home__hero-glow" aria-hidden />
@@ -343,36 +385,37 @@ export function ParentDashboard() {
                 <span className="par-home__hero-chip">{todayShort}</span>
               ) : null}
               <h1 className="par-home__title">
-                {childHello ? `${childHello}'s overview` : "Family portal"}
+                {childHello
+                  ? t("dash.childOverview", { name: childHello })
+                  : t("dash.familyPortal")}
               </h1>
               <p className="par-home__sub">
                 {schoolName}
-                {classLabel ? ` · ${classLabel}` : ""}. Track attendance, published
-                results, fees, and school news.
+                {classLabel ? ` · ${classLabel}` : ""}. {t("dash.familyTrackSub")}
               </p>
             </div>
             <div className="par-home__hero-stats">
               <div className="par-home__hero-stat">
                 <strong>{attToday?.text ?? "—"}</strong>
-                <span>Today</span>
+                <span>{t("dash.today")}</span>
               </div>
               <div className="par-home__hero-stat">
                 <strong>
                   {avgScore != null
                     ? `${avgScore}%`
                     : selectedChild?.parentsCanViewResults === false
-                      ? "Private"
+                      ? t("dash.private")
                       : "—"}
                 </strong>
-                <span>Average</span>
+                <span>{t("dash.average")}</span>
               </div>
               <Link href="/parent/fees" className="par-home__hero-stat par-home__hero-stat--link">
                 <strong><EtbAmount cents={selectedChild?.outstandingCents ?? 0} /></strong>
-                <span>Fees due</span>
+                <span>{t("dash.feesDue")}</span>
               </Link>
               <div className="par-home__hero-stat par-home__hero-stat--accent">
                 <strong>{parentAlerts.length}</strong>
-                <span>Alerts</span>
+                <span>{t("dash.alerts")}</span>
               </div>
             </div>
           </div>
@@ -383,24 +426,25 @@ export function ParentDashboard() {
         ) : null}
 
         <ParentChildBar
-          children={children}
           selectedId={selectedChildId}
           onChange={setSelectedChildId}
-          label="Child"
-        />
+          label={t("common.child")}
+        >
+          {children}
+        </ParentChildBar>
 
         {selectedChild ? (
-          <section className="par-home__kpis" aria-label="Family shortcuts">
+          <section className="par-home__kpis" aria-label={t("dash.familyShortcuts")}>
             <a href="#par-attendance" className="par-home__kpi-card">
               <span className="par-home__kpi-icon par-home__kpi-icon--green" aria-hidden>
                 <DashIcon name="attendance" />
               </span>
               <div>
-                <p className="par-home__kpi-label">Attendance</p>
+                <p className="par-home__kpi-label">{t("dash.attendance")}</p>
                 <p className="par-home__kpi-value">
                   {attendanceRate != null ? `${attendanceRate}%` : attToday?.text ?? "—"}
                 </p>
-                <p className="par-home__kpi-hint">Overall rate</p>
+                <p className="par-home__kpi-hint">{t("dash.overallRate")}</p>
               </div>
             </a>
             <Link href="/parent/results" className="par-home__kpi-card">
@@ -408,18 +452,18 @@ export function ParentDashboard() {
                 <DashIcon name="results" />
               </span>
               <div>
-                <p className="par-home__kpi-label">Results</p>
+                <p className="par-home__kpi-label">{t("dash.results")}</p>
                 <p className="par-home__kpi-value">
                   {avgScore != null
                     ? `${avgScore}%`
                     : selectedChild.parentsCanViewResults === false
-                      ? "Private"
+                      ? t("dash.private")
                       : "—"}
                 </p>
                 <p className="par-home__kpi-hint">
                   {publishedScores.length > 0
-                    ? `${publishedScores.length} published`
-                    : "Published scores"}
+                    ? t("dash.publishedCount", { count: publishedScores.length })
+                    : t("dash.publishedScores")}
                 </p>
               </div>
             </Link>
@@ -431,12 +475,14 @@ export function ParentDashboard() {
                 <DashIcon name="fees" />
               </span>
               <div>
-                <p className="par-home__kpi-label">Fees</p>
+                <p className="par-home__kpi-label">{t("dash.fees")}</p>
                 <p className="par-home__kpi-value">
                   <EtbAmount cents={selectedChild.outstandingCents} />
                 </p>
                 <p className="par-home__kpi-hint">
-                  {selectedChild.outstandingCents > 0 ? "Outstanding" : "Up to date"}
+                  {selectedChild.outstandingCents > 0
+                    ? t("dash.outstanding")
+                    : t("dash.upToDate")}
                 </p>
               </div>
             </Link>
@@ -445,9 +491,9 @@ export function ParentDashboard() {
                 <DashIcon name="calendar" />
               </span>
               <div>
-                <p className="par-home__kpi-label">Timetable</p>
-                <p className="par-home__kpi-value">Today</p>
-                <p className="par-home__kpi-hint">Classes & schedule</p>
+                <p className="par-home__kpi-label">{t("nav.Timetable")}</p>
+                <p className="par-home__kpi-value">{t("dash.timetableToday")}</p>
+                <p className="par-home__kpi-hint">{t("dash.classesSchedule")}</p>
               </div>
             </Link>
           </section>
@@ -455,20 +501,24 @@ export function ParentDashboard() {
 
         {dueTotal > 0 && children.length > 1 ? (
           <p className="par-home__family-due">
-            All children · <strong><EtbAmount cents={dueTotal} /></strong> outstanding ·{" "}
-            <Link href="/parent/fees">View fees</Link>
+            {t("dash.allChildrenOutstanding")}
+            <strong><EtbAmount cents={dueTotal} /></strong>
+            <Link href="/parent/fees">{t("dash.viewFees")}</Link>
           </p>
         ) : null}
 
         {resultAlerts.length > 0 && selectedChild?.parentsCanViewResults !== false ? (
-          <section className="par-home__publish-banner" aria-label="Published results">
+          <section
+            className="par-home__publish-banner"
+            aria-label={t("dash.publishedScores")}
+          >
             <div>
-              <p className="par-home__publish-eyebrow">Official release</p>
+              <p className="par-home__publish-eyebrow">{t("dash.officialRelease")}</p>
               <h2 className="par-home__publish-title">{resultAlerts[0].title}</h2>
               <p className="par-home__publish-body">{resultAlerts[0].body}</p>
             </div>
             <Link href="/parent/results" className="par-home__btn par-home__btn--primary">
-              View published results
+              {t("dash.viewPublishedResults")}
             </Link>
           </section>
         ) : null}
@@ -479,8 +529,8 @@ export function ParentDashboard() {
               <article className="par-home__panel par-home__panel--chart" id="par-attendance">
                 <header className="par-home__panel-head">
                   <div>
-                    <h2>Attendance</h2>
-                    <p className="par-home__panel-sub">Overall rate and status mix</p>
+                    <h2>{t("dash.attendance")}</h2>
+                    <p className="par-home__panel-sub">{t("dash.overallRateMix")}</p>
                   </div>
                   {attendanceSummary ? (
                     <span className="par-home__badge">{attendanceSummary.rate}%</span>
@@ -488,33 +538,43 @@ export function ParentDashboard() {
                 </header>
                 {attendanceSummary ? (
                   <div className="par-home__chart-layout">
-                    <AttendanceRing rate={attendanceRate} />
-                    <AttendanceBreakdown counts={attendanceSummary.counts} />
+                    <AttendanceRing
+                      rate={attendanceRate}
+                      attendanceLabel={t("dash.attendance")}
+                    />
+                    <AttendanceBreakdown
+                      counts={attendanceSummary.counts}
+                      labels={attendanceBreakdownLabels}
+                    />
                   </div>
                 ) : (
-                  <p className="par-home__empty">No attendance summary yet for this child.</p>
+                  <p className="par-home__empty">{t("dash.noAttendanceSummary")}</p>
                 )}
               </article>
 
               <article className="par-home__panel par-home__panel--chart">
                 <header className="par-home__panel-head">
                   <div>
-                    <h2>Published scores</h2>
-                    <p className="par-home__panel-sub">Official results by subject</p>
+                    <h2>{t("dash.publishedScores")}</h2>
+                    <p className="par-home__panel-sub">{t("dash.officialBySubject")}</p>
                   </div>
                   <Link href="/parent/results" className="par-home__panel-link">
-                    View all <DashIcon name="chevron" className="dash-icon--xs" />
+                    {t("dash.viewAll")}{" "}
+                    <DashIcon name="chevron" className="dash-icon--xs" />
                   </Link>
                 </header>
                 {selectedChild?.parentsCanViewResults === false ? (
                   <div className="par-home__empty-block">
-                    <p>This student has turned off parent access to results.</p>
-                    <p className="par-home__list-meta">
-                      They can re-enable it from Profile → Results privacy.
-                    </p>
+                    <p>{t("dash.resultsAccessOff")}</p>
+                    <p className="par-home__list-meta">{t("dash.resultsAccessOffHint")}</p>
                   </div>
                 ) : (
-                  <ScoreBars scores={scoreUpdates} />
+                  <ScoreBars
+                    scores={scoreUpdates}
+                    emptyTitle={t("dash.noOfficialScoresChild")}
+                    emptyHint={t("dash.alertWhenResultsPublished")}
+                    chartAria={t("dash.publishedScoresChart")}
+                  />
                 )}
               </article>
             </div>
@@ -523,26 +583,26 @@ export function ParentDashboard() {
               <article className="par-home__panel">
                 <header className="par-home__panel-head">
                   <div>
-                    <h2>Recent attendance</h2>
-                    <p className="par-home__panel-sub">Latest roll call days</p>
+                    <h2>{t("dash.recentAttendance")}</h2>
+                    <p className="par-home__panel-sub">{t("dash.latestRollCall")}</p>
                   </div>
                 </header>
                 {recentAttendance.length === 0 ? (
-                  <p className="par-home__empty">No attendance records yet.</p>
+                  <p className="par-home__empty">{t("dash.noAttendanceRecords")}</p>
                 ) : (
                   <ul className="par-home__timeline">
                     {recentAttendance.map((row) => (
                       <li key={row.id} className="par-home__timeline-row">
                         <div className="par-home__timeline-date">
                           <span className="par-home__timeline-weekday">
-                            {formatWeekday(row.date)}
+                            {formatWeekday(row.date, locale)}
                           </span>
-                          <p className="par-home__list-title">{formatDate(row.date)}</p>
+                          <p className="par-home__list-title">{formatDate(row.date, locale)}</p>
                         </div>
                         <span
                           className={`par-home__status par-home__status--${row.status}`}
                         >
-                          {statusLabel(row.status)}
+                          {statusLabel(row.status, t)}
                         </span>
                       </li>
                     ))}
@@ -553,15 +613,15 @@ export function ParentDashboard() {
               <article className="par-home__panel">
                 <header className="par-home__panel-head">
                   <div>
-                    <h2>Top subjects</h2>
-                    <p className="par-home__panel-sub">Highest published scores</p>
+                    <h2>{t("dash.topSubjects")}</h2>
+                    <p className="par-home__panel-sub">{t("dash.highestScores")}</p>
                   </div>
                   <Link href="/parent/report-card" className="par-home__panel-link">
-                    Report card
+                    {t("dash.reportCard")}
                   </Link>
                 </header>
                 {sortedScores.length === 0 ? (
-                  <p className="par-home__empty">No published scores yet.</p>
+                  <p className="par-home__empty">{t("dash.noPublishedScores")}</p>
                 ) : (
                   <ul className="par-home__rank-list">
                     {sortedScores.slice(0, 5).map((row, index) => (
@@ -582,8 +642,8 @@ export function ParentDashboard() {
               <article className="par-home__panel par-home__panel--aside">
                 <header className="par-home__panel-head">
                   <div>
-                    <h2>Alerts</h2>
-                    <p className="par-home__panel-sub">Updates for your family</p>
+                    <h2>{t("dash.alerts")}</h2>
+                    <p className="par-home__panel-sub">{t("dash.updatesForFamily")}</p>
                   </div>
                   <span className="par-home__badge">{parentAlerts.length}</span>
                 </header>
@@ -600,13 +660,13 @@ export function ParentDashboard() {
                           <p className="par-home__list-title">
                             {n.title}
                             {isResults ? (
-                              <span className="par-home__published-tag">Results</span>
+                              <span className="par-home__published-tag">{t("dash.results")}</span>
                             ) : null}
                           </p>
                           <p className="par-home__list-meta">{n.body}</p>
                           {isResults ? (
                             <Link href="/parent/results" className="par-home__link">
-                              Open results
+                              {t("dash.openResults")}
                             </Link>
                           ) : null}
                         </div>
@@ -620,13 +680,13 @@ export function ParentDashboard() {
             <article className="par-home__panel par-home__panel--aside">
               <header className="par-home__panel-head">
                 <div>
-                  <h2>Announcements</h2>
-                  <p className="par-home__panel-sub">News from your school</p>
+                  <h2>{t("dash.announcements")}</h2>
+                  <p className="par-home__panel-sub">{t("dash.newsFromSchool")}</p>
                 </div>
                 <span className="par-home__badge">{announcements.length}</span>
               </header>
               {announcements.length === 0 ? (
-                <p className="par-home__empty">No school announcements yet.</p>
+                <p className="par-home__empty">{t("dash.noSchoolAnnouncements")}</p>
               ) : (
                 <ul className="par-home__announce-list">
                   {announcements.slice(0, 5).map((item) => (
@@ -634,7 +694,7 @@ export function ParentDashboard() {
                       <span className="par-home__announce-dot" aria-hidden />
                       <div>
                         <p className="par-home__list-title">{item.title}</p>
-                        <p className="par-home__list-meta">{formatDate(item.createdAt)}</p>
+                        <p className="par-home__list-meta">{formatDate(item.createdAt, locale)}</p>
                         {item.body ? (
                           <p className="par-home__list-body">{item.body}</p>
                         ) : null}

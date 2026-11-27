@@ -1,8 +1,4 @@
-import {
-  GradePreset,
-  LibraryResourceType,
-  SchoolType,
-} from '@prisma/client';
+import { GradePreset, LibraryResourceType, SchoolType } from '@prisma/client';
 
 export const DEFAULT_CURRICULUM_PACKAGE_KEY = 'ETHIOPIAN_PRIVATE';
 

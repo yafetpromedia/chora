@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { DashboardPage } from "@/components/dashboard/dashboard-page";
+import { useLocale } from "@/components/i18n/locale-provider";
 import { ParentChildBar } from "@/components/parent/parent-child-bar";
 import { EtbAmount } from "@/components/billing/etb-amount";
 import {
@@ -48,10 +49,11 @@ function readProofAsDataUrl(file: File): Promise<string> {
 }
 
 export default function ParentFeesPage() {
+  const { t } = useLocale();
   return (
     <Suspense
       fallback={
-        <DashboardPage role="parent" title="Fees">
+        <DashboardPage role="parent" title={t("pages.parentFees.title")}>
           <div className="par-fees">
             <p className="stu-fees__row-meta">Loading fees…</p>
           </div>
@@ -65,6 +67,7 @@ export default function ParentFeesPage() {
 
 function ParentFeesPageContent() {
   const router = useRouter();
+  const { t } = useLocale();
   const searchParams = useSearchParams();
   const [overview, setOverview] = useState<ParentFinanceOverview | null>(null);
   const [children, setChildren] = useState<ParentChildOption[]>([]);
@@ -121,26 +124,26 @@ function ParentFeesPageContent() {
     const txRef = searchParams.get("tx_ref")?.trim();
     if (chapaReturn !== "1" || !txRef) return;
 
-    setPaying(true);
-    setError("");
-    void verifyChapaPayment(txRef)
-      .then((res) => {
+    void (async () => {
+      setPaying(true);
+      setError("");
+      try {
+        const res = await verifyChapaPayment(txRef);
         setMessage(`${res.message}\n\nReceipt #: ${res.receiptNumber}`);
         if (selectedId) {
-          return getParentFeesDue(selectedId).then(setDue);
+          setDue(await getParentFeesDue(selectedId));
         }
-      })
-      .catch((err) =>
+      } catch (err) {
         setError(
           err instanceof Error
             ? err.message
             : "Could not confirm Chapa payment yet. Try again in a moment.",
-        ),
-      )
-      .finally(() => {
+        );
+      } finally {
         setPaying(false);
         router.replace("/parent/fees");
-      });
+      }
+    })();
   }, [searchParams, router, selectedId]);
 
   const steps = useMemo(() => {
@@ -253,8 +256,8 @@ function ParentFeesPageContent() {
   return (
     <DashboardPage
       role="parent"
-      title="Fees & payments"
-      subtitle="Pay school fees for your linked children"
+      title={t("pages.parentFeesPay.title")}
+      subtitle={t("pages.parentFeesPay.subtitle")}
     >
       <div className="par-fees">
         {error ? <p className="stu-fees__alert stu-fees__alert--error">{error}</p> : null}
@@ -300,7 +303,7 @@ function ParentFeesPageContent() {
             </header>
 
             <ParentChildBar
-              children={children}
+              options={children}
               selectedId={selectedId}
               onChange={setSelectedId}
               label="Paying for"

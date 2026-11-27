@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import type { GradeWithSections } from "@/lib/api";
 import { getMyTeacherProfile } from "@/lib/teachers";
@@ -14,23 +14,10 @@ import {
   type AttendanceStatus,
   type RosterStudent,
 } from "@/lib/attendance";
+import { useLocale } from "@/components/i18n/locale-provider";
 import { AppToast } from "@/components/ui/app-toast";
 
 const STATUSES: AttendanceStatus[] = ["present", "absent", "late", "excused"];
-
-const STATUS_LABEL: Record<AttendanceStatus, string> = {
-  present: "Present",
-  absent: "Absent",
-  late: "Late",
-  excused: "Excused",
-};
-
-const REASONS: { value: AttendanceReason; label: string }[] = [
-  { value: "sick", label: "Sick" },
-  { value: "family_emergency", label: "Family" },
-  { value: "unexcused", label: "Unexcused" },
-  { value: "other", label: "Other" },
-];
 
 type LocalStudent = RosterStudent & {
   localStatus: AttendanceStatus;
@@ -44,9 +31,9 @@ function studentInitial(firstName: string, lastName: string) {
   return (letter || "?").toUpperCase();
 }
 
-function formatStudentName(firstName: string, lastName: string) {
+function formatStudentName(firstName: string, lastName: string, fallback: string) {
   const full = `${firstName} ${lastName}`.trim();
-  if (!full) return "Student";
+  if (!full) return fallback;
   return full
     .toLowerCase()
     .split(/\s+/)
@@ -66,16 +53,42 @@ function formatDisplayDate(iso: string) {
   }
 }
 
+function AttendanceMarkFallback() {
+  const { t } = useLocale();
+  return <p className="tch-meta">{t("attendanceMark.loadingAttendance")}</p>;
+}
+
 export function AttendanceMarkPanel() {
   return (
-    <Suspense fallback={<p className="tch-meta">Loading attendance…</p>}>
+    <Suspense fallback={<AttendanceMarkFallback />}>
       <AttendanceMarkPanelInner />
     </Suspense>
   );
 }
 
 function AttendanceMarkPanelInner() {
+  const { t } = useLocale();
   const searchParams = useSearchParams();
+
+  const statusLabel: Record<AttendanceStatus, string> = useMemo(
+    () => ({
+      present: t("common.present"),
+      absent: t("common.absent"),
+      late: t("common.late"),
+      excused: t("common.excused"),
+    }),
+    [t],
+  );
+
+  const reasons: { value: AttendanceReason; label: string }[] = useMemo(
+    () => [
+      { value: "sick", label: t("attendanceMark.reasonSick") },
+      { value: "family_emergency", label: t("attendanceMark.reasonFamily") },
+      { value: "unexcused", label: t("attendanceMark.reasonUnexcused") },
+      { value: "other", label: t("attendanceMark.reasonOther") },
+    ],
+    [t],
+  );
   const initialGradeId = searchParams.get("gradeId") ?? "";
   const initialSectionId = searchParams.get("sectionId") ?? "";
 
@@ -101,34 +114,6 @@ function AttendanceMarkPanelInner() {
   >(null);
 
   const selectedGrade = grades.find((g) => g.id === gradeId);
-
-  const loadRoster = useCallback(async () => {
-    if (!gradeId) return;
-    setLoading(true);
-    setError("");
-    setSaved(false);
-    try {
-      const period = sessionType === "daily" ? 0 : periodNumber;
-      const roster = await getAttendanceRoster({
-        gradeId,
-        sectionId: sectionId || undefined,
-        date,
-        periodNumber: period,
-      });
-      setStudents(
-        roster.map((s) => ({
-          ...s,
-          localStatus: s.status ?? "present",
-          localReason: s.reason,
-        })),
-      );
-      setSelected(new Set());
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load class");
-    } finally {
-      setLoading(false);
-    }
-  }, [gradeId, sectionId, date, sessionType, periodNumber]);
 
   useEffect(() => {
     void Promise.all([
@@ -161,8 +146,43 @@ function AttendanceMarkPanelInner() {
   }, [initialGradeId, initialSectionId]);
 
   useEffect(() => {
-    if (gradeId) void loadRoster();
-  }, [gradeId, sectionId, date, sessionType, periodNumber, loadRoster]);
+    if (!gradeId) return;
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setLoading(true);
+      setError("");
+      setSaved(false);
+    });
+    void (async () => {
+      try {
+        const period = sessionType === "daily" ? 0 : periodNumber;
+        const roster = await getAttendanceRoster({
+          gradeId,
+          sectionId: sectionId || undefined,
+          date,
+          periodNumber: period,
+        });
+        if (cancelled) return;
+        setStudents(
+          roster.map((s) => ({
+            ...s,
+            localStatus: s.status ?? "present",
+            localReason: s.reason,
+          })),
+        );
+        setSelected(new Set());
+      } catch (err) {
+        if (!cancelled)
+          setError(err instanceof Error ? err.message : t("attendanceMark.couldNotLoadClass"));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [gradeId, sectionId, date, sessionType, periodNumber]);
 
   const counts = useMemo(() => {
     const c = { present: 0, absent: 0, late: 0, excused: 0 };
@@ -246,7 +266,7 @@ function AttendanceMarkPanelInner() {
   async function onSave() {
     if (!gradeId || students.length === 0) return;
     if (sessionType === "period" && !subject.trim()) {
-      setError("Enter the subject for this period");
+      setError(t("attendanceMark.enterSubjectPeriod"));
       return;
     }
     setSaving(true);
@@ -266,7 +286,7 @@ function AttendanceMarkPanelInner() {
       });
       setSaved(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not save");
+      setError(err instanceof Error ? err.message : t("attendanceMark.couldNotSave"));
     } finally {
       setSaving(false);
     }
@@ -276,16 +296,14 @@ function AttendanceMarkPanelInner() {
 
   const classLabel = selectedGrade
     ? `${selectedGrade.name}${sectionId ? ` · ${selectedGrade.sections.find((s) => s.id === sectionId)?.name ?? ""}` : ""}`
-    : "Select class";
+    : t("attendanceMark.selectClass");
 
   return (
     <div className="att-v4__workspace">
       <AppToast message={error} tone="error" onDismiss={() => setError("")} />
       <AppToast
         message={
-          saved
-            ? "Attendance saved. Parents are notified for absences and late arrivals."
-            : ""
+          saved ? t("attendanceMark.savedToast") : ""
         }
         tone="success"
         onDismiss={() => setSaved(false)}
@@ -293,7 +311,7 @@ function AttendanceMarkPanelInner() {
 
       <section className="att-v4__filters">
         <div className="att-v4__field">
-          <span>Grade</span>
+          <span>{t("attendanceMark.grade")}</span>
           <select
             value={gradeId}
             onChange={(e) => {
@@ -303,7 +321,7 @@ function AttendanceMarkPanelInner() {
             disabled={grades.length === 0}
           >
             {grades.length === 0 ? (
-              <option value="">No classes assigned</option>
+              <option value="">{t("attendanceMark.noClassesAssigned")}</option>
             ) : null}
             {grades.map((g) => (
               <option key={g.id} value={g.id}>{g.name}</option>
@@ -311,40 +329,46 @@ function AttendanceMarkPanelInner() {
           </select>
         </div>
         <div className="att-v4__field">
-          <span>Section</span>
+          <span>{t("attendanceMark.section")}</span>
           <select value={sectionId} onChange={(e) => setSectionId(e.target.value)}>
-            <option value="">All sections</option>
+            <option value="">{t("attendanceMark.allSections")}</option>
             {selectedGrade?.sections.map((s) => (
               <option key={s.id} value={s.id}>{s.name}</option>
             ))}
           </select>
         </div>
         <div className="att-v4__field">
-          <span>Date</span>
+          <span>{t("attendanceMark.date")}</span>
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
         </div>
         {mode === "BOTH" ? (
           <div className="att-v4__field">
-            <span>Session</span>
+            <span>{t("attendanceMark.session")}</span>
             <select value={sessionType} onChange={(e) => setSessionType(e.target.value as "daily" | "period")}>
-              <option value="daily">Daily</option>
-              <option value="period">Period</option>
+              <option value="daily">{t("attendanceMark.daily")}</option>
+              <option value="period">{t("attendanceMark.period")}</option>
             </select>
           </div>
         ) : null}
         {(sessionType === "period" || mode === "PERIOD") && (
           <>
             <div className="att-v4__field">
-              <span>Period</span>
+              <span>{t("attendanceMark.period")}</span>
               <select value={periodNumber} onChange={(e) => setPeriodNumber(Number(e.target.value))}>
                 {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
-                  <option key={n} value={n}>Period {n}</option>
+                  <option key={n} value={n}>
+                    {t("attendanceMark.periodN", { n })}
+                  </option>
                 ))}
               </select>
             </div>
             <div className="att-v4__field att-v4__field--wide">
-              <span>Subject</span>
-              <input placeholder="Math, English…" value={subject} onChange={(e) => setSubject(e.target.value)} />
+              <span>{t("attendanceMark.subject")}</span>
+              <input
+                placeholder={t("attendanceMark.subjectPlaceholder")}
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+              />
             </div>
           </>
         )}
@@ -356,7 +380,11 @@ function AttendanceMarkPanelInner() {
             <div>
               <h2 className="att-manual__class">{classLabel}</h2>
               <p className="att-manual__meta">
-                {students.length} student{students.length === 1 ? "" : "s"} · {formatDisplayDate(date)}
+                {students.length}{" "}
+                {students.length === 1
+                  ? t("attendanceMark.studentOne")
+                  : t("attendanceMark.studentsMany")}{" "}
+                · {formatDisplayDate(date)}
               </p>
             </div>
             <div className="att-manual__bulk-actions">
@@ -365,7 +393,7 @@ function AttendanceMarkPanelInner() {
                 className="att-v4__btn att-v4__btn--ghost att-manual__all-present"
                 onClick={() => setConfirmAction("all_present")}
               >
-                Mark all present
+                {t("attendanceMark.markAllPresent")}
               </button>
               <button
                 type="button"
@@ -373,7 +401,7 @@ function AttendanceMarkPanelInner() {
                 disabled={selected.size === 0}
                 onClick={() => setConfirmAction("selected_late")}
               >
-                Selected late ({selected.size})
+                {t("attendanceMark.selectedLate", { count: selected.size })}
               </button>
               <button
                 type="button"
@@ -381,30 +409,30 @@ function AttendanceMarkPanelInner() {
                 disabled={selected.size === 0}
                 onClick={() => setConfirmAction("selected_absent")}
               >
-                Selected absent ({selected.size})
+                {t("attendanceMark.selectedAbsent", { count: selected.size })}
               </button>
             </div>
           </div>
           <div className="att-manual__kpis">
             <div className="att-manual__kpi att-manual__kpi--rate">
               <span className="att-manual__kpi-value">{presentRate}%</span>
-              <span className="att-manual__kpi-label">Attendance</span>
+              <span className="att-manual__kpi-label">{t("attendanceMark.attendanceKpi")}</span>
             </div>
             <div className="att-manual__kpi att-manual__kpi--present">
               <span className="att-manual__kpi-value">{counts.present}</span>
-              <span className="att-manual__kpi-label">Present</span>
+              <span className="att-manual__kpi-label">{t("common.present")}</span>
             </div>
             <div className="att-manual__kpi att-manual__kpi--absent">
               <span className="att-manual__kpi-value">{counts.absent}</span>
-              <span className="att-manual__kpi-label">Absent</span>
+              <span className="att-manual__kpi-label">{t("common.absent")}</span>
             </div>
             <div className="att-manual__kpi att-manual__kpi--late">
               <span className="att-manual__kpi-value">{counts.late}</span>
-              <span className="att-manual__kpi-label">Late</span>
+              <span className="att-manual__kpi-label">{t("common.late")}</span>
             </div>
             <div className="att-manual__kpi att-manual__kpi--excused">
               <span className="att-manual__kpi-value">{counts.excused}</span>
-              <span className="att-manual__kpi-label">Excused</span>
+              <span className="att-manual__kpi-label">{t("common.excused")}</span>
             </div>
           </div>
           <div className="att-manual__progress" aria-hidden>
@@ -418,11 +446,11 @@ function AttendanceMarkPanelInner() {
           <input
             className="att-manual__search"
             type="search"
-            placeholder="Search student…"
+            placeholder={t("attendanceMark.searchPlaceholder")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
-          <div className="att-manual__view-tabs" role="tablist" aria-label="Roster filter">
+          <div className="att-manual__view-tabs" role="tablist" aria-label={t("attendanceMark.rosterFilterAria")}>
             <button
               type="button"
               role="tab"
@@ -430,7 +458,7 @@ function AttendanceMarkPanelInner() {
               className={`att-manual__view-tab${viewFilter === "all" ? " att-manual__view-tab--on" : ""}`}
               onClick={() => setViewFilter("all")}
             >
-              All
+              {t("attendanceMark.all")}
               <span className="att-manual__view-count">{students.length}</span>
             </button>
             <button
@@ -440,7 +468,7 @@ function AttendanceMarkPanelInner() {
               className={`att-manual__view-tab${viewFilter === "exceptions" ? " att-manual__view-tab--on" : ""}`}
               onClick={() => setViewFilter("exceptions")}
             >
-              Exceptions
+              {t("attendanceMark.exceptions")}
               <span className="att-manual__view-count">{exceptionCount}</span>
             </button>
           </div>
@@ -449,17 +477,19 @@ function AttendanceMarkPanelInner() {
         {loading ? (
           <div className="att-manual__empty">
             <span className="att-manual__empty-spinner" aria-hidden />
-            <p>Loading class roster…</p>
+            <p>{t("attendanceMark.loadingRoster")}</p>
           </div>
         ) : filtered.length === 0 ? (
           <div className="att-manual__empty">
             <p className="att-manual__empty-title">
-              {students.length === 0 ? "No students in this class" : "No matches"}
+              {students.length === 0
+                ? t("attendanceMark.noStudentsInClass")
+                : t("attendanceMark.noMatches")}
             </p>
             <span>
               {students.length === 0
-                ? "Choose another grade or section above."
-                : "Try a different search or show all students."}
+                ? t("attendanceMark.noStudentsHint")
+                : t("attendanceMark.noMatchesHint")}
             </span>
           </div>
         ) : (
@@ -476,7 +506,13 @@ function AttendanceMarkPanelInner() {
                         type="checkbox"
                         checked={selected.has(s.studentProfileId)}
                         onChange={() => toggleSelected(s.studentProfileId)}
-                        aria-label={`Select ${formatStudentName(s.firstName, s.lastName)}`}
+                        aria-label={t("attendanceMark.selectStudentAria", {
+                          name: formatStudentName(
+                            s.firstName,
+                            s.lastName,
+                            t("attendanceMark.studentFallback"),
+                          ),
+                        })}
                       />
                     </label>
                     <span
@@ -487,17 +523,29 @@ function AttendanceMarkPanelInner() {
                     </span>
                     <div className="att-manual__identity">
                       <p className="att-manual__name">
-                        {formatStudentName(s.firstName, s.lastName)}
+                        {formatStudentName(
+                          s.firstName,
+                          s.lastName,
+                          t("attendanceMark.studentFallback"),
+                        )}
                       </p>
                       {s.sectionName ? (
-                        <p className="att-manual__section">Section {s.sectionName}</p>
+                        <p className="att-manual__section">
+                          {t("attendanceMark.sectionLabel", { name: s.sectionName })}
+                        </p>
                       ) : null}
                     </div>
                   </div>
                   <div
                     className="att-manual__segment"
                     role="group"
-                    aria-label={`Status for ${formatStudentName(s.firstName, s.lastName)}`}
+                    aria-label={t("attendanceMark.statusForAria", {
+                      name: formatStudentName(
+                        s.firstName,
+                        s.lastName,
+                        t("attendanceMark.studentFallback"),
+                      ),
+                    })}
                   >
                     {STATUSES.map((st) => (
                       <button
@@ -507,16 +555,16 @@ function AttendanceMarkPanelInner() {
                         onClick={() => setStatus(s.studentProfileId, st)}
                         aria-pressed={s.localStatus === st}
                       >
-                        {STATUS_LABEL[st]}
+                        {statusLabel[st]}
                       </button>
                     ))}
                   </div>
                 </div>
                 {s.localStatus === "absent" ? (
                   <div className="att-manual__reasons">
-                    <span className="att-manual__reasons-label">Reason</span>
+                    <span className="att-manual__reasons-label">{t("attendanceMark.reason")}</span>
                     <div className="att-manual__reason-chips">
-                      {REASONS.map((r) => (
+                      {reasons.map((r) => (
                         <button
                           key={r.value}
                           type="button"
@@ -538,12 +586,14 @@ function AttendanceMarkPanelInner() {
       {students.length > 0 ? (
         <footer className="att-manual__footer">
           <div className="att-manual__footer-info">
-            <strong>{students.length}</strong> students
+            <strong>{students.length}</strong> {t("attendanceMark.studentsFooter")}
             <span className="att-manual__footer-dot" aria-hidden>·</span>
             <span>
               {exceptionCount === 0
-                ? "Everyone marked present"
-                : `${exceptionCount} exception${exceptionCount === 1 ? "" : "s"} to save`}
+                ? t("attendanceMark.everyonePresent")
+                : exceptionCount === 1
+                  ? t("attendanceMark.exceptionsToSave", { count: exceptionCount })
+                  : t("attendanceMark.exceptionsToSaveMany", { count: exceptionCount })}
             </span>
           </div>
           <button
@@ -552,7 +602,7 @@ function AttendanceMarkPanelInner() {
             disabled={saving}
             onClick={() => void onSave()}
           >
-            {saving ? "Saving…" : "Save attendance"}
+            {saving ? t("attendanceMark.saving") : t("attendanceMark.saveAttendance")}
           </button>
         </footer>
       ) : null}
@@ -562,15 +612,15 @@ function AttendanceMarkPanelInner() {
           <div className="att-manual__confirm-card">
             <h3>
               {confirmAction === "all_present"
-                ? "Mark everyone present?"
+                ? t("attendanceMark.confirmAllPresentTitle")
                 : confirmAction === "selected_late"
-                  ? `Mark ${selected.size} student(s) late?`
-                  : `Mark ${selected.size} student(s) absent?`}
+                  ? t("attendanceMark.confirmLateTitle", { count: selected.size })
+                  : t("attendanceMark.confirmAbsentTitle", { count: selected.size })}
             </h3>
             <p>
               {confirmAction === "all_present"
-                ? "This updates the local roster. Save attendance to notify parents of exceptions."
-                : "Statuses update locally. Save attendance when you are ready."}
+                ? t("attendanceMark.confirmAllPresentBody")
+                : t("attendanceMark.confirmOtherBody")}
             </p>
             <div className="att-manual__confirm-actions">
               <button
@@ -578,14 +628,14 @@ function AttendanceMarkPanelInner() {
                 className="att-v4__btn att-v4__btn--ghost"
                 onClick={() => setConfirmAction(null)}
               >
-                Cancel
+                {t("attendanceMark.cancel")}
               </button>
               <button
                 type="button"
                 className="att-v4__btn att-v4__btn--primary"
                 onClick={applyConfirm}
               >
-                Confirm
+                {t("attendanceMark.confirm")}
               </button>
             </div>
           </div>

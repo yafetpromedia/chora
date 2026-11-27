@@ -2,7 +2,6 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
-  OnModuleInit,
 } from '@nestjs/common';
 import { CouponKind, Plan } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -21,60 +20,8 @@ function addDays(from: Date, days: number) {
 }
 
 @Injectable()
-export class CouponsService implements OnModuleInit {
+export class CouponsService {
   constructor(private readonly prisma: PrismaService) {}
-
-  async onModuleInit() {
-    await this.seedDefaults();
-  }
-
-  private async seedDefaults() {
-    const defaults: Array<{
-      code: string;
-      kind: CouponKind;
-      percentOff: number;
-      extraDays: number;
-      complimentaryMonths: number;
-      plan: Plan | null;
-      notes: string;
-    }> = [
-      {
-        code: 'PILOT14',
-        kind: CouponKind.EXTRA_TRIAL_DAYS,
-        percentOff: 0,
-        extraDays: 14,
-        complimentaryMonths: 1,
-        plan: null,
-        notes: 'Adds 14 days to an expired or active trial',
-      },
-      {
-        code: 'SAVE50',
-        kind: CouponKind.PERCENT_OFF,
-        percentOff: 50,
-        extraDays: 0,
-        complimentaryMonths: 1,
-        plan: null,
-        notes: '50% off the next invoice — school still pays the rest',
-      },
-      {
-        code: 'PARTNER',
-        kind: CouponKind.COMPLIMENTARY,
-        percentOff: 100,
-        extraDays: 0,
-        complimentaryMonths: 3,
-        plan: Plan.STARTER,
-        notes: 'Complimentary Starter access for 3 months',
-      },
-    ];
-
-    for (const row of defaults) {
-      await this.prisma.coupon.upsert({
-        where: { code: row.code },
-        create: { ...row, isActive: true },
-        update: {},
-      });
-    }
-  }
 
   normalizeCode(code: string) {
     return code.trim().toUpperCase().replace(/\s+/g, '');
@@ -103,13 +50,17 @@ export class CouponsService implements OnModuleInit {
       throw new BadRequestException('That coupon code already exists');
     }
     if (dto.kind === CouponKind.PERCENT_OFF && (dto.percentOff ?? 0) <= 0) {
-      throw new BadRequestException('Percent-off coupons need a percent between 1 and 100');
+      throw new BadRequestException(
+        'Percent-off coupons need a percent between 1 and 100',
+      );
     }
     if (dto.kind === CouponKind.EXTRA_TRIAL_DAYS && (dto.extraDays ?? 0) <= 0) {
       throw new BadRequestException('Trial coupons need extra days');
     }
     if (dto.kind === CouponKind.COMPLIMENTARY && !dto.plan) {
-      throw new BadRequestException('Complimentary coupons must grant a paid plan');
+      throw new BadRequestException(
+        'Complimentary coupons must grant a paid plan',
+      );
     }
     if (dto.plan === Plan.TRIAL) {
       throw new BadRequestException('Coupons cannot grant the trial plan');
@@ -119,8 +70,10 @@ export class CouponsService implements OnModuleInit {
       data: {
         code,
         kind: dto.kind,
-        percentOff: dto.percentOff ?? (dto.kind === CouponKind.PERCENT_OFF ? 50 : 0),
-        extraDays: dto.extraDays ?? (dto.kind === CouponKind.EXTRA_TRIAL_DAYS ? 14 : 0),
+        percentOff:
+          dto.percentOff ?? (dto.kind === CouponKind.PERCENT_OFF ? 50 : 0),
+        extraDays:
+          dto.extraDays ?? (dto.kind === CouponKind.EXTRA_TRIAL_DAYS ? 14 : 0),
         complimentaryMonths: dto.complimentaryMonths ?? 1,
         plan: dto.plan ?? null,
         maxRedemptions: dto.maxRedemptions ?? null,
@@ -140,7 +93,9 @@ export class CouponsService implements OnModuleInit {
     if (existing.kind === CouponKind.COMPLIMENTARY) {
       const nextPlan = dto.plan === undefined ? existing.plan : dto.plan;
       if (!nextPlan || nextPlan === Plan.TRIAL) {
-        throw new BadRequestException('Complimentary coupons must grant a paid plan');
+        throw new BadRequestException(
+          'Complimentary coupons must grant a paid plan',
+        );
       }
     }
     if (
@@ -148,7 +103,9 @@ export class CouponsService implements OnModuleInit {
       dto.percentOff !== undefined &&
       dto.percentOff <= 0
     ) {
-      throw new BadRequestException('Percent-off coupons need a percent between 1 and 100');
+      throw new BadRequestException(
+        'Percent-off coupons need a percent between 1 and 100',
+      );
     }
     if (
       existing.kind === CouponKind.EXTRA_TRIAL_DAYS &&
@@ -170,8 +127,7 @@ export class CouponsService implements OnModuleInit {
             : dto.expiresAt
               ? new Date(dto.expiresAt)
               : null,
-        notes:
-          dto.notes === undefined ? undefined : dto.notes?.trim() || null,
+        notes: dto.notes === undefined ? undefined : dto.notes?.trim() || null,
         percentOff: dto.percentOff,
         extraDays: dto.extraDays,
         complimentaryMonths: dto.complimentaryMonths,
@@ -203,7 +159,9 @@ export class CouponsService implements OnModuleInit {
       coupon.maxRedemptions != null &&
       coupon.redeemedCount >= coupon.maxRedemptions
     ) {
-      throw new BadRequestException('That coupon has reached its redemption limit');
+      throw new BadRequestException(
+        'That coupon has reached its redemption limit',
+      );
     }
 
     const already = await this.prisma.couponRedemption.findUnique({
@@ -247,7 +205,9 @@ export class CouponsService implements OnModuleInit {
     ) {
       const plan = coupon.plan ?? Plan.STARTER;
       if (plan === Plan.TRIAL) {
-        throw new BadRequestException('Complimentary coupons must grant a paid plan');
+        throw new BadRequestException(
+          'Complimentary coupons must grant a paid plan',
+        );
       }
       const months = Math.max(1, coupon.complimentaryMonths);
       const currentPeriodEnd = addMonths(now, months);

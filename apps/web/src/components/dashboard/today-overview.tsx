@@ -1,24 +1,30 @@
 "use client";
 
 import Link from "next/link";
+import { useLocale } from "@/components/i18n/locale-provider";
 import { EtbAmount } from "@/components/billing/etb-amount";
 import { formatEtbPlain } from "@/lib/currency";
 import type { AdminDayOverview, ParentDayOverview } from "@/lib/dashboard-day";
 import { DashIcon } from "@/components/dashboard/dash-icons";
 
-function attendanceLabel(status: string) {
-  if (status === "present" || status === "late" || status === "excused") {
-    return { text: "Present", tone: "ok" as const };
-  }
-  if (status === "absent") return { text: "Absent", tone: "bad" as const };
-  return { text: "Not marked yet", tone: "muted" as const };
+function useAttendanceLabel() {
+  const { t } = useLocale();
+  return (status: string) => {
+    if (status === "present" || status === "late" || status === "excused") {
+      return { text: t("adminDash.present"), tone: "ok" as const };
+    }
+    if (status === "absent") return { text: t("adminDash.absent"), tone: "bad" as const };
+    return { text: t("staffDash.notMarkedYet"), tone: "muted" as const };
+  };
 }
 
 export function AdminTodayOverview({ day }: { day: AdminDayOverview }) {
+  const { t, tn } = useLocale();
+
   return (
-    <section className="dash-admin-today" aria-label="Today overview">
+    <section className="dash-admin-today" aria-label={t("staffDash.todayOverviewAria")}>
       <div className="dash-admin-today__head">
-        <h2 className="dash-admin-today__title">Today at a glance</h2>
+        <h2 className="dash-admin-today__title">{t("staffDash.todayGlance")}</h2>
         <span className="dash-admin-today__date">{day.date}</span>
       </div>
 
@@ -27,26 +33,29 @@ export function AdminTodayOverview({ day }: { day: AdminDayOverview }) {
           <span className="dash-admin-today__value">
             {day.attendance.rate != null ? `${day.attendance.rate}%` : "—"}
           </span>
-          <span className="dash-admin-today__label">Attendance</span>
+          <span className="dash-admin-today__label">{t("dash.attendance")}</span>
         </div>
         <div className="dash-admin-today__stat">
           <span className="dash-admin-today__value">{day.finance.pendingPayments}</span>
-          <span className="dash-admin-today__label">Payments pending</span>
+          <span className="dash-admin-today__label">{t("staffDash.paymentsPending")}</span>
         </div>
         <div className="dash-admin-today__stat">
           <span className="dash-admin-today__value">{day.staff.classesMarkedToday}</span>
-          <span className="dash-admin-today__label">Classes marked</span>
+          <span className="dash-admin-today__label">{t("staffDash.classesMarked")}</span>
         </div>
         <div className="dash-admin-today__stat">
           <span className="dash-admin-today__value">{day.staff.teachersTotal}</span>
-          <span className="dash-admin-today__label">Teachers</span>
+          <span className="dash-admin-today__label">{tn("Teachers")}</span>
         </div>
       </div>
 
       {day.finance.outstandingCents != null ? (
         <p className="dash-admin-today__note">
-          Outstanding fees: <strong><EtbAmount cents={day.finance.outstandingCents} /></strong>
-          {day.finance.unpaidStudents != null ? ` · ${day.finance.unpaidStudents} students` : ""}
+          {t("staffDash.outstandingFees")}{" "}
+          <strong><EtbAmount cents={day.finance.outstandingCents} /></strong>
+          {day.finance.unpaidStudents != null
+            ? ` ${t("staffDash.studentsSuffix", { count: day.finance.unpaidStudents })}`
+            : ""}
         </p>
       ) : null}
 
@@ -63,21 +72,23 @@ export function AdminTodayOverview({ day }: { day: AdminDayOverview }) {
           ))}
         </ul>
       ) : (
-        <p className="dash-admin-today__note dash-admin-today__note--ok">No urgent alerts for today.</p>
+        <p className="dash-admin-today__note dash-admin-today__note--ok">
+          {t("staffDash.noUrgentAlerts")}
+        </p>
       )}
 
       <div className="dash-admin-today__actions">
         <Link href="/admin/attendance" className="dash-admin-chip-link">
-          Attendance
+          {t("dash.attendance")}
         </Link>
         <Link href="/admin/results" className="dash-admin-chip-link">
-          Results
+          {t("dash.results")}
         </Link>
         <Link href="/admin/finance" className="dash-admin-chip-link">
-          Finance
+          {t("dash.fees")}
         </Link>
         <Link href="/admin/results/promotion" className="dash-admin-chip-link">
-          Year promotion
+          {t("staffDash.yearPromotion")}
         </Link>
       </div>
     </section>
@@ -85,24 +96,27 @@ export function AdminTodayOverview({ day }: { day: AdminDayOverview }) {
 }
 
 export function ParentTodayOverview({ day }: { day: ParentDayOverview }) {
+  const { t } = useLocale();
+  const attendanceLabel = useAttendanceLabel();
+
   if (day.children.length === 0) {
     return (
       <section className="dash-panel dash-panel--flat">
-        <p className="setup-hint">No children linked to your account.</p>
+        <p className="setup-hint">{t("staffDash.noChildrenLinked")}</p>
       </section>
     );
   }
 
   return (
-    <section className="dash-panel dash-panel--flat dash-today" aria-label="Your children today">
+    <section className="dash-panel dash-panel--flat dash-today" aria-label={t("staffDash.yourChildrenTodayAria")}>
       <div className="dash-panel-head">
-        <h2 className="dash-panel-title">Your children today</h2>
+        <h2 className="dash-panel-title">{t("staffDash.yourChildrenToday")}</h2>
         <span className="dash-panel-badge">{day.date}</span>
       </div>
       {day.totalDueCents > 0 ? (
         <p className="auth-alert" style={{ marginBottom: "0.75rem" }}>
-          Total fees due: <EtbAmount cents={day.totalDueCents} /> —{" "}
-          <Link href="/parent/fees">Pay or view details</Link>
+          {t("staffDash.totalFeesDue")} <EtbAmount cents={day.totalDueCents} /> —{" "}
+          <Link href="/parent/fees">{t("staffDash.payOrViewDetails")}</Link>
         </p>
       ) : null}
       <ul className="dash-list">
@@ -117,15 +131,17 @@ export function ParentTodayOverview({ day }: { day: ParentDayOverview }) {
                   {child.section ? ` · ${child.section}` : ""}
                 </p>
                 <p className="setup-hint">
-                  Attendance: <strong>{att.text}</strong>
+                  {t("staffDash.attendanceColon")} <strong>{att.text}</strong>
                   {child.performanceLabel
-                    ? ` · Performance: ${child.performanceLabel}${
+                    ? ` ${t("staffDash.performanceColon")} ${child.performanceLabel}${
                         child.overallAverage != null ? ` (${child.overallAverage}%)` : ""
                       }`
                     : ""}
                   {child.outstandingCents > 0
-                    ? ` · Fees: ${formatEtbPlain(child.outstandingCents)} due`
-                    : " · Fees: up to date"}
+                    ? ` ${t("staffDash.feesDueAmount", {
+                        amount: formatEtbPlain(child.outstandingCents),
+                      })}`
+                    : ` ${t("staffDash.feesUpToDate")}`}
                 </p>
               </div>
             </li>

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DashIcon } from "@/components/dashboard/dash-icons";
+import { useLocale } from "@/components/i18n/locale-provider";
 import { AppToast } from "@/components/ui/app-toast";
 import { handlePlatformAuthFailure } from "@/lib/platform-auth";
 import { getPlatformUsage, type UsageRow } from "@/lib/platform-billing";
@@ -19,6 +20,7 @@ function pctLabel(ratio: number | null) {
 type UsageFilter = "ALL" | "OVER" | "HIGH";
 
 export function PlatformUsage() {
+  const { t } = useLocale();
   const router = useRouter();
   const [rows, setRows] = useState<UsageRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -40,11 +42,13 @@ export function PlatformUsage() {
   }, []);
 
   useEffect(() => {
-    setLoading(true);
-    void load()
-      .catch((e) => fail(e, "Failed to load usage"))
-      .finally(() => setLoading(false));
-  }, [load, router]);
+    queueMicrotask(() => {
+      setLoading(true);
+      void load()
+        .catch((e) => fail(e, t("platformUi.usageErrLoad")))
+        .finally(() => setLoading(false));
+    });
+  }, [load, router, t]);
 
   const overCount = useMemo(
     () =>
@@ -103,25 +107,23 @@ export function PlatformUsage() {
             <DashIcon name="students" className="dash-icon--md" />
           </span>
           <div>
-            <p className="plat-subjects-v2__eyebrow">Capacity</p>
-            <h2 className="plat-subjects-v2__title">Usage vs plan limits</h2>
-            <p className="plat-subjects-v2__sub">
-              See how each school uses seats against their subscription limits.
-            </p>
+            <p className="plat-subjects-v2__eyebrow">{t("platformUi.usageEyebrow")}</p>
+            <h2 className="plat-subjects-v2__title">{t("platformUi.usageTitle")}</h2>
+            <p className="plat-subjects-v2__sub">{t("platformUi.usageSub")}</p>
           </div>
         </div>
         <div className="plat-subjects-v2__hero-stats">
           <div className="plat-subjects-v2__stat">
             <strong>{rows.length}</strong>
-            <span>Schools</span>
+            <span>{t("platformUi.usageStatSchools")}</span>
           </div>
           <div className="plat-subjects-v2__stat">
             <strong>{overCount}</strong>
-            <span>Over limit</span>
+            <span>{t("platformUi.usageStatOver")}</span>
           </div>
           <div className="plat-subjects-v2__stat">
             <strong>{highCount}</strong>
-            <span>85%+ usage</span>
+            <span>{t("platformUi.usageStatHigh")}</span>
           </div>
         </div>
       </header>
@@ -133,7 +135,7 @@ export function PlatformUsage() {
             <strong>
               {rows.reduce((sum, r) => sum + r.usage.students, 0).toLocaleString()}
             </strong>
-            <span>Total students</span>
+            <span>{t("platformUi.usageTotalStudents")}</span>
           </div>
         </article>
         <article className="plat-subjects-v2__kpi">
@@ -142,14 +144,14 @@ export function PlatformUsage() {
             <strong>
               {rows.reduce((sum, r) => sum + r.usage.teachers, 0).toLocaleString()}
             </strong>
-            <span>Total teachers</span>
+            <span>{t("platformUi.usageTotalTeachers")}</span>
           </div>
         </article>
         <article className="plat-subjects-v2__kpi">
           <DashIcon name="alert" className="dash-icon--sm" />
           <div>
             <strong>{overCount}</strong>
-            <span>Needs upgrade</span>
+            <span>{t("platformUi.usageNeedsUpgrade")}</span>
           </div>
         </article>
       </div>
@@ -159,18 +161,18 @@ export function PlatformUsage() {
           <DashIcon name="students" className="dash-icon--sm" />
           <input
             type="search"
-            placeholder="Search school…"
+            placeholder={t("platformUi.usageSearchPh")}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            aria-label="Search usage"
+            aria-label={t("platformUi.usageSearchAria")}
           />
         </div>
         <div className="plat-filter-tabs plat-subjects-v2__filters" role="tablist">
           {(
             [
-              { id: "ALL" as const, label: "All", count: rows.length },
-              { id: "OVER" as const, label: "Over limit", count: overCount },
-              { id: "HIGH" as const, label: "85%+ usage", count: highCount },
+              { id: "ALL" as const, label: t("platformUi.usageFilterAll"), count: rows.length },
+              { id: "OVER" as const, label: t("platformUi.usageFilterOver"), count: overCount },
+              { id: "HIGH" as const, label: t("platformUi.usageFilterHigh"), count: highCount },
             ] as const
           ).map((f) => (
             <button
@@ -192,19 +194,19 @@ export function PlatformUsage() {
         <table className="plat-subjects-v2__table">
           <thead>
             <tr>
-              <th>School</th>
-              <th>Plan</th>
-              <th>Students</th>
-              <th>Teachers</th>
-              <th>Admins</th>
-              <th>Parents</th>
+              <th>{t("platformUi.usageColSchool")}</th>
+              <th>{t("platformUi.usageColPlan")}</th>
+              <th>{t("platformUi.usageColStudents")}</th>
+              <th>{t("platformUi.usageColTeachers")}</th>
+              <th>{t("platformUi.usageColAdmins")}</th>
+              <th>{t("platformUi.usageColParents")}</th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
               <tr>
                 <td colSpan={6} className="plat-subjects-v2__empty">
-                  No schools match your filters.
+                  {t("platformUi.usageNoMatch")}
                 </td>
               </tr>
             ) : (

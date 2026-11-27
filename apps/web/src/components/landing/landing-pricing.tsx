@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { useLocale } from "@/components/i18n/locale-provider";
 import { BirrSymbol } from "@/components/billing/birr-symbol";
 import { DashIcon, type DashIconName } from "@/components/dashboard/dash-icons";
 import {
@@ -23,10 +24,10 @@ import {
 
 const PAID_PLANS: PaidPlan[] = ["STARTER", "PROFESSIONAL", "ENTERPRISE"];
 
-const PLAN_BLURBS: Record<PaidPlan, string> = {
-  STARTER: "Base from 2,000 ETB/mo · up to 500 students",
-  PROFESSIONAL: "Base from 4,000 ETB/mo · up to 2,000 students",
-  ENTERPRISE: "Groups & chains · custom contract",
+const PLAN_BLURB_KEYS: Record<PaidPlan, string> = {
+  STARTER: "landing.planBlurbStarter",
+  PROFESSIONAL: "landing.planBlurbProfessional",
+  ENTERPRISE: "landing.planBlurbEnterprise",
 };
 
 const MODULE_ICONS: Record<SchoolModuleKey, DashIconName> = {
@@ -47,10 +48,14 @@ function formatBasePrice(
   plan: PaidPlan,
   interval: BillingInterval,
   currency: DisplayCurrency,
+  translate: (key: string) => string,
 ): { main: string; sub?: string } {
   const raw = PLAN_PRICES[plan];
   if (raw.custom) {
-    return { main: "Custom", sub: "Talk to our team" };
+    return {
+      main: translate("landing.priceCustom"),
+      sub: translate("landing.priceTalkToTeam"),
+    };
   }
   const factor = interval === "year" ? YEARLY_MULTIPLIER : 1;
   if (currency === "usd") {
@@ -88,6 +93,7 @@ function formatMoney(
 }
 
 export function LandingPricing() {
+  const { t } = useLocale();
   const [interval, setInterval] = useState<BillingInterval>("month");
   const [currency, setCurrency] = useState<DisplayCurrency>("etb");
   const [bundleId, setBundleId] = useState<BillingBundleId>("ops");
@@ -109,24 +115,24 @@ export function LandingPricing() {
   return (
     <div className="lp-pricing">
       <div className="lp-pricing__controls">
-        <div className="lp-toggle" role="group" aria-label="Billing period">
+        <div className="lp-toggle" role="group" aria-label={t("landing.billingPeriodAria")}>
           <button
             type="button"
             className={`lp-toggle__btn${interval === "month" ? " lp-toggle__btn--on" : ""}`}
             onClick={() => setInterval("month")}
           >
-            Monthly
+            {t("landing.monthly")}
           </button>
           <button
             type="button"
             className={`lp-toggle__btn${interval === "year" ? " lp-toggle__btn--on" : ""}`}
             onClick={() => setInterval("year")}
           >
-            Yearly
-            <span className="lp-toggle__save">−2 mo</span>
+            {t("landing.yearly")}
+            <span className="lp-toggle__save">{t("landing.yearlySave")}</span>
           </button>
         </div>
-        <div className="lp-toggle" role="group" aria-label="Currency">
+        <div className="lp-toggle" role="group" aria-label={t("landing.currencyAria")}>
           <button
             type="button"
             className={`lp-toggle__btn${currency === "usd" ? " lp-toggle__btn--on" : ""}`}
@@ -161,7 +167,7 @@ export function LandingPricing() {
         </article>
 
         {PAID_PLANS.map((plan) => {
-          const price = formatBasePrice(plan, interval, currency);
+          const price = formatBasePrice(plan, interval, currency, t);
           const featured = plan === "STARTER";
           return (
             <article
@@ -176,7 +182,7 @@ export function LandingPricing() {
                   <BirrSymbol size={20} className="lp-price-card__birr" />
                 ) : null}
               </div>
-              <p className="lp-price-card__sub">{price.sub ?? PLAN_BLURBS[plan]}</p>
+              <p className="lp-price-card__sub">{price.sub ?? t(PLAN_BLURB_KEYS[plan])}</p>
               <ul className="lp-price-card__list">
                 {PLAN_FEATURES[plan].map((f) => (
                   <li key={f}>{f}</li>
@@ -205,17 +211,14 @@ export function LandingPricing() {
       <section className="lp-mod" aria-labelledby="lp-mod-title">
         <div className="lp-mod__glow" aria-hidden />
         <header className="lp-mod__header">
-          <p className="lp-mod__eyebrow">Modular add-ons</p>
+          <p className="lp-mod__eyebrow">{t("landing.modularAddons")}</p>
           <h3 id="lp-mod-title" className="lp-mod__title">
-            Add only what you use
+            {t("landing.addWhatYouUse")}
           </h3>
-          <p className="lp-mod__lede">
-            Start with a size-band base, then unlock modules. Bundles discount the module total —
-            not the base.
-          </p>
+          <p className="lp-mod__lede">{t("landing.modularLede")}</p>
         </header>
 
-        <div className="lp-mod__bundles" role="tablist" aria-label="Example bundles">
+        <div className="lp-mod__bundles" role="tablist" aria-label={t("landing.exampleBundlesAria")}>
           {BILLING_BUNDLES.map((b) => (
             <button
               key={b.id}
@@ -275,7 +278,7 @@ export function LandingPricing() {
                     <small>/mo</small>
                   </span>
                   <span className={`lp-mod__tag${included ? " is-on" : ""}`}>
-                    {included ? "In bundle" : "Optional"}
+                    {included ? t("landing.inBundle") : t("landing.optional")}
                   </span>
                 </div>
               </li>
@@ -291,8 +294,9 @@ export function LandingPricing() {
       </section>
 
       <p className="lp-pricing__note">
-        Pay for a size band base, then unlock attendance, results, finance, library, and more —
-        only if you need them. Final invoices follow your selected modules.
+        Pay for a size band base, then unlock attendance, results, Chapa-ready finance, library, and
+        more — only if you need them. School plans can invoice in USD or ETB; final invoices follow
+        your selected modules.
       </p>
     </div>
   );

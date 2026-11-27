@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { copyFile, mkdir, writeFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import { extname, join } from 'path';
@@ -19,7 +23,11 @@ import { PlatformContentSyncService } from './platform-content-sync.service';
 
 @Injectable()
 export class PlatformContentService {
-  private readonly uploadRoot = join(process.cwd(), 'uploads', 'platform-library');
+  private readonly uploadRoot = join(
+    process.cwd(),
+    'uploads',
+    'platform-library',
+  );
   private readonly schoolUploadRoot = join(process.cwd(), 'uploads', 'library');
 
   constructor(
@@ -76,7 +84,9 @@ export class PlatformContentService {
         ...(dto.description !== undefined
           ? { description: dto.description.trim() || null }
           : {}),
-        ...(dto.gradePreset !== undefined ? { gradePreset: dto.gradePreset } : {}),
+        ...(dto.gradePreset !== undefined
+          ? { gradePreset: dto.gradePreset }
+          : {}),
         ...(dto.isArchived !== undefined ? { isArchived: dto.isArchived } : {}),
       },
       include: { _count: { select: { packages: true } } },
@@ -150,7 +160,10 @@ export class PlatformContentService {
     });
   }
 
-  async updateLibraryResource(id: string, dto: UpdatePlatformLibraryResourceDto) {
+  async updateLibraryResource(
+    id: string,
+    dto: UpdatePlatformLibraryResourceDto,
+  ) {
     const existing = await this.prisma.platformLibraryResource.findUnique({
       where: { id },
     });
@@ -172,15 +185,21 @@ export class PlatformContentService {
       data: {
         ...(dto.title !== undefined ? { title: dto.title.trim() } : {}),
         ...(dto.categoryId !== undefined ? { categoryId: dto.categoryId } : {}),
-        ...(dto.resourceType !== undefined ? { resourceType: dto.resourceType } : {}),
+        ...(dto.resourceType !== undefined
+          ? { resourceType: dto.resourceType }
+          : {}),
         ...(dto.description !== undefined
           ? { description: dto.description.trim() || null }
           : {}),
-        ...(dto.subject !== undefined ? { subject: dto.subject.trim() || null } : {}),
+        ...(dto.subject !== undefined
+          ? { subject: dto.subject.trim() || null }
+          : {}),
         ...(dto.gradeLabel !== undefined
           ? { gradeLabel: dto.gradeLabel.trim() || null }
           : {}),
-        ...(dto.fileUrl !== undefined ? { fileUrl: dto.fileUrl.trim() || null } : {}),
+        ...(dto.fileUrl !== undefined
+          ? { fileUrl: dto.fileUrl.trim() || null }
+          : {}),
         ...(dto.externalUrl !== undefined
           ? { externalUrl: dto.externalUrl.trim() || null }
           : {}),
@@ -227,7 +246,9 @@ export class PlatformContentService {
     return this.prisma.platformMessageTemplate.findMany({
       where: includeArchived ? {} : { isArchived: false },
       orderBy: { sortOrder: 'asc' },
-      include: { _count: { select: { packageLinks: true, schoolTemplates: true } } },
+      include: {
+        _count: { select: { packageLinks: true, schoolTemplates: true } },
+      },
     });
   }
 
@@ -253,11 +274,16 @@ export class PlatformContentService {
         description: dto.description?.trim() || null,
         sortOrder: (maxOrder._max.sortOrder ?? 0) + 1,
       },
-      include: { _count: { select: { packageLinks: true, schoolTemplates: true } } },
+      include: {
+        _count: { select: { packageLinks: true, schoolTemplates: true } },
+      },
     });
   }
 
-  async updateMessageTemplate(id: string, dto: UpdatePlatformMessageTemplateDto) {
+  async updateMessageTemplate(
+    id: string,
+    dto: UpdatePlatformMessageTemplateDto,
+  ) {
     const existing = await this.prisma.platformMessageTemplate.findUnique({
       where: { id },
     });
@@ -274,7 +300,9 @@ export class PlatformContentService {
           : {}),
         ...(dto.body !== undefined ? { body: dto.body.trim() } : {}),
       },
-      include: { _count: { select: { packageLinks: true, schoolTemplates: true } } },
+      include: {
+        _count: { select: { packageLinks: true, schoolTemplates: true } },
+      },
     });
   }
 
@@ -307,10 +335,13 @@ export class PlatformContentService {
       where: { id },
       include: {
         components: { orderBy: { sortOrder: 'asc' } },
-        packageLinks: { include: { package: { select: { key: true, label: true } } } },
+        packageLinks: {
+          include: { package: { select: { key: true, label: true } } },
+        },
       },
     });
-    if (!row) throw new NotFoundException('Platform assessment template not found');
+    if (!row)
+      throw new NotFoundException('Platform assessment template not found');
     return row;
   }
 
@@ -431,7 +462,11 @@ export class PlatformContentService {
   }
 
   getFilePath(filename: string) {
-    if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
+    if (
+      filename.includes('..') ||
+      filename.includes('/') ||
+      filename.includes('\\')
+    ) {
       throw new BadRequestException('Invalid file');
     }
     return join(this.uploadRoot, filename);

@@ -46,6 +46,11 @@ export function isSchoolWorkspaceRole(role: string | null): boolean {
   return role === "admin" || role === "staff";
 }
 
+/**
+ * Clears the signed-in session only.
+ * Last school code/brand stay so login can skip the school-code step
+ * until the user chooses “Change school”.
+ */
 export function clearSessionStorage() {
   localStorage.removeItem(AUTH_TOKEN_KEY);
   localStorage.removeItem(AUTH_REFRESH_TOKEN_KEY);
@@ -53,6 +58,10 @@ export function clearSessionStorage() {
   localStorage.removeItem(AUTH_USER_ID_KEY);
   localStorage.removeItem(AUTH_PERMISSIONS_KEY);
   localStorage.removeItem(AUTH_ROLE_TEMPLATE_KEY);
+}
+
+/** Forget the remembered school (user tapped Change / Back on login). */
+export function clearRememberedSchool() {
   localStorage.removeItem(AUTH_SCHOOL_JOIN_CODE_KEY);
   localStorage.removeItem(AUTH_SCHOOL_NAME_KEY);
   localStorage.removeItem(AUTH_SCHOOL_LOGO_KEY);

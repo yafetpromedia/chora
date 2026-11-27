@@ -1,31 +1,41 @@
 "use client";
 
 import { Reveal, Stagger, StaggerItem } from "@/components/motion/reveal";
-import {
-  BRAND_NAME,
-  CHORA_CONNECT_CARD_LINE,
-  CHORA_CONNECT_NAME,
-  CHORA_CONNECT_TAGLINE,
-} from "@/lib/brand";
+import { useLocale } from "@/components/i18n/locale-provider";
+import { BRAND_NAME, CHORA_CONNECT_NAME } from "@/lib/brand";
 import type { ReactNode } from "react";
 
-const PILLARS = [
-  { title: "Academics", items: ["Results", "Timetable", "Assessments"] },
-  { title: "Operations", items: ["Attendance", "Finance", "Admissions"] },
-  { title: "Learning", items: ["eLibrary", "Classwork", "AI"] },
+const PILLAR_KEYS = [
+  {
+    title: "pillarAcademics",
+    items: ["itemResults", "itemTimetable", "itemAssessments"],
+  },
+  {
+    title: "pillarOperations",
+    items: ["itemAttendance", "itemFinance", "itemAdmissions"],
+  },
+  {
+    title: "pillarLearning",
+    items: ["itemElibrary", "itemClasswork", "itemAi"],
+  },
 ] as const;
 
-const AUDIENCE = ["Parents", "Teachers", "Students", "School"] as const;
+const AUDIENCE_KEYS = [
+  "audienceParents",
+  "audienceTeachers",
+  "audienceStudents",
+  "audienceSchool",
+] as const;
 
-const PLANNED_FEATURES = [
-  { title: "Direct messaging", desc: "Parent ↔ teacher, student ↔ teacher, staff ↔ staff", icon: "chat" },
-  { title: "Parent communication", desc: "Updates about a child's academic and school activities", icon: "family" },
-  { title: "School announcements", desc: "Important updates delivered to the right people", icon: "megaphone" },
-  { title: "Smart notifications", desc: "Important events without notification overload", icon: "bell" },
-  { title: "Message requests", desc: "Structured communication with school departments", icon: "inbox" },
-  { title: "File sharing", desc: "Documents, assignments, notices, and resources", icon: "file" },
-  { title: "Department channels", desc: "Registrar, finance, academic office, and more", icon: "building" },
-  { title: "Role-based access", desc: "Users communicate only where permissions allow", icon: "shield" },
+const FEATURE_KEYS = [
+  { title: "featDirectMessaging", desc: "featDirectMessagingDesc", icon: "chat" },
+  { title: "featParentComm", desc: "featParentCommDesc", icon: "family" },
+  { title: "featAnnouncements", desc: "featAnnouncementsDesc", icon: "megaphone" },
+  { title: "featSmartNotif", desc: "featSmartNotifDesc", icon: "bell" },
+  { title: "featMsgRequests", desc: "featMsgRequestsDesc", icon: "inbox" },
+  { title: "featFileSharing", desc: "featFileSharingDesc", icon: "file" },
+  { title: "featDeptChannels", desc: "featDeptChannelsDesc", icon: "building" },
+  { title: "featRoleAccess", desc: "featRoleAccessDesc", icon: "shield" },
 ] as const;
 
 function ConnectIcon({ size = 20 }: { size?: number }) {
@@ -43,7 +53,7 @@ function ConnectIcon({ size = 20 }: { size?: number }) {
   );
 }
 
-function FeatureIcon({ name }: { name: (typeof PLANNED_FEATURES)[number]["icon"] }) {
+function FeatureIcon({ name }: { name: (typeof FEATURE_KEYS)[number]["icon"] }) {
   const stroke = {
     fill: "none",
     stroke: "currentColor",
@@ -52,7 +62,7 @@ function FeatureIcon({ name }: { name: (typeof PLANNED_FEATURES)[number]["icon"]
     strokeLinejoin: "round" as const,
   };
 
-  const icons: Record<(typeof PLANNED_FEATURES)[number]["icon"], ReactNode> = {
+  const icons: Record<(typeof FEATURE_KEYS)[number]["icon"], ReactNode> = {
     chat: <svg viewBox="0 0 24 24" aria-hidden="true" {...stroke}><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z" /></svg>,
     family: <svg viewBox="0 0 24 24" aria-hidden="true" {...stroke}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></svg>,
     megaphone: <svg viewBox="0 0 24 24" aria-hidden="true" {...stroke}><path d="M4 10v4M8 8v8M12 6v12M16 4v16" /></svg>,
@@ -66,16 +76,16 @@ function FeatureIcon({ name }: { name: (typeof PLANNED_FEATURES)[number]["icon"]
   return <span className="lp3-connect__cap-icon">{icons[name]}</span>;
 }
 
-function ConnectDiagram() {
+function ConnectDiagram({ t }: { t: (key: string) => string }) {
   return (
     <div className="lp3-connect__flow">
       <div className="lp3-connect__flow-row lp3-connect__flow-row--top">
-        {PILLARS.map((pillar) => (
+        {PILLAR_KEYS.map((pillar) => (
           <div key={pillar.title} className="lp3-connect__flow-pillar">
-            <strong>{pillar.title}</strong>
+            <strong>{t(`choraConnect.${pillar.title}`)}</strong>
             <ul>
               {pillar.items.map((item) => (
-                <li key={item}>{item}</li>
+                <li key={item}>{t(`choraConnect.${item}`)}</li>
               ))}
             </ul>
           </div>
@@ -96,9 +106,9 @@ function ConnectDiagram() {
       </div>
 
       <div className="lp3-connect__flow-row lp3-connect__flow-row--bottom">
-        {AUDIENCE.map((role) => (
+        {AUDIENCE_KEYS.map((role) => (
           <span key={role} className="lp3-connect__flow-audience">
-            {role}
+            {t(`choraConnect.${role}`)}
           </span>
         ))}
       </div>
@@ -107,6 +117,8 @@ function ConnectDiagram() {
 }
 
 export function LandingChoraConnect() {
+  const { t } = useLocale();
+
   return (
     <section id="connect" className="lp3-connect" aria-labelledby="connect-heading">
       <div className="lp3-container">
@@ -118,17 +130,16 @@ export function LandingChoraConnect() {
               <div className="lp3-connect__copy">
                 <div className="lp3-connect__badges">
                   <span className="lp3-connect__badge lp3-connect__badge--glass">{CHORA_CONNECT_NAME}</span>
-                  <span className="lp3-connect__badge lp3-connect__badge--solid">Coming soon</span>
+                  <span className="lp3-connect__badge lp3-connect__badge--solid">
+                    {t("choraConnect.comingSoon")}
+                  </span>
                 </div>
 
                 <h2 id="connect-heading" className="lp3-connect__headline">
-                  {CHORA_CONNECT_TAGLINE}
+                  {t("choraConnect.tagline")}
                 </h2>
 
-                <p className="lp3-connect__subhead">
-                  A smarter way for schools, teachers, students, and parents to communicate — all in
-                  one place.
-                </p>
+                <p className="lp3-connect__subhead">{t("choraConnect.subhead")}</p>
 
                 <article className="lp3-connect__preview">
                   <div className="lp3-connect__preview-icon">
@@ -136,19 +147,18 @@ export function LandingChoraConnect() {
                   </div>
                   <div className="lp3-connect__preview-body">
                     <h3>{CHORA_CONNECT_NAME}</h3>
-                    <p>{CHORA_CONNECT_CARD_LINE}</p>
+                    <p>{t("choraConnect.cardLine")}</p>
                   </div>
-                  <span className="lp3-connect__preview-soon">Coming soon</span>
+                  <span className="lp3-connect__preview-soon">{t("choraConnect.comingSoon")}</span>
                 </article>
 
                 <p className="lp3-connect__note">
-                  {BRAND_NAME} already has announcements and alerts today. Connect adds the advanced
-                  layer later — without replacing what you use now.
+                  {t("choraConnect.note", { brand: BRAND_NAME })}
                 </p>
               </div>
 
               <div className="lp3-connect__visual" aria-hidden>
-                <ConnectDiagram />
+                <ConnectDiagram t={t} />
               </div>
             </div>
           </div>
@@ -156,18 +166,20 @@ export function LandingChoraConnect() {
 
         <Reveal>
           <div className="lp3-connect__caps-head">
-            <span className="lp3-eyebrow">Planned capabilities</span>
-            <h3 className="lp3-connect__caps-title">What {CHORA_CONNECT_NAME} will include</h3>
+            <span className="lp3-eyebrow">{t("choraConnect.plannedCaps")}</span>
+            <h3 className="lp3-connect__caps-title">
+              {t("choraConnect.whatIncludes", { name: CHORA_CONNECT_NAME })}
+            </h3>
           </div>
         </Reveal>
 
         <Stagger className="lp3-connect__caps">
-          {PLANNED_FEATURES.map((feature) => (
+          {FEATURE_KEYS.map((feature) => (
             <StaggerItem key={feature.title}>
               <article className="lp3-connect__cap">
                 <FeatureIcon name={feature.icon} />
-                <h4>{feature.title}</h4>
-                <p>{feature.desc}</p>
+                <h4>{t(`choraConnect.${feature.title}`)}</h4>
+                <p>{t(`choraConnect.${feature.desc}`)}</p>
               </article>
             </StaggerItem>
           ))}

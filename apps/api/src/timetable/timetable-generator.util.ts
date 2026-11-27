@@ -109,7 +109,11 @@ function orderedWeekdaysForLesson(
   });
 }
 
-function orderedPeriods(periodNumbers: number[], weekday: Weekday, classBusy: Set<string>) {
+function orderedPeriods(
+  periodNumbers: number[],
+  weekday: Weekday,
+  classBusy: Set<string>,
+) {
   return [...periodNumbers].sort((a, b) => {
     const suffixA = `:${weekday}:${a}`;
     const suffixB = `:${weekday}:${b}`;
@@ -228,13 +232,19 @@ export function generateTimetableSchedule(
         ) {
           continue;
         }
-        if (canPlaceSubject(first, weekday, p1) && canPlaceSubject(second, weekday, p2)) {
+        if (
+          canPlaceSubject(first, weekday, p1) &&
+          canPlaceSubject(second, weekday, p2)
+        ) {
           occupy(first, weekday, p1);
           occupy(second, weekday, p2);
           done = true;
           break;
         }
-        if (canPlaceSubject(first, weekday, p2) && canPlaceSubject(second, weekday, p1)) {
+        if (
+          canPlaceSubject(first, weekday, p2) &&
+          canPlaceSubject(second, weekday, p1)
+        ) {
           occupy(first, weekday, p2);
           occupy(second, weekday, p1);
           done = true;
@@ -252,7 +262,10 @@ export function generateTimetableSchedule(
             const p1 = periods[i];
             const p2 = periods[j];
             if (p1 === p2) continue;
-            if (canPlaceSubject(first, weekday, p1) && canPlaceSubject(second, weekday, p2)) {
+            if (
+              canPlaceSubject(first, weekday, p1) &&
+              canPlaceSubject(second, weekday, p2)
+            ) {
               occupy(first, weekday, p1);
               occupy(second, weekday, p2);
               done = true;

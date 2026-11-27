@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   gradeSubmission,
   type ClassworkAssignment,
@@ -9,6 +9,7 @@ import {
 } from "@/lib/classwork";
 import { openClassworkFile } from "@/lib/teacher-cards";
 import { AppToast } from "@/components/ui/app-toast";
+import { useLocale } from "@/components/i18n/locale-provider";
 
 type Props = {
   assignment: ClassworkAssignment;
@@ -26,23 +27,27 @@ function studentInitial(name: string) {
   return (name.trim().charAt(0) || "?").toUpperCase();
 }
 
-function formatSubmitted(iso: string | null) {
-  if (!iso) return null;
-  try {
-    return new Date(iso).toLocaleString(undefined, {
-      month: "short",
-      day: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-    });
-  } catch {
-    return null;
-  }
-}
+const STATUS_KEYS: Record<string, string> = {
+  PENDING: "classworkUi.statusPending",
+  SUBMITTED: "classworkUi.statusSubmitted",
+  GRADED: "classworkUi.statusGraded",
+  LATE: "classworkUi.statusLate",
+  DRAFT: "classworkUi.statusDraft",
+  PUBLISHED: "classworkUi.statusPublished",
+  CLOSED: "classworkUi.statusClosed",
+};
 
-function StatusBadge({ status }: { status: string }) {
-  const key = status.toLowerCase();
-  return <span className={`cw-status cw-status--${key}`}>{status}</span>;
+function draftsFromSubmissions(
+  submissions: Props["submissions"],
+): Record<string, DraftGrade> {
+  const next: Record<string, DraftGrade> = {};
+  for (const s of submissions) {
+    next[s.id] = {
+      score: s.score != null ? String(s.score) : "",
+      feedback: s.feedback ?? "",
+    };
+  }
+  return next;
 }
 
 const QUICK_PRESETS = [100, 90, 80, 70, 50, 0];
@@ -53,23 +58,44 @@ export function ClassworkSubmissionReview({
   mode,
   onGraded,
 }: Props) {
-  const [drafts, setDrafts] = useState<Record<string, DraftGrade>>({});
+  const { t, locale } = useLocale();
+  const dateLocale = locale === "am" ? "am-ET" : undefined;
+  const [drafts, setDrafts] = useState<Record<string, DraftGrade>>(() =>
+    draftsFromSubmissions(submissions),
+  );
+  const [prevSubmissions, setPrevSubmissions] = useState(submissions);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [savedId, setSavedId] = useState<string | null>(null);
   const [error, setError] = useState("");
 
   const maxScore = assignment.maxScore;
 
-  useEffect(() => {
-    const next: Record<string, DraftGrade> = {};
-    for (const s of submissions) {
-      next[s.id] = {
-        score: s.score != null ? String(s.score) : "",
-        feedback: s.feedback ?? "",
-      };
-    }
-    setDrafts(next);
-  }, [submissions]);
+  if (prevSubmissions !== submissions) {
+    setPrevSubmissions(submissions);
+    setDrafts(draftsFromSubmissions(submissions));
+  }
+
+  const formatSubmitted = useCallback(
+    (iso: string | null) => {
+      if (!iso) return null;
+      try {
+        return new Date(iso).toLocaleString(dateLocale, {
+          month: "short",
+          day: "numeric",
+          hour: "numeric",
+          minute: "2-digit",
+        });
+      } catch {
+        return null;
+      }
+    },
+    [dateLocale],
+  );
+
+  function statusLabel(status: string) {
+    const key = STATUS_KEYS[status] ?? STATUS_KEYS.PENDING;
+    return t(key);
+  }
 
   const stats = useMemo(() => {
     const submitted = submissions.filter((s) => s.status !== "PENDING").length;
@@ -116,44 +142,47 @@ export function ClassworkSubmissionReview({
         onGraded();
         setTimeout(() => setSavedId((cur) => (cur === submission.id ? null : cur)), 2000);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Grading failed");
+        setError(
+          err instanceof Error ? err.message : t("classworkSubmissionReviewUi.gradingFailed"),
+        );
       } finally {
         setSavingId(null);
       }
     },
-    [assignment.id, onGraded],
+    [assignment.id, onGraded, t],
   );
 
   const onSave = useCallback(
     async (submission: ClassworkSubmission) => {
       const draft = drafts[submission.id];
       if (!draft?.score.trim()) {
-        setError("Enter a score before saving.");
+        setError(t("classworkSubmissionReviewUi.scoreRequired"));
         return;
       }
       const score = Number(draft.score);
       if (Number.isNaN(score) || score < 0 || score > maxScore) {
-        setError(`Score must be between 0 and ${maxScore}.`);
+        setError(t("classworkSubmissionReviewUi.scoreRange", { max: maxScore }));
         return;
       }
       await applyGrade(submission, score, draft.feedback);
     },
-    [applyGrade, drafts, maxScore],
+    [applyGrade, drafts, maxScore, t],
   );
 
-  const label = mode === "WORKSHEET" ? "worksheet" : "assignment";
+  const subKey =
+    mode === "WORKSHEET"
+      ? "classworkSubmissionReviewUi.subWorksheet"
+      : "classworkSubmissionReviewUi.subAssignment";
 
   return (
     <section className="cw-review">
       <header className="cw-review__head">
         <div>
-          <h3 className="cw-review__title">Submission desk</h3>
-          <p className="cw-review__sub">
-            Grade each {label} instantly — scores save as you go.
-          </p>
+          <h3 className="cw-review__title">{t("classworkSubmissionReviewUi.title")}</h3>
+          <p className="cw-review__sub">{t(subKey)}</p>
         </div>
         <div className="cw-review__max">
-          <span>Out of</span>
+          <span>{t("classworkSubmissionReviewUi.outOf")}</span>
           <strong>{maxScore}</strong>
         </div>
       </header>
@@ -163,19 +192,19 @@ export function ClassworkSubmissionReview({
       <div className="cw-review__stats">
         <div className="cw-review__stat">
           <strong>{stats.submitted}</strong>
-          <span>Submitted</span>
+          <span>{t("classworkSubmissionReviewUi.statSubmitted")}</span>
         </div>
         <div className="cw-review__stat cw-review__stat--graded">
           <strong>{stats.graded}</strong>
-          <span>Graded</span>
+          <span>{t("classworkSubmissionReviewUi.statGraded")}</span>
         </div>
         <div className="cw-review__stat">
           <strong>{stats.pending}</strong>
-          <span>Waiting</span>
+          <span>{t("classworkSubmissionReviewUi.statWaiting")}</span>
         </div>
         <div className="cw-review__stat cw-review__stat--avg">
           <strong>{stats.classAvg != null ? stats.classAvg : "—"}</strong>
-          <span>Class avg</span>
+          <span>{t("classworkSubmissionReviewUi.statClassAvg")}</span>
         </div>
       </div>
 
@@ -184,12 +213,15 @@ export function ClassworkSubmissionReview({
           <div className="cw-review__progress-fill" style={{ width: `${stats.pct}%` }} />
         </div>
         <span className="cw-review__progress-label">
-          {stats.graded}/{stats.total} graded
+          {t("classworkSubmissionReviewUi.progressGraded", {
+            graded: stats.graded,
+            total: stats.total,
+          })}
         </span>
       </div>
 
       {submissions.length === 0 ? (
-        <p className="cw-empty__sub">No students enrolled for this class.</p>
+        <p className="cw-empty__sub">{t("classworkSubmissionReviewUi.noStudents")}</p>
       ) : (
         <ul className="cw-review__grid">
           {submissions.map((s) => {
@@ -216,13 +248,19 @@ export function ClassworkSubmissionReview({
                       ) : null}
                     </div>
                   </div>
-                  <StatusBadge status={s.status} />
+                  <span className={`cw-status cw-status--${s.status.toLowerCase()}`}>
+                    {statusLabel(s.status)}
+                  </span>
                 </div>
 
                 {submittedLabel ? (
-                  <p className="cw-review__time">Submitted {submittedLabel}</p>
+                  <p className="cw-review__time">
+                    {t("classworkSubmissionReviewUi.submittedAt", { when: submittedLabel })}
+                  </p>
                 ) : (
-                  <p className="cw-review__time cw-review__time--muted">Not submitted yet</p>
+                  <p className="cw-review__time cw-review__time--muted">
+                    {t("classworkSubmissionReviewUi.notSubmitted")}
+                  </p>
                 )}
 
                 {s.note ? <p className="cw-review__note">{s.note}</p> : null}
@@ -234,10 +272,14 @@ export function ClassworkSubmissionReview({
                       className="cw-review__file-btn"
                       onClick={() => void openClassworkFile(s.fileUrl!)}
                     >
-                      View {s.fileName ?? "submission"}
+                      {t("classworkSubmissionReviewUi.viewFile", {
+                        name: s.fileName ?? t("classworkSubmissionReviewUi.submissionFallback"),
+                      })}
                     </button>
                   ) : (
-                    <span className="cw-review__no-file">No file attached</span>
+                    <span className="cw-review__no-file">
+                      {t("classworkSubmissionReviewUi.noFile")}
+                    </span>
                   )}
                 </div>
 
@@ -245,7 +287,7 @@ export function ClassworkSubmissionReview({
                   <div className="cw-review__grade">
                     <div className="cw-review__score-row">
                       <label className="cw-review__score-field">
-                        <span>Score</span>
+                        <span>{t("classworkSubmissionReviewUi.score")}</span>
                         <div className="cw-review__score-input-wrap">
                           <input
                             type="number"
@@ -261,7 +303,10 @@ export function ClassworkSubmissionReview({
                         </div>
                       </label>
                       {s.score != null && s.status === "GRADED" ? (
-                        <div className="cw-review__score-pill" aria-label="Saved score">
+                        <div
+                          className="cw-review__score-pill"
+                          aria-label={t("classworkSubmissionReviewUi.savedScoreAria")}
+                        >
                           {Math.round((s.score / maxScore) * 100)}%
                         </div>
                       ) : null}
@@ -270,6 +315,12 @@ export function ClassworkSubmissionReview({
                     <div className="cw-review__quick">
                       {QUICK_PRESETS.map((pct) => {
                         const val = Math.round((pct / 100) * maxScore);
+                        const quickLabel =
+                          pct === 100
+                            ? t("classworkSubmissionReviewUi.quickFull")
+                            : pct === 0
+                              ? t("classworkSubmissionReviewUi.quickZero")
+                              : t("classworkSubmissionReviewUi.quickPct", { pct });
                         return (
                           <button
                             key={pct}
@@ -281,21 +332,21 @@ export function ClassworkSubmissionReview({
                               void applyGrade(s, val, draft.feedback);
                             }}
                           >
-                            {pct === 100 ? "Full" : pct === 0 ? "Zero" : `${pct}%`}
+                            {quickLabel}
                           </button>
                         );
                       })}
                     </div>
 
                     <label className="cw-review__feedback">
-                      <span>Feedback (optional)</span>
+                      <span>{t("classworkSubmissionReviewUi.feedbackOptional")}</span>
                       <textarea
                         rows={2}
                         value={draft.feedback}
                         onChange={(e) =>
                           updateDraft(s.id, { feedback: e.target.value })
                         }
-                        placeholder="Short note for the student…"
+                        placeholder={t("classworkSubmissionReviewUi.feedbackPlaceholder")}
                       />
                     </label>
 
@@ -305,11 +356,17 @@ export function ClassworkSubmissionReview({
                       disabled={isSaving}
                       onClick={() => void onSave(s)}
                     >
-                      {isSaving ? "Saving…" : justSaved ? "Saved ✓" : "Save grade"}
+                      {isSaving
+                        ? t("common.saving")
+                        : justSaved
+                          ? t("classworkSubmissionReviewUi.savedOk")
+                          : t("classworkSubmissionReviewUi.saveGrade")}
                     </button>
                   </div>
                 ) : (
-                  <p className="cw-review__await">Waiting for student to submit.</p>
+                  <p className="cw-review__await">
+                    {t("classworkSubmissionReviewUi.awaitingSubmit")}
+                  </p>
                 )}
               </li>
             );

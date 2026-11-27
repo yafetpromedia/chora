@@ -22,7 +22,9 @@ import { GradesModule } from './grades/grades.module';
 import { PermissionsModule } from './permissions/permissions.module';
 import { StudentsModule } from './students/students.module';
 import { TeachersModule } from './teachers/teachers.module';
+import { IdCardsModule } from './id-cards/id-cards.module';
 import { CommonModule } from './common/common.module';
+import { EmailModule } from './email/email.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ResultsModule } from './results/results.module';
 import { ClassworkModule } from './classwork/classwork.module';
@@ -46,12 +48,14 @@ import { SupportModule } from './support/support.module';
     PrismaModule,
     PermissionsModule,
     CommonModule,
+    EmailModule,
     SubscriptionsModule,
     SchoolsModule,
     UsersModule,
     GradesModule,
     StudentsModule,
     TeachersModule,
+    IdCardsModule,
     FayedaModule,
     InvitesModule,
     AuthModule,

@@ -123,7 +123,7 @@ export class FayedaService {
     this.purgeExpired();
 
     const sessionId = `fyd_${randomBytes(12).toString('hex')}`;
-    const code = this.config.get('FAYEDA_MOCK_OTP') ?? '123456';
+    const code = this.config.get<string>('FAYEDA_MOCK_OTP') ?? '123456';
     const phone = this.resolvePhone(normalized);
 
     this.sessions.set(sessionId, {
@@ -151,14 +151,19 @@ export class FayedaService {
 
     const session = this.sessions.get(sessionId);
     if (!session || session.schoolId !== schoolId) {
-      throw new NotFoundException('Verification session expired. Send a new code.');
+      throw new NotFoundException(
+        'Verification session expired. Send a new code.',
+      );
     }
 
     if (session.code !== code.trim()) {
       throw new UnauthorizedException('Invalid verification code');
     }
 
-    const profile = this.lookupProfile(session.identifier, session.identifierType);
+    const profile = this.lookupProfile(
+      session.identifier,
+      session.identifierType,
+    );
     await this.assertNotAlreadyEnrolled(
       schoolId,
       profile.fan,
@@ -167,7 +172,8 @@ export class FayedaService {
     );
 
     const verificationToken = `fvt_${randomBytes(16).toString('hex')}`;
-    const { verificationToken: _omit, ...rest } = profile;
+    const rest: FayedaVerificationToken['profile'] = { ...profile };
+    delete (rest as Partial<FayedaVerifiedProfile>).verificationToken;
 
     this.tokens.set(verificationToken, {
       token: verificationToken,
@@ -240,7 +246,7 @@ export class FayedaService {
     identifier: string,
     type: 'FAN' | 'FCN',
   ): FayedaVerifiedProfile {
-    const mode = this.config.get('FAYEDA_MODE') ?? 'mock';
+    const mode = this.config.get<string>('FAYEDA_MODE') ?? 'mock';
 
     if (mode === 'mock') {
       const direct = DEMO_PROFILES[identifier];
@@ -278,8 +284,24 @@ export class FayedaService {
     const month = 1 + (parseInt(hash.slice(4, 6), 16) % 12);
     const day = 1 + (parseInt(hash.slice(6, 8), 16) % 28);
 
-    const firstNames = ['Hanna', 'Meron', 'Sara', 'Lidya', 'Betty', 'Nati', 'Dawit', 'Samuel'];
-    const middleNames = ['Tesfaye', 'Abebe', 'Kebede', 'Mulu', 'Girma', 'Haile'];
+    const firstNames = [
+      'Hanna',
+      'Meron',
+      'Sara',
+      'Lidya',
+      'Betty',
+      'Nati',
+      'Dawit',
+      'Samuel',
+    ];
+    const middleNames = [
+      'Tesfaye',
+      'Abebe',
+      'Kebede',
+      'Mulu',
+      'Girma',
+      'Haile',
+    ];
     const lastNames = ['Bekele', 'Tadesse', 'Alemu', 'Desta', 'Worku', 'Gebre'];
 
     const pick = (arr: string[], offset: number) =>
@@ -294,7 +316,10 @@ export class FayedaService {
       gender: isMale ? Gender.MALE : Gender.FEMALE,
       dateOfBirth: `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`,
       nationality: 'ET',
-      phone: `09${hash.slice(14, 22).replace(/\D/g, '').slice(0, 8)}`.slice(0, 10),
+      phone: `09${hash.slice(14, 22).replace(/\D/g, '').slice(0, 8)}`.slice(
+        0,
+        10,
+      ),
       region: 'Addis Ababa',
       zone: 'Bole Sub City',
       woreda: 'Woreda 03',
