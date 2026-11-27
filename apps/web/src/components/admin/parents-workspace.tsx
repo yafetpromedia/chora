@@ -29,6 +29,9 @@ export function ParentsWorkspace() {
   const [saved, setSaved] = useState("");
   const [search, setSearch] = useState("");
   const [manageTarget, setManageTarget] = useState<ParentRecord | null>(null);
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [phone, setPhone] = useState("");
   const [username, setUsername] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [tempPassword, setTempPassword] = useState("");
@@ -88,6 +91,9 @@ export function ParentsWorkspace() {
 
   function openManage(parent: ParentRecord) {
     setManageTarget(parent);
+    setFirstName(parent.firstName ?? "");
+    setLastName(parent.lastName ?? "");
+    setPhone(parent.phone ?? "");
     setUsername(parent.username ?? "");
     setNewPassword("");
     setTempPassword("");
@@ -97,6 +103,9 @@ export function ParentsWorkspace() {
 
   function closeManage() {
     setManageTarget(null);
+    setFirstName("");
+    setLastName("");
+    setPhone("");
     setUsername("");
     setNewPassword("");
     setTempPassword("");
@@ -133,14 +142,36 @@ export function ParentsWorkspace() {
   async function onSaveAccount(e: FormEvent) {
     e.preventDefault();
     if (!manageTarget) return;
-    const body: { username?: string; password?: string } = {};
+    const body: {
+      firstName?: string;
+      lastName?: string;
+      phone?: string | null;
+      username?: string;
+      password?: string;
+    } = {};
+    if (firstName.trim() && firstName.trim() !== manageTarget.firstName) {
+      body.firstName = firstName.trim();
+    }
+    if (lastName.trim() && lastName.trim() !== manageTarget.lastName) {
+      body.lastName = lastName.trim();
+    }
+    const nextPhone = phone.trim() || null;
+    if (nextPhone !== (manageTarget.phone ?? null)) {
+      body.phone = nextPhone;
+    }
     if (username.trim() && username.trim() !== manageTarget.username) {
       body.username = username.trim();
     }
     if (newPassword.trim()) {
       body.password = newPassword.trim();
     }
-    if (!body.username && !body.password) {
+    if (
+      !body.firstName &&
+      !body.lastName &&
+      body.phone === undefined &&
+      !body.username &&
+      !body.password
+    ) {
       setError(t("parentsUi.needChange"));
       return;
     }
@@ -157,10 +188,36 @@ export function ParentsWorkspace() {
       setNewPassword("");
       setParents((rows) =>
         rows.map((p) =>
-          p.userId === manageTarget.userId ? { ...p, username: result.username } : p,
+          p.userId === manageTarget.userId
+            ? {
+                ...p,
+                username: result.username,
+                email: result.email,
+                phone: result.phone,
+                firstName: result.firstName,
+                lastName: result.lastName,
+                name: result.name,
+              }
+            : p,
         ),
       );
-      setManageTarget((p) => (p ? { ...p, username: result.username } : p));
+      setManageTarget((p) =>
+        p
+          ? {
+              ...p,
+              username: result.username,
+              email: result.email,
+              phone: result.phone,
+              firstName: result.firstName,
+              lastName: result.lastName,
+              name: result.name,
+            }
+          : p,
+      );
+      setFirstName(result.firstName);
+      setLastName(result.lastName);
+      setPhone(result.phone ?? "");
+      setUsername(result.username);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("parentsUi.saveFailed"));
     } finally {
@@ -344,6 +401,37 @@ export function ParentsWorkspace() {
 
             <form className="par-v2__form" onSubmit={(e) => void onSaveAccount(e)}>
               <label className="par-v2__field">
+                <span>{t("parentsUi.firstName")}</span>
+                <input
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  autoComplete="given-name"
+                  required
+                />
+              </label>
+
+              <label className="par-v2__field">
+                <span>{t("parentsUi.lastName")}</span>
+                <input
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  autoComplete="family-name"
+                  required
+                />
+              </label>
+
+              <label className="par-v2__field">
+                <span>{t("parentsUi.phone")}</span>
+                <input
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder={t("parentsUi.phonePlaceholder")}
+                  autoComplete="tel"
+                />
+              </label>
+
+              <label className="par-v2__field">
                 <span>{t("parentsUi.username")}</span>
                 <input
                   value={username ?? ""}
@@ -368,10 +456,6 @@ export function ParentsWorkspace() {
               </label>
 
               <div className="par-v2__readonly">
-                <div>
-                  <span>{t("parentsUi.phone")}</span>
-                  <strong>{manageTarget.phone ?? emptyDash}</strong>
-                </div>
                 <div>
                   <span>{t("parentsUi.portalEmail")}</span>
                   <strong>{manageTarget.email}</strong>

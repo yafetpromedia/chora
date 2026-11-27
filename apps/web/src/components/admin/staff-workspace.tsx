@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useLocale } from "@/components/i18n/locale-provider";
+import { AdminStaffPhotoField } from "@/components/admin/admin-staff-photo-field";
 import { DashIcon } from "@/components/dashboard/dash-icons";
 import { StaffPermissionsDrawer } from "@/components/teachers/staff-permissions-drawer";
 import { useCurrentUserId } from "@/lib/use-client-snapshot";
@@ -15,6 +16,7 @@ import {
   listRoleTemplates,
   listTeachers,
   setStaffPermissionGrants,
+  updateTeacher,
   type PermissionCatalogItem,
   type RoleTemplate,
   type StaffPermissionsDetail,
@@ -84,6 +86,8 @@ export function StaffWorkspace() {
   const [roleFilter, setRoleFilter] = useState("");
   const [teamFilter, setTeamFilter] = useState("");
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<TeacherRecord | null>(null);
+  const [toast, setToast] = useState("");
   const [permDrawerOpen, setPermDrawerOpen] = useState(false);
   const [permDetail, setPermDetail] = useState<StaffPermissionsDetail | null>(null);
   const [permCatalog, setPermCatalog] = useState<PermissionCatalogItem[]>([]);
@@ -190,10 +194,21 @@ export function StaffWorkspace() {
     setLastName("");
     setPassword("");
     setRoleTemplateSlug("reception");
+    setEditTarget(null);
   }
 
   function openCreate() {
     resetForm();
+    setDrawerOpen(true);
+  }
+
+  function openEdit(person: TeacherRecord) {
+    setEditTarget(person);
+    setFirstName(person.firstName ?? "");
+    setLastName(person.lastName ?? "");
+    setEmail(person.email ?? "");
+    setPassword("");
+    setRoleTemplateSlug(person.roleTemplateSlug ?? "reception");
     setDrawerOpen(true);
   }
 
@@ -258,13 +273,32 @@ export function StaffWorkspace() {
     setBusy(true);
     setError("");
     try {
-      await createTeacher({
-        email: email.trim(),
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
-        password: password || undefined,
-        roleTemplateSlug,
-      });
+      if (editTarget) {
+        await updateTeacher(editTarget.userId, {
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
+          email: email.trim(),
+          password: password.trim() || undefined,
+          roleTemplateSlug,
+        });
+        setToast(
+          t("adminStaffUi.accountUpdated", {
+            name: displayName({
+              ...editTarget,
+              firstName: firstName.trim(),
+              lastName: lastName.trim(),
+            }),
+          }),
+        );
+      } else {
+        await createTeacher({
+          email: email.trim(),
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
+          password: password || undefined,
+          roleTemplateSlug,
+        });
+      }
       setDrawerOpen(false);
       resetForm();
       await load();
@@ -309,6 +343,14 @@ export function StaffWorkspace() {
         ) : null}
         <button
           type="button"
+          className="tch-v2__action"
+          disabled={busy}
+          onClick={() => openEdit(person)}
+        >
+          {t("adminStaffUi.editProfile")}
+        </button>
+        <button
+          type="button"
           className="tch-v2__action tch-v2__action--primary"
           disabled={busy}
           onClick={() => void openPermissions(person.userId)}
@@ -322,6 +364,7 @@ export function StaffWorkspace() {
   return (
     <div className="tch-v2 staff-v2">
       <AppToast message={error} tone="error" onDismiss={() => setError("")} />
+      <AppToast message={toast} tone="success" onDismiss={() => setToast("")} />
 
       <header className="tch-v2__hero tch-v2__hero--compact">
         <div className="tch-v2__hero-glow" aria-hidden />
@@ -514,7 +557,7 @@ export function StaffWorkspace() {
 
       {drawerOpen ? (
         <div
-          className="stu-drawer-backdrop"
+          className="tch-drawer-backdrop"
           role="presentation"
           onClick={() => {
             setDrawerOpen(false);
@@ -522,19 +565,24 @@ export function StaffWorkspace() {
           }}
         >
           <aside
-            className="stu-drawer stu-drawer--wide tch-drawer-panel"
+            className="tch-drawer-shell tch-drawer-shell--wide"
             onClick={(e) => e.stopPropagation()}
             role="dialog"
-            aria-label={t("adminStaffUi.drawerAdd")}
+            aria-label={editTarget ? t("adminStaffUi.drawerEdit") : t("adminStaffUi.drawerAdd")}
           >
-            <header className="stu-drawer__head">
+            <header className="tch-drawer-shell__head">
               <div>
-                <h2 className="stu-drawer__title">{t("adminStaffUi.newTitle")}</h2>
-                <p className="stu-drawer__sub">{t("adminStaffUi.newSub")}</p>
+                <p className="tch-drawer-shell__eyebrow">{t("adminStaffUi.chip")}</p>
+                <h2 className="tch-drawer-shell__title">
+                  {editTarget ? t("adminStaffUi.editTitle") : t("adminStaffUi.newTitle")}
+                </h2>
+                <p className="tch-drawer-shell__sub">
+                  {editTarget ? t("adminStaffUi.editSub") : t("adminStaffUi.newSub")}
+                </p>
               </div>
               <button
                 type="button"
-                className="stu-drawer__close"
+                className="tch-drawer-shell__close"
                 aria-label={t("common.close")}
                 onClick={() => {
                   setDrawerOpen(false);
@@ -545,59 +593,80 @@ export function StaffWorkspace() {
               </button>
             </header>
 
-            <form className="stu-drawer__body tch-drawer" onSubmit={(e) => void onSubmit(e)}>
-              <label>
-                {t("adminStaffUi.role")}
-                <select
-                  value={roleTemplateSlug}
-                  onChange={(e) => setRoleTemplateSlug(e.target.value)}
-                >
-                  {templates
-                    .filter((tpl) =>
-                      (OFFICE_STAFF_ROLE_SLUGS as readonly string[]).includes(tpl.slug),
-                    )
-                    .map((tpl) => (
-                      <option key={tpl.slug} value={tpl.slug}>
-                        {tpl.name}
-                      </option>
-                    ))}
-                </select>
-              </label>
-              <label>
-                {t("adminStaffUi.firstName")}
-                <input
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
-                  required
-                />
-              </label>
-              <label>
-                {t("adminStaffUi.lastName")}
-                <input value={lastName} onChange={(e) => setLastName(e.target.value)} required />
-              </label>
-              <label>
-                {t("adminStaffUi.email")}
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                />
-              </label>
-              <label>
-                {t("adminStaffUi.tempPassword")}
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  minLength={8}
-                  placeholder={t("adminStaffUi.minEightChars")}
-                />
-              </label>
-              <div className="tch-drawer__actions">
-                <button type="submit" className="tch-v2__btn tch-v2__btn--primary" disabled={busy}>
-                  {busy ? t("common.saving") : t("adminStaffUi.createAccount")}
-                </button>
+            <form className="tch-drawer-shell__form" onSubmit={(e) => void onSubmit(e)}>
+              <div className="tch-drawer-shell__body tch-drawer">
+                <label>
+                  {t("adminStaffUi.role")}
+                  <select
+                    value={roleTemplateSlug}
+                    onChange={(e) => setRoleTemplateSlug(e.target.value)}
+                  >
+                    {templates
+                      .filter((tpl) =>
+                        (OFFICE_STAFF_ROLE_SLUGS as readonly string[]).includes(tpl.slug),
+                      )
+                      .map((tpl) => (
+                        <option key={tpl.slug} value={tpl.slug}>
+                          {tpl.name}
+                        </option>
+                      ))}
+                  </select>
+                </label>
+                <label>
+                  {t("adminStaffUi.firstName")}
+                  <input
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    required
+                  />
+                </label>
+                <label>
+                  {t("adminStaffUi.lastName")}
+                  <input value={lastName} onChange={(e) => setLastName(e.target.value)} required />
+                </label>
+                <label>
+                  {t("adminStaffUi.email")}
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                  />
+                </label>
+                <label>
+                  {editTarget
+                    ? t("adminStaffUi.newPasswordOptional")
+                    : t("adminStaffUi.tempPassword")}
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    minLength={editTarget ? undefined : 8}
+                    placeholder={t("adminStaffUi.minEightChars")}
+                    autoComplete="new-password"
+                  />
+                  {editTarget ? (
+                    <em className="tch-drawer-hint">{t("adminStaffUi.leaveBlankPassword")}</em>
+                  ) : null}
+                </label>
+                {editTarget ? (
+                  <AdminStaffPhotoField
+                    userId={editTarget.userId}
+                    photoUrl={editTarget.photoUrl}
+                    onUpdated={(next) => {
+                      setPeople((rows) =>
+                        rows.map((p) => (p.userId === next.userId ? { ...p, ...next } : p)),
+                      );
+                      setEditTarget((prev) =>
+                        prev && prev.userId === next.userId ? { ...prev, ...next } : prev,
+                      );
+                    }}
+                    onToast={setToast}
+                    onError={setError}
+                  />
+                ) : null}
+              </div>
+              <footer className="tch-drawer-shell__foot">
                 <button
                   type="button"
                   className="tch-v2__btn tch-v2__btn--ghost"
@@ -608,7 +677,14 @@ export function StaffWorkspace() {
                 >
                   {t("common.cancel")}
                 </button>
-              </div>
+                <button type="submit" className="tch-v2__btn tch-v2__btn--primary" disabled={busy}>
+                  {busy
+                    ? t("common.saving")
+                    : editTarget
+                      ? t("adminStaffUi.saveAccount")
+                      : t("adminStaffUi.createAccount")}
+                </button>
+              </footer>
             </form>
           </aside>
         </div>

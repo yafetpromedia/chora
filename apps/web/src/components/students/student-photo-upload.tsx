@@ -48,7 +48,7 @@ export function StudentPhotoUpload({ value, onChange, label = "Student photo" }:
           {value ? (
             <button
               type="button"
-              className="stu-btn stu-btn--ghost stu-btn--danger-text"
+              className="stu-btn stu-btn--danger"
               onClick={() => onChange(null)}
             >
               Remove

@@ -152,8 +152,9 @@ function CardResultsInner() {
       <style>{`
         .src-page {
           min-height: 100vh;
+          min-height: 100dvh;
           margin: 0;
-          padding: 1.25rem 1rem 2.5rem;
+          padding: 1rem 1rem calc(1.75rem + env(safe-area-inset-bottom, 0px));
           background:
             radial-gradient(circle at top left, rgba(20,125,118,0.14), transparent 42%),
             linear-gradient(180deg, #e8f3f2 0%, #f7fafb 48%, #fff 100%);
@@ -168,11 +169,16 @@ function CardResultsInner() {
           display: flex;
           align-items: center;
           gap: 0.65rem;
-          margin-bottom: 1rem;
+          margin-bottom: 0.85rem;
           color: #0f5f5a;
         }
-        .src-brand strong { display: block; letter-spacing: 0.12em; font-size: 0.9rem; }
-        .src-brand span { display: block; font-size: 0.8rem; opacity: 0.85; }
+        .src-brand .brand-mark {
+          width: 2.75rem;
+          height: 2.75rem;
+          flex-shrink: 0;
+        }
+        .src-brand strong { display: block; letter-spacing: 0.08em; font-size: 1rem; }
+        .src-brand span { display: block; font-size: 0.78rem; opacity: 0.85; line-height: 1.35; }
         .src-card {
           background: #fff;
           border: 1px solid #c9dbd9;
@@ -182,10 +188,10 @@ function CardResultsInner() {
         }
         .src-card__head {
           display: flex;
-          gap: 0.85rem;
+          gap: 0.75rem;
           align-items: center;
-          padding: 1.1rem 1.15rem;
-          background: #147d76;
+          padding: 0.95rem 1rem;
+          background: linear-gradient(135deg, #0f5f5a, #147d76);
           color: #fff;
         }
         .src-card__logo {
@@ -241,17 +247,20 @@ function CardResultsInner() {
         }
         .src-btn {
           width: 100%;
-          margin-top: 0.35rem;
+          margin-top: 0.45rem;
           border: 0;
-          border-radius: 10px;
-          padding: 0.8rem 1rem;
-          background: #147d76;
+          border-radius: 12px;
+          min-height: 3rem;
+          padding: 0.85rem 1rem;
+          background: linear-gradient(135deg, #0f5f5a, #147d76);
           color: #fff;
           font: inherit;
-          font-weight: 700;
+          font-size: 1rem;
+          font-weight: 750;
           cursor: pointer;
+          box-shadow: 0 8px 22px rgba(20, 125, 118, 0.28);
         }
-        .src-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .src-btn:disabled { opacity: 0.6; cursor: not-allowed; box-shadow: none; }
         .src-err {
           margin: 0 0 0.85rem;
           padding: 0.65rem 0.75rem;
@@ -330,16 +339,33 @@ function CardResultsInner() {
         }
         .src-foot a { color: #147d76; font-weight: 700; }
         .src-lockout {
-          margin-top: 0.75rem;
+          margin-top: 0.85rem;
           width: 100%;
-          border: 1px solid #c9dbd9;
+          border: 1.5px solid #147d76;
           background: #fff;
-          border-radius: 10px;
-          padding: 0.55rem;
+          border-radius: 12px;
+          min-height: 2.85rem;
+          padding: 0.7rem 1rem;
           font: inherit;
           color: #0f5f5a;
-          font-weight: 650;
+          font-size: 0.95rem;
+          font-weight: 700;
           cursor: pointer;
+          box-shadow: 0 4px 14px rgba(20, 125, 118, 0.12);
+        }
+        @media (max-width: 420px) {
+          .src-page { padding: 0.75rem 0.75rem calc(1.5rem + env(safe-area-inset-bottom, 0px)); }
+          .src-brand { margin-bottom: 0.55rem; gap: 0.65rem; }
+          .src-brand .brand-mark { width: 2.15rem; height: 2.15rem; }
+          .src-brand strong { font-size: 0.92rem; }
+          .src-brand span { font-size: 0.72rem; }
+          .src-card { border-radius: 16px; }
+          .src-card__head { padding: 0.8rem; }
+          .src-card__head h1 { font-size: 0.95rem; }
+          .src-card__body { padding: 0.9rem; }
+          .src-student h2 { font-size: 1.05rem; }
+          .src-btn, .src-lockout { min-height: 3.05rem; font-size: 1rem; }
+          .src-field input { min-height: 2.75rem; font-size: 1rem; }
         }
       `}</style>
 

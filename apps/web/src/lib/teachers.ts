@@ -273,6 +273,10 @@ export async function createTeacher(body: {
 export async function updateTeacher(
   userId: string,
   body: {
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+    password?: string;
     roleTemplateSlug?: string;
     homeroomGradeId?: string | null;
     homeroomSectionId?: string | null;
@@ -330,6 +334,19 @@ export async function reviewTeacherPhoto(
   return apiPatch<TeacherRecord>(
     `/schools/teachers/${encodeURIComponent(userId)}/photo/review`,
     body,
+  );
+}
+
+export async function adminSetTeacherPhoto(userId: string, photoUrl: string) {
+  return apiPatch<TeacherRecord>(
+    `/schools/teachers/${encodeURIComponent(userId)}/photo`,
+    { photoUrl },
+  );
+}
+
+export async function adminClearTeacherPhoto(userId: string) {
+  return apiDelete<TeacherRecord>(
+    `/schools/teachers/${encodeURIComponent(userId)}/photo`,
   );
 }
 

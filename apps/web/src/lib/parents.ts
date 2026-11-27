@@ -34,13 +34,21 @@ export async function resetParentPassword(userId: string) {
 
 export async function updateParentAccount(
   userId: string,
-  body: { username?: string; password?: string },
+  body: {
+    firstName?: string;
+    lastName?: string;
+    phone?: string | null;
+    username?: string;
+    password?: string;
+  },
 ) {
   return apiPatch<{
     userId: string;
     username: string;
     email: string;
     phone: string | null;
+    firstName: string;
+    lastName: string;
     name: string;
     passwordUpdated: boolean;
   }>(`/schools/parents/${userId}`, body);

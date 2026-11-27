@@ -1,11 +1,12 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { TeacherIdCardView } from "@/components/teacher/teacher-id-card";
 import { AUTH_TOKEN_KEY } from "@/lib/auth";
 import { getMyTeacherIdCard, listTeacherIdCards, type TeacherIdCard } from "@/lib/teacher-cards";
 import { BRAND_NAME } from "@/lib/brand";
+import { prepareAndPrint, stripPreloaderFromDom } from "@/lib/id-card-print";
 import { useLocale } from "@/components/i18n/locale-provider";
 
 function PrintTeacherIdCardInner() {
@@ -15,10 +16,16 @@ function PrintTeacherIdCardInner() {
   const userId = searchParams.get("userId") ?? "";
   const duplex = searchParams.get("duplex") !== "0";
   const me = searchParams.get("me") === "1";
+  const pageRef = useRef<HTMLDivElement>(null);
 
   const [card, setCard] = useState<TeacherIdCard | null>(null);
   const [error, setError] = useState("");
   const [ready, setReady] = useState(false);
+  const [printing, setPrinting] = useState(false);
+
+  useEffect(() => {
+    stripPreloaderFromDom();
+  }, []);
 
   useEffect(() => {
     if (!localStorage.getItem(AUTH_TOKEN_KEY)) {
@@ -47,14 +54,36 @@ function PrintTeacherIdCardInner() {
 
   useEffect(() => {
     if (!ready || !card) return;
-    const timeout = window.setTimeout(() => window.print(), 450);
-    return () => window.clearTimeout(timeout);
+    let cancelled = false;
+    void (async () => {
+      setPrinting(true);
+      try {
+        await prepareAndPrint(pageRef.current);
+      } finally {
+        if (!cancelled) setPrinting(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [ready, card]);
+
+  async function onPrint() {
+    setPrinting(true);
+    try {
+      await prepareAndPrint(pageRef.current);
+    } finally {
+      setPrinting(false);
+    }
+  }
 
   if (error) {
     return (
       <div className="sid-print-page sid-print-page--error">
         <p>{error}</p>
+        <button type="button" className="sid-print-toolbar__btn" onClick={() => router.back()}>
+          {t("common.close")}
+        </button>
       </div>
     );
   }
@@ -73,7 +102,33 @@ function PrintTeacherIdCardInner() {
   });
 
   return (
-    <div className="sid-print-page">
+    <div className="sid-print-page" ref={pageRef}>
+      <div className="sid-print-toolbar no-print">
+        <div className="sid-print-toolbar__copy">
+          <p className="sid-print-toolbar__brand">
+            {t("idCardPrintChromeUi.facultyId", { brand: BRAND_NAME })}
+          </p>
+          <p className="sid-print-toolbar__hint">{t("idCardPrintChromeUi.previewHint")}</p>
+        </div>
+        <div className="sid-print-toolbar__actions">
+          <button
+            type="button"
+            className="sid-print-toolbar__btn sid-print-toolbar__btn--ghost"
+            onClick={() => router.back()}
+          >
+            {t("idCardPrintChromeUi.done")}
+          </button>
+          <button
+            type="button"
+            className="sid-print-toolbar__btn sid-print-toolbar__btn--primary"
+            disabled={printing}
+            onClick={() => void onPrint()}
+          >
+            {printing ? t("idCardPrintChromeUi.preparingStaff") : t("idCardPrintChromeUi.printAgain")}
+          </button>
+        </div>
+      </div>
+
       <header className="sid-print-meta sid-print-meta--page">
         <div className="sid-print-meta__row">
           {card.schoolLogoUrl ? (
@@ -110,14 +165,18 @@ function PrintTeacherIdCardInner() {
         <div className="sid-print-mount">
           <span className="sid-print-side-label">{t("idCardPrintChromeUi.front")}</span>
           <div className="sid-print-mount__frame">
-            <TeacherIdCardView card={card} showBack={false} />
+            <div className="sid-print-mount__scale">
+              <TeacherIdCardView card={card} showBack={false} />
+            </div>
           </div>
         </div>
         {duplex ? (
           <div className="sid-print-mount sid-print-mount--back">
             <span className="sid-print-side-label">{t("idCardPrintChromeUi.backLong")}</span>
             <div className="sid-print-mount__frame">
-              <TeacherIdCardView card={card} backOnly />
+              <div className="sid-print-mount__scale">
+                <TeacherIdCardView card={card} backOnly />
+              </div>
             </div>
           </div>
         ) : null}

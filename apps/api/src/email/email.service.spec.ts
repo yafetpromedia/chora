@@ -320,6 +320,32 @@ describe('email delivery', () => {
     expect(mockSendMail).toHaveBeenCalledTimes(2);
   });
 
+  it('does not process or claim queued mail while email delivery is disabled', async () => {
+    const { prisma, service } = memory();
+    await service.enqueue({
+      to: 'parent@example.com',
+      category: 'welcome',
+      templateId: 'welcome',
+      idempotencyKey: 'disabled-queue',
+      vars: { firstName: 'Sara', schoolName: 'Everest' },
+    });
+
+    const disabledService = new EmailService(
+      config({ CHORA_EMAIL_ENABLED: 'false' }) as never,
+      prisma as never,
+      new EmailPreferencesService(prisma as never),
+    );
+
+    await expect(disabledService.processDue()).resolves.toEqual({
+      processed: 0,
+    });
+
+    expect(prisma.rows[0].status).toBe('QUEUED');
+    expect(prisma.emailDelivery.findMany).not.toHaveBeenCalled();
+    expect(prisma.emailDelivery.updateMany).not.toHaveBeenCalled();
+    expect(mockSendMail).not.toHaveBeenCalled();
+  });
+
   it('suppresses a duplicate send', async () => {
     const { prisma, service } = memory();
     const first = await service.enqueue({
@@ -385,14 +411,15 @@ describe('email delivery', () => {
       ],
     });
     expect(prisma.emailDelivery.create).toHaveBeenCalledTimes(1);
-    expect(prisma.user.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
-          schoolId: 'school-b',
-          role: 'parent',
-        }),
-      }),
-    );
+    const userFindManyCalls = prisma.user.findMany.mock
+      .calls as unknown as Array<
+      [{ where: { schoolId: string; role: string } }]
+    >;
+    const userFindManyCall = userFindManyCalls[0][0];
+    expect(userFindManyCall.where).toMatchObject({
+      schoolId: 'school-b',
+      role: 'parent',
+    });
   });
 
   it('skips a parent who turned email off', async () => {

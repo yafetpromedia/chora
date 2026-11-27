@@ -1,17 +1,38 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { useLocale } from "@/components/i18n/locale-provider";
 
 const HOLD_MS = 1750;
 const EXIT_MS = 650;
 
+function isPrintPath(pathname: string | null | undefined) {
+  if (!pathname) return false;
+  return pathname === "/print" || pathname.startsWith("/print/");
+}
+
+function shouldSkipPreloader(pathname: string | null) {
+  if (isPrintPath(pathname)) return true;
+  if (typeof window !== "undefined") {
+    return isPrintPath(window.location.pathname);
+  }
+  return false;
+}
+
 export function ChoraPreloader() {
   const { t } = useLocale();
-  const [visible, setVisible] = useState(true);
+  const pathname = usePathname();
+  const skip = shouldSkipPreloader(pathname);
+  const [visible, setVisible] = useState(() => !shouldSkipPreloader(pathname));
   const [exiting, setExiting] = useState(false);
 
   useEffect(() => {
+    if (skip) {
+      document.getElementById("chora-preloader")?.remove();
+      return;
+    }
+
     let exitTimer: ReturnType<typeof setTimeout> | undefined;
     let holdTimer: ReturnType<typeof setTimeout> | undefined;
     let cancelled = false;
@@ -39,9 +60,9 @@ export function ChoraPreloader() {
       if (holdTimer) clearTimeout(holdTimer);
       if (exitTimer) clearTimeout(exitTimer);
     };
-  }, []);
+  }, [skip]);
 
-  if (!visible) return null;
+  if (skip || !visible) return null;
 
   return (
     <div
@@ -49,6 +70,7 @@ export function ChoraPreloader() {
       className={`chora-preloader${exiting ? " chora-preloader--exit" : ""}`}
       aria-busy="true"
       aria-live="polite"
+      data-print-hide="true"
     >
       <div className="chora-preloader__icon chora-icon-anim" aria-hidden="true">
         <svg
@@ -91,7 +113,9 @@ export function ChoraPreloader() {
 
       <div className="chora-preloader__copy">
         <div className="chora-preloader__name">Chora</div>
-        <div className="chora-preloader__tagline">{t("choraPreloaderUi.tagline")}</div>
+        <div className="chora-preloader__tagline">
+          {t("choraPreloaderUi.tagline")}
+        </div>
       </div>
 
       <div className="chora-preloader__track" aria-hidden="true">

@@ -1,4 +1,5 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { EmailPreferencesService } from './email-preferences.service';
 
 describe('email preferences', () => {
@@ -21,12 +22,20 @@ describe('email preferences', () => {
       },
       parentEmailPreference: {
         findFirst: jest.fn(),
+        findUnique: jest.fn(),
+        create: jest.fn(),
+        update: jest.fn(),
         upsert: jest.fn(),
       },
       user: {
         findFirst: jest.fn(),
       },
     };
+    Object.assign(prisma, {
+      $transaction: jest.fn((callback: (tx: typeof prisma) => unknown) =>
+        callback(prisma),
+      ),
+    });
     return { prisma, service: new EmailPreferencesService(prisma as never) };
   }
 
@@ -56,20 +65,72 @@ describe('email preferences', () => {
     });
   });
 
+  it('refuses to update a preference row belonging to another school', async () => {
+    const { prisma, service } = setup();
+    prisma.user.findFirst.mockResolvedValue({ id: 'parent-1' });
+    prisma.parentEmailPreference.findUnique.mockResolvedValue({
+      userId: 'parent-1',
+      schoolId: 'school-b',
+    });
+
+    await expect(
+      service.updateOwn(
+        { id: 'parent-1', schoolId: 'school-a', role: 'parent' },
+        { absenceEnabled: false },
+      ),
+    ).rejects.toBeInstanceOf(NotFoundException);
+
+    expect(prisma.parentEmailPreference.update).not.toHaveBeenCalled();
+  });
+
+  it('rejects a concurrent preference create if the winning row belongs to another school', async () => {
+    const { prisma, service } = setup();
+    prisma.user.findFirst.mockResolvedValue({ id: 'parent-1' });
+    prisma.parentEmailPreference.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        userId: 'parent-1',
+        schoolId: 'school-b',
+      });
+    prisma.parentEmailPreference.create.mockRejectedValueOnce(
+      new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+        code: 'P2002',
+        clientVersion: 'test',
+      }),
+    );
+
+    await expect(
+      service.updateOwn(
+        { id: 'parent-1', schoolId: 'school-a', role: 'parent' },
+        { absenceEnabled: false },
+      ),
+    ).rejects.toBeInstanceOf(NotFoundException);
+
+    expect(prisma.parentEmailPreference.create).toHaveBeenCalledTimes(1);
+    expect(prisma.parentEmailPreference.update).not.toHaveBeenCalled();
+    expect(prisma.user.findFirst).toHaveBeenCalledTimes(2);
+    expect(prisma.parentEmailPreference.findUnique).toHaveBeenCalledTimes(2);
+  });
+
   it('lets a parent change only their own preferences', async () => {
     const { prisma, service } = setup();
-    prisma.parentEmailPreference.upsert.mockResolvedValue({
-      userId: 'parent-1',
-      schoolId: 'school-a',
-      enabled: false,
-      absenceEnabled: true,
-      lateEnabled: true,
-      examinationEnabled: true,
-      announcementEnabled: true,
-      paymentReminderEnabled: true,
-      paymentConfirmationEnabled: true,
-      reportCardEnabled: true,
-    });
+    prisma.user.findFirst.mockResolvedValue({ id: 'parent-1' });
+    prisma.parentEmailPreference.findUnique.mockResolvedValue(null);
+    prisma.parentEmailPreference.create.mockImplementation(
+      ({ data }: { data: Record<string, unknown> }) => ({
+        userId: 'parent-1',
+        schoolId: 'school-a',
+        enabled: false,
+        absenceEnabled: true,
+        lateEnabled: true,
+        examinationEnabled: true,
+        announcementEnabled: true,
+        paymentReminderEnabled: true,
+        paymentConfirmationEnabled: true,
+        reportCardEnabled: true,
+        ...data,
+      }),
+    );
     await expect(
       service.updateOwn(
         { id: 'teacher-1', schoolId: 'school-a', role: 'teacher' },
@@ -81,14 +142,13 @@ describe('email preferences', () => {
       { id: 'parent-1', schoolId: 'school-a', role: 'parent' },
       { enabled: false },
     );
-    expect(prisma.parentEmailPreference.upsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { userId: 'parent-1' },
-        create: expect.objectContaining({
-          schoolId: 'school-a',
-          enabled: false,
-        }),
-      }),
-    );
+    const createCalls = prisma.parentEmailPreference.create.mock
+      .calls as unknown as Array<[{ data: Record<string, unknown> }]>;
+    const createCall = createCalls[0][0];
+    expect(createCall.data).toMatchObject({
+      userId: 'parent-1',
+      schoolId: 'school-a',
+      enabled: false,
+    });
   });
 });

@@ -215,8 +215,14 @@ export class StudentsService {
       throw new NotFoundException('School not found');
     }
 
-    const data: { username?: string; passwordHash?: string; email?: string } =
-      {};
+    const data: {
+      username?: string;
+      passwordHash?: string;
+      email?: string;
+      firstName?: string;
+      lastName?: string;
+      phone?: string | null;
+    } = {};
     const nextUsername = dto.username?.trim()
       ? await this.usersService.assertUsernameAvailable(
           schoolId,
@@ -230,6 +236,20 @@ export class StudentsService {
       data.email = buildParentContactEmail(school.joinCode, nextUsername);
     } else if (isLegacyParentContactEmail(user.email)) {
       data.email = buildParentContactEmail(school.joinCode, user.username);
+    }
+
+    if (dto.firstName !== undefined) {
+      const firstName = dto.firstName.trim();
+      if (!firstName) throw new BadRequestException('First name is required');
+      data.firstName = firstName;
+    }
+    if (dto.lastName !== undefined) {
+      const lastName = dto.lastName.trim();
+      if (!lastName) throw new BadRequestException('Last name is required');
+      data.lastName = lastName;
+    }
+    if (dto.phone !== undefined) {
+      data.phone = dto.phone?.trim() || null;
     }
 
     if (dto.password?.trim()) {
@@ -258,6 +278,8 @@ export class StudentsService {
       username: updated.username,
       email: updated.email,
       phone: updated.phone,
+      firstName: updated.firstName,
+      lastName: updated.lastName,
       name: `${updated.firstName} ${updated.lastName}`.trim(),
       passwordUpdated: !!dto.password?.trim(),
     };

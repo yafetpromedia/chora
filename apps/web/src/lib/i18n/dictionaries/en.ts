@@ -447,7 +447,12 @@ export const en = {
     editHint:
       "Sign in with username and school code {code}, or with your email. Leave password blank to keep the current one.",
     username: "Username (sign-in)",
+    usernameValue: "Username",
     email: "Email",
+    emailOwnHint:
+      "Chora sends school email to this address. Use your own Gmail or another inbox you already have.",
+    emailPlaceholderHint:
+      "This saved address is only an account placeholder, not an inbox. Replace it with your Gmail so school messages can reach you.",
     firstName: "First name",
     lastName: "Last name",
     phone: "Phone",
@@ -487,7 +492,7 @@ export const en = {
     fan: "FAN",
     idRef: "ID / ref",
     usernamePlaceholder: "Letters, numbers, . _ -",
-    emailPlaceholder: "you@example.com",
+    emailPlaceholder: "you@gmail.com",
     phonePlaceholder: "+251…",
   },
   roles: {
